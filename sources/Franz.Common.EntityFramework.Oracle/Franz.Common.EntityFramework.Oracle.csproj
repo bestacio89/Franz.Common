@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+
+
+  <PropertyGroup>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	</PropertyGroup>
+	<Import Project="..\..\common.targets" />
+	<ItemGroup>
+    <PackageReference Include="Oracle.EntityFrameworkCore" Version="8.21.121" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
+    <ProjectReference Include="..\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
+  </ItemGroup>
+
+</Project>
