@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+	  <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	</PropertyGroup>
+
+	<Import Project="..\..\common.targets" />
+
+	<ItemGroup>
+
+	  <PackageReference Include="AspNetCore.HealthChecks.AzureServiceBus" Version="7.0.0" />
+
+	  <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.2.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Franz.Common.Messaging.Identity\Franz.Common.Messaging.Identity.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Messaging.MultiTenancy\Franz.Common.Messaging.MultiTenancy.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Messaging.RabbitMQ\Franz.Common.Messaging.AzureEventBus.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+	  <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	</PropertyGroup>
+
+	<Import Project="..\..\common.targets" />
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.2.5" />
+		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.5.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Headers\Franz.Common.Headers.csproj" />
+    <ProjectReference Include="..\Franz.Common.Http.Headers\Franz.Common.Http.Headers.csproj" />
+    <ProjectReference Include="..\Franz.Common.Http\Franz.Common.Http.csproj" />
+    <ProjectReference Include="..\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
+  </ItemGroup>
+
+</Project>

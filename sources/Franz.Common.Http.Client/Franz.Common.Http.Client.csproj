@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+	  <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	</PropertyGroup>
+
+	<Import Project="..\..\common.targets" />
+
+	<ItemGroup>
+		<SupportedPlatform Include="browser" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Errors\Franz.Common.Errors.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Headers\Franz.Common.Headers.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Identity\Franz.Common.Identity.csproj" />
+	  <ProjectReference Include="..\Franz.Common.IO\Franz.Common.IO.csproj" />
+	  <ProjectReference Include="..\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Reflection\Franz.Common.Reflection.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Serialization\Franz.Common.Serialization.csproj" />
+	  <ProjectReference Include="..\Franz.Common\Franz.Common.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Update="Properties\Resources.Designer.cs">
+			<DesignTime>True</DesignTime>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>Resources.resx</DependentUpon>
+		</Compile>
+	</ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Update="Properties\Resources.resx">
+			<Generator>PublicResXFileCodeGenerator</Generator>
+			<LastGenOutput>Resources.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
+	</ItemGroup>
+
+</Project>

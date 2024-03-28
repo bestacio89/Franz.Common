@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	</PropertyGroup>
+
+	<Import Project="..\..\common.targets" />
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Franz.Common.Bootstrap\Franz.Common.Bootstrap.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Http.Authentication\Franz.Common.Http.Authentication.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Http.Documentation\Franz.Common.Http.Documentation.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Http.Headers\Franz.Common.Http.Headers.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Http.Identity\Franz.Common.Http.Identity.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Http.MultiTenancy\Franz.Common.Http.MultiTenancy.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Http\Franz.Common.Http.csproj" />
+	</ItemGroup>
+
+</Project>
