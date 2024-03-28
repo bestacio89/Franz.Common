@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+	  <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	</PropertyGroup>
+	<Import Project="..\..\common.targets" />
+
+	<ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
+    <ProjectReference Include="..\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
+  </ItemGroup>
+
+</Project>
