@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+  </PropertyGroup>
+  <Import Project="..\..\common.targets" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Headers\Franz.Common.Headers.csproj" />
+    <ProjectReference Include="..\Franz.Common.Identity\Franz.Common.Identity.csproj" />
+    <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
+  </ItemGroup>
+
+</Project>

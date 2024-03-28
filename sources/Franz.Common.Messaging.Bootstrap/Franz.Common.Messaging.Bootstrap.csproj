@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <Import Project="..\..\common.targets" />
+
+	<ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Bootstrap\Franz.Common.Bootstrap.csproj" />
+    <ProjectReference Include="..\Franz.Common.Messaging.Hosting.MediatR\Franz.Common.Messaging.Hosting.MediatR.csproj" />
+    <ProjectReference Include="..\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
+    <ProjectReference Include="..\Franz.Common.Messaging.Identity\Franz.Common.Messaging.Identity.csproj" />
+    <ProjectReference Include="..\Franz.Common.Messaging.MultiTenancy\Franz.Common.Messaging.MultiTenancy.csproj" />
+    <ProjectReference Include="..\Franz.Common.Messaging.RabbitMQ\Franz.Common.Messaging.AzureEventBus.csproj" />
+  
+  </ItemGroup>
+
+</Project>
