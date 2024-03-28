@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+  </PropertyGroup>
+  <Import Project="..\..\common.targets" />
+	
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
+  </ItemGroup>
+	
+  <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
+    <ProjectReference Include="..\Franz.Common.Reflection\Franz.Common.Reflection.csproj" />
+    <ProjectReference Include="..\Franz.Common\Franz.Common.csproj" />
+  </ItemGroup>
+</Project>
