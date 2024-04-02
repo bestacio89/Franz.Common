@@ -29,7 +29,7 @@ public interface IConsumer<TKey, TValue>
   void Dispose();
 
   ConsumeResult<TKey, TValue> Consume(TimeSpan timeout);
-  Task<ConsumeResult<TKey, TValue>> ConsumeAsynch(CancellationToken cancellationToken, TimeSpan TimeOut);
+  ConsumeResult<TKey, TValue> Consume();
   ConsumeResult<TKey, TValue> Consume(int millisecondsTimeout);
 
   void Assign(TopicPartitionOffset partition);
@@ -61,6 +61,6 @@ public interface IConsumer<TKey, TValue>
   WatermarkOffsets QueryWatermarkOffsets(TopicPartition topicPartition, TimeSpan timeout);
 
   void Close();
-  Task<bool> TryConsumeAsync(out ConsumeResult<TKey, TValue> result, CancellationToken cancellationToken, TimeSpan timeout);
+
   int AddBrokers(string brokers);
 }

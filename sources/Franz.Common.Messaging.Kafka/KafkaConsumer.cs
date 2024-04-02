@@ -1,5 +1,4 @@
 using Confluent.Kafka;
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using System;
 using System.Reflection.Metadata;
 using Handle = Confluent.Kafka.Handle;
@@ -67,49 +66,7 @@ public class KafkaConsumer : IConsumer<string, string>
 
   public ConsumeResult<string, string> Consume(TimeSpan timeout) => _consumer.Consume(timeout);
 
-  public async Task<ConsumeResult<string, string>> ConsumeAsync(CancellationToken cancellationToken, TimeSpan timeout)
-  {
-    try
-    {
-      // Use Confluent.Kafka's ConsumeAsync with cancellation token (if available)
-      if (_consumer.TryConsumeAsync(out ConsumeResult<string, string> consumeResult, cancellationToken, timeout).Result)
-      {
-        return consumeResult;
-      }
-      else
-      {
-        // Handle timeout scenario (e.g., throw exception or log)
-        throw new Exception("Consume operation timed out."); // Example exception
-      }
-    }
-    catch (ConsumeException ex)
-    {
-      // Handle other potential exceptions
-      throw;
-    }
-  }
-
-  public async Task<bool> TryConsumeAsync(out ConsumeResult<TKey, TValue> result, CancellationToken cancellationToken, TimeSpan timeout)
-  {
-    try
-    {
-      // Check if Confluent.Kafka supports TryConsumeAsync (v1.0.0 or later)
-      if (_consumer.TryConsumeAsync(out result, cancellationToken, timeout))
-      {
-        return true;
-      }
-      else
-      {
-        // Handle timeout scenario (e.g., throw exception or log)
-        return false;
-      }
-    }
-    catch (ConsumeException ex)
-    {
-      // Handle other potential exceptions
-      throw;
-    }
-  }
+  public ConsumeResult<string, string> Consume() => _consumer.Consume();
 
   public ConsumeResult<string, string> Consume(int millisecondsTimeout) => _consumer.Consume(millisecondsTimeout);
 
