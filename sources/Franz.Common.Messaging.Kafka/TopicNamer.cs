@@ -1,51 +1,37 @@
 using Franz.Common.Reflection;
 using System.Reflection;
+using System.Linq;
 
-namespace Franz.Common.Messaging.Kafka;
-
-public static class TopicNamer
+namespace Franz.Common.Messaging.Kafka
 {
-  private const string TopicSuffixName = "-in";
-  private const string DeadLetterTopicSuffixName = "-in-dlt";
-
-  public static string GetTopicName(Assembly assembly)
+  public static class TopicNamer
   {
-    var assemblyWrapper = new AssemblyWrapper(assembly);
-    var result = GetTopicName(assemblyWrapper);
+    private const string TopicSuffixName = "-in";
+    private const string DeadLetterTopicSuffixName = "-in-dlt";
 
-    return result;
-  }
+    public static string GetTopicName(Assembly assembly)
+    {
+      var serviceName = GetServiceName(assembly.GetName().Name);
+      return string.Concat(serviceName, TopicSuffixName);
+    }
 
-  public static string GetTopicName(IAssembly assembly)
-  {
-    var serviceName = GetServiceName(assembly);
+    public static string GetDeadLetterTopicName(Assembly assembly)
+    {
+      var serviceName = GetServiceName(assembly.GetName().Name);
+      return string.Concat(serviceName, DeadLetterTopicSuffixName);
+    }
 
-    var result = string.Concat(serviceName, TopicSuffixName);
+    private static string GetServiceName(string assemblyName)
+    {
+      // Extract the service name from the second part of the assembly name (e.g., Franz.Common)
+      var parts = assemblyName.Split('.');
+      if (parts.Length >= 2)
+      {
+        return parts[1].ToLower();
+      }
 
-    return result;
-  }
-
-  public static string GetDeadLetterTopicName(Assembly assembly)
-  {
-    var assemblyWrapper = new AssemblyWrapper(assembly);
-    var result = GetDeadLetterTopicName(assemblyWrapper);
-
-    return result;
-  }
-
-  public static string GetDeadLetterTopicName(IAssembly assembly)
-  {
-    var serviceName = GetServiceName(assembly);
-
-    var result = string.Concat(serviceName, DeadLetterTopicSuffixName);
-
-    return result;
-  }
-
-  private static string GetServiceName(IAssembly assembly)
-  {
-    var serviceName = assembly.ExtractParts(2, "-").ToLower();
-
-    return serviceName;
+      // Handle cases where the assembly name doesn't follow the expected format
+      throw new InvalidOperationException("Unable to extract service name from assembly name: " + assemblyName);
+    }
   }
 }

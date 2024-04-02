@@ -8,7 +8,6 @@ public sealed class ModelProvider : IModelProvider, IDisposable
   private readonly IConnectionProvider connectionProvider;
   private KafkaModel? model;
 
-
   public ModelProvider(IConnectionProvider connectionProvider)
   {
     this.connectionProvider = connectionProvider;
@@ -22,7 +21,6 @@ public sealed class ModelProvider : IModelProvider, IDisposable
     {
       model = new KafkaModel(connectionProvider);
     }
-
     return model;
   }
 
