@@ -11,9 +11,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Annotations\Franz.Common.Annotations.csproj" />
     <ProjectReference Include="..\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="NewFolder\" />
   </ItemGroup>
 
 </Project>
