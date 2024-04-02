@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Confluent.Kafka;
 using System.Collections.Generic;
 using Confluent.Kafka.Admin;
+using System.Reflection;
 
 namespace Franz.Common.Messaging.Kafka
 {
@@ -25,8 +26,8 @@ namespace Franz.Common.Messaging.Kafka
       this.AdminClient = adminClient;
       this.assemblyAccessor = assemblyAccessor;
       var assembly = assemblyAccessor.GetEntryAssembly();
-      topicName = TopicNamer.GetTopicName(assembly);
-      deadLetterTopicName = TopicNamer.GetDeadLetterTopicName(assembly);
+      topicName = TopicNamer.GetTopicName((System.Reflection.Assembly)assembly);
+      deadLetterTopicName = TopicNamer.GetDeadLetterTopicName((System.Reflection.Assembly)assembly);
     }
 
     public void Initialize()

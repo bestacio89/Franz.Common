@@ -30,7 +30,7 @@ namespace Franz.Common.Messaging.Kafka
     }
 
     public void Publish<TIntegrationEvent>(TIntegrationEvent integrationEvent)
-        where TIntegrationEvent : IIntegrationEvent
+    where TIntegrationEvent : BaseEvent, IIntegrationEvent
     {
       _messagingInitializer.Initialize();
 
