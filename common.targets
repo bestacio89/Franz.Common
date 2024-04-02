@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>        
+		<LangVersion>latest</LangVersion> 
+		<Nullable>disable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Version>1.2.060</Version>
+		<Authors> AjnaTellus Solutions</Authors>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<RunSettingsFilePath>$(MSBuildProjectDirectory)\..\..\test.runsettings</RunSettingsFilePath>
+	</PropertyGroup>
+</Project>
