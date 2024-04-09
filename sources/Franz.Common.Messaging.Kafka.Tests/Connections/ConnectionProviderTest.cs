@@ -66,7 +66,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Connections
       var connectionProvider = new ConnectionProvider(connectionFactoryProviderMock.Object);
 
       // Act and Assert
-      !Assert.Throws<Exception>(() => connectionProvider.Dispose());
+      Assert.IsNotType<Exception>(() => connectionProvider.Dispose());
     }
   }
 }
