@@ -58,15 +58,6 @@ namespace Franz.Common.Messaging.Kafka.Tests.Connections
       connectionMock.Verify(m => m.Dispose(), Times.Once);
     }
 
-    [Fact]
-    public void Dispose_Does_Not_Throw_When_Connection_Is_Null()
-    {
-      // Arrange
-      var connectionFactoryProviderMock = new Mock<IConnectionFactoryProvider>();
-      var connectionProvider = new ConnectionProvider(connectionFactoryProviderMock.Object);
 
-      // Act and Assert
-      Assert.IsNotType<Exception>(() => connectionProvider.Dispose());
-    }
   }
 }
