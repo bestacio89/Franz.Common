@@ -1,16 +1,16 @@
-using NUnit.Framework;
-using Microsoft.Extensions.Options;
+using System;
+using Xunit;
 using Franz.Common.Messaging.Configuration;
 using Confluent.Kafka;
 using Franz.Common.Messaging.Kafka.Connections;
 using Franz.Common.Testing;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Connections
 {
-  [TestFixture]
-  public class ConnectionFactoryProviderTests : UnitTest
+  public class ConnectionFactoryProviderTests
   {
-    [Test]
+    [Fact]
     public void GetCurrent_Returns_Correct_Configuration_With_Default_Values()
     {
       // Arrange
@@ -22,14 +22,14 @@ namespace Franz.Common.Messaging.Kafka.Tests.Connections
       var config = connectionFactoryProvider.GetCurrent();
 
       // Assert
-      Assert.AreEqual("localhost", config.BootstrapServers);
-      Assert.IsNull(config.SslCaLocation);
-      Assert.IsNull(config.SslCertificateLocation);
-      Assert.IsNull(config.SslKeyLocation);
-      Assert.AreEqual(SecurityProtocol.Plaintext, config.SecurityProtocol);
+      Assert.Equal("localhost", config.BootstrapServers);
+      Assert.Null(config.SslCaLocation);
+      Assert.Null(config.SslCertificateLocation);
+      Assert.Null(config.SslKeyLocation);
+      Assert.Equal(SecurityProtocol.Plaintext, config.SecurityProtocol);
     }
 
-    [Test]
+    [Fact]
     public void GetCurrent_Returns_Correct_Configuration_With_Ssl_Enabled()
     {
       // Arrange
@@ -48,11 +48,11 @@ namespace Franz.Common.Messaging.Kafka.Tests.Connections
       var config = connectionFactoryProvider.GetCurrent();
 
       // Assert
-      Assert.AreEqual("host", config.BootstrapServers);
-      Assert.AreEqual("ca.crt", config.SslCaLocation);
-      Assert.AreEqual("cert.crt", config.SslCertificateLocation);
-      Assert.AreEqual("key.pem", config.SslKeyLocation);
-      Assert.AreEqual(SecurityProtocol.Ssl, config.SecurityProtocol);
+      Assert.Equal("host", config.BootstrapServers);
+      Assert.Equal("ca.crt", config.SslCaLocation);
+      Assert.Equal("cert.crt", config.SslCertificateLocation);
+      Assert.Equal("key.pem", config.SslKeyLocation);
+      Assert.Equal(SecurityProtocol.Ssl, config.SecurityProtocol);
     }
   }
 }

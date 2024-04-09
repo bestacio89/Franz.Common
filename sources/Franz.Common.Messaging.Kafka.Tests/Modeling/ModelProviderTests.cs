@@ -1,14 +1,13 @@
-using Franz.Common.Messaging.Kafka.Connections;
-using Moq;
 using System;
-using NUnit.Framework;
+using Moq;
+using Xunit;
+using Franz.Common.Messaging.Kafka.Connections;
 using Franz.Common.Messaging.Kafka.Modeling;
 using Franz.Common.Testing;
 
 namespace Franz.Common.Messaging.Kafka.Modeling.Tests
 {
-  [TestFixture]
-  public class ModelProviderTests:UnitTest
+  public class ModelProviderTests
   {
     private readonly Mock<IConnectionProvider> _connectionProviderMock;
     private readonly ModelProvider _modelProvider;
@@ -19,35 +18,35 @@ namespace Franz.Common.Messaging.Kafka.Modeling.Tests
       _modelProvider = new ModelProvider(_connectionProviderMock.Object);
     }
 
-    [Test]
+    [Fact]
     public void Current_ShouldReturnKafkaModel()
     {
       var model = _modelProvider.Current;
 
-      Assert.IsInstanceOf<KafkaModel>(model);
+      Assert.IsType<KafkaModel>(model);  // Use IsType for type checking
     }
 
-    [Test]
+    [Fact]
     public void Current_ShouldReturnSameInstance()
     {
       var model1 = _modelProvider.Current;
       var model2 = _modelProvider.Current;
 
-      Assert.IsTrue(model1.Equals(model2));
+      Assert.Same(model1, model2);  // Use Same for reference equality
     }
 
-    [Test]
+    [Fact]
     public void Dispose_ShouldDisposeModel()
     {
       var model = _modelProvider.Current;
-      var modelMock = Mock.Get(model);
+      var modelMock = Moq.Mock.Get<IDisposable>(model);  // Cast to IDisposable
 
       _modelProvider.Dispose();
 
       modelMock.Verify(x => x.Dispose(), Times.Once);
     }
 
-    [Test]
+    [Fact]
     public void Dispose_ShouldNotDisposeModelWhenModelIsNotCreated()
     {
       _modelProvider.Dispose();

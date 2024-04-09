@@ -2,12 +2,11 @@ using Confluent.Kafka;
 using Franz.Common.Messaging.Kafka.Transactions;
 using Franz.Common.Testing;
 using Moq;
-using NUnit.Framework;
+using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Transactions
 {
-  [TestFixture]
-  public class MessagingTransactionTests:UnitTest
+  public class MessagingTransactionTests
   {
     private readonly Mock<IProducer<string, string>> _producerMock;
     private readonly MessagingTransaction _transaction;
@@ -18,24 +17,27 @@ namespace Franz.Common.Messaging.Kafka.Tests.Transactions
       _transaction = new MessagingTransaction(_producerMock.Object);
     }
 
-    [Test]
+    [Fact]
     public void Begin_ShouldBeginTransaction()
     {
       _transaction.Begin();
+
       _producerMock.Verify(x => x.BeginTransaction(), Times.Once);
     }
 
-    [Test]
+    [Fact]
     public void Complete_ShouldCommitTransaction()
     {
       _transaction.Complete();
+
       _producerMock.Verify(x => x.CommitTransaction(), Times.Once);
     }
 
-    [Test]
+    [Fact]
     public void Rollback_ShouldAbortTransaction()
     {
       _transaction.Rollback();
+
       _producerMock.Verify(x => x.AbortTransaction(), Times.Once);
     }
   }

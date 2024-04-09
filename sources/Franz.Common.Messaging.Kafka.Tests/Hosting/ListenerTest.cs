@@ -1,19 +1,16 @@
+using System;
+using System.Threading.Tasks;
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Primitives;
+using Moq;
+using Xunit;
+using Franz.Common.Messaging.Kafka.Hosting;
 using Franz.Common.Reflection;
 using Franz.Common.Testing;
-using Moq;
-using System;
-using System.Linq;
-using NUnit.Framework;
-using Franz.Common.Messaging.Kafka.Hosting;
-using System.Text;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Hosting
 {
-  [TestFixture]
-  public class KafkaListenerTests : UnitTest
+  public class KafkaListenerTests
   {
     private readonly Mock<IConsumer<Ignore, string>> _consumerMock;
     private readonly Mock<IAssemblyAccessor> _assemblyAccessorMock;
@@ -28,29 +25,30 @@ namespace Franz.Common.Messaging.Kafka.Tests.Hosting
       _listener = new KafkaListener(_consumerMock.Object, _assemblyAccessorMock.Object, _loggerMock.Object);
     }
 
-    [Test]
+    [Fact]
     public void Listen_ShouldSubscribeToTopic()
     {
       _listener.Listen();
+
       _consumerMock.Verify(x => x.Subscribe(It.IsAny<string>()), Times.Once);
     }
 
-    [Test]
-    public void Listen_ShouldInvokeReceivedEvent()
+    [Fact]
+    public async Task Listen_ShouldInvokeReceivedEvent()
     {
-      var received = false;
-      _listener.Received += (sender, args) => { received = true; };
-      _consumerMock.Setup(x => x.Consume(It.IsAny<TimeSpan>()))
-           .Returns(new ConsumeResult<Ignore, string>() { Message = new Message<Ignore, string> { Value = "test message" } });
+      bool received = false;
+      _listener.Received += (sender, args) => received = true;
 
+      _consumerMock.Setup(x => x.Consume(It.IsAny<TimeSpan>()))
+          .Returns(new ConsumeResult<Ignore, string>() { Message = new Message<Ignore, string> { Value = "test message" } });
 
       _listener.Listen();
 
       Assert.True(received);
     }
 
-    [Test]
-    public void Listen_ShouldLogErrorOnConsumeException()
+    [Fact]
+    public async Task Listen_ShouldLogErrorOnConsumeException()
     {
       _consumerMock.Setup(x => x.Consume(It.IsAny<TimeSpan>()))
           .Throws(new ConsumeException(new ConsumeResult<byte[], byte[]>(), new Error(ErrorCode.Unknown, "error")));
@@ -60,12 +58,12 @@ namespace Franz.Common.Messaging.Kafka.Tests.Hosting
       _loggerMock.Verify(x => x.LogError(It.IsAny<string>(), null), Times.Once);
     }
 
-    [Test]
-    public void StopListen_ShouldUnsubscribeFromTopic()
+    [Fact]
+    public async Task StopListen_ShouldUnsubscribeFromTopic()
     {
-      _listener.StopListen();
+       _listener.StopListen();
+
       _consumerMock.Verify(x => x.Unsubscribe(), Times.Once);
     }
-
   }
 }
