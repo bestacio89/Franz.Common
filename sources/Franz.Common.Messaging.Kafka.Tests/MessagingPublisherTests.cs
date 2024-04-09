@@ -104,7 +104,7 @@ namespace Franz.Common.Messaging.Kafka.Tests
       Assert.Throws<Exception>(() => _publisher.Publish(new TestIntegrationEvent()));
     }
 
-    private class TestIntegrationEvent : IIntegrationEvent
+    private class TestIntegrationEvent : BaseEvent, IIntegrationEvent
     {
     }
   }

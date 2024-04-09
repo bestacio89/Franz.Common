@@ -35,9 +35,9 @@ namespace Franz.Common.Messaging.Kafka.Tests
       var consumer = new KafkaConsumer(_factory.Build(mockConsumer.Object));
 
       // Assert
-      Assert.AreEqual("localhost:9092", consumer._config.BootstrapServers);
-      Assert.AreEqual("test-group", consumer._config.GroupId);
-      Assert.AreEqual(AutoOffsetReset.Earliest, consumer._config.AutoOffsetReset);
+      Assert.AreEqual("localhost:9092", consumer.Config.BootstrapServers);
+      Assert.AreEqual("test-group", consumer.Config.GroupId);
+      Assert.AreEqual(AutoOffsetReset.Earliest, consumer.Config.AutoOffsetReset);
     }
   }
 }
