@@ -35,7 +35,7 @@ steps:
 - task: NuGetCommand@2
   inputs:
     command: 'push'
-    packagesToPush: '$(Build.ArtifactStagingDirectory)/*.nupkg'
+    packagesToPush: '$$(Build.ArtifactStagingDirectory)\**\*.nupkg'
     nuGetFeedType: 'internal'
     publishVstsFeed: 'AjnaTellus/Franz/FranzArtifact'
   displayName: 'Publish NuGet Packages to Azure Artifacts'
