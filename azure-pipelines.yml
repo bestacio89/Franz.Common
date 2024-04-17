@@ -34,15 +34,6 @@ steps:
 
 - task: NuGetCommand@2
   inputs:
-    command: 'pack'
-    packagesToPack: '**/*.csproj'
-    configuration: '$(buildConfiguration)'
-    versioningScheme: 'byPrereleaseNumber'
-    includeReferencedProjects: true
-  displayName: 'Pack NuGet Packages'
-
-- task: NuGetCommand@2
-  inputs:
     command: 'push'
     packagesToPush: '$(Build.ArtifactStagingDirectory)/*.nupkg'
     nuGetFeedType: 'internal'
