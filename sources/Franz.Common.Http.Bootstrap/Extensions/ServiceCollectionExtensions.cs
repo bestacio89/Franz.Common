@@ -15,7 +15,7 @@ public static class ServiceCollectionExtensions
     services
       .AddCommonArchitecture(configuration, assembly)
       .AddHttpControllers()
-      .AddHubbixAuthentication()
+      .AddFranzAuthentication()
       .AddFrenchRouting()
       .AddDefaultCors(configuration)
       .AddForwardedHeaders()

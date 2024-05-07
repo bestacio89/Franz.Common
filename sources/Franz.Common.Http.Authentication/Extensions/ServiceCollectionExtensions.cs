@@ -6,7 +6,7 @@ using System.IdentityModel.Tokens.Jwt;
 namespace Microsoft.Extensions.DependencyInjection;
 public static class ServiceCollectionExtensions
 {
-  public static IServiceCollection AddHubbixAuthentication(this IServiceCollection services)
+  public static IServiceCollection AddFranzAuthentication(this IServiceCollection services)
   {
     services
       .AddSwaggerGen(options =>
