@@ -1,6 +1,6 @@
 # Specify the Azure Artifacts feed URL and PAT
 $FEED_URL = "https://pkgs.dev.azure.com/AjnaTellus/Franz/_packaging/FranzArtifact/nuget/v3/index.json"
-$PAT = "e4ugb7pl5qgpyoebosfko42ruem6wwmlqamwzkyl477amhc2byvq"
+$PAT = "87glMerj7UR9G4P0rnrqT2RUrRSt1nZmteA0gXc5wmqUCm3Ufp9HJQQJ99BAACAAAAAc3GLLAAASAZDOiIBA"
 
 # Directory where NuGet packages will be built
 $PACKAGES_DIRECTORY = "AzureArtifacts"

@@ -100,6 +100,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Franz.Common.Annotations", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Franz.Common.Business.Tests", "tests\Franz.Common.Business.Test\Franz.Common.Business.Tests.csproj", "{77B2D597-7EC6-449A-9C4D-B896455CE0FA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.MassTransit", "sources\Franz.Common.Messaging.MassTransit\Franz.Common.Messaging.MassTransit.csproj", "{C669CF3B-C8C1-4B19-B316-B955C9E3D28B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -274,6 +276,10 @@ Global
 		{77B2D597-7EC6-449A-9C4D-B896455CE0FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{77B2D597-7EC6-449A-9C4D-B896455CE0FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{77B2D597-7EC6-449A-9C4D-B896455CE0FA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C669CF3B-C8C1-4B19-B316-B955C9E3D28B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C669CF3B-C8C1-4B19-B316-B955C9E3D28B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C669CF3B-C8C1-4B19-B316-B955C9E3D28B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C669CF3B-C8C1-4B19-B316-B955C9E3D28B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -321,6 +327,7 @@ Global
 		{5F781740-EEAB-455A-8C2B-B05FFDC2CEBA} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 		{0B27D385-43ED-4441-B70B-04ECF0908117} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 		{77B2D597-7EC6-449A-9C4D-B896455CE0FA} = {99C4C621-B376-4D7A-BB9B-C56DEB0AA0CB}
+		{C669CF3B-C8C1-4B19-B316-B955C9E3D28B} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {069A32C7-587A-42C8-B9D2-9CF7EE93E2BD}
