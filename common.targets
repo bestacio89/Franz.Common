@@ -18,11 +18,11 @@
 		<PackageId>$(MSBuildProjectName)</PackageId>
 		<Description>Shared utility library for the Franz Framework.</Description>
 		<Copyright>Copyright © 2025 Bernardo Estacio Abreu</Copyright>
-		<RepositoryUrl>https://github.com/YourRepo</RepositoryUrl>
+		<RepositoryUrl>https://dev.azure.com/AjnaTellus/Franz/_git/Franz.Common</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageTags>Franz;Common;Utilities</PackageTags>
-
+		<PackageReadmeFile>readme.md</PackageReadmeFile>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 	</PropertyGroup>
 
