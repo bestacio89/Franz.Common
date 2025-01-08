@@ -1,15 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>        
-		<LangVersion>latest</LangVersion> 
+		<TargetFramework>net8.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
 		<Nullable>disable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
-		<Version>1.2.061</Version>
-		<Authors> AjnaTellus Solutions</Authors>
+		<Version>1.2.062</Version>
+		<Authors> Bernardo Estacio Abreu</Authors>
 	</PropertyGroup>
 
 	<PropertyGroup>
 		<RunSettingsFilePath>$(MSBuildProjectDirectory)\..\..\test.runsettings</RunSettingsFilePath>
 	</PropertyGroup>
+
+	<PropertyGroup>
+		<!-- NuGet Metadata -->
+		<PackageId>$(MSBuildProjectName)</PackageId>
+		<Description>Shared utility library for the Franz Framework.</Description>
+		<Copyright>Copyright © 2025 Bernardo Estacio Abreu</Copyright>
+		<RepositoryUrl>https://github.com/YourRepo</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageTags>Franz;Common;Utilities</PackageTags>
+
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+	</PropertyGroup>
+
+	<!-- Include README File -->
+	<ItemGroup>
+		<!-- Ensure README is included during packaging -->
+		<None Include="$(MSBuildProjectDirectory)\readme.md" Pack="true" PackagePath="" />
+	</ItemGroup>
+
+	
 </Project>
