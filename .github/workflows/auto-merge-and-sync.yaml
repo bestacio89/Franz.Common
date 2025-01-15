@@ -3,7 +3,7 @@ name: Auto-Merge and Sync with Azure DevOps
 on:
   pull_request:
     branches:
-      - main
+      - develop
     types:
       - opened
       - synchronize
