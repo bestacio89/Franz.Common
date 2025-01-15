@@ -1,0 +1,50 @@
+name: Auto-Merge and Sync with Azure DevOps
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+
+  push:
+    branches:
+      - main
+
+  schedule:
+    # Runs every two weeks on Monday at 1:00 AM UTC
+    - cron: '0 1 */14 * *'
+
+jobs:
+  auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Merge the pull request
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "github-actions-bot@example.com"
+          git fetch origin ${{ github.event.pull_request.head.ref }}
+          git checkout ${{ github.event.pull_request.head.ref }}
+          git merge ${{ github.event.pull_request.base.ref }} --no-ff --commit
+          git push origin HEAD:${{ github.event.pull_request.base.ref }}
+
+  sync-to-azure:
+    needs: auto-merge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Push to Azure DevOps
+        env:
+          AZURE_REPO_URL: ${{ secrets.AZURE_REPO_URL }}
+          AZURE_REPO_USERNAME: ${{ secrets.AZURE_REPO_USERNAME }}
+          AZURE_REPO_PAT: ${{ secrets.AZURE_REPO_PAT }}
+        run: |
+          git remote add azure https://$AZURE_REPO_USERNAME:$AZURE_REPO_PAT@$AZURE_REPO_URL
+          git push azure develop --force
