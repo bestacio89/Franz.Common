@@ -6,24 +6,42 @@ A foundational library in the **Franz Framework** designed to provide core utili
 
 ## **Features**
 
-- **Dependency Injection Interfaces**:
-  - `IScopedDependency` for scoped lifetime services.
-  - `ISingletonDependency` for singleton lifetime services.
-- **Data Seeding**:
-  - `ISeeder` interface for implementing database seeding logic.
-- **Extensions**:
-  - `CollectionExtensions` for working with collections.
-  - `EnumerableExtensions` for LINQ-related enhancements.
-  - `HostEnvironmentExtensions` for interacting with hosting environments.
-- **Core Utilities**:
-  - `Company` and `ProductGeneration` classes for foundational business logic.
+### **Dependency Injection Interfaces**
+- **`IScopedDependency`**: Marker interface for services with a scoped lifetime.
+- **`ISingletonDependency`**: Marker interface for services with a singleton lifetime.
+
+**Important**: Any service interface must inherit from either `IScopedDependency` or `ISingletonDependency`. Services that do not implement one of these interfaces will not be registered properly in the dependency injection system.
+
+### **Data Seeding**
+- **`ISeeder`**: Interface for implementing database seeding logic.
+  - Includes:
+    - **`Order`**: Determines the execution order of seeders.
+    - **`SeedAsync()`**: Defines the asynchronous method for data initialization.
+
+### **Extensions**
+- **`CollectionExtensions`**:
+  - Includes methods for manipulating and interacting with collections:
+    - `AddIfNotContains`
+    - `AddRange`
+    - `IsNullOrEmpty`
+- **`EnumerableExtensions`**:
+  - Enhances LINQ functionality with methods such as `ForEach`.
+- **`HostEnvironmentExtensions`**:
+  - Helps determine the current environment:
+    - `IsIntegration`
+    - `IsValidation`
+    - `IsPreProduction`
+
+### **Core Utilities**
+- **`Company`**: Provides foundational business logic for managing company-related data.
+- **`ProductGeneration`**: Handles logic for generating product-related data.
 
 ---
 
 ## **Version Information**
 
 - **Current Version**: `1.2.62`
-- Part of the private Franz Framework suite, hosted on an Azure NuGet feed.
+- Part of the private Franz Framework suite, hosted on a private Azure NuGet feed.
 
 ---
 
@@ -53,22 +71,41 @@ dotnet add package Franz.Common --version 1.2.62
 
 ### **1. Dependency Injection**
 
-Use `IScopedDependency` and `ISingletonDependency` to simplify service registrations:
+Use `IScopedDependency` and `ISingletonDependency` to simplify service registrations. **Ensure that your service interfaces implement one of these dependencies.**
 
+#### Scoped Service Example:
 ```csharp
-public class MyService : IScopedDependency
+public interface IScopedExampleService : IScopedDependency
 {
-    public void DoWork()
+    void PerformScopedOperation();
+}
+
+public class ScopedExampleService : IScopedExampleService
+{
+    public void PerformScopedOperation()
     {
-        // Business logic here
+        Console.WriteLine("Scoped operation executed.");
     }
 }
+
+// Registration
+services.AddScoped<IScopedExampleService, ScopedExampleService>();
 ```
 
-Register the service:
-
+#### Singleton Service Example:
 ```csharp
-services.AddScoped<MyService>();
+public interface ISingletonExampleService : ISingletonDependency
+{
+    string GetConfigValue();
+}
+
+public class SingletonExampleService : ISingletonExampleService
+{
+    public string GetConfigValue() => "Singleton Config";
+}
+
+// Registration
+services.AddSingleton<ISingletonExampleService, SingletonExampleService>();
 ```
 
 ### **2. Database Seeding**
@@ -76,81 +113,107 @@ services.AddScoped<MyService>();
 Implement the `ISeeder` interface for database initialization:
 
 ```csharp
-public class MySeeder : ISeeder
+public class ExampleSeeder : ISeeder
 {
-    public Task SeedAsync()
+    public int Order => 1;
+
+    public async Task SeedAsync()
     {
-        // Seeding logic here
-        return Task.CompletedTask;
+        Console.WriteLine("Seeding database...");
+        // Add your data seeding logic here
+        await Task.CompletedTask;
     }
+}
+
+// Example usage
+var seeders = serviceProvider.GetServices<ISeeder>()
+                             .OrderBy(seeder => seeder.Order);
+
+foreach (var seeder in seeders)
+{
+    await seeder.SeedAsync();
 }
 ```
 
 ### **3. Extensions**
 
-Leverage provided extensions for common tasks:
-
-- **Collections**:
-
+#### Collection Extensions:
 ```csharp
-var myList = new List<int> {1, 2, 3};
-myList.AddRangeIfNotExists(new[] {3, 4, 5});
+var list = new List<int> { 1, 2, 3 };
+
+// Check if list is null or empty
+if (!list.IsNullOrEmpty())
+{
+    Console.WriteLine("List contains elements.");
+}
+
+// Add an item if it doesn't exist
+list.AddIfNotContains(4); // Adds 4
+list.AddIfNotContains(1); // Does nothing
+
+// Add a range of items
+list.AddRange(new[] { 5, 6 });
 ```
 
-- **Enumerable Enhancements**:
-
+#### Enumerable Extensions:
 ```csharp
-var numbers = Enumerable.Range(1, 10);
-var result = numbers.FilterBy(x => x > 5);
+var numbers = Enumerable.Range(1, 5);
+
+// Perform an action for each element
+numbers.ForEach(x => Console.WriteLine($"Processing {x}"));
 ```
 
-- **Host Environment**:
-
+#### Host Environment Extensions:
 ```csharp
-var isProduction = hostEnvironment.IsProduction();
+if (hostEnvironment.IsIntegration())
+{
+    Console.WriteLine("Running in the integration environment.");
+}
+else if (hostEnvironment.IsValidation())
+{
+    Console.WriteLine("Running in the validation environment.");
+}
+else if (hostEnvironment.IsPreProduction())
+{
+    Console.WriteLine("Running in the pre-production environment.");
+}
 ```
-
-### **4. Core Utilities**
-
-- **Company Class**: Represents foundational business logic for managing company-related data.
-- **ProductGeneration Class**: Handles logic related to generating product data.
 
 ---
 
 ## **Dependencies**
 
-- Fully independent; designed as a core library for the Franz Framework ecosystem.
+This library is fully self-contained and serves as a core building block for the private Franz Framework.
 
 ---
 
-## **Development Note**
+## **Development Notes**
 
-This library is under private development as part of the Franz Framework. It is not available on NuGet.org but is distributed through a private Azure feed.
+This library is part of the private Franz Framework and is not publicly available. It is distributed exclusively through a private Azure NuGet feed.
 
----
-
-## **Contributing**
-
-Contributions are restricted to the Franz Framework development team. If you have access, follow these steps:
+### **Contributing**
+Contributions are restricted to the Franz Framework development team. If you are authorized to contribute:
 1. Clone the repository.
 2. Create a feature branch.
-3. Submit a pull request with detailed explanations.
+3. Submit a pull request with a detailed explanation of your changes.
 
 ---
 
 ## **License**
 
-This library is part of a private framework and subject to internal licensing terms. Contact the author for more details.
+This library is private and governed by the Franz Framework's internal licensing terms. For licensing inquiries, please contact the framework's maintainers.
 
 ---
 
 ## **Changelog**
 
 ### Version 1.2.62
-- Introduced core dependency injection abstractions.
-- Added database seeding interface.
+- Introduced dependency injection interfaces (`IScopedDependency`, `ISingletonDependency`).
+- Added `ISeeder` interface for data seeding.
 - Enhanced collection and enumerable extensions.
-- Included foundational `Company` and `ProductGeneration` classes.
+- Introduced `HostEnvironmentExtensions` for environment-specific logic.
+- Included `Company` and `ProductGeneration` classes for foundational business logic.
 
 ---
 
+This README ensures clarity, provides real-world examples, and reflects all the requested refinements. Let me know if there’s anything more to adjust!

@@ -6,27 +6,46 @@ A powerful library within the **Franz Framework**, designed to facilitate **doma
 
 ## **Features**
 
-- **Command Handlers**:
-  - Interfaces for defining and handling commands (`ICommandRequest`, `ICommandBaseRequest`, `ICommandHandler`).
-- **Queries**:
-  - Abstractions for query handling (`IQueryRequest`, `IQueryHandler`).
-- **Domain-Driven Design (DDD) Support**:
-  - Core building blocks for DDD:
-    - `AggregateRoot`
-    - `Entity`
-    - `ValueObject`
-    - `Enumeration`
-    - Repositories (`IReadRepository`, `IAggregateRepository`).
-- **Event-Driven Architecture**:
-  - Event abstractions for integrating and handling domain and integration events:
-    - `IEvent`
-    - `IEventHandler`
-    - `IntegrationEvent`.
-- **Extensions**:
-  - `ServiceCollectionExtensions` for dependency injection.
-  - `TypeExtensions` for reflection and type utilities.
-- **Helpers**:
-  - `HandlerCollector` to streamline command, query, and event handler discovery and registration.
+### **1. Command Handlers**
+- Interfaces for defining and handling commands:
+  - `ICommandRequest<TResult>`
+  - `ICommandBaseRequest`
+  - `ICommandHandler<TCommand, TResult>`
+  - `ICommandHandler<TCommand>` (void result)
+
+### **2. Queries**
+- Abstractions for query handling:
+  - `IQueryRequest<TResult>`
+  - `IQueryHandler<TRequest, TResult>`
+
+### **3. Domain-Driven Design (DDD) Support**
+- Core building blocks for DDD:
+  - **Entities**:
+    - Base classes: `Entity<TId>` and `Entity`.
+    - Example: `Order`, `Customer`.
+  - **Value Objects**:
+    - For immutable, equality-driven domain objects.
+  - **Enumeration**:
+    - Strongly typed enums with metadata and behavior.
+  - **Repositories**:
+    - Interfaces: `IAggregateRepository`, `IReadRepository`.
+  - **AggregateRoot**:
+    - Marker interface for aggregates in the domain model.
+
+### **4. Event-Driven Architecture**
+- Event abstractions for integrating and handling domain and integration events:
+  - `IEvent`
+  - `IEventHandler<TEvent>`
+  - `IntegrationEvent` (specific to cross-system communication)
+  - `BaseEvent` (common properties for all events)
+
+### **5. Extensions**
+- Utility methods for simplifying development:
+  - `ServiceCollectionExtensions`: Streamlines DI for handlers.
+  - `TypeExtensions`: Reflection and type utilities for advanced scenarios.
+
+### **6. Helpers**
+- `HandlerCollector`: Automatically discovers and registers command, query, and event handlers for dependency injection.
 
 ---
 
@@ -34,9 +53,9 @@ A powerful library within the **Franz Framework**, designed to facilitate **doma
 
 This package relies on:
 - **MediatR** (12.2.0): For mediator-based communication between commands, queries, and events.
-- **Scrutor** (4.2.2): For assembly scanning and dependency injection.
+- **Scrutor** (4.2.2): For assembly scanning and DI registration.
 - **Microsoft.Extensions.DependencyInjection** (8.0.0): For DI support.
-- **Franz.Common.DependencyInjection**: Provides core DI patterns.
+- **Franz.Common.DependencyInjection**: Core DI patterns.
 - **Franz.Common.Errors**: For standardized error handling and exceptions.
 
 ---
@@ -73,24 +92,30 @@ dotnet add package Franz.Common.Business --version 1.2.62
 
 ### **1. Commands**
 
-Define a command using the `ICommandRequest` and handle it with the `ICommandHandler`:
+Define a command using `ICommandRequest` and handle it with `ICommandHandler`:
 
 ```csharp
 using Franz.Common.Business.Commands;
 
-public class CreateOrderCommand : ICommandRequest
+public class CreateOrderCommand : ICommandRequest<Guid>
 {
-    public int OrderId { get; set; }
+    public string CustomerName { get; set; }
+    public decimal TotalAmount { get; set; }
 }
 
-public class CreateOrderHandler : ICommandHandler<CreateOrderCommand>
+public class CreateOrderHandler : ICommandHandler<CreateOrderCommand, Guid>
 {
-    public async Task Handle(CreateOrderCommand request, CancellationToken cancellationToken)
+    public async Task<Guid> Handle(CreateOrderCommand request, CancellationToken cancellationToken)
     {
         // Business logic for creating an order
+        var orderId = Guid.NewGuid();
+        Console.WriteLine($"Order created for {request.CustomerName} with ID: {orderId}");
+        return orderId;
     }
 }
 ```
+
+---
 
 ### **2. Queries**
 
@@ -99,77 +124,103 @@ Define a query using `IQueryRequest` and handle it with `IQueryHandler`:
 ```csharp
 using Franz.Common.Business.Queries;
 
-public class GetOrderQuery : IQueryRequest<Order>
+public class GetOrderByIdQuery : IQueryRequest<Order>
 {
-    public int OrderId { get; set; }
+    public Guid OrderId { get; set; }
 }
 
-public class GetOrderHandler : IQueryHandler<GetOrderQuery, Order>
+public class GetOrderByIdHandler : IQueryHandler<GetOrderByIdQuery, Order>
 {
-    public async Task<Order> Handle(GetOrderQuery request, CancellationToken cancellationToken)
+    public async Task<Order> Handle(GetOrderByIdQuery request, CancellationToken cancellationToken)
     {
         // Fetch the order based on OrderId
-        return new Order();
+        return new Order(request.OrderId, "CustomerName", 100.00m);
     }
 }
 ```
+
+---
 
 ### **3. Domain-Driven Design**
 
-Use core abstractions for domain models:
-- Define an aggregate root:
+#### **Entity**
+Define a domain entity using the `Entity<TId>` base class:
 
 ```csharp
 using Franz.Common.Business.Domain;
 
-public class Order : AggregateRoot
+public class Order : Entity<Guid>, IAggregateRoot
 {
-    public int OrderId { get; private set; }
     public string CustomerName { get; private set; }
+    public decimal TotalAmount { get; private set; }
 
-    public Order(int orderId, string customerName)
+    public Order(Guid orderId, string customerName, decimal totalAmount)
     {
-        OrderId = orderId;
+        Id = orderId;
         CustomerName = customerName;
+        TotalAmount = totalAmount;
+        DateCreated = DateTime.UtcNow;
     }
 }
 ```
 
-- Implement a repository for aggregates:
+---
+
+#### **ValueObject**
+Create immutable, equality-driven value objects using `ValueObject`:
 
 ```csharp
-using Franz.Common.Business.Domain;
-
-public class OrderRepository : IAggregateRepository<Order>
+public class Address : ValueObject
 {
-    // Implement repository methods
+    public string Street { get; }
+    public string City { get; }
+    public string PostalCode { get; }
+
+    public Address(string street, string city, string postalCode)
+    {
+        Street = street;
+        City = city;
+        PostalCode = postalCode;
+    }
+
+    protected override IEnumerable<object> GetEqualityComponents()
+    {
+        yield return Street;
+        yield return City;
+        yield return PostalCode;
+    }
 }
 ```
 
+---
+
 ### **4. Events**
 
-Publish and handle events using the `IEvent` and `IEventHandler` interfaces:
+Define an event and handle it using `IEvent` and `IEventHandler`:
 
 ```csharp
 using Franz.Common.Business.Events;
 
 public class OrderCreatedEvent : IEvent
 {
-    public int OrderId { get; set; }
+    public Guid OrderId { get; set; }
+    public string CustomerName { get; set; }
 }
 
 public class OrderCreatedHandler : IEventHandler<OrderCreatedEvent>
 {
     public async Task Handle(OrderCreatedEvent @event, CancellationToken cancellationToken)
     {
-        // Handle the event
+        Console.WriteLine($"Order created for {@event.CustomerName}.");
     }
 }
 ```
 
+---
+
 ### **5. Dependency Injection**
 
-Register all handlers and services using `ServiceCollectionExtensions`:
+Register all handlers and services automatically with `ServiceCollectionExtensions`:
 
 ```csharp
 using Franz.Common.Business.Extensions;
@@ -178,7 +229,7 @@ public class Startup
 {
     public void ConfigureServices(IServiceCollection services)
     {
-        services.AddBusinessServices(); // Registers commands, queries, and event handlers automatically
+        services.AddBusinessServices(); // Registers commands, queries, and event handlers
     }
 }
 ```
@@ -187,7 +238,7 @@ public class Startup
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
+This package is part of the private **Franz Framework**. Contributions are restricted to internal development teams. If you are authorized to contribute:
 1. Clone the repository.
 2. Create a feature branch.
 3. Submit a pull request for review.
@@ -204,7 +255,9 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ### Version 1.2.62
 - Added abstractions for commands, queries, and events.
-- Introduced DDD components: `AggregateRoot`, `Entity`, `ValueObject`.
+- Introduced DDD components: `Entity`, `ValueObject`, `AggregateRoot`, and `Enumeration`.
 - Integrated MediatR for CQRS and event handling.
 - Added `ServiceCollectionExtensions` for streamlined dependency registration.
+
+---
 
