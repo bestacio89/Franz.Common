@@ -1,25 +1,34 @@
 ﻿# **Franz.Common.DependencyInjection**
 
-A core library within the **Franz Framework** designed to simplify and enhance the usage of dependency injection in .NET applications. This package provides utilities and extensions for efficient registration of services, resolving dependencies, and managing lifetimes.
+A core library within the **Franz Framework**, designed to simplify and enhance the usage of dependency injection in .NET applications. This package provides utilities and extensions for efficient registration of services, managing lifetimes, and ensuring clean dependency resolution.
 
 ---
 
 ## **Features**
 
-- **Service Registration**:
-  - `ServiceCollectionExtensions` simplifies the registration of common service patterns.
-- **Custom Strategies**:
-  - `RegistrationStrategySkipExistingPair` prevents duplicate service registrations, ensuring efficient dependency resolution.
-- **Reflection Utilities**:
-  - `ITypeSourceSelectorExtensions` integrates with reflection-based service registration.
-- **Modular Integration**:
-  - Works seamlessly with other **Franz Framework** libraries, including `Franz.Common` and `Franz.Common.Reflection`.
+### **1. Service Registration**
+- **Scoped Dependencies**:
+  - Automatically registers services implementing `IScopedDependency` with scoped lifetimes.
+- **Singleton Dependencies**:
+  - Registers services implementing `ISingletonDependency` with singleton lifetimes.
+- **Reflection-Based Registration**:
+  - Automatically registers services based on custom reflection rules using `ITypeSourceSelectorExtensions`.
+
+### **2. Custom Strategies**
+- **RegistrationStrategySkipExistingPair**:
+  - Prevents duplicate service registrations, ensuring efficient dependency management.
+
+### **3. Modular Integration**
+- **Advanced Assembly Filtering**:
+  - Filters assemblies using `FromCompanyApplicationDependenciesWithPredicate` for targeted registration.
+- **Flexible Service Types**:
+  - Supports scoped, singleton, and transient registrations with various interfaces and class hierarchies.
 
 ---
 
 ## **Version Information**
 
-- **Current Version**: 1.2.62
+- **Current Version**: `1.2.62`
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -27,10 +36,14 @@ A core library within the **Franz Framework** designed to simplify and enhance t
 ## **Dependencies**
 
 This package relies on:
-- **Microsoft.Extensions.DependencyInjection.Abstractions**: Provides the core interfaces for dependency injection.
-- **Scrutor** (4.2.2): Enables advanced scanning and automatic service registration.
-- **Franz.Common**: Core utilities for the framework.
-- **Franz.Common.Reflection**: Reflection utilities for enhanced DI support.
+- **Microsoft.Extensions.DependencyInjection.Abstractions**:
+  Provides the core interfaces for dependency injection.
+- **Scrutor** (4.2.2):
+  Enables advanced scanning and automatic service registration.
+- **Franz.Common**:
+  Supplies core utilities for the framework.
+- **Franz.Common.Reflection**:
+  Adds reflection utilities for enhanced DI support.
 
 ---
 
@@ -57,47 +70,78 @@ dotnet add package Franz.Common.DependencyInjection --version 1.2.62
 
 ## **Usage**
 
-### **1. Service Registration**
+### **1. Core Service Registration**
 
-Use the `ServiceCollectionExtensions` to streamline the registration of services:
+Use the `ServiceCollectionExtensions` to register common dependencies based on their interfaces and lifetimes:
 
+#### Register Scoped Dependencies
+Automatically register all classes implementing `IScopedDependency`:
 ```csharp
 using Franz.Common.DependencyInjection.Extensions;
 
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddScoped<IOrderService, OrderService>(); // Example: Scoped registration
-        services.AddSingleton<ILogger, Logger>(); // Example: Singleton registration
-    }
-}
+services.AddScopedDependencies();
 ```
 
-### **2. Prevent Duplicate Registrations**
+#### Register Singleton Dependencies
+Automatically register all classes implementing `ISingletonDependency`:
+```csharp
+using Franz.Common.DependencyInjection.Extensions;
 
-Use `RegistrationStrategySkipExistingPair` to avoid redundant service registrations:
+services.AddSingletonDependencies();
+```
 
+#### Add Dependencies with Custom Assembly Filtering
+Use a custom predicate to filter assemblies:
+```csharp
+services.AddDependencies(assembly => assembly.GetName().Name.Contains("MyApp"));
+```
+
+---
+
+### **2. Advanced Registration Patterns**
+
+#### Prevent Duplicate Registrations
+Avoid redundant registrations using `RegistrationStrategySkipExistingPair`:
 ```csharp
 using Franz.Common.DependencyInjection.Extensions;
 
 services.AddWithStrategy<ILogger, Logger>(new RegistrationStrategySkipExistingPair());
 ```
 
-This ensures the service is only registered if it hasn’t been registered already.
-
-### **3. Reflection-Based Registration**
-
-Automatically register services using reflection with `ITypeSourceSelectorExtensions`:
-
+#### Reflection-Based Registration
+Automatically register services based on reflection:
 ```csharp
-using Franz.Common.DependencyInjection.Extensions;
-
 services.Scan(scan => scan
-    .FromAssemblies(AppDomain.CurrentDomain.GetAssemblies())
+    .FromCompanyApplicationDependenciesWithPredicate(assembly => assembly.GetName().Name.StartsWith("MyCompany"))
     .AddClasses(classes => classes.AssignableTo<IService>())
     .AsImplementedInterfaces()
     .WithScopedLifetime());
+```
+
+#### Custom Registration for Self and Matching Interfaces
+Register services with custom rules:
+```csharp
+services.AddSelfScoped<IOrderService>();
+services.AddMatchingInterfaceScoped<IOrderService>();
+services.AddImplementedInterfaceSingleton<IOrderService>();
+```
+
+---
+
+### **3. Custom Extension Points**
+
+#### Add No-Duplicate Services
+Ensure no duplicate services are added:
+```csharp
+services.AddNoDuplicateScoped<IOrderService, OrderService>();
+services.AddNoDuplicateSingleton<ILogger, Logger>();
+services.AddNoDuplicateTransient<IService, ServiceImplementation>();
+```
+
+#### Add Inherited Class Registration
+Register classes inheriting from a specific base type:
+```csharp
+services.AddInheritedClassSingleton<MyBaseType>();
 ```
 
 ---
@@ -105,16 +149,16 @@ services.Scan(scan => scan
 ## **Integration with Franz Framework**
 
 The **Franz.Common.DependencyInjection** package integrates seamlessly with:
-- **Franz.Common**: Provides foundational utilities.
-- **Franz.Common.Reflection**: Adds advanced reflection capabilities for dependency injection.
-
-Ensure these dependencies are installed to leverage full functionality.
+- **Franz.Common**:
+  Provides foundational utilities.
+- **Franz.Common.Reflection**:
+  Enables advanced assembly and type filtering for DI registration.
 
 ---
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
+This package is part of a private framework. Contributions are limited to the internal development team. If you are authorized to contribute:
 1. Clone the repository.
 2. Create a feature branch.
 3. Submit a pull request for review.
@@ -130,7 +174,10 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ## **Changelog**
 
 ### Version 1.2.62
-- Introduced `ServiceCollectionExtensions` for streamlined service registration.
-- Added `RegistrationStrategySkipExistingPair` for efficient DI strategies.
-- Integrated `ITypeSourceSelectorExtensions` for reflection-based DI.
+- Added `ServiceCollectionExtensions` for streamlined service registration.
+- Introduced `RegistrationStrategySkipExistingPair` to handle duplicate service registrations.
+- Added support for reflection-based registration via `ITypeSourceSelectorExtensions`.
+- Integrated scoped, singleton, and transient registration utilities.
+
+---
 
