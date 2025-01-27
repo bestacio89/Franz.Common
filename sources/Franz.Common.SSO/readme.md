@@ -50,7 +50,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.SSO --version 1.2.62
+dotnet add package Franz.Common.SSO --Version 1.2.63
 ```
 
 ---
@@ -141,7 +141,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `ISsoProvider` for custom SSO provider implementation.
 - Introduced `GenericSSOProvider` and `GenericSSOManager` for generic SSO workflows.
 - Integrated with ASP.NET Core Identity and Entity Framework Core.

@@ -47,7 +47,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Reflection --version 1.2.62
+dotnet add package Franz.Common.Reflection --Version 1.2.63
 ```
 
 ---
@@ -136,7 +136,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `AssemblyWrapper` and `AssemblyAccessorWrapper` for assembly management.
 - Introduced `ReflectionHelper` for simplifying reflection-based tasks.
 - Provided `TypeExtensions` for enhanced type operations.

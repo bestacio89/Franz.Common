@@ -51,7 +51,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Http.Headers --version 1.2.62
+dotnet add package Franz.Common.Http.Headers --Version 1.2.63
 ```
 
 ---
@@ -148,7 +148,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `HeaderRequiredAttribute` for enforcing required headers.
 - Introduced `ComplexModelBinder` for advanced header parsing.
 - Added `HeaderContextAccessor` for simplified HTTP context access.

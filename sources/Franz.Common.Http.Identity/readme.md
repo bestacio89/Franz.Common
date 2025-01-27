@@ -46,7 +46,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Http.Identity --version 1.2.62
+dotnet add package Franz.Common.Http.Identity --Version 1.2.63
 ```
 
 ---
@@ -147,7 +147,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Introduced `IdentityContextAccessor` for streamlined identity access.
 - Added `ServiceCollectionExtensions` for identity service registration.
 - Full compatibility with **Franz.Common.Identity**, **Franz.Common.Http**, and **Franz.Common.Headers**.

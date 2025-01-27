@@ -44,7 +44,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.MultiTenancy --version 1.2.62
+dotnet add package Franz.Common.MultiTenancy --Version 1.2.63
 ```
 
 ---
@@ -135,7 +135,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `ITenantContextAccessor` for accessing tenant-specific information.
 - Added `IDomainContextAccessor` for retrieving domain-specific data.
 - Simplified multi-tenancy support for .NET applications.

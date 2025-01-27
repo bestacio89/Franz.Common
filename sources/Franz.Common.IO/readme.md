@@ -40,7 +40,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.IO --version 1.2.62
+dotnet add package Franz.Common.IO --Version 1.2.63
 ```
 
 ---
@@ -93,5 +93,5 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `DeleteTemporaryFileAfterReadingStream` for efficient temporary file handling.

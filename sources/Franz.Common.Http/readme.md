@@ -56,7 +56,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Http --version 1.2.62
+dotnet add package Franz.Common.Http --Version 1.2.63
 ```
 
 ---
@@ -154,7 +154,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `ErrorResponseProvider` and `ExceptionFilter` for centralized error management.
 - Introduced routing extensions with `FrenchControllerParameterTransformer` and `TranslateControllerParameterTransformer`.
 - Added `HttpContextExtensions` for simplified header and context management.

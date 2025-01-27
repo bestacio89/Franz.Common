@@ -63,7 +63,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.DependencyInjection --version 1.2.62
+dotnet add package Franz.Common.DependencyInjection --Version 1.2.63
 ```
 
 ---
@@ -173,11 +173,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
-- Added `ServiceCollectionExtensions` for streamlined service registration.
-- Introduced `RegistrationStrategySkipExistingPair` to handle duplicate service registrations.
-- Added support for reflection-based registration via `ITypeSourceSelectorExtensions`.
-- Integrated scoped, singleton, and transient registration utilities.
+### Version 1.2.63
+- Refined readme
 
 ---
 

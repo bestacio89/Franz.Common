@@ -48,7 +48,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.MultiTenancy --version 1.2.62
+dotnet add package Franz.Common.Messaging.MultiTenancy --Version 1.2.63
 ```
 
 ---
@@ -156,7 +156,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `TenantContextAccessor` and `DomainContextAccessor` for managing tenant and domain contexts.
 - Introduced `TenantMessageBuilder` and `DomainMessageBuilder` for constructing tenant and domain-aware messages.
 - Integrated `ServiceCollectionExtensions` for streamlined multi-tenancy messaging setup.

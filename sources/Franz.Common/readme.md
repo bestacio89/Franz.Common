@@ -62,7 +62,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Use the .NET CLI to install:
 
 ```bash
-dotnet add package Franz.Common --version 1.2.62
+dotnet add package Franz.Common --Version 1.2.63
 ```
 
 ---
@@ -207,13 +207,8 @@ This library is private and governed by the Franz Framework's internal licensing
 
 ## **Changelog**
 
-### Version 1.2.62
-- Introduced dependency injection interfaces (`IScopedDependency`, `ISingletonDependency`).
-- Added `ISeeder` interface for data seeding.
-- Enhanced collection and enumerable extensions.
-- Introduced `HostEnvironmentExtensions` for environment-specific logic.
-- Included `Company` and `ProductGeneration` classes for foundational business logic.
+### Version 1.2.63
 
+- Refined Readme
 ---
 
-This README ensures clarity, provides real-world examples, and reflects all the requested refinements. Let me know if there’s anything more to adjust!

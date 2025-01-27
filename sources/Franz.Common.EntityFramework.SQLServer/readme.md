@@ -45,7 +45,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package via the .NET CLI:
 
 ```bash
-dotnet add package Franz.Common.EntityFramework.SQLServer --version 1.2.62
+dotnet add package Franz.Common.EntityFramework.SQLServer --Version 1.2.63
 ```
 
 ---
@@ -115,7 +115,7 @@ This library is part of a private framework and subject to internal licensing te
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - **Initial release** with:
   - SQL Server integration via Entity Framework Core.
   - Multi-tenancy support.
