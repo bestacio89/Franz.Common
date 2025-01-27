@@ -50,7 +50,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.Bootstrap --version 1.2.62
+dotnet add package Franz.Common.Messaging.Bootstrap --Version 1.2.63
 ```
 
 ---
@@ -118,7 +118,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Introduced `ServiceCollectionExtensions` for centralized messaging configuration.
 - Full integration with **Franz.Common.Messaging.Hosting**, **Kafka**, and **MultiTenancy**.
 - Improved modularity with support for MediatR in messaging workflows.

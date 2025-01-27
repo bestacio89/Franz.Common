@@ -68,7 +68,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Http.Client --version 1.2.62
+dotnet add package Franz.Common.Http.Client --Version 1.2.63
 ```
 
 ---
@@ -175,7 +175,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `HttpService` for simplified HTTP interactions.
 - Introduced custom request builders and delegating handlers.
 - Added file upload utilities with `HttpFileParameter`.

@@ -49,7 +49,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.EntityFramework.Oracle --version 1.2.62
+dotnet add package Franz.Common.EntityFramework.Oracle --Version 1.2.63
 ```
 
 ---
@@ -140,7 +140,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `ServiceCollectionExtensions` for Oracle database context registration.
 - Integrated support for multi-tenancy via `Franz.Common.MultiTenancy`.
 - Full compatibility with **Franz.Common.EntityFramework** repository patterns.

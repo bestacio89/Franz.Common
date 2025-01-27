@@ -83,7 +83,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Business --version 1.2.62
+dotnet add package Franz.Common.Business --Version 1.2.63
 ```
 
 ---
@@ -253,11 +253,9 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
-- Added abstractions for commands, queries, and events.
-- Introduced DDD components: `Entity`, `ValueObject`, `AggregateRoot`, and `Enumeration`.
-- Integrated MediatR for CQRS and event handling.
-- Added `ServiceCollectionExtensions` for streamlined dependency registration.
+### Version 1.2.63
+
+- Refined Readme
 
 ---
 
