@@ -50,7 +50,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Http.MultiTenancy --version 1.2.62
+dotnet add package Franz.Common.Http.MultiTenancy --Version 1.2.63
 ```
 
 ---
@@ -142,7 +142,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Introduced `TenantContextAccessor` and `DomainContextAccessor` for tenant-specific data management.
 - Added `AddRequiredHeaderParameter` for multi-tenancy support in Swagger.
 - Integrated `ServiceCollectionExtensions` for streamlined multi-tenancy service registration.

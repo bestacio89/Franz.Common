@@ -48,7 +48,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.MassTransit --version 1.2.62
+dotnet add package Franz.Common.Messaging.MassTransit --Version 1.2.63
 ```
 
 ---
@@ -150,7 +150,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `IKafkaProducer` and `IKafkaConsumer` interfaces for Kafka operations.
 - Integrated `IMessagingClient` for abstracted messaging operations.
 - Provided `ServiceRegistration` for streamlined Kafka setup with MassTransit.

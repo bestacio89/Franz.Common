@@ -48,7 +48,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.EntityFramework --version 1.2.62
+dotnet add package Franz.Common.Messaging.EntityFramework --Version 1.2.63
 ```
 
 ---
@@ -138,7 +138,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `TransactionFilter` for transactional consistency in messaging workflows.
 - Integrated `ServiceCollectionExtensions` for EF Core and messaging services registration.
 - Full compatibility with **Franz.Common.EntityFramework** and **Franz.Common.Messaging.Hosting**.

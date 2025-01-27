@@ -34,7 +34,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Annotations --version 1.2.62
+dotnet add package Franz.Common.Annotations --Version 1.2.63
 ```
 
 ---
@@ -113,6 +113,6 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Introduced `RequiredKafkaTopicAttribute` for Kafka topic validation.
 

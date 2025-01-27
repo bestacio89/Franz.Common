@@ -43,7 +43,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Bootstrap --version 1.2.62
+dotnet add package Franz.Common.Bootstrap --Version 1.2.63
 ```
 
 ---
@@ -111,7 +111,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `ServiceCollectionExtensions` for dependency registration.
 - Integrated with `Resources.resx` for centralized resource management.
 - Full compatibility with core **Franz Framework** libraries.

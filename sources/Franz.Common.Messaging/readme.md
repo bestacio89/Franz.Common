@@ -65,7 +65,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging --version 1.2.62
+dotnet add package Franz.Common.Messaging --Version 1.2.63
 ```
 
 ---
@@ -162,7 +162,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `MessageContext` and `IMessageContextAccessor` for centralized message data management.
 - Introduced `MessageFactory` with builder strategies for consistent message creation.
 - Integrated `HeaderPropagationMessageBuilder` for header propagation.

@@ -47,7 +47,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Http.Messaging --version 1.2.62
+dotnet add package Franz.Common.Http.Messaging --Version 1.2.63
 ```
 
 ---
@@ -125,7 +125,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Introduced `KafkaHealthCheck` for monitoring Kafka messaging system health.
 - Added `TransactionFilter` for transactional consistency.
 - Integrated `ServiceCollectionExtensions` for streamlined DI setup.

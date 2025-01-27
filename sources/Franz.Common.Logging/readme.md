@@ -51,7 +51,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Logging --version 1.2.62
+dotnet add package Franz.Common.Logging --Version 1.2.63
 ```
 
 ---
@@ -139,7 +139,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Integrated Serilog and Elastic APM enrichers for structured logging.
 - Added `TraceHelper` for advanced tracing support.
 - Introduced `HostBuilderExtensions` for simplified logging configuration.

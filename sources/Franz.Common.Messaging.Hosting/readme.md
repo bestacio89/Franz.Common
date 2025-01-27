@@ -55,7 +55,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.Hosting --version 1.2.62
+dotnet add package Franz.Common.Messaging.Hosting --Version 1.2.63
 ```
 
 ---
@@ -156,7 +156,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.62
+### Version 1.2.63
 - Added `MessagingHostedService` for background messaging processing.
 - Introduced `IAsyncMessageActionFilter` and `MessageActionExecutionDelegate` for extending messaging pipelines.
 - Integrated `TransactionFilter` for transactional consistency.
