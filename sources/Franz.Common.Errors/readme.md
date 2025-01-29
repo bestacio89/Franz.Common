@@ -100,7 +100,7 @@ public class CustomException : ExceptionBase
 ## **Contributing**
 
 We welcome contributions! Please follow these steps:
-1. Fork the repository.
+1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a new branch for your feature or bug fix.
 3. Submit a pull request for review.
 
@@ -111,3 +111,7 @@ We welcome contributions! Please follow these steps:
 This library is licensed under the MIT License. See the LICENSE file for more details.
 
 ---
+
+## **Changelog**
+
+-- Upgrade to .net 9
