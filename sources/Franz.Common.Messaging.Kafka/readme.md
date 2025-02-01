@@ -27,7 +27,7 @@ A Kafka integration library within the **Franz Framework** designed to simplify 
 
 ## **Version Information**
 
-- **Current Version**: 1.2.62
+- **Current Version**: 1.2.64
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -59,7 +59,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.Kafka --Version 1.2.63
+dotnet add package Franz.Common.Messaging.Kafka --Version 1.2.64
 ```
 
 ---
@@ -161,7 +161,7 @@ The **Franz.Common.Messaging.Kafka** package integrates seamlessly with:
 ## **Contributing**
 
 This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository.
+1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
@@ -175,7 +175,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.63
+### Version 1.2.64
 - Added `ConnectionFactoryProvider` and `KafkaConsumerGroup` for connection and consumer management.
 - Introduced `KafkaSender` and `KafkaConsumerFactory` for producer and consumer workflows.
 - Added serialization utilities with `JsonMessageDeserializer`.

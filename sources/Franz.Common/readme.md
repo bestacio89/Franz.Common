@@ -1,6 +1,6 @@
 ﻿# **Franz.Common**
 
-A foundational library in the **Franz Framework** designed to provide core utilities, dependency injection abstractions, and common extensions for .NET applications. This library is part of the private Franz Framework ecosystem, versioned as `1.2.62`, and hosted on a private Azure NuGet feed.
+A foundational library in the **Franz Framework** designed to provide core utilities, dependency injection abstractions, and common extensions for .NET applications. This library is part of the private Franz Framework ecosystem, versioned as `1.2.64`, and hosted on a private Azure NuGet feed.
 
 ---
 
@@ -40,7 +40,7 @@ A foundational library in the **Franz Framework** designed to provide core utili
 
 ## **Version Information**
 
-- **Current Version**: `1.2.62`
+- **Current Version**: `1.2.64`
 - Part of the private Franz Framework suite, hosted on a private Azure NuGet feed.
 
 ---
@@ -62,7 +62,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Use the .NET CLI to install:
 
 ```bash
-dotnet add package Franz.Common --Version 1.2.63
+dotnet add package Franz.Common --Version 1.2.64
 ```
 
 ---
@@ -193,7 +193,7 @@ This library is part of the private Franz Framework and is not publicly availabl
 
 ### **Contributing**
 Contributions are restricted to the Franz Framework development team. If you are authorized to contribute:
-1. Clone the repository.
+1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request with a detailed explanation of your changes.
 
@@ -207,8 +207,8 @@ This library is private and governed by the Franz Framework's internal licensing
 
 ## **Changelog**
 
-### Version 1.2.63
+### Version 1.2.64
 
-- Refined Readme
+- Upgrade version to .net 9
 ---
 

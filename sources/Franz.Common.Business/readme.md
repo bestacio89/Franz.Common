@@ -62,7 +62,7 @@ This package relies on:
 
 ## **Version Information**
 
-- **Current Version**: 1.2.62
+- **Current Version**: 1.2.64
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -83,7 +83,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Business --Version 1.2.63
+dotnet add package Franz.Common.Business --Version 1.2.64
 ```
 
 ---
@@ -239,7 +239,7 @@ public class Startup
 ## **Contributing**
 
 This package is part of the private **Franz Framework**. Contributions are restricted to internal development teams. If you are authorized to contribute:
-1. Clone the repository.
+1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
@@ -253,9 +253,9 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.63
+### Version 1.2.64
 
-- Refined Readme
+- Upgrade version to .net 9
 
 ---
 

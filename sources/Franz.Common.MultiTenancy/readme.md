@@ -17,7 +17,7 @@ A lightweight library within the **Franz Framework** designed to enable multi-te
 
 ## **Version Information**
 
-- **Current Version**: 1.2.62
+- **Current Version**: 1.2.64
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -44,7 +44,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.MultiTenancy --Version 1.2.63
+dotnet add package Franz.Common.MultiTenancy --Version 1.2.64
 ```
 
 ---
@@ -121,7 +121,7 @@ The **Franz.Common.MultiTenancy** package serves as a foundational utility for e
 ## **Contributing**
 
 This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository.
+1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
@@ -135,7 +135,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.63
+### Version 1.2.64
 - Added `ITenantContextAccessor` for accessing tenant-specific information.
 - Added `IDomainContextAccessor` for retrieving domain-specific data.
 - Simplified multi-tenancy support for .NET applications.

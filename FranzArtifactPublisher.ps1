@@ -1,6 +1,6 @@
-# Specify the Azure Artifacts feed URL and PAT
-$FEED_URL = "https://pkgs.dev.azure.com/AjnaTellus/Franz/_packaging/FranzArtifact/nuget/v3/index.json"
-$PAT = "87glMerj7UR9G4P0rnrqT2RUrRSt1nZmteA0gXc5wmqUCm3Ufp9HJQQJ99BAACAAAAAc3GLLAAASAZDOiIBA"
+# Define Azure Artifacts feed URL and PAT
+$FEED_URL = "https://pkgs.dev.azure.com/AjnaTellus/Franz/_packaging/FranzArtifacts/nuget/v3/index.json"
+$PAT = "EMWFEqQv9Ruq6TpjpdJCVpeBJM4NujVB4QQ2AZyBWOhyx5TlButEJQQJ99BAACAAAAAc3GLLAAASAZDOoTeM"
 
 # Directory where NuGet packages will be built
 $PACKAGES_DIRECTORY = "AzureArtifacts"
@@ -8,33 +8,31 @@ $PACKAGES_DIRECTORY = "AzureArtifacts"
 # Perform NuGet packaging
 dotnet pack -c Release -o $PACKAGES_DIRECTORY
 
-# Get the list of packages in the feed
-$existingPackages = Get-PackageSource -ProviderName NuGet -Location $FEED_URL | Get-Package -AllVersions
-
-# Publish packages to Azure Artifacts feed
+# List of packages in the directory
 $packages = Get-ChildItem -Path $PACKAGES_DIRECTORY -Filter *.nupkg
 foreach ($package in $packages) {
-    # Extract package metadata
-    $packageInfo = [System.IO.Path]::GetFileNameWithoutExtension($package.Name) -split '\.'
-    $packageName = $packageInfo[0]
-    $packageVersion = $packageInfo[1]
+    # Extract package metadata using regex
+    if ($package.Name -match "^(?<name>.+?)\.(?<version>(\d+\.)+\d+)\.nupkg$") {
+        $packageName = $matches.name
+        $packageVersion = $matches.version
 
-    # Check if a package with the same version already exists in the feed
-    $duplicatePackage = $existingPackages | Where-Object { $_.Id -eq $packageName -and $_.Version -eq $packageVersion }
+        # Check if the package already exists in Azure Artifacts
+        $existingPackage = & dotnet nuget list source -s $FEED_URL | Select-String "$packageName $packageVersion"
 
-    if ($null -eq $duplicatePackage) {
-        Write-Host "Publishing $($package.Name)..."
-        dotnet nuget push $package.FullName --source $FEED_URL --api-key $PAT --interactive
+        if ($null -eq $existingPackage) {
+            Write-Host "Publishing $($package.Name)..."
+            dotnet nuget push $package.FullName --source $FEED_URL --api-key $PAT --skip-duplicate
+        } else {
+            Write-Host "Skipping $($package.Name) (duplicate version)."
+        }
     } else {
-        Write-Host "Skipping $($package.Name) (duplicate version)."
+        Write-Host "Skipping $($package.Name) (invalid filename format)."
     }
 }
 
-# Remove all files from the directory
-Remove-Item -Path "$PACKAGES_DIRECTORY\*" -Force
+# Clean up the packages directory
+Remove-Item -Path "$PACKAGES_DIRECTORY\*" -Force -Recurse
 
-# Pause the script to keep the PowerShell window open
-Write-Host "Press any key to continue..."
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-
-pause
+# Pause for user interaction
+Write-Host "Process completed."
+Read-Host "Press Enter to exit"

@@ -30,7 +30,7 @@ A messaging abstraction library within the **Franz Framework** that simplifies t
 
 ## **Version Information**
 
-- **Current Version**: 1.2.62
+- **Current Version**: 1.2.64
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -65,7 +65,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging --Version 1.2.63
+dotnet add package Franz.Common.Messaging --Version 1.2.64
 ```
 
 ---
@@ -148,7 +148,7 @@ The **Franz.Common.Messaging** package integrates seamlessly with:
 ## **Contributing**
 
 This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository.
+1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
@@ -162,9 +162,6 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.63
-- Added `MessageContext` and `IMessageContextAccessor` for centralized message data management.
-- Introduced `MessageFactory` with builder strategies for consistent message creation.
-- Integrated `HeaderPropagationMessageBuilder` for header propagation.
-- Full compatibility with **Franz.Common.Business** and **Franz.Common.Headers**.
+### Version 1.2.64
+- Upgrade version to .net 9
 

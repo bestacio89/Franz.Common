@@ -1,6 +1,6 @@
 ﻿# **Franz.Common.EntityFramework.SQLServer**
 
-A private utility library for seamless integration of **Entity Framework Core** with **SQL Server**, designed as part of the **Franz Framework** ecosystem. This package is versioned as `1.2.62` and is hosted exclusively on a private Azure NuGet feed.
+A private utility library for seamless integration of **Entity Framework Core** with **SQL Server**, designed as part of the **Franz Framework** ecosystem. This package is versioned as `1.2.64` and is hosted exclusively on a private Azure NuGet feed.
 
 ---
 
@@ -21,7 +21,7 @@ A private utility library for seamless integration of **Entity Framework Core** 
 
 ## **Version Information**
 
-- **Current Version**: `1.2.62`
+- **Current Version**: `1.2.64`
 - This package and all related `Franz` packages are under active development and maintained privately.
 
 ---
@@ -45,7 +45,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package via the .NET CLI:
 
 ```bash
-dotnet add package Franz.Common.EntityFramework.SQLServer --Version 1.2.63
+dotnet add package Franz.Common.EntityFramework.SQLServer --Version 1.2.64
 ```
 
 ---
@@ -84,7 +84,7 @@ SslEnforcement sslOption = SslEnforcement.Required;
 
 ## **Dependencies**
 
-This package is built to work with the following Franz Framework packages (all versioned `1.2.62`):
+This package is built to work with the following Franz Framework packages (all versioned `1.2.64`):
 - `Franz.Common.EntityFramework`
 - `Franz.Common.MultiTenancy`
 
@@ -101,7 +101,7 @@ This library is part of the **Franz Framework**, a privately developed and maint
 ## **Contributing**
 
 Contributions are restricted to the internal development team. If you have access to the private repository, follow these steps:
-1. Clone the repository.
+1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch for your updates.
 3. Submit a pull request for review.
 
@@ -115,8 +115,5 @@ This library is part of a private framework and subject to internal licensing te
 
 ## **Changelog**
 
-### Version 1.2.63
-- **Initial release** with:
-  - SQL Server integration via Entity Framework Core.
-  - Multi-tenancy support.
-  - SSL enforcement enum and extensions.
+### Version 1.2.64
+- Upgrade version to .net 9

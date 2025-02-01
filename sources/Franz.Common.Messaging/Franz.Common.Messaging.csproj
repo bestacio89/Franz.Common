@@ -6,10 +6,10 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Azure.Messaging.EventGrid" Version="4.21.0" />
-		<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Primitives" Version="8.0.0" />
+		<PackageReference Include="Azure.Messaging.EventGrid" Version="4.29.0" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Primitives" Version="9.0.1" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 	</ItemGroup>
 
