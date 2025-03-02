@@ -38,3 +38,6 @@ TestResults
 
 # Visual Studio
 .vs/
+
+FranzArtifactPublisher.ps1
+nugetpublish.ps1
