@@ -17,7 +17,7 @@ A library within the **Franz Framework** designed to integrate identity manageme
 
 ## **Version Information**
 
-- **Current Version**: 1.2.64
+- **Current Version**: 1.2.65
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -47,7 +47,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.Identity --Version 1.2.64
+dotnet add package Franz.Common.Messaging.Identity --Version 1.2.65
 ```
 
 ---
@@ -134,7 +134,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.64
+### Version 1.2.65
 - Introduced `IdentityContextAccessor` for managing identity contexts in messaging workflows.
 - Added `AuthorizationMessageBuilder` for constructing identity-aware messages.
 - Integrated `ServiceCollectionExtensions` for simplified registration of identity-aware messaging services.

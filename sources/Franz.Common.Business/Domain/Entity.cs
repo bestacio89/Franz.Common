@@ -2,7 +2,7 @@ using Franz.Common.Business.Events;
 
 namespace Franz.Common.Business.Domain;
 
-public abstract class Entity<TId> : IEntity, IAggregateRoot
+public abstract class Entity<TId> : IEntity
 {
   private int? requestedHashCode;
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
