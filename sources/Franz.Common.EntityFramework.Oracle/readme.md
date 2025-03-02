@@ -19,7 +19,7 @@ A specialized library within the **Franz Framework** that extends **Entity Frame
 
 ## **Version Information**
 
-- **Current Version**: 1.2.64
+- **Current Version**: 1.2.65
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -49,7 +49,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.EntityFramework.Oracle --Version 1.2.64
+dotnet add package Franz.Common.EntityFramework.Oracle --Version 1.2.65
 ```
 
 ---
@@ -140,6 +140,6 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.64
+### Version 1.2.65
 - Upgrade version to .net 9
 

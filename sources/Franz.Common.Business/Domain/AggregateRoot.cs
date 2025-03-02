@@ -1,42 +1,43 @@
+using Franz.Common.Business.Domain;
 using Franz.Common.Business.Events;
 
-namespace Franz.Common.Business.Domain;
-public abstract class AggregateRoot <TEvent>: IAggregateRoot where TEvent: BaseEvent
+public abstract class AggregateRoot<TEvent> : Entity<Guid>, IAggregateRoot
+    where TEvent : BaseEvent
 {
-  #region Properties
-  public Guid Id { get; protected set; }
-  private readonly List<TEvent> _changes = new List<TEvent>();
-  public int Version { get; set; } = -1;
+  private readonly List<TEvent> _changes = new();
+  public int Version { get; private set; } = -1;
 
-  #endregion
+  protected AggregateRoot() { }
 
-  #region Methods
-  public IEnumerable<TEvent> getUncomittedchanges()
+  protected AggregateRoot(Guid id) : base()
   {
-    return _changes;
+    Id = id;
   }
-  public void MarkChangesAsCommited()
-  {
-    _changes.Clear();
-  }
+
+  public IEnumerable<TEvent> GetUncommittedChanges() => _changes.AsReadOnly();
+
+  public void MarkChangesAsCommitted() => _changes.Clear();
+
   private void ApplyChange(TEvent @event, bool isNew)
   {
-    var method = this.GetType().GetMethod("Apply", new Type[] { @event.GetType() });
+    var method = GetType().GetMethod("Apply", new[] { @event.GetType() });
+
     if (method == null)
-    {
-      throw new ArgumentNullException(nameof(@event), $"The apply method was not found in the aggregate for {@event.GetType().Name}!");
-    }
+      throw new InvalidOperationException($"Apply method not found for {@event.GetType().Name}.");
+
     method.Invoke(this, new object[] { @event });
+
     if (isNew)
     {
       _changes.Add(@event);
     }
-
   }
+
   protected void RaiseEvent(TEvent @event)
   {
     ApplyChange(@event, true);
   }
+
   public void ReplayEvents(IEnumerable<TEvent> events)
   {
     foreach (var @event in events)
@@ -44,28 +45,4 @@ public abstract class AggregateRoot <TEvent>: IAggregateRoot where TEvent: BaseE
       ApplyChange(@event, false);
     }
   }
-
-  public void ReplayEvents(IEnumerable<TEvent> events, DateTime? startDate = null, DateTime? endDate = null)
-  {
-    foreach (var @event in events)
-    {
-      if ((startDate == null || @event.Date >= startDate.Value)
-          && (endDate == null || @event.Date <= endDate.Value))
-      {
-        ApplyChange(@event, false);
-      }
-    }
-  }
-  public void ReplayEvents(IEnumerable<TEvent> events, DateTime? date = null)
-  {
-    foreach (var @event in events)
-    {
-      if (date == null || @event.Date <= date.Value)
-      {
-        ApplyChange(@event, false);
-      }
-    }
-  }
-  #endregion
 }
-

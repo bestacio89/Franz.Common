@@ -1,61 +1,44 @@
 using Franz.Common.Business.Domain;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 
-namespace Franz.Common.EntityFramework.Repositories;
 public abstract class AggregateRepository<TDbContext, TAggregateRoot> : IAggregateRepository<TAggregateRoot>
-  where TDbContext : DbContext
-  where TAggregateRoot : IAggregateRoot
+    where TDbContext : DbContext
+    where TAggregateRoot : class,IAggregateRoot
 {
-  protected TDbContext DbContext { get; }
+  protected readonly TDbContext DbContext;
 
   public AggregateRepository(TDbContext dbContext)
   {
     DbContext = dbContext;
   }
 
-  public async Task AddAsync<TEntity>(TEntity entity, CancellationToken cancellationToken = default)
-    where TEntity : IEntity
+  public async Task<TAggregateRoot> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
   {
-    await DbContext.AddAsync(entity, cancellationToken);
+    return await DbContext.Set<TAggregateRoot>()
+        .IncludeAllRelationships(DbContext) // 
+        .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
   }
 
-  public async Task AddRangeAsync<TEntity>(IEnumerable<TEntity> entities, CancellationToken cancellationToken = default)
-    where TEntity : IEntity
+  public async Task AddAsync(TAggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
   {
-    await DbContext.AddRangeAsync(entities, cancellationToken);
-  }
-
-  public void Remove<TEntity>(TEntity entity)
-    where TEntity : IEntity
-  {
-    DbContext.Remove(entity);
-  }
-
-  public void RemoveRange<TEntity>(IEnumerable<TEntity> entities)
-    where TEntity : IEntity
-  {
-    DbContext.RemoveRange(entities);
-  }
-
-  public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
-  {
+    await DbContext.Set<TAggregateRoot>().AddAsync(aggregateRoot, cancellationToken);
     await DbContext.SaveChangesAsync(cancellationToken);
   }
 
-  public async Task<TEntity> Update<TEntity>(TEntity entity, CancellationToken cancellation)
+  public async Task UpdateAsync(TAggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
   {
-#pragma warning disable CS8604 // Possible null reference argument.
-    DbContext.Entry(entity).State = EntityState.Modified;
-#pragma warning restore CS8604 // Possible null reference argument.
-    await DbContext.SaveChangesAsync();
-    return entity;
+    var existingAggregate = await GetByIdAsync(aggregateRoot.Id, cancellationToken);
 
+    if (existingAggregate == null)
+      throw new InvalidOperationException($"Aggregate {typeof(TAggregateRoot).Name} not found.");
+
+    DbContext.Entry(existingAggregate).CurrentValues.SetValues(aggregateRoot);
+    await DbContext.SaveChangesAsync(cancellationToken);
   }
 
-
-  Task IAggregateRepository<TAggregateRoot>.Update<TEntity>(TEntity entity, CancellationToken cancellationToken)
+  public async Task DeleteAsync(TAggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
   {
-    throw new NotImplementedException();
+    DbContext.Set<TAggregateRoot>().Remove(aggregateRoot);
+    await DbContext.SaveChangesAsync(cancellationToken);
   }
 }

@@ -21,7 +21,7 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 
 ## **Version Information**
 
-- **Current Version**: 1.2.64
+- **Current Version**: 1.2.65
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -54,7 +54,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Http.Documentation --Version 1.2.64
+dotnet add package Franz.Common.Http.Documentation --Version 1.2.65
 ```
 
 ---
@@ -149,5 +149,5 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.64
+### Version 1.2.65
 - Upgrade version to .net 9

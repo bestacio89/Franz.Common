@@ -1,4 +1,5 @@
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 using Franz.Common.EntityFramework.Behaviors;
 using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.EntityFramework.Properties;
@@ -60,6 +61,55 @@ public static class ServiceCollectionExtensions
 
     return services;
   }
+
+  public static IServiceCollection AddEntityRepositories<TDbContext>(this IServiceCollection services)
+    where TDbContext : DbContext
+  {
+    services = services.AddScoped<DbContext>(sp => sp.GetRequiredService<TDbContext>());
+
+    var typeDbContext = typeof(TDbContext);
+    var entityTypes = GetEntityTypesFromDbContext(typeDbContext)
+        .Where(type => typeof(IEntity).IsAssignableFrom(type) && !typeof(IAggregateRoot).IsAssignableFrom(type));
+
+    foreach (var entityType in entityTypes)
+    {
+      var repositoryInterface = typeof(IEntityRepository<>).MakeGenericType(entityType);
+      var repositoryImplementation = typeof(EntityRepository<,>).MakeGenericType(typeDbContext, entityType);
+
+      if (!services.Any(x => x.ServiceType == repositoryInterface))
+      {
+        services.AddScoped(repositoryInterface, repositoryImplementation);
+      }
+    }
+
+    return services;
+  }
+
+  public static IServiceCollection AddAggregateRepositories<TDbContext, TEvent>(this IServiceCollection services)
+    where TDbContext : DbContext
+    where TEvent : BaseEvent
+  {
+    services = services.AddScoped<DbContext>(sp => sp.GetRequiredService<TDbContext>());
+
+    var typeDbContext = typeof(TDbContext);
+    var aggregateTypes = GetEntityTypesFromDbContext(typeDbContext)
+        .Where(type => typeof(IAggregateRoot).IsAssignableFrom(type));
+
+    foreach (var aggregateType in aggregateTypes)
+    {
+      var repositoryInterface = typeof(IAggregateRepository<>).MakeGenericType(aggregateType);
+      var repositoryImplementation = typeof(AggregateRepository<,>).MakeGenericType(typeDbContext, aggregateType, typeof(TEvent));
+
+      if (!services.Any(x => x.ServiceType == repositoryInterface))
+      {
+        services.AddScoped(repositoryInterface, repositoryImplementation);
+      }
+    }
+
+    return services;
+  }
+
+
 
   private static IEnumerable<Type> GetEntityTypesFromDbContext(Type typeDbContext)
   {

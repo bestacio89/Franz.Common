@@ -1,6 +1,6 @@
 ﻿# **Franz.Common.EntityFramework.SQLServer**
 
-A private utility library for seamless integration of **Entity Framework Core** with **SQL Server**, designed as part of the **Franz Framework** ecosystem. This package is versioned as `1.2.64` and is hosted exclusively on a private Azure NuGet feed.
+A private utility library for seamless integration of **Entity Framework Core** with **SQL Server**, designed as part of the **Franz Framework** ecosystem. This package is versioned as `1.2.65` and is hosted exclusively on a private Azure NuGet feed.
 
 ---
 
@@ -21,7 +21,7 @@ A private utility library for seamless integration of **Entity Framework Core** 
 
 ## **Version Information**
 
-- **Current Version**: `1.2.64`
+- **Current Version**: `1.2.65`
 - This package and all related `Franz` packages are under active development and maintained privately.
 
 ---
@@ -45,7 +45,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package via the .NET CLI:
 
 ```bash
-dotnet add package Franz.Common.EntityFramework.SQLServer --Version 1.2.64
+dotnet add package Franz.Common.EntityFramework.SQLServer --Version 1.2.65
 ```
 
 ---
@@ -84,7 +84,7 @@ SslEnforcement sslOption = SslEnforcement.Required;
 
 ## **Dependencies**
 
-This package is built to work with the following Franz Framework packages (all versioned `1.2.64`):
+This package is built to work with the following Franz Framework packages (all versioned `1.2.65`):
 - `Franz.Common.EntityFramework`
 - `Franz.Common.MultiTenancy`
 
@@ -115,5 +115,5 @@ This library is part of a private framework and subject to internal licensing te
 
 ## **Changelog**
 
-### Version 1.2.64
+### Version 1.2.65
 - Upgrade version to .net 9

@@ -18,19 +18,175 @@ A powerful library within the **Franz Framework**, designed to facilitate **doma
   - `IQueryRequest<TResult>`
   - `IQueryHandler<TRequest, TResult>`
 
-### **3. Domain-Driven Design (DDD) Support**
-- Core building blocks for DDD:
-  - **Entities**:
-    - Base classes: `Entity<TId>` and `Entity`.
-    - Example: `Order`, `Customer`.
-  - **Value Objects**:
-    - For immutable, equality-driven domain objects.
-  - **Enumeration**:
-    - Strongly typed enums with metadata and behavior.
-  - **Repositories**:
-    - Interfaces: `IAggregateRepository`, `IReadRepository`.
-  - **AggregateRoot**:
-    - Marker interface for aggregates in the domain model.
+3. Domain-Driven Design (DDD) Support
+This package includes core building blocks for Domain-Driven Design.
+
+✅ Entities
+Entities represent unique objects in the system, identified by a primary key (TId).
+
+```csharp
+
+public class Order : Entity<Guid>
+{
+    public string CustomerName { get; private set; }
+    public decimal TotalAmount { get; private set; }
+
+    public Order(Guid orderId, string customerName, decimal totalAmount)
+    {
+        Id = orderId;
+        CustomerName = customerName;
+        TotalAmount = totalAmount;
+    }
+}
+```
+✅ Value Objects
+Value objects are immutable, equality-driven domain concepts.
+
+```csharp
+Copy
+Edit
+public class Address : ValueObject
+{
+    public string Street { get; }
+    public string City { get; }
+    public string PostalCode { get; }
+
+    public Address(string street, string city, string postalCode)
+    {
+        Street = street;
+        City = city;
+        PostalCode = postalCode;
+    }
+
+    protected override IEnumerable<object> GetEqualityComponents()
+    {
+        yield return Street;
+        yield return City;
+        yield return PostalCode;
+    }
+}
+```
+✅ Enumerations
+Enums with behavior and metadata support.
+
+✅ Repositories
+Interfaces for handling data persistence:
+
+IAggregateRepository<TAggregateRoot>
+IReadRepository<T>
+
+🆕 4. Working with Aggregates
+New in version 1.2.65
+Aggregates now follow a strict event-driven model. Unlike regular entities, they:
+
+Enforce consistency across related entities.
+Use event sourcing to track and replay changes.
+Always have a Guid ID.
+🔹 Aggregate Example: Product
+```csharp
+Copy
+Edit
+public class Product : EventSourcedAggregateRoot<ProductEvent>
+{
+    public string Name { get; private set; }
+    public decimal Price { get; private set; }
+    private readonly List<ProductReview> _reviews = new();
+    public IReadOnlyCollection<ProductReview> Reviews => _reviews.AsReadOnly();
+
+    private Product() { }
+
+    public Product(Guid id, string name, decimal price) : base(id)
+    {
+        RaiseEvent(new ProductCreatedEvent(id, name, price));
+    }
+
+    public void UpdatePrice(decimal newPrice)
+    {
+        if (newPrice <= 0)
+            throw new InvalidOperationException("Price must be positive.");
+
+        RaiseEvent(new ProductPriceUpdatedEvent(Id, newPrice));
+    }
+
+    public void AddReview(string comment, int rating)
+    {
+        if (rating < 1 || rating > 5)
+            throw new InvalidOperationException("Rating must be between 1 and 5.");
+
+        RaiseEvent(new ProductReviewAddedEvent(Id, comment, rating));
+    }
+
+    public void Apply(ProductCreatedEvent @event)
+    {
+        Id = @event.ProductId;
+        Name = @event.Name;
+        Price = @event.Price;
+    }
+
+    public void Apply(ProductPriceUpdatedEvent @event)
+    {
+        Price = @event.NewPrice;
+    }
+
+    public void Apply(ProductReviewAddedEvent @event)
+    {
+        _reviews.Add(new ProductReview(@event.Comment, @event.Rating));
+    }
+}
+```
+5. Event Handling in Aggregates
+Aggregates don’t allow direct state modifications. Instead, changes are applied through events.
+
+Event Definitions
+```csharp
+public class ProductCreatedEvent : BaseEvent
+{
+    public Guid ProductId { get; }
+    public string Name { get; }
+    public decimal Price { get; }
+
+    public ProductCreatedEvent(Guid productId, string name, decimal price)
+    {
+        ProductId = productId;
+        Name = name;
+        Price = price;
+    }
+}
+
+public class ProductPriceUpdatedEvent : BaseEvent
+{
+    public Guid ProductId { get; }
+    public decimal NewPrice { get; }
+
+    public ProductPriceUpdatedEvent(Guid productId, decimal newPrice)
+    {
+        ProductId = productId;
+        NewPrice = newPrice;
+    }
+}
+
+public class ProductReviewAddedEvent : BaseEvent
+{
+    public Guid ProductId { get; }
+    public string Comment { get; }
+    public int Rating { get; }
+
+    public ProductReviewAddedEvent(Guid productId, string comment, int rating)
+    {
+        ProductId = productId;
+        Comment = comment;
+        Rating = rating;
+    }
+}
+
+
+```
+Changelog
+Version 1.2.65
+Introduced explicit separation between Entities and Aggregates.
+Implemented event-based aggregate structure.
+Upgraded to .NET 9.
+
 
 ### **4. Event-Driven Architecture**
 - Event abstractions for integrating and handling domain and integration events:
@@ -62,7 +218,7 @@ This package relies on:
 
 ## **Version Information**
 
-- **Current Version**: 1.2.64
+- **Current Version**: 1.2.65
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -83,7 +239,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Business --Version 1.2.64
+dotnet add package Franz.Common.Business --Version 1.2.65
 ```
 
 ---
@@ -253,7 +409,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.64
+### Version 1.2.65
 
 - Upgrade version to .net 9
 

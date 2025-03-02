@@ -1,60 +1,172 @@
-﻿# **Franz.Common.EntityFramework**
+﻿# **Franz.Common.EntityFramework**  
 
 A comprehensive library within the **Franz Framework**, designed to extend and simplify the integration of **Entity Framework Core** in .NET applications. This package provides additional features, abstractions, and utilities for managing relational and NoSQL databases, including support for **Cosmos DB** and **MongoDB**.
 
 ---
 
-## **Features**
+## **Features**  
 
-- **Database Configurations**:
-  - Flexible configurations for **Cosmos DB** (`CosmosDBConfig`) and **MongoDB** (`MongoDBConfig`).
-  - Centralized management of database options (`DatabaseOptions`).
-- **Repositories**:
-  - Abstractions for data persistence:
-    - `ReadRepository`: For querying read-only data.
-    - `AggregateRepository`: For managing aggregates in domain-driven design.
-- **Multi-Database Context**:
-  - Support for multiple database contexts (`DbContextMultiDatabase`).
-- **Behaviors**:
-  - `PersistenceBehavior` for managing transactional and persistence concerns.
-- **Conversions**:
-  - `EnumerationConverter`: Converts enumerations to database-friendly formats.
-- **Extensions**:
-  - `MediatorExtensions`: Extensions for MediatR.
-  - `ModelBuilderExtensions`: Simplify model configuration.
-  - `ServiceCollectionExtensions`: Streamlined dependency injection setup.
-
----
-
-## **Version Information**
-
-- **Current Version**: 1.2.64
-- Part of the private **Franz Framework** ecosystem.
+- **Database Configurations**:  
+  - Flexible configurations for **Cosmos DB** (`CosmosDBConfig`) and **MongoDB** (`MongoDBConfig`).  
+  - Centralized management of database options (`DatabaseOptions`).  
+- **Repositories** (**🆕 Separation of Entity and Aggregate Repositories**):  
+  - `EntityRepository<TEntity>`: CRUD operations for standalone entities.  
+  - `AggregateRepository<TAggregateRoot>`: Manages aggregates using event sourcing.  
+  - `ReadRepository<T>`: Read-only data access.  
+- **Multi-Database Context**:  
+  - Support for multiple database contexts (`DbContextMultiDatabase`).  
+- **Behaviors**:  
+  - `PersistenceBehavior` for managing transactional and persistence concerns.  
+- **Conversions**:  
+  - `EnumerationConverter`: Converts enumerations to database-friendly formats.  
+- **Extensions**:  
+  - `MediatorExtensions`: Extensions for MediatR.  
+  - `ModelBuilderExtensions`: Simplify model configuration.  
+  - `ServiceCollectionExtensions`: Streamlined dependency injection setup.  
 
 ---
 
-## **Dependencies**
+## **Version Information**  
 
-This package relies on:
-- **Microsoft.EntityFrameworkCore** (8.0.0): Core Entity Framework functionality.
-- **Microsoft.EntityFrameworkCore.Cosmos** (8.0.0): Cosmos DB provider for EF Core.
-- **Microsoft.EntityFrameworkCore.Relational** (8.0.0): Relational database provider for EF Core.
-- **Microsoft.Extensions.Configuration.Abstractions** (8.0.0): For configuration management.
-- **Microsoft.Extensions.Hosting.Abstractions** (8.0.0): Hosting abstractions for dependency injection.
-- **MongoDB.Driver** (2.22.0): MongoDB .NET driver for NoSQL database interaction.
-- **Franz.Common.Business**: DDD and CQRS support.
-- **Franz.Common.DependencyInjection**: Simplified DI patterns.
-- **Franz.Common.Errors**: Centralized error management.
-- **Franz.Common.MultiTenancy**: Multi-tenancy support for databases.
-- **Franz.Common.Reflection**: Advanced reflection utilities.
+- **Current Version**: 1.2.65  
+- Part of the private **Franz Framework** ecosystem.  
 
 ---
 
-## **Installation**
+## **🆕 Separation of Entity and Aggregate Repositories**  
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+> **As of version 1.2.65**, repositories have been split into:  
+> - **`EntityRepository<TEntity>`** → Used for **CRUD-based** operations.  
+> - **`AggregateRepository<TAggregateRoot>`** → Used for **event-sourced aggregates**.  
 
+### **1️⃣ Entity Repository (CRUD Operations)**  
+For simple **standalone entities** that don’t require event sourcing:  
+```csharp
+public class EntityRepository<TDbContext, TEntity> : IEntityRepository<TEntity>
+    where TDbContext : DbContext
+    where TEntity : class, IEntity
+{
+    protected readonly TDbContext DbContext;
+
+    public EntityRepository(TDbContext dbContext)
+    {
+        DbContext = dbContext;
+    }
+
+    public async Task<TEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await DbContext.Set<TEntity>().FindAsync(new object?[] { id }, cancellationToken);
+    }
+
+    public async Task AddAsync(TEntity entity, CancellationToken cancellationToken = default)
+    {
+        await DbContext.Set<TEntity>().AddAsync(entity, cancellationToken);
+        await DbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateAsync(TEntity entity, CancellationToken cancellationToken = default)
+    {
+        DbContext.Set<TEntity>().Update(entity);
+        await DbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(TEntity entity, CancellationToken cancellationToken = default)
+    {
+        DbContext.Set<TEntity>().Remove(entity);
+        await DbContext.SaveChangesAsync(cancellationToken);
+    }
+}
+```
+✅ **Best for:**  
+- Entities that **don’t require consistency across multiple objects**.  
+- Standard **CRUD operations** (Create, Read, Update, Delete).  
+
+---
+
+### **2️⃣ Aggregate Repository (Event-Sourced Aggregates)**  
+For managing **aggregates** using **event sourcing**:  
+```csharp
+public abstract class AggregateRepository<TDbContext, TAggregateRoot, TEvent>
+    where TDbContext : DbContext
+    where TAggregateRoot : EventSourcedAggregateRoot<TEvent>
+    where TEvent : BaseEvent
+{
+    protected readonly TDbContext DbContext;
+    private readonly IEventStore _eventStore;
+
+    public AggregateRepository(TDbContext dbContext, IEventStore eventStore)
+    {
+        DbContext = dbContext;
+        _eventStore = eventStore;
+    }
+
+    public async Task<TAggregateRoot> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var aggregate = await DbContext.Set<TAggregateRoot>().FindAsync(new object[] { id }, cancellationToken);
+        if (aggregate == null) return null;
+
+        var events = await _eventStore.GetEventsByAggregateIdAsync(id);
+        aggregate.ReplayEvents(events);
+
+        return aggregate;
+    }
+
+    public async Task SaveAsync(TAggregateRoot aggregate, CancellationToken cancellationToken = default)
+    {
+        var uncommittedChanges = aggregate.GetUncommittedChanges();
+
+        foreach (var @event in uncommittedChanges)
+        {
+            await _eventStore.SaveEventAsync(@event);
+        }
+
+        aggregate.MarkChangesAsCommitted();
+        await DbContext.SaveChangesAsync(cancellationToken);
+    }
+}
+```
+✅ **Best for:**  
+- Aggregates that require **transactional consistency**.  
+- Systems using **event sourcing**.  
+- Complex **business rules that enforce domain logic**.  
+
+---
+
+### **🆕 3️⃣ Choosing the Right Repository**  
+
+| **Feature** | **EntityRepository** | **AggregateRepository** |
+|------------|---------------------|------------------------|
+| **Use Case** | Standalone entities | Event-sourced aggregates |
+| **CRUD Support?** | ✅ Yes | ❌ No (modifications via events) |
+| **Supports Event Sourcing?** | ❌ No | ✅ Yes |
+| **Direct Entity Access?** | ✅ Yes | ❌ No (changes happen via root) |
+
+---
+
+## **Usage Examples**  
+
+### **1️⃣ CRUD-Based Repository (For Entities)**  
+```csharp
+public class OrderRepository : EntityRepository<AppDbContext, Order>
+{
+    public OrderRepository(AppDbContext dbContext) : base(dbContext) { }
+}
+```
+
+### **2️⃣ Event-Sourced Repository (For Aggregates)**  
+```csharp
+public class ProductRepository : AggregateRepository<AppDbContext, Product, ProductEvent>
+{
+    public ProductRepository(AppDbContext dbContext, IEventStore eventStore)
+        : base(dbContext, eventStore) { }
+}
+```
+
+---
+
+## **Installation**  
+
+### **From Private Azure Feed**  
 ```bash
 dotnet nuget add source "https://your-private-feed-url" \
   --name "AzurePrivateFeed" \
@@ -62,124 +174,38 @@ dotnet nuget add source "https://your-private-feed-url" \
   --password "YourAzurePassword" \
   --store-password-in-clear-text
 ```
-
-Install the package:
-
+Install the package:  
 ```bash
-dotnet add package Franz.Common.EntityFramework --Version 1.2.64
+dotnet add package Franz.Common.EntityFramework --Version 1.2.65
 ```
 
 ---
 
-## **Usage**
-
-### **1. Configuring Database Contexts**
-
-Define a context using `DbContextBase` or `DbContextMultiDatabase`:
-
-```csharp
-using Franz.Common.EntityFramework;
-
-public class AppDbContext : DbContextBase
-{
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-
-    public DbSet<Order> Orders { get; set; }
-}
-```
-
-### **2. Cosmos DB Configuration**
-
-Use the `CosmosDBConfig` class to configure Cosmos DB:
-
-```csharp
-using Franz.Common.EntityFramework.Configuration;
-
-var cosmosConfig = new CosmosDBConfig
-{
-    Endpoint = "https://cosmosdb-endpoint.documents.azure.com",
-    Key = "your-cosmos-key",
-    DatabaseName = "MyDatabase"
-};
-```
-
-### **3. MongoDB Configuration**
-
-Configure MongoDB using `MongoDBConfig`:
-
-```csharp
-using Franz.Common.EntityFramework.Configuration;
-
-var mongoConfig = new MongoDBConfig
-{
-    ConnectionString = "mongodb://localhost:27017",
-    DatabaseName = "MyMongoDatabase"
-};
-```
-
-### **4. Dependency Injection**
-
-Use `ServiceCollectionExtensions` to register EF Core services:
-
-```csharp
-using Franz.Common.EntityFramework.Extensions;
-
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer("YourConnectionString"));
-
-        services.AddCosmosDB(cosmosConfig);
-        services.AddMongoDB(mongoConfig);
-    }
-}
-```
-
-### **5. Repositories**
-
-Leverage `ReadRepository` or `AggregateRepository` for querying and persistence:
-
-```csharp
-using Franz.Common.EntityFramework.Repositories;
-
-public class OrderRepository : ReadRepository<Order>
-{
-    public OrderRepository(AppDbContext context) : base(context) { }
-}
-```
+## **Integration with Franz Framework**  
+The **Franz.Common.EntityFramework** library integrates seamlessly with:  
+- **Franz.Common.Business**: Enables **DDD and CQRS** patterns.  
+- **Franz.Common.DependencyInjection**: Simplifies **DI setup** for repositories.  
+- **Franz.Common.Errors**: Provides **standardized error handling**.  
 
 ---
 
-## **Integration with Franz Framework**
-
-The **Franz.Common.EntityFramework** library integrates seamlessly with:
-- **Franz.Common.Business**: Enables DDD and CQRS patterns.
-- **Franz.Common.DependencyInjection**: Simplifies DI setup for database services.
-- **Franz.Common.Errors**: Provides standardized error handling.
-
-Ensure these dependencies are installed to fully utilize the library.
+## **Contributing**  
+This package is part of a private framework. Contributions are limited to the internal development team.  
+1. Clone the repository. @ [GitHub - Franz.Common](https://github.com/bestacio89/Franz.Common/)  
+2. Create a feature branch.  
+3. Submit a pull request for review.  
 
 ---
 
-## **Contributing**
-
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
+## **License**  
+This library is licensed under the MIT License.
 
 ---
 
-## **License**
-
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
+## **Changelog**  
+### **Version 1.2.65**  
+- **Introduced explicit separation between Entity and Aggregate Repositories.**  
+- **Implemented event-based aggregate repository structure.**  
+- **Upgraded to .NET 9**.  
 
 ---
-
-## **Changelog**
-
-### Version 1.2.64
-- Upgrade version to .net 9
-
