@@ -1,4 +1,4 @@
-﻿# **Franz.Common.EntityFramework**  
+# **Franz.Common.EntityFramework**  
 
 A comprehensive library within the **Franz Framework**, designed to extend and simplify the integration of **Entity Framework Core** in .NET applications. This package provides additional features, abstractions, and utilities for managing relational and NoSQL databases, including support for **Cosmos DB** and **MongoDB**.
 
