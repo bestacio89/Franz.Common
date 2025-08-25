@@ -17,7 +17,7 @@ A specialized library within the **Franz Framework**, designed to streamline the
 
 ## **Version Information**
 
-- **Current Version**: 1.2.65
+- **Current Version**: 1.3
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -127,4 +127,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ### Version 1.2.65
 - Upgrade version to .net 9
-
+### Version 1.3
+- Upgrade version to .net 9.0.8
+- New features and improvements
+- Mediator concepts separated and compatible with both custom mediator and Mediatr

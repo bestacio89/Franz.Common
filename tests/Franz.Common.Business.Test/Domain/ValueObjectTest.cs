@@ -1,3 +1,4 @@
+#nullable enable
 using Franz.Common.Business.Domain;
 using Xunit;
 
@@ -5,14 +6,17 @@ namespace Franz.Common.Business.Tests.Domain;
 
 public class ValueObjectTest
 {
-  private static readonly ValueObject FicheEtatCivileUnique = CreateDefaultFicheEtatCivileValueObject();
-  private static readonly ValueObject AddresseUnique = CreateDefaulAddresse();
+  // Non-nullable static test objects
+  private static readonly FicheEtatCivile FicheEtatCivileUnique = CreateDefaultFicheEtatCivileValueObject();
+  private static readonly Addresse AddresseUnique = CreateDefaultAddresse();
 
   [Theory]
   [MemberData(nameof(EqualValueObjects))]
   public void Equals_SameObjects_ReturnsTrue(ValueObject? instanceA, ValueObject? instanceB, string raison)
   {
-    var result = EqualityComparer<ValueObject>.Default.Equals(instanceA, instanceB);
+    var result = instanceA is null && instanceB is null
+        ? true
+        : EqualityComparer<ValueObject>.Default.Equals(instanceA, instanceB);
 
     Assert.True(result, raison);
   }
@@ -21,7 +25,9 @@ public class ValueObjectTest
   [MemberData(nameof(NoEqualValueObjects))]
   public void Equals_NoSameObjects_ReturnsFalse(ValueObject? instanceA, ValueObject? instanceB, string raison)
   {
-    var result = EqualityComparer<ValueObject>.Default.Equals(instanceA, instanceB);
+    var result = instanceA is null && instanceB is null
+        ? true
+        : EqualityComparer<ValueObject>.Default.Equals(instanceA, instanceB);
 
     Assert.False(result, raison);
   }
@@ -29,29 +35,22 @@ public class ValueObjectTest
   [Fact]
   public void Equals_NoSameTypeOfValueObject_ReturnsFalse()
   {
-
     var result = FicheEtatCivileUnique.Equals(AddresseUnique);
-
-    Assert.False(result, "Les deux ValuesObject ne sont pas de même type.");
+    Assert.False(result, "Les deux ValueObjects ne sont pas de même type.");
   }
 
-  [Fact]
-  public void Copy_SameValueObjectAfter_ReturnsTrue()
-  {
-    var AddresseCopie = AddresseUnique.GetCopy();
-
-    Assert.True(AddresseCopie.Equals(AddresseUnique));
-  }
+[Fact]
+public void Copy_SameValueObjectAfter_ReturnsTrue()
+{
+    var addresseCopie = AddresseUnique.GetCopy(); 
+    Assert.True(addresseCopie.Equals(AddresseUnique));
+}
 
   private static FicheEtatCivile CreateDefaultFicheEtatCivileValueObject()
-  {
-    return new("John", "Doe", 32);
-  }
+      => new("John", "Doe", 32);
 
-  private static Addresse CreateDefaulAddresse()
-  {
-    return new("Ligne 1", "Ligne 2", "Strasbourg", "67300");
-  }
+  private static Addresse CreateDefaultAddresse()
+      => new("Ligne 1", "Ligne 2", "Strasbourg", "67300");
 
   public class FicheEtatCivile : ValueObject
   {
@@ -65,7 +64,6 @@ public class ValueObjectTest
       Prenom = prenom;
       Age = age;
     }
-
 
     protected override IEnumerable<object> GetEqualityComponents()
     {
@@ -100,40 +98,16 @@ public class ValueObjectTest
   }
 
   public static readonly TheoryData<ValueObject?, ValueObject?, string> EqualValueObjects = new()
-  {
     {
-      null,
-      null,
-      "Doivent être égales car les deux instances sont nulles."
-    },
-    {
-      FicheEtatCivileUnique,
-      FicheEtatCivileUnique,
-      "Doivent être égales car c'est la même instance ValueObject."
-    },
-    {
-      new FicheEtatCivile("Albert", "Einstein", 70),
-      new FicheEtatCivile("Albert", "Einstein", 70),
-      "Doivent être égales car ces deux ValueObject ont les mêmes égalités de membres."
-    }
-  };
+        { null, null, "Doivent être égales car les deux instances sont nulles." },
+        { FicheEtatCivileUnique, FicheEtatCivileUnique, "Doivent être égales car c'est la même instance ValueObject." },
+        { new FicheEtatCivile("Albert", "Einstein", 70), new FicheEtatCivile("Albert", "Einstein", 70), "Doivent être égales car ces deux ValueObjects ont les mêmes égalités de membres." }
+    };
 
   public static readonly TheoryData<ValueObject, ValueObject, string> NoEqualValueObjects = new()
-  {
     {
-      new FicheEtatCivile("Albert", "Einstein", 40),
-      new FicheEtatCivile("Albert", "Einstein", 70),
-      "Ne doivent pas être égales car ils différent sur l'âge."
-    },
-          {
-      new FicheEtatCivile("Albert", "Einstein", 70),
-      new FicheEtatCivile("Albert", "Enstein", 70),
-      "Ne doivent pas être égales car ils différent sur le nom."
-    },
-    {
-      new FicheEtatCivile("Albert", "Einstein", 70),
-      new FicheEtatCivile("Alberts", "Einstein", 70),
-      "Ne doivent pas être égales car ils différent sur le prénom."
-    }
-  };
+        { new FicheEtatCivile("Albert", "Einstein", 40), new FicheEtatCivile("Albert", "Einstein", 70), "Ne doivent pas être égales car ils différent sur l'âge." },
+        { new FicheEtatCivile("Albert", "Einstein", 70), new FicheEtatCivile("Albert", "Enstein", 70), "Ne doivent pas être égales car ils différent sur le nom." },
+        { new FicheEtatCivile("Albert", "Einstein", 70), new FicheEtatCivile("Alberts", "Einstein", 70), "Ne doivent pas être égales car ils différent sur le prénom." }
+    };
 }

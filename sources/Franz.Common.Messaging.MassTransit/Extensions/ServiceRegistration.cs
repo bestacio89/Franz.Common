@@ -14,11 +14,13 @@ public static class MassTransitKafkaServiceRegistration
   {
     services.AddMassTransit(x =>
     {
+      // In-memory bus (optional, for testing or local)
       x.UsingInMemory((context, cfg) =>
       {
         cfg.ConfigureEndpoints(context);
       });
 
+      // Kafka rider
       x.AddRider(rider =>
       {
         configureConsumers?.Invoke(rider);
@@ -42,7 +44,5 @@ public static class MassTransitKafkaServiceRegistration
     // Register your KafkaProducer
     services.AddScoped<IKafkaProducer, KafkaProducer>();
 
-    // Add hosted service
-    services.AddMassTransitHostedService();
   }
 }

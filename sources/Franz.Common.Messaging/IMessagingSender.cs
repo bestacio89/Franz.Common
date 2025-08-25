@@ -1,9 +1,11 @@
-using Franz.Common.Business.Commands;
+
+
+using Franz.Common.Mediator.Messages;
 
 namespace Franz.Common.Messaging;
 
 public interface IMessagingSender
 {
     void Send<TCommandBaseRequest>(TCommandBaseRequest command)
-      where TCommandBaseRequest : ICommandBaseRequest;
+      where TCommandBaseRequest : ICommand;
 }

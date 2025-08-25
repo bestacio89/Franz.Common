@@ -1,3 +1,4 @@
+﻿#nullable enable
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
@@ -37,11 +38,13 @@ namespace Franz.Common.Messaging.Kafka.Hosting
         try
         {
           var consumeResult = _consumer.Consume();
+
           var message = new Message
           {
             Headers = TransfertHeaders(consumeResult),
-            Body = consumeResult.Value,
+            Body = consumeResult.Message.Value ?? string.Empty, // ✅ Ensure non-null
           };
+
           Received?.Invoke(this, new MessageEventArgs(message));
         }
         catch (ConsumeException e)
@@ -51,6 +54,7 @@ namespace Franz.Common.Messaging.Kafka.Hosting
       }
     }
 
+
     public void StopListen()
     {
       _consumer.Unsubscribe();
@@ -58,12 +62,15 @@ namespace Franz.Common.Messaging.Kafka.Hosting
 
     public static MessageHeaders TransfertHeaders(ConsumeResult<Ignore, string> consumeResult)
     {
-      var dictionary = consumeResult.Headers
-          .ToDictionary(x => x.Key, x => new StringValues(Encoding.UTF8.GetString(x.GetValueBytes())));
+      var dictionary = consumeResult.Message.Headers
+          .ToDictionary(
+              header => header.Key ?? string.Empty, // Ensure key is not null
+              header => new StringValues(
+                  Encoding.UTF8.GetString(header.GetValueBytes() ?? Array.Empty<byte>())
+              )
+          );
 
-      var result = new MessageHeaders(dictionary);
-
-      return result;
+      return new MessageHeaders(dictionary);
     }
   }
 }

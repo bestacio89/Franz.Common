@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 	  <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
@@ -7,8 +7,8 @@
 	<Import Project="..\..\common.targets" />
 
 	<ItemGroup>
-		<PackageReference Include="Pomelo.EntityFrameworkCore.Mysql" Version="8.0.2" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.2" />
+		<PackageReference Include="Pomelo.EntityFrameworkCore.Mysql" Version="9.0.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.8" />
 	  <ProjectReference Include="..\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
 	</ItemGroup>
 

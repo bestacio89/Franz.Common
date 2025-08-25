@@ -1,31 +1,36 @@
+using Franz.Common.Mediator.Handlers;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Franz.Common.Business.Helpers;
-public class HandlerCollector
+namespace Franz.Common.Business.Helpers
 {
-  public static void CollectHandlers(IServiceCollection services, Assembly assembly)
+  public static class HandlerCollector
   {
-    var handlerInterfaceType = typeof(IRequestHandler<,>);
-
-    foreach (var type in assembly.GetTypes()
-        .Where(t => t.IsClass && !t.IsAbstract && !t.IsGenericTypeDefinition))
+    public static void CollectHandlers(IServiceCollection services, Assembly assembly)
     {
-      var interfaces = type.GetInterfaces();
-      var handlerInterface = interfaces.FirstOrDefault(i => i.IsGenericType &&
-          i.GetGenericTypeDefinition() == handlerInterfaceType);
-
-      if (handlerInterface != null)
+      foreach (var type in assembly.GetTypes()
+          .Where(t => t.IsClass && !t.IsAbstract && !t.IsGenericTypeDefinition))
       {
-        var requestType = handlerInterface.GetGenericArguments()[0];
-        var responseType = handlerInterface.GetGenericArguments()[1];
+        var interfaces = type.GetInterfaces();
 
-        services.AddTransient(handlerInterface, type);
+        // Command handlers
+        var commandHandler = interfaces.FirstOrDefault(i =>
+            i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICommandHandler<,>));
+        if (commandHandler != null)
+        {
+          services.AddTransient(commandHandler, type);
+          continue; // skip to next type
+        }
+
+        // Query handlers
+        var queryHandler = interfaces.FirstOrDefault(i =>
+            i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryHandler<,>));
+        if (queryHandler != null)
+        {
+          services.AddTransient(queryHandler, type);
+        }
       }
     }
   }

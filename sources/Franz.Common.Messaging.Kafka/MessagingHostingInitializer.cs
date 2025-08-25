@@ -1,3 +1,4 @@
+#nullable enable
 using Franz.Common.Hosting;
 
 namespace Franz.Common.Messaging.Kafka;

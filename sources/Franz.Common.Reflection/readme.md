@@ -20,7 +20,7 @@ A utility library within the **Franz Framework** that provides reflection-based 
 
 ## **Version Information**
 
-- **Current Version**: 1.2.65
+- **Current Version**: 1.3
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -143,3 +143,10 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added `ServiceCollectionExtensions` and `HostBuilderExtensions` for dynamic dependency injection and host configuration.
 
 ---
+
+
+### Version 1.3
+- Upgraded to **.NET 9.0.8**
+- Added **new features and improvements**
+- Separated **business concepts** from **mediator concepts**
+- Now compatible with both the **in-house mediator** and **MediatR**

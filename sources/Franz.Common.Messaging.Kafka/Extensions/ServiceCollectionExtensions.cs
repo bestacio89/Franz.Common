@@ -1,3 +1,4 @@
+#nullable enable
 using Microsoft.Extensions.Configuration;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Kafka.Connections;

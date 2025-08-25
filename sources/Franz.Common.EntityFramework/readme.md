@@ -28,7 +28,7 @@ A comprehensive library within the **Franz Framework**, designed to extend and s
 
 ## **Version Information**  
 
-- **Current Version**: 1.2.65  
+- **Current Version**: 1.3
 - Part of the private **Franz Framework** ecosystem.  
 
 ---
@@ -206,6 +206,12 @@ This library is licensed under the MIT License.
 ### **Version 1.2.65**  
 - **Introduced explicit separation between Entity and Aggregate Repositories.**  
 - **Implemented event-based aggregate repository structure.**  
-- **Upgraded to .NET 9**.  
+- **Upgraded to .NET 9**. 
+
+### Version 1.3
+- Upgraded to **.NET 9.0.8**
+- Added **new features and improvements**
+- Separated **business concepts** from **mediator concepts**
+- Now compatible with both the **in-house mediator** and **MediatR**
 
 ---

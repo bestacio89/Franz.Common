@@ -1,30 +1,37 @@
-using Franz.Common.Business.Commands;
-using MediatR;
+
+using Franz.Common.Mediator.Messages;
+using Franz.Common.Mediator.Pipelines;
 using Microsoft.Extensions.Logging;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace Franz.Common.EntityFramework.Behaviors;
-public class PersistenceBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>, ICommandBaseRequest
+namespace Franz.Common.EntityFramework.Behaviors
 {
-  private readonly DbContextBase dbContextBase;
-  private readonly ILogger<PersistenceBehavior<TRequest, TResponse>> logger;
-
-  public PersistenceBehavior(DbContextBase dbContextBase, ILogger<PersistenceBehavior<TRequest, TResponse>> logger)
+  public class PersistenceBehavior<TRequest, TResponse> : IPipeline<TRequest, TResponse>
+      where TRequest : ICommand<TResponse>
   {
-    this.dbContextBase = dbContextBase;
-    this.logger = logger;
-  }
+    private readonly DbContextBase _dbContextBase;
+    private readonly ILogger<PersistenceBehavior<TRequest, TResponse>> _logger;
 
-  public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
-  {
-    logger.LogInformation($"Persistence handling {typeof(TRequest).Name}");
+    public PersistenceBehavior(
+        DbContextBase dbContextBase,
+        ILogger<PersistenceBehavior<TRequest, TResponse>> logger)
+    {
+      _dbContextBase = dbContextBase;
+      _logger = logger;
+    }
 
-    var response = await next();
+    public async Task<TResponse> Handle(TRequest request, Func<Task<TResponse>> next, CancellationToken cancellationToken)
+    {
+      _logger.LogInformation($"Persistence handling {typeof(TRequest).Name}");
 
-    logger.LogInformation($"Persistence handled {typeof(TResponse).Name}");
+      var response = await next();
 
-    await dbContextBase.SaveEntitiesAsync(cancellationToken);
+      _logger.LogInformation($"Persistence handled {typeof(TResponse).Name}");
 
-    return response;
+      await _dbContextBase.SaveEntitiesAsync(cancellationToken);
+
+      return response;
+    }
   }
 }

@@ -1,3 +1,4 @@
+#nullable enable
 using Franz.Common.Messaging.Kafka.Connections;
 using Franz.Common.Messaging.KafKa.Modeling;
 

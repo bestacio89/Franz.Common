@@ -19,7 +19,7 @@ A dedicated library within the **Franz Framework** that extends **Entity Framewo
 
 ## **Version Information**
 
-- **Current Version**: 1.2.65
+- **Current Version**: 1.3
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -27,7 +27,7 @@ A dedicated library within the **Franz Framework** that extends **Entity Framewo
 ## **Dependencies**
 
 This package relies on:
-- **Npgsql.EntityFrameworkCore.PostgreSQL** (8.0.0): Official EF Core provider for PostgreSQL.
+- **Npgsql.EntityFrameworkCore.PostgreSQL** (9.0.0): Official EF Core provider for PostgreSQL.
 - **Franz.Common.EntityFramework**: Core EF utilities and repository patterns.
 - **Franz.Common.MultiTenancy**: Multi-tenancy support for PostgreSQL databases.
 
@@ -142,4 +142,10 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ### Version 1.2.65
 - Upgrade version to .net 9
+
+### Version 1.3
+- Upgraded to **.NET 9.0.8**
+- Added **new features and improvements**
+- Separated **business concepts** from **mediator concepts**
+- Now compatible with both the **in-house mediator** and **MediatR**
 

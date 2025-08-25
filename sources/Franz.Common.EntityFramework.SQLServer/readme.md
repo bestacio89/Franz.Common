@@ -21,7 +21,7 @@ A private utility library for seamless integration of **Entity Framework Core** 
 
 ## **Version Information**
 
-- **Current Version**: `1.2.65`
+- **Current Version**: `1.3`
 - This package and all related `Franz` packages are under active development and maintained privately.
 
 ---
@@ -117,3 +117,9 @@ This library is part of a private framework and subject to internal licensing te
 
 ### Version 1.2.65
 - Upgrade version to .net 9
+
+### Version 1.3
+- Upgraded to **.NET 9.0.8**
+- Added **new features and improvements**
+- Separated **business concepts** from **mediator concepts**
+- Now compatible with both the **in-house mediator** and **MediatR**

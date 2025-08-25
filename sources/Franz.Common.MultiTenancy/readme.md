@@ -17,7 +17,7 @@ A lightweight library within the **Franz Framework** designed to enable multi-te
 
 ## **Version Information**
 
-- **Current Version**: 1.2.65
+- **Current Version**: 1.3
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -140,3 +140,9 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added `IDomainContextAccessor` for retrieving domain-specific data.
 - Simplified multi-tenancy support for .NET applications.
 
+
+### Version 1.3
+- Upgraded to **.NET 9.0.8**
+- Added **new features and improvements**
+- Separated **business concepts** from **mediator concepts**
+- Now compatible with both the **in-house mediator** and **MediatR**

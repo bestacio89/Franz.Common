@@ -1,5 +1,6 @@
+#nullable enable
 using Confluent.Kafka;
-using Franz.Common.Business.Commands;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Factories;
 using System.Text;
@@ -26,7 +27,7 @@ namespace Franz.Common.Messaging.Kafka
       _messageFactory = messageFactory;
     }
 
-    public void Send<TCommandBaseRequest>(TCommandBaseRequest command) where TCommandBaseRequest : ICommandBaseRequest
+    public void Send<TCommandBaseRequest>(TCommandBaseRequest command) where TCommandBaseRequest : ICommand
     {
       var message = _messageFactory.Build(command);
 
@@ -35,15 +36,24 @@ namespace Franz.Common.Messaging.Kafka
       Send(command, message);
     }
 
-    private void Send(ICommandBaseRequest command, Message message)
+    private void Send(ICommand command, Message message)
     {
+      if (_producer is null)
+        throw new InvalidOperationException("Kafka producer is not initialized.");
+
       var topicName = TopicNamer.GetTopicName(command.GetType().Assembly);
-      var headers = BuildHeaders(message);
-      var body = BuildBody(message);
+      var headers = BuildHeaders(message) ?? new Confluent.Kafka.Headers(); // fallback to empty headers
+      var body = BuildBody(message) ?? Array.Empty<byte>();                 // fallback to empty body
 
       _messagingTransaction?.Begin();
 
-      _producer.ProduceAsync(topicName, new Message<string, byte[]> { Headers = headers, Value = body });
+      // ProduceAsync returns a Task, we should await it if this method becomes async
+      _producer.ProduceAsync(topicName, new Confluent.Kafka.Message<string, byte[]>
+      {
+        Headers = headers,
+        Value = body
+      });
+
       _producer.Flush();
     }
 

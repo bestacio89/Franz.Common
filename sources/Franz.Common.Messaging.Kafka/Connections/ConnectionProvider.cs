@@ -1,8 +1,8 @@
-namespace Franz.Common.Messaging.Kafka.Connections;
+#nullable enable
 
 using Confluent.Kafka;
 using System;
-
+namespace Franz.Common.Messaging.Kafka.Connections;
 public sealed class ConnectionProvider : IConnectionProvider, IDisposable
 {
   private readonly IConnectionFactoryProvider connectionFactoryProvider;

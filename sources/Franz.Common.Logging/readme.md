@@ -19,7 +19,7 @@ A comprehensive logging library within the **Franz Framework**, designed to enha
 
 ## **Version Information**
 
-- **Current Version**: 1.2.65
+- **Current Version**: 1.3
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -141,3 +141,9 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ### Version 1.2.65
 - Upgrade version to .net 9
+
+### Version 1.3
+- Upgraded to **.NET 9.0.8**
+- Added **new features and improvements**
+- Separated **business concepts** from **mediator concepts**
+- Now compatible with both the **in-house mediator** and **MediatR**

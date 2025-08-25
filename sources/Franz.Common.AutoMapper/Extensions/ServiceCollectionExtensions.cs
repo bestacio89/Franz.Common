@@ -1,25 +1,25 @@
 ﻿using AutoMapper;
+using Microsoft.Extensions.DependencyInjection;
+using System.Reflection;
 
-namespace Microsoft.Extensions.DependencyInjection;
-public static class ServiceCollectionExtensions
+namespace Microsoft.Extensions.DependencyInjection
 {
-  public static IServiceCollection AddAutoMapper(this IServiceCollection services)
+  public static class ServiceCollectionExtensions
   {
-    services
-      .AddInheritedClassSingleton<Profile>()
-      .AddNoDuplicateSingleton(serviceProvider =>
+    /// <summary>
+    /// Registers AutoMapper with all profiles found in the calling assembly.
+    /// </summary>
+    public static IServiceCollection AddAutoMapper(this IServiceCollection services, params Assembly[] assemblies)
+    {
+      if (assemblies == null || assemblies.Length == 0)
       {
-        var profiles = serviceProvider.GetServices<Profile>();
+        assemblies = new[] { Assembly.GetCallingAssembly() };
+      }
 
-        var mapperConfiguration = new MapperConfiguration(configuration =>
-        {
-          configuration.AddProfiles(profiles);
-        });
-        var result = mapperConfiguration.CreateMapper();
+      // Register AutoMapper
+      services.AddAutoMapper(assemblies);
 
-        return result;
-      });
-
-    return services;
+      return services;
+    }
   }
 }

@@ -1,7 +1,7 @@
-using Franz.Common.Business.Commands;
+using Franz.Common.Mediator.Messages;
 
 namespace Franz.Common.Business.Tests.Samples;
 
-public class CreateSomething : ICommandRequest
+public class CreateSomething : ICommand
 {
 }

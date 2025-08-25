@@ -1,7 +1,7 @@
-using Franz.Common.Business.Commands;
 using Franz.Common.Business.Events;
 
 using Franz.Common.Errors;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Hosting.Delegating;
 using Franz.Common.Messaging.Hosting.Executing;
@@ -77,10 +77,10 @@ public class MessagingStrategyExecuter : IMessagingStrategyExecuter
 
     if (classMessage is IIntegrationEvent integrationEvent)
       await mediator.Publish(integrationEvent);
-    else if (classMessage is ICommandBaseRequest commandBaseRequest)
+    else if (classMessage is ICommand commandBaseRequest)
       await mediator.Send(commandBaseRequest);
     else
-      throw new TechnicalException(string.Format(Resources.MessagingStrategyExecuterParameterNotImplementedException, $"{nameof(IIntegrationEvent)} or {nameof(ICommandBaseRequest)}"));
+      throw new TechnicalException(string.Format(Resources.MessagingStrategyExecuterParameterNotImplementedException, $"{nameof(IIntegrationEvent)} or {nameof(ICommand)}"));
   }
 
   private static object GetParameter(Message message)

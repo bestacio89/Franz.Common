@@ -7,13 +7,14 @@
   <Import Project="..\..\common.targets" />
   
   <ItemGroup>
-    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="MediatR" Version="13.0.0" />
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
-    <PackageReference Include="Scrutor" Version="6.0.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.8" />
+    <PackageReference Include="Scrutor" Version="6.1.0" />
   </ItemGroup>
   
   <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
     <ProjectReference Include="..\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
     <ProjectReference Include="..\Franz.Common.Errors\Franz.Common.Errors.csproj" />
   </ItemGroup>

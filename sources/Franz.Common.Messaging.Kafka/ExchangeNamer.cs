@@ -3,7 +3,7 @@ using System.Reflection;
 
 namespace Franz.Common.Messaging.Kafka;
 
-public static class ExchangeNamer
+public static class ExchangeSourceNamer
 {
   private const string DeadLetterExchangeSuffixName = "-dlq";
   private const string EventExchangeSuffixName = "-event";

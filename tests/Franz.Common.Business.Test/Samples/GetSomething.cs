@@ -1,7 +1,8 @@
-using Franz.Common.Business.Queries;
+
+using Franz.Common.Mediator.Messages;
 
 namespace Franz.Common.Business.Tests.Samples;
 
-public class GetSomething : IQueryRequest<Something>
+public class GetSomething : IQuery<Something>
 {
 }
