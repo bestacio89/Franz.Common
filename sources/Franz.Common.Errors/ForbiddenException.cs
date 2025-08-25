@@ -19,8 +19,5 @@ public class ForbiddenException : Exception
     {
     }
 
-    protected ForbiddenException(SerializationInfo serializationInfo, StreamingContext streamingContext)
-      : base(serializationInfo, streamingContext)
-    {
-    }
+
 }

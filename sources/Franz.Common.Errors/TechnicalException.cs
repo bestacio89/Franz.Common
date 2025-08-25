@@ -19,8 +19,5 @@ public class TechnicalException : ExceptionBase
     {
     }
 
-    protected TechnicalException(SerializationInfo serializationInfo, StreamingContext context)
-        : base(serializationInfo, context)
-    {
-    }
+ 
 }

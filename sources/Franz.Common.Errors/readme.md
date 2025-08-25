@@ -114,4 +114,11 @@ This library is licensed under the MIT License. See the LICENSE file for more de
 
 ## **Changelog**
 
+### Version 1.2.065
 -- Upgrade to .net 9
+
+### Version 1.3
+- Upgraded to **.NET 9.0.8**
+- Added **new features and improvements**
+- Separated **business concepts** from **mediator concepts**
+- Now compatible with both the **in-house mediator** and **MediatR**

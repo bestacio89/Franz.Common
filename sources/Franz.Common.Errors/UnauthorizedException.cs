@@ -19,8 +19,5 @@ public class UnauthorizedException : ExceptionBase
     {
     }
 
-    protected UnauthorizedException(SerializationInfo serializationInfo, StreamingContext context)
-      : base(serializationInfo, context)
-    {
-    }
+    
 }

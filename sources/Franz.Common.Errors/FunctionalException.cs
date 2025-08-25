@@ -19,8 +19,5 @@ public class FunctionalException : ExceptionBase
     {
     }
 
-    protected FunctionalException(SerializationInfo serializationInfo, StreamingContext context)
-      : base(serializationInfo, context)
-    {
-    }
+  
 }

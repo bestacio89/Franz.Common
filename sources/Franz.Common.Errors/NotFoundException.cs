@@ -19,8 +19,5 @@ public class NotFoundException : ExceptionBase
     {
     }
 
-    protected NotFoundException(SerializationInfo serializationInfo, StreamingContext context)
-      : base(serializationInfo, context)
-    {
-    }
+
 }

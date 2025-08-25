@@ -19,8 +19,5 @@ public abstract class ExceptionBase : Exception
     {
     }
 
-    protected ExceptionBase(SerializationInfo serializationInfo, StreamingContext context)
-        : base(serializationInfo, context)
-    {
-    }
+ 
 }

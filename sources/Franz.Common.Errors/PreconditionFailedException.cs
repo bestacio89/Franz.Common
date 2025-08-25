@@ -19,8 +19,5 @@ public class PreconditionFailedException : ExceptionBase
     {
     }
 
-    protected PreconditionFailedException(SerializationInfo serializationInfo, StreamingContext context)
-      : base(serializationInfo, context)
-    {
-    }
+   
 }
