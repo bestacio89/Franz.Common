@@ -1,4 +1,4 @@
-﻿using Franz.Common.Mediatr.Dispatchers;
+﻿using Franz.Common.Mediator.Dispatchers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
