@@ -38,7 +38,7 @@ public static class ServiceCollectionExtensions
 
         var domainContextAccessor = serviceProvider.GetService<IDomainContextAccessor>();
 
-        var domainId = domainContextAccessor?.GetCurrentId();
+        var domainId = domainContextAccessor?.GetCurrentDomainId();
         connectionString = domainId.HasValue
           ? connectionString.Replace(DatabaseNamePattern, domainId!.Value.ToString())
           : connectionString.Replace($"_{DatabaseNamePattern}", string.Empty);
