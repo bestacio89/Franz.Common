@@ -1,4 +1,4 @@
-using Franz.Common.Messaging.MultiTenancy;
+using Franz.Common.Messaging.MultiTenancy.Accessors;
 using Franz.Common.MultiTenancy;
 
 namespace Microsoft.Extensions.DependencyInjection;

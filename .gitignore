@@ -40,5 +40,5 @@ TestResults
 # Visual Studio
 .vs/
 
-FranzArtifactPublisher.ps1
-nugetpublish.ps1
+*.ps1
+.AzureArtifacts/

@@ -1,4 +1,6 @@
-﻿# **Franz.Common.Messaging.MultiTenancy**
+﻿---
+
+# **Franz.Common.Messaging.MultiTenancy**
 
 A library within the **Franz Framework** that adds multi-tenancy support to messaging workflows. This package provides tools for managing tenant and domain-specific messaging contexts, enabling seamless integration of multi-tenancy in distributed systems.
 
@@ -6,35 +8,51 @@ A library within the **Franz Framework** that adds multi-tenancy support to mess
 
 ## **Features**
 
-- **Tenant Context Management**:
-  - `TenantContextAccessor` for handling tenant-specific data in messaging workflows.
-- **Domain Context Management**:
-  - `DomainContextAccessor` for managing domain-specific information during message processing.
-- **Message Builders**:
-  - `TenantMessageBuilder` and `DomainMessageBuilder` for constructing messages with tenant and domain data.
-- **Service Registration**:
-  - `ServiceCollectionExtensions` to simplify the setup of multi-tenancy messaging services.
+* **Tenant Context Management**:
+
+  * `TenantContextAccessor` for handling tenant-specific data in messaging workflows.
+* **Domain Context Management**:
+
+  * `DomainContextAccessor` for managing domain-specific information during message processing.
+* **Resolvers**:
+
+  * `HeaderTenantResolver` and `HeaderDomainResolver` for resolving multi-tenancy metadata from message headers.
+  * `MessagePropertyTenantResolver` and `MessagePropertyDomainResolver` for resolving multi-tenancy metadata from message properties.
+* **Resolution Pipelines**:
+
+  * `DefaultTenantResolutionPipeline` and `DefaultDomainResolutionPipeline` to coordinate multiple resolvers in order.
+* **Middleware**:
+
+  * `TenantResolutionMiddleware` and `DomainResolutionMiddleware` for automatic resolution per message.
+* **Service Registration**:
+
+  * `ServiceCollectionExtensions` to simplify the setup of multi-tenancy messaging services.
+* **Message Builders**:
+
+  * `TenantMessageBuilder` and `DomainMessageBuilder` for constructing messages with tenant and domain data.
 
 ---
 
 ## **Version Information**
 
-- **Current Version**: 1.3
-- Part of the private **Franz Framework** ecosystem.
+* **Current Version**: 1.3.1
+* Part of the private **Franz Framework** ecosystem.
 
 ---
 
 ## **Dependencies**
 
 This package relies on:
-- **Franz.Common.Messaging**: Provides foundational messaging utilities and abstractions.
-- **Franz.Common.MultiTenancy**: Core utilities for tenant and domain management.
+
+* **Franz.Common.Messaging**: Provides foundational messaging utilities and abstractions.
+* **Franz.Common.MultiTenancy**: Core utilities for tenant and domain management.
 
 ---
 
 ## **Installation**
 
 ### **From Private Azure Feed**
+
 Since this package is hosted privately, configure your NuGet client:
 
 ```bash
@@ -48,7 +66,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.MultiTenancy --Version 1.2.65
+dotnet add package Franz.Common.Messaging.MultiTenancy --Version 1.3.1
 ```
 
 ---
@@ -57,7 +75,7 @@ dotnet add package Franz.Common.Messaging.MultiTenancy --Version 1.2.65
 
 ### **1. Register Multi-Tenancy Messaging Services**
 
-Use `ServiceCollectionExtensions` to register multi-tenancy messaging services:
+Use `ServiceCollectionExtensions` to register messaging multi-tenancy services:
 
 ```csharp
 using Franz.Common.Messaging.MultiTenancy.Extensions;
@@ -66,10 +84,12 @@ public class Startup
 {
     public void ConfigureServices(IServiceCollection services)
     {
-        services.AddMultiTenancyMessaging();
+        services.AddFranzMessagingMultiTenancy();
     }
 }
 ```
+
+---
 
 ### **2. Access Tenant and Domain Contexts**
 
@@ -80,17 +100,14 @@ using Franz.Common.Messaging.MultiTenancy;
 
 public class TenantService
 {
-    private readonly TenantContextAccessor _tenantContextAccessor;
+    private readonly ITenantContextAccessor _tenantContextAccessor;
 
-    public TenantService(TenantContextAccessor tenantContextAccessor)
+    public TenantService(ITenantContextAccessor tenantContextAccessor)
     {
         _tenantContextAccessor = tenantContextAccessor;
     }
 
-    public string GetCurrentTenantId()
-    {
-        return _tenantContextAccessor.TenantId;
-    }
+    public Guid? GetCurrentTenantId() => _tenantContextAccessor.GetCurrentTenantId();
 }
 ```
 
@@ -99,34 +116,52 @@ using Franz.Common.Messaging.MultiTenancy;
 
 public class DomainService
 {
-    private readonly DomainContextAccessor _domainContextAccessor;
+    private readonly IDomainContextAccessor _domainContextAccessor;
 
-    public DomainService(DomainContextAccessor domainContextAccessor)
+    public DomainService(IDomainContextAccessor domainContextAccessor)
     {
         _domainContextAccessor = domainContextAccessor;
     }
 
-    public string GetCurrentDomainName()
+    public Guid? GetCurrentDomainId() => _domainContextAccessor.GetCurrentDomainId();
+}
+```
+
+---
+
+### **3. Automatic Tenant/Domain Resolution in Messaging Pipelines**
+
+Enable middleware to resolve tenant and domain per-message:
+
+```csharp
+using Franz.Common.Messaging.MultiTenancy.Middleware;
+
+public class MessagingPipeline
+{
+    public void Configure(IMessagePipelineBuilder pipeline)
     {
-        return _domainContextAccessor.DomainName;
+        pipeline.Use<TenantResolutionMiddleware>();
+        pipeline.Use<DomainResolutionMiddleware>();
     }
 }
 ```
 
-### **3. Build Tenant and Domain Messages**
+---
+
+### **4. Build Tenant and Domain Messages**
 
 Use `TenantMessageBuilder` and `DomainMessageBuilder` to create tenant and domain-aware messages:
 
 ```csharp
 using Franz.Common.Messaging.MultiTenancy;
 
-var tenantMessageBuilder = new TenantMessageBuilder();
-var tenantMessage = tenantMessageBuilder.WithTenantId("tenant-123")
-                                        .Build();
+var tenantMessage = new TenantMessageBuilder()
+    .WithTenantId(Guid.NewGuid())
+    .Build();
 
-var domainMessageBuilder = new DomainMessageBuilder();
-var domainMessage = domainMessageBuilder.WithDomainName("example.com")
-                                         .Build();
+var domainMessage = new DomainMessageBuilder()
+    .WithDomainId(Guid.NewGuid())
+    .Build();
 ```
 
 ---
@@ -134,15 +169,18 @@ var domainMessage = domainMessageBuilder.WithDomainName("example.com")
 ## **Integration with Franz Framework**
 
 The **Franz.Common.Messaging.MultiTenancy** package integrates seamlessly with:
-- **Franz.Common.Messaging**: Provides core messaging abstractions.
-- **Franz.Common.MultiTenancy**: Extends tenant and domain management capabilities into messaging workflows.
+
+* **Franz.Common.Messaging**: Provides core messaging abstractions.
+* **Franz.Common.MultiTenancy**: Extends tenant and domain management capabilities into messaging workflows.
+* **Franz.Common.Http.MultiTenancy**: Aligns messaging and HTTP multi-tenancy under the same abstractions and contracts.
 
 ---
 
 ## **Contributing**
 
 This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
+
+1. Clone the repository. @ [https://github.com/bestacio89/Franz.Common/](https://github.com/bestacio89/Franz.Common/)
 2. Create a feature branch.
 3. Submit a pull request for review.
 
@@ -157,13 +195,31 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ## **Changelog**
 
 ### Version 1.2.65
-- Added `TenantContextAccessor` and `DomainContextAccessor` for managing tenant and domain contexts.
-- Introduced `TenantMessageBuilder` and `DomainMessageBuilder` for constructing tenant and domain-aware messages.
-- Integrated `ServiceCollectionExtensions` for streamlined multi-tenancy messaging setup.
 
+* Added `TenantContextAccessor` and `DomainContextAccessor` for managing tenant and domain contexts.
+* Introduced `TenantMessageBuilder` and `DomainMessageBuilder` for constructing tenant and domain-aware messages.
+* Integrated `ServiceCollectionExtensions` for streamlined multi-tenancy messaging setup.
 
 ### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
+
+* Upgraded to **.NET 9.0.8**
+* Added **new features and improvements**
+* Separated **business concepts** from **mediator concepts**
+* Now compatible with both the **in-house mediator** and **MediatR**
+
+### Version 1.3.1
+
+* Expanded **messaging multi-tenancy abstractions** to align with HTTP and core multi-tenancy:
+
+  * Added `HeaderTenantResolver` and `HeaderDomainResolver`.
+  * Added `MessagePropertyTenantResolver` and `MessagePropertyDomainResolver`.
+  * Introduced `DefaultTenantResolutionPipeline` and `DefaultDomainResolutionPipeline` to orchestrate resolvers.
+  * Added `TenantResolutionMiddleware` and `DomainResolutionMiddleware` for automatic resolution in messaging pipelines.
+* Enhanced `TenantContextAccessor` and `DomainContextAccessor` to fully implement the updated core contracts (`GetCurrentTenantId`, `SetCurrentTenantId`, etc.).
+* Extended `Message` with a `Properties` dictionary for application-level metadata.
+* Added `MessagePropertiesExtensions` for strongly-typed property access.
+* Improved **service registration** via `AddFranzMessagingMultiTenancy`.
+
+---
+
+Would you like me to also prepare a **NuGet-style release notes snippet** for version `1.3.1` (short, consumer-facing highlights) so you can publish it with your private feed alongside the README?

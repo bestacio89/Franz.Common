@@ -18,14 +18,14 @@ public class DomainMessageBuilder : IMessageBuilder
 
     public bool CanBuild(Message message)
     {
-        var result = domainContextAccessor?.GetCurrentId().HasValue == true;
+        var result = domainContextAccessor?.GetCurrentDomainId().HasValue == true;
 
         return result;
     }
 
     public void Build(Message message)
     {
-        var id = domainContextAccessor?.GetCurrentId();
+        var id = domainContextAccessor?.GetCurrentDomainId();
 
         if (id != null)
             message.Headers.Add(HeaderConstants.DomainId, id.ToString());

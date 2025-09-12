@@ -18,14 +18,14 @@ public class TenantMessageBuilder : IMessageBuilder
 
     public bool CanBuild(Message message)
     {
-        var result = tenantContextAccessor?.GetCurrentId().HasValue == true;
+        var result = tenantContextAccessor?.GetCurrentTenantId().HasValue == true;
 
         return result;
     }
 
     public void Build(Message message)
     {
-        var id = tenantContextAccessor?.GetCurrentId();
+        var id = tenantContextAccessor?.GetCurrentTenantId();
 
         if (id != null)
             message.Headers.Add(HeaderConstants.TenantId, id.ToString());
