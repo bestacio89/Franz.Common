@@ -151,3 +151,18 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
 
+### Version 1.3.1
+
+- Introduced tenant resolution pipeline (DefaultTenantResolutionPipeline) to orchestrate multiple strategies.
+- Added resolvers for different multi-tenancy strategies:
+  - HeaderTenantResolver (resolves tenant from request headers).
+  - HostTenantResolver (resolves tenant from host/subdomain).
+  - QueryStringTenantResolver (resolves tenant from query string).
+  - JwtClaimTenantResolver (resolves tenant from JWT claims).
+
+- Implemented TenantResolutionMiddleware for resolving the tenant once per request and storing it in context.
+- Enhanced TenantContextAccessor and DomainContextAccessor to use HttpContext.Items for request-scoped tenant/domain storage.
+- Added DI extension methods (AddFranzMultiTenancy) for easy registration of multi-tenancy services.
+- Added middleware extension (UseFranzMultiTenancy) for seamless integration into the ASP.NET Core pipeline.
+- Improved Swagger integration by supporting tenant-specific headers in documentation via AddRequiredHeaderParameter.
+- Laid foundation for tenant-aware services (DbContexts, caching, feature flags) by standardizing tenant resolution across HTTP requests.

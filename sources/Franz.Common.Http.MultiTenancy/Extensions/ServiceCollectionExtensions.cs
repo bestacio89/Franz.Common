@@ -1,21 +1,22 @@
-using Franz.Common.Http.MultiTenancy;
-using Franz.Common.Http.MultiTenancy.Documentation;
+// Extensions/MultiTenancyServiceCollectionExtensions.cs
+using Franz.Common.Http.MultiTenancy.Accessors;
+using Franz.Common.Http.MultiTenancy.Middleware;
 using Franz.Common.MultiTenancy;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace Microsoft.Extensions.DependencyInjection;
-public static class ServiceCollectionExtensions
+namespace Franz.Common.Http.MultiTenancy.Extensions
 {
-  public static IServiceCollection AddHttpMultitenancyContext(this IServiceCollection services)
+  public static class MultiTenancyServiceCollectionExtensions
   {
-    services
-      .AddHttpContextAccessor()
-      .AddNoDuplicateScoped<ITenantContextAccessor, TenantContextAccessor>()
-      .AddNoDuplicateScoped<IDomainContextAccessor, DomainContextAccessor>()
-      .AddSwaggerGen(options =>
-      {
-        options.OperationFilter<AddRequiredHeaderParameter>();
-      });
+    public static IServiceCollection AddFranzMultiTenancy(this IServiceCollection services)
+    {
+      services.AddHttpContextAccessor();
+      services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();
+      services.AddScoped<IDomainContextAccessor, DomainContextAccessor>();
+      services.AddScoped<ITenantResolutionPipeline, DefaultTenantResolutionPipeline>();
+      services.AddScoped<IDomainResolutionPipeline, DefaultDomainResolutionPipeline>();
 
-    return services;
+      return services;
+    }
   }
 }

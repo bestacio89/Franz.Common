@@ -25,7 +25,7 @@ public class DomainRequestBuilder : IRequestBuilder
 
   public void Build(HttpRequestMessage request)
   {
-    var id = domainContextAccessor?.GetCurrentId();
+    var id = domainContextAccessor?.GetCurrentDomainId();
 
     if (id != null)
       request.Headers.Add(HeaderConstants.DomainId, id.ToString());

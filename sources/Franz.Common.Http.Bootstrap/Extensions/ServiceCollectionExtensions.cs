@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Franz.Common.Http.MultiTenancy.Extensions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using System.Reflection;
 
@@ -22,7 +23,7 @@ public static class ServiceCollectionExtensions
       .AddHttpHeaderContext()
       .AddHeaderRequiredCapability()
       .AddHttpIdentityContext()
-      .AddHttpMultitenancyContext()
+      .AddFranzMultiTenancy()
       .AddSerializers()
       .AddHttpSerialization()
       .AddDocumentation()
