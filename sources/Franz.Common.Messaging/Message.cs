@@ -40,4 +40,9 @@ public class Message
 #pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
     public virtual MessageHeaders Headers { get; set; }
+
+  /// <summary>
+  /// User-defined metadata for business-level properties that should not be mixed with transport headers.
+  /// </summary>
+  public virtual IDictionary<string, object> Properties { get; set; }
 }

@@ -1,5 +1,4 @@
-
-using Franz.Common.Errors;
+﻿using Franz.Common.Errors;
 using Franz.Common.Headers;
 
 using Microsoft.Extensions.Primitives;
@@ -103,9 +102,9 @@ public static class MessageHeadersExtensions
   {
     var check = messageHeaders.TryGetValue(key, out var obj);
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+#pragma warning disable CS8632
     string? result = null;
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+#pragma warning restore CS8632
     if (check)
       result = obj;
 
@@ -121,5 +120,39 @@ public static class MessageHeadersExtensions
       value = obj;
 
     return result;
+  }
+
+  // ----------------------------
+  // 🆕 Setter Extensions
+  // ----------------------------
+
+  public static void SetTenantId(this MessageHeaders messageHeaders, Guid tenantId)
+  {
+    messageHeaders[HeaderConstants.TenantId] = tenantId.ToString();
+  }
+
+  public static void SetDomainId(this MessageHeaders messageHeaders, Guid domainId)
+  {
+    messageHeaders[HeaderConstants.DomainId] = domainId.ToString();
+  }
+
+  public static void SetIdentityId(this MessageHeaders messageHeaders, Guid userId)
+  {
+    messageHeaders[HeaderConstants.UserId] = userId.ToString();
+  }
+
+  public static void SetIdentityEmail(this MessageHeaders messageHeaders, string email)
+  {
+    messageHeaders[HeaderConstants.UserEmail] = email;
+  }
+
+  public static void SetIdentityFullName(this MessageHeaders messageHeaders, string fullName)
+  {
+    messageHeaders[HeaderConstants.UserFullName] = fullName;
+  }
+
+  public static void SetIdentityRoles(this MessageHeaders messageHeaders, IEnumerable<string> roles)
+  {
+    messageHeaders[HeaderConstants.UserRoles] = new StringValues(roles.ToArray());
   }
 }
