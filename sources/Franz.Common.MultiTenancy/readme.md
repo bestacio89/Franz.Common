@@ -146,3 +146,17 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
+### Version 1.3.1
+
+- Bug fixes and performance improvements.
+  - Expanded multi-tenancy core abstractions to support advanced scenarios:
+  - Introduced TenantInfo and TenantDomain models (supporting multiple domains per tenant).
+  - Added ITenantStore interface for tenant registry and validation.
+  - Added ITenantResolver and ITenantResolutionPipeline abstractions for flexible resolution strategies (headers, hosts, query strings, JWT claims).
+  - Introduced ITenantValidator to enforce tenant state (active, expired, disabled).
+  - Added ITenantContext to represent scoped tenant metadata.
+  - Added TenantResolutionResult and TenantResolutionSource to standardize resolution outcomes.
+  - Provided InMemoryTenantStore for testing and prototyping.
+  - Enhanced Domain Context Accessor and Tenant Context Accessor for setting and retrieving context within the request scope.
+  - Prepared groundwork for Franz.Common.Http.MultiTenancy middleware and resolver implementations.
