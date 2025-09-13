@@ -17,7 +17,7 @@ steps:
       git config user.email "build@azure.devops"
       
       # Add GitHub remote
-      git remote add github https://$bestacio89:$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git
+      git remote add github https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git
       
       # Push branch from Azure -> GitHub
       git push github HEAD:main
