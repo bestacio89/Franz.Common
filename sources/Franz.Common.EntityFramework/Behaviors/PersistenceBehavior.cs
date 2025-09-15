@@ -1,6 +1,6 @@
 
 using Franz.Common.Mediator.Messages;
-using Franz.Common.Mediator.Pipelines;
+using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.Logging;
 using System.Threading;
 using System.Threading.Tasks;
