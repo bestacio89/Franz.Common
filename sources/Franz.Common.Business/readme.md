@@ -1,6 +1,6 @@
 ﻿Got it ✅ — your doc currently repeats some concepts (entities, value objects, aggregates) both under **Features** and **Usage**, and the changelog also shows up twice. I’ll restructure it so it:
 
-* Keeps the **novelties** (like aggregates being event-sourced in `1.2.65`, mediator separation in `1.3`).
+* Keeps the **novelties** (like aggregates being event-sourced in `1.3.2`, mediator separation in `1.3`).
 * Explains each feature **once**, with examples where useful.
 * Flows in a clean order: *Overview → Features → Usage → Dependencies → Installation → Contribution → License → Changelog*.
 
@@ -233,14 +233,3 @@ Authorized contributors:
 * Aggregates redesigned to use **event sourcing**
 * All aggregates now require a `Guid` identifier
 
----
-
-This way:
-
-* **No duplication** (Entities, Value Objects, Aggregates appear only once under Features).
-* **Novelties highlighted** in Changelog and Features.
-* **Usage examples** streamlined under each feature instead of repeated in a separate Usage section.
-
----
-
-Would you like me to also **split this into a README.md format** with collapsible sections (like GitHub `<details>` tags for examples), so it’s cleaner for developers browsing the repo?

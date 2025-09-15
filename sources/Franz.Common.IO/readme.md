@@ -40,7 +40,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.IO --Version 1.2.65
+dotnet add package Franz.Common.IO  
 ```
 
 ---

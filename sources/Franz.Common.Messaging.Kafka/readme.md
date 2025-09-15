@@ -27,7 +27,7 @@ A Kafka integration library within the **Franz Framework** designed to simplify 
 
 ## **Version Information**
 
-- **Current Version**: 1.3
+- **Current Version**: 1.3.2
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -59,7 +59,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.Kafka --Version 1.2.65
+dotnet add package Franz.Common.Messaging.Kafka  
 ```
 
 ---
