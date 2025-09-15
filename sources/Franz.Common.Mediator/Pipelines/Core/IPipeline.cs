@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Franz.Common.Mediator.Pipelines;
+namespace Franz.Common.Mediator.Pipelines.Core;
 public interface IPipeline<TRequest, TResponse>
 {
   Task<TResponse> Handle(
