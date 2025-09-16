@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Franz.Common.Mediator.Pipelines.Core;
+using Microsoft.Extensions.Logging;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -6,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Franz.Common.Mediator.Pipelines;
+namespace Franz.Common.Mediator.Pipelines.Logging;
 public class LoggingPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 {
   private readonly ILogger<LoggingPipeline<TRequest, TResponse>> _logger;

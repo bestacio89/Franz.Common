@@ -17,7 +17,7 @@ An extension library within the **Franz Framework** that integrates **MediatR** 
 
 ## **Version Information**
 
-- **Current Version**: 1.3
+- **Current Version**: 1.3.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -47,7 +47,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.Hosting.MediatR --Version 1.2.65
+dotnet add package Franz.Common.Messaging.Hosting.MediatR  
 ```
 
 ---

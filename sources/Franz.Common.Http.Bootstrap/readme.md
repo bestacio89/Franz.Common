@@ -24,7 +24,7 @@ A comprehensive library within the **Franz Framework**, designed to centralize a
 
 ## **Version Information**
 
-- **Current Version**: 1.3
+- **Current Version**: 1.3.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -58,7 +58,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Http.Bootstrap --Version 1.2.65
+dotnet add package Franz.Common.Http.Bootstrap  
 ```
 
 ---
@@ -150,3 +150,6 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
+### Version 1.3.4
+- Eliminated dependency on `Franz.Common.Bootstrap` to Automapper

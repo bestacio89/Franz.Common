@@ -1,0 +1,33 @@
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  # Checkout your Azure DevOps repo
+  - checkout: self
+    persistCredentials: true
+
+  # Configure Git and push to GitHub
+  - script: |
+      echo "##[group]Configure Git"
+      git config user.name "Azure DevOps"
+      git config user.email "build@azure.devops"
+      echo "##[endgroup]"
+
+      echo "##[group]Setup GitHub remote"
+      git remote remove github || true
+      git remote add github https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git
+      git remote -v
+      echo "##[endgroup]"
+
+      echo "##[group]Push current branch to GitHub"
+      CURRENT_BRANCH=$(Build.SourceBranchName)
+      echo "Pushing branch $CURRENT_BRANCH to GitHub..."
+      git push github HEAD:$CURRENT_BRANCH
+      echo "##[endgroup]"
+    displayName: 'Mirror branch to GitHub'

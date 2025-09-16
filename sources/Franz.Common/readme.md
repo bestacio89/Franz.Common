@@ -40,7 +40,7 @@ A foundational library in the **Franz Framework** designed to provide core utili
 
 ## **Version Information**
 
-- **Current Version**: `1.2.65`
+- **Current Version**: `1.3.4`
 - Part of the private Franz Framework suite, hosted on a private Azure NuGet feed.
 
 ---
@@ -62,7 +62,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Use the .NET CLI to install:
 
 ```bash
-dotnet add package Franz.Common --Version 1.2.65
+dotnet add package Franz.Common  
 ```
 
 ---

@@ -35,14 +35,12 @@ public static class ServiceCollectionExtensions
     // Register your Franz mediator (commands, queries, pipelines)
     foreach (var assembly in assemblies)
     {
-      services.AddFranzMediator(assembly); // registers dispatcher, handlers, Franz pipelines
+      services.AddFranzMediator(new[] { assembly }); // registers dispatcher, handlers, Franz pipelines
     }
 
     // Register any optional dependencies
     services.AddDependencies();
 
-    // Register AutoMapper
-    services.AddAutoMapper(assemblies);
 
     return services;
   }

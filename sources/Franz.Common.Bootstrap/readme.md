@@ -22,7 +22,7 @@ A foundational library within the **Franz Framework**, designed to simplify the 
 
 ## **Version Information**
 
-- **Current Version**: 1.3
+- **Current Version**: 1.3.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -43,7 +43,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Bootstrap --Version 1.2.65
+dotnet add package Franz.Common.Bootstrap  
 ```
 
 ---
@@ -118,3 +118,5 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Now compatible with both the **in-house mediator** and **MediatR**
 ---
 
+### Version 1.3.4
+- Eliminated dependency on `Franz.Common.Bootstrap` to Automapper

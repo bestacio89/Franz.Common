@@ -1,12 +1,4 @@
-﻿Got it ✅ — your doc currently repeats some concepts (entities, value objects, aggregates) both under **Features** and **Usage**, and the changelog also shows up twice. I’ll restructure it so it:
-
-* Keeps the **novelties** (like aggregates being event-sourced in `1.2.65`, mediator separation in `1.3`).
-* Explains each feature **once**, with examples where useful.
-* Flows in a clean order: *Overview → Features → Usage → Dependencies → Installation → Contribution → License → Changelog*.
-
-Here’s a cleaned-up version:
-
----
+﻿---
 
 # **Franz.Common.Business**
 
@@ -183,7 +175,6 @@ services.AddBusinessServices(); // Registers all handlers automatically
 
 ## **Dependencies**
 
-* **MediatR** (13.0.0) – mediator pattern.
 * **Scrutor** (4.2.2) – assembly scanning & DI.
 * **Microsoft.Extensions.DependencyInjection** (9.0.0) – DI support.
 * **Franz.Common.DependencyInjection** – core DI patterns.
@@ -204,7 +195,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 ```
 
 ```bash
-dotnet add package Franz.Common.Business --Version 1.3
+dotnet add package Franz.Common.Business --Version 
 ```
 
 ---
@@ -233,14 +224,3 @@ Authorized contributors:
 * Aggregates redesigned to use **event sourcing**
 * All aggregates now require a `Guid` identifier
 
----
-
-This way:
-
-* **No duplication** (Entities, Value Objects, Aggregates appear only once under Features).
-* **Novelties highlighted** in Changelog and Features.
-* **Usage examples** streamlined under each feature instead of repeated in a separate Usage section.
-
----
-
-Would you like me to also **split this into a README.md format** with collapsible sections (like GitHub `<details>` tags for examples), so it’s cleaner for developers browsing the repo?

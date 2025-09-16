@@ -21,7 +21,7 @@ A private utility library for seamless integration of **Entity Framework Core** 
 
 ## **Version Information**
 
-- **Current Version**: `1.3`
+- **Current Version**: `1.3.4`
 - This package and all related `Franz` packages are under active development and maintained privately.
 
 ---
@@ -45,7 +45,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package via the .NET CLI:
 
 ```bash
-dotnet add package Franz.Common.EntityFramework.SQLServer --Version 1.2.65
+dotnet add package Franz.Common.EntityFramework.SQLServer  
 ```
 
 ---
@@ -84,7 +84,7 @@ SslEnforcement sslOption = SslEnforcement.Required;
 
 ## **Dependencies**
 
-This package is built to work with the following Franz Framework packages (all versioned `1.2.65`):
+This package is built to work with the following Franz Framework packages (all versioned `1.3.3`):
 - `Franz.Common.EntityFramework`
 - `Franz.Common.MultiTenancy`
 

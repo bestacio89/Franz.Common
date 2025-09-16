@@ -20,7 +20,7 @@ A library within the **Franz Framework** designed to streamline the management, 
 
 ## **Version Information**
 
-- **Current Version**: 1.3
+- **Current Version**: 1.3.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -51,7 +51,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Http.Headers --Version 1.2.65
+dotnet add package Franz.Common.Http.Headers  
 ```
 
 ---

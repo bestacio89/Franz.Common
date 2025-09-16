@@ -1,164 +1,311 @@
-﻿# Franz.Common.Mediator
-
-`Franz.Common.Mediator` is the **core mediator library** for the Franz framework.
-It provides **request/response handling**, **notifications**, and **pipeline behaviors**, fully decoupled from business models and infrastructure.
+﻿Here’s a **full draft of a `README.md`** for `Franz.Common.Mediator` that captures *everything we’ve built together* — enterprise-grade mediator with options, pipelines, observability, context, results, testing, and extensibility. It’s written as a clean, developer-friendly doc with code snippets inline.
 
 ---
 
-## 📂 Project Structure
+# Franz.Common.Mediator
 
-```
-Franz.Common/
- ├── Franz.Common.Business/         # Domain models, ValueObjects, Commands, Queries
- ├── Franz.Common.Mediator/         # Mediator abstractions, dispatcher, pipelines, handlers
- │    ├── Messages/                 # ICommand, IQuery, INotification definitions
- │    ├── Handlers/                 # ICommandHandler, IQueryHandler, INotificationHandler
- │    ├── Pipelines/                # IPipeline and custom pipeline behaviors
- │    └── Dispatchers/              # Dispatcher implementing Send/Publish
- ├── Franz.Common.Infrastructure/   # Handler implementations, database or messaging integrations
- └── Franz.Common.Tests/            # Unit tests for Business and Mediator layers
+Franz.Common.Mediator is a **production-grade mediator library** for .NET that goes beyond MediatR.
+It’s **framework-agnostic, configurable, observable, resilient, and testable** — built for real enterprise systems.
+
+Unlike minimal mediators, Franz ships with:
+
+* Clean **contracts** (commands, queries, notifications, streams).
+* Plug-and-play **pipelines** for logging, validation, retry, caching, transactions, circuit breakers, bulkheads, and more.
+* **Options-driven configuration** (no hardcoded values).
+* Built-in **observability** with correlation IDs, multi-tenant context, and per-handler telemetry.
+* Unified **Result/Error** handling with structured metadata.
+* A lightweight **TestDispatcher** for easy unit testing.
+
+---
+
+## 📦 Installation
+
+```bash
+dotnet add package Franz.Common.Mediator
 ```
 
 ---
 
-## ⚡ Usage
+## 🚀 Quick Start
 
-### 1. Define Commands and Queries (Business Layer)
-
-```csharp
-using Franz.Common.Mediator.Messages;
-
-public record CreateUserCommand(string Name, string Email) : ICommand<Guid>;
-
-public record GetUserQuery(Guid Id) : IQuery<User>;
-```
-
-### 2. Implement Handlers (Infrastructure Layer)
+### 1. Define a Command and Handler
 
 ```csharp
-using Franz.Common.Mediator.Handlers;
-using Franz.Common.Business.Domain;
+public record CreateUserCommand(string Username, string Email) : ICommand<Result<Guid>>;
 
-public class CreateUserHandler : ICommandHandler<CreateUserCommand, Guid>
+public class CreateUserHandler : ICommandHandler<CreateUserCommand, Result<Guid>>
 {
-    private readonly IUserRepository _repository;
-
-    public CreateUserHandler(IUserRepository repository)
-        => _repository = repository;
-
-    public async Task<Guid> Handle(CreateUserCommand request, CancellationToken cancellationToken)
+    public async Task<Result<Guid>> Handle(CreateUserCommand request, CancellationToken ct)
     {
-        var user = new User(request.Name, request.Email);
-        await _repository.AddAsync(user);
-        return user.Id;
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return Result<Guid>.Failure("Invalid email");
+
+        return Result<Guid>.Success(Guid.NewGuid());
     }
 }
 ```
 
+### 2. Wire Mediator in DI
+
 ```csharp
-public class GetUserHandler : IQueryHandler<GetUserQuery, User>
+services.AddFranzMediator(options =>
 {
-    private readonly IUserRepository _repository;
+    options.Retry.MaxAttempts = 3;
+    options.Timeout.Duration = TimeSpan.FromSeconds(2);
+    options.CircuitBreaker.FailureThreshold = 5;
+    options.Bulkhead.MaxConcurrentRequests = 20;
+    options.Caching.DefaultTtl = TimeSpan.FromMinutes(5);
 
-    public GetUserHandler(IUserRepository repository)
-        => _repository = repository;
+    options.EnableDefaultConsoleObserver = true; // for demo/test
+});
+```
 
-    public Task<User> Handle(GetUserQuery request, CancellationToken cancellationToken)
-        => _repository.GetByIdAsync(request.Id);
+### 3. Dispatch from your app
+
+```csharp
+var result = await dispatcher.Send(new CreateUserCommand("bob", "bob@example.com"));
+
+if (result.IsSuccess)
+    Console.WriteLine($"Created user {result.Value}");
+else
+    Console.WriteLine($"Failed: {result.Error.Message}");
+```
+
+---
+
+## 🔧 Features
+
+### ✅ Commands & Queries
+
+```csharp
+public record GetUserQuery(Guid Id) : IQuery<Result<User>>;
+
+public class GetUserHandler : IQueryHandler<GetUserQuery, Result<User>>
+{
+    public Task<Result<User>> Handle(GetUserQuery query, CancellationToken ct) =>
+        Task.FromResult(Result<User>.Success(new User(query.Id, "bob")));
 }
 ```
 
-### 3. Register Mediator in DI Container
+### 📣 Notifications
 
 ```csharp
-using Microsoft.Extensions.DependencyInjection;
-using Franz.Common.Mediator;
+public record UserCreatedEvent(Guid Id, string Email) : INotification;
 
-var services = new ServiceCollection();
-
-services
-    .AddMediator(typeof(Dispatcher).Assembly)   // Registers pipelines and handlers
-    .AddDependencies();                          // Add business and infrastructure dependencies
-```
-
-### 4. Send Commands and Queries
-
-```csharp
-var dispatcher = serviceProvider.GetRequiredService<IDispatcher>();
-
-// Send a command
-var userId = await dispatcher.Send(new CreateUserCommand("Alice", "alice@example.com"));
-
-// Send a query
-var user = await dispatcher.Send(new GetUserQuery(userId));
-```
-
----
-
-## 🧩 Pipeline Behaviors
-
-Custom behaviors can be applied globally:
-
-```csharp
-using Franz.Common.Mediator.Pipelines;
-using Franz.Common.EntityFramework.Behaviors;
-
-services.AddTransient(typeof(IPipeline<,>), typeof(PersistenceBehavior<,>));
-services.AddTransient(typeof(IPipeline<,>), typeof(LoggingBehavior<,>));
-services.AddTransient(typeof(IPipeline<,>), typeof(ValidationBehavior<,>));
-```
-
----
-
-## 📢 Notifications (Integration Events)
-
-```csharp
-using Franz.Common.Mediator.Messages;
-
-public record UserCreatedEvent(User User) : INotification;
-
-public class UserCreatedHandler : INotificationHandler<UserCreatedEvent>
+public class SendWelcomeEmailHandler : INotificationHandler<UserCreatedEvent>
 {
-    public Task Handle(UserCreatedEvent notification, CancellationToken cancellationToken)
+    public Task Handle(UserCreatedEvent ev, CancellationToken ct)
     {
-        Console.WriteLine($"User created: {notification.User.Id}");
+        Console.WriteLine($"Welcome {ev.Email}!");
         return Task.CompletedTask;
     }
 }
-
-// Publishing a notification
-await dispatcher.Publish(new UserCreatedEvent(user));
 ```
 
----
+Dispatcher supports:
 
-## 🧪 Unit Tests
-
-All existing unit tests in `Franz.Common.Business.Tests` and `Franz.Common.Mediator.Tests` ensure **value objects**, **commands/queries**, and **notifications** behave correctly:
+* Sequential or Parallel publish strategies.
+* Error policies (`StopOnFirstFailure` / `ContinueOnError`).
+* Per-handler telemetry.
 
 ```csharp
-[Fact]
-public void Copy_SameValueObjectAfter_ReturnsTrue()
+await dispatcher.PublishAsync(new UserCreatedEvent(userId, email),
+    PublishStrategy.Parallel,
+    NotificationErrorHandling.ContinueOnError);
+```
+
+### 🌊 Streaming Queries
+
+```csharp
+public record GetNumbersStream(int Count) : IStreamQuery<int>;
+
+public class GetNumbersStreamHandler : IStreamQueryHandler<GetNumbersStream, int>
 {
-    var addresseCopie = AddresseUnique.GetCopy();
-    Assert.True(addresseCopie.Equals(AddresseUnique));
+    public async IAsyncEnumerable<int> Handle(GetNumbersStream q, [EnumeratorCancellation] CancellationToken ct)
+    {
+        for (int i = 0; i < q.Count; i++)
+        {
+            yield return i;
+            await Task.Delay(100, ct);
+        }
+    }
 }
 ```
 
-Run all tests:
-
-```bash
-dotnet test
+```csharp
+await foreach (var n in dispatcher.Stream(new GetNumbersStream(5)))
+    Console.WriteLine(n);
 ```
 
 ---
 
-## 🔧 Integration
+## 🧩 Pipelines (Cross-Cutting Concerns)
 
-* **Dispatcher** resolves handlers from DI automatically.
-* Pipelines (logging, validation, persistence) are fully pluggable.
-* Supports **commands**, **queries**, and **notifications** in a clean separation of concerns.
-* Independent of MediatR — Franz.Common.Mediator is the authoritative mediator layer.
+Franz ships with many built-in pipelines, all **options-driven**:
+
+* **LoggingPipeline** → request/response logging.
+* **ValidationPipeline** → runs all `IValidator<TRequest>`.
+* **RetryPipeline** → retry transient errors.
+* **TimeoutPipeline** → cancel long-running requests.
+* **CircuitBreakerPipeline** → stop calling failing handlers.
+* **BulkheadPipeline** → limit concurrent requests.
+* **CachingPipeline** → cache query results.
+* **TransactionPipeline** → commit/rollback with `IUnitOfWork`.
+
+Example:
+
+```csharp
+public class RetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
+{
+    private readonly RetryOptions _options;
+
+    public RetryPipeline(RetryOptions options) => _options = options;
+
+    public async Task<TResponse> Handle(TRequest request, CancellationToken ct, Func<Task<TResponse>> next)
+    {
+        for (int i = 0; i < _options.MaxAttempts; i++)
+        {
+            try { return await next(); }
+            catch when (i < _options.MaxAttempts - 1)
+            {
+                await Task.Delay(_options.Delay, ct);
+            }
+        }
+        throw new Exception("Retries exhausted.");
+    }
+}
+```
+
+---
+
+## 📋 Options Pattern
+
+All pipelines are driven by central options:
+
+```csharp
+public class FranzMediatorOptions
+{
+    public RetryOptions Retry { get; set; } = new();
+    public TimeoutOptions Timeout { get; set; } = new();
+    public CircuitBreakerOptions CircuitBreaker { get; set; } = new();
+    public BulkheadOptions Bulkhead { get; set; } = new();
+    public CachingOptions Caching { get; set; } = new();
+    public TransactionOptions Transaction { get; set; } = new();
+
+    public bool EnableDefaultConsoleObserver { get; set; }
+}
+```
+
+---
+
+## 🔍 Observability & Context
+
+Every request/notification/stream is observable via `IMediatorObserver`.
+
+```csharp
+public class ConsoleMediatorObserver : IMediatorObserver
+{
+    public Task OnRequestStarted(Type req, string correlationId) =>
+        Task.Run(() => Console.WriteLine($"➡ {req.Name} started [{correlationId}]"));
+
+    public Task OnRequestCompleted(Type req, string correlationId, TimeSpan duration) =>
+        Task.Run(() => Console.WriteLine($"✅ {req.Name} completed in {duration.TotalMs()} ms"));
+
+    public Task OnRequestFailed(Type req, string correlationId, Exception ex) =>
+        Task.Run(() => Console.WriteLine($"❌ {req.Name} failed: {ex.Message}"));
+}
+```
+
+### MediatorContext
+
+Available everywhere in pipelines/handlers:
+
+```csharp
+MediatorContext.Current.UserId
+MediatorContext.Current.TenantId
+MediatorContext.Current.Culture
+MediatorContext.Current.CorrelationId
+```
+
+Populate automatically with ASP.NET Core middleware:
+
+```csharp
+app.UseMediatorContext();
+```
+
+---
+
+## ❗ Error & Result Handling
+
+Every handler returns a `Result` or `Result<T>`.
+
+```csharp
+public class Result
+{
+    public bool IsSuccess { get; }
+    public Error? Error { get; }
+    // ...
+}
+
+public class Result<T> : Result
+{
+    public T? Value { get; }
+}
+```
+
+### Example
+
+```csharp
+if (!result.IsSuccess)
+{
+    Console.WriteLine(result.Error.Code);     // e.g., "ValidationError"
+    Console.WriteLine(result.Error.Message);  // e.g., "Email is required"
+}
+```
+
+Errors carry codes and metadata for structured responses.
+
+---
+
+## 🧪 Testing
+
+Use the `TestDispatcher` to run handlers without DI or full setup.
+
+```csharp
+var dispatcher = new TestDispatcher()
+    .WithHandler(new CreateUserHandler())
+    .WithPipeline(new LoggingPipeline<,>())
+    .WithPreProcessor(new LoggingPreProcessor<>());
+
+var result = await dispatcher.Send(new CreateUserCommand("bob", "bob@example.com"));
+
+Assert.True(result.IsSuccess);
+```
+
+---
+
+## 🌐 ASP.NET Core Integration
+
+In a Web API, convert mediator results to HTTP results with an adapter:
+
+```csharp
+app.MapPost("/users", async (CreateUserCommand cmd, IDispatcher dispatcher) =>
+{
+    var result = await dispatcher.Send(cmd);
+    return result.ToIResult(); // Ok() or Problem()
+});
+```
+
+---
+
+## 📐 Design Principles
+
+* **Framework-agnostic** → core never references ASP.NET, EF, Mongo, etc.
+* **Contracts only** → no adapters included, devs own infra details.
+* **Options-driven** → configure via DI/appsettings.
+* **Observable** → correlation IDs, telemetry hooks, multi-tenant context.
+* **Resilient** → retries, timeouts, bulkheads, circuit breakers built-in.
+* **Testable** → TestDispatcher and fakes included.
 
 ---
 
@@ -168,34 +315,30 @@ MIT
 
 ---
 
-```mermaid
-flowchart TD
-    subgraph Business
-        A[Commands / Queries / Events] -->|Send / Publish| B[Dispatcher / IDispatcher]
-    end
+## 📝 Changelog
 
-    subgraph Mediator
-        B --> C[Pipeline Behaviors]
-        C --> D[Handler Resolution]
-    end
+### v1.3.4
 
-    subgraph Infrastructure
-        D --> E[Command / Query Handler Implementations]
-        D --> F[Notification Handlers / Integration Events]
-        E --> G[Repositories / Database / External Services]
-        F --> H[Messaging / Event Publishing]
-    end
+* Introduced Options pattern (`Retry`, `Timeout`, `CircuitBreaker`, `Bulkhead`, `Caching`, `Transaction`).
+* Upgraded pipelines to be options-aware.
+* Added `MediatorContext` with user/tenant/culture.
+* Expanded observability with `IMediatorObserver` and per-handler telemetry.
+* Unified `Result`/`Result<T>` error handling.
+* Added Validation with structured errors + FluentValidation adapter.
+* Introduced `TestDispatcher` for unit testing.
+* Added `AddFranzMediator()` DI extension with automatic scanning.
+* Default `ConsoleMediatorObserver` for demo/testing.
 
-    style Business fill:#f9f,stroke:#333,stroke-width:1px
-    style Mediator fill:#9cf,stroke:#333,stroke-width:1px
-    style Infrastructure fill:#fc9,stroke:#333,stroke-width:1px
-```
+---
+## [1.3.3] - 2025-09-15
+### Added
+- Introduced `Error` value object (`Franz.Common.Mediator.Errors.Error`) with factory helpers:
+  - `Error.NotFound`, `Error.Validation`, `Error.Conflict`, `Error.Unexpected`.
+- Added `ErrorCodes` constants for consistency.
+- Updated `Result` and `Result<T>` to integrate with `Error`.
+- Updated ASP.NET Core adapter to map `Error` codes to proper HTTP responses:
+  - NotFound → 404
+  - Validation → 400
+  - Conflict → 409
+  - Unexpected/default → 500
 
-
-## 📈 Changelog
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
