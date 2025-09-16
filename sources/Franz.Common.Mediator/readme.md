@@ -317,7 +317,7 @@ MIT
 
 ## 📝 Changelog
 
-### v1.3.2
+### v1.3.4
 
 * Introduced Options pattern (`Retry`, `Timeout`, `CircuitBreaker`, `Bulkhead`, `Caching`, `Transaction`).
 * Upgraded pipelines to be options-aware.

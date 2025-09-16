@@ -175,7 +175,6 @@ services.AddBusinessServices(); // Registers all handlers automatically
 
 ## **Dependencies**
 
-* **MediatR** (13.0.0) – mediator pattern.
 * **Scrutor** (4.2.2) – assembly scanning & DI.
 * **Microsoft.Extensions.DependencyInjection** (9.0.0) – DI support.
 * **Franz.Common.DependencyInjection** – core DI patterns.

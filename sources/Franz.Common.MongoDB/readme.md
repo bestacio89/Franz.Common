@@ -17,7 +17,7 @@ A library within the **Franz Framework** designed to streamline the integration 
 
 ## **Version Information**
 
-- **Current Version**: 1.3.3
+- **Current Version**: 1.3.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

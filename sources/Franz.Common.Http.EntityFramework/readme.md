@@ -1,4 +1,10 @@
-﻿# **Franz.Common.Http.EntityFramework**
+﻿🔥 Nice — you’ve got a clean README already, but now that **1.3.4** introduces **multi-provider support**, the changelog and features need a little update.
+
+Here’s how I’d rewrite it for **v1.3.4**:
+
+---
+
+# **Franz.Common.Http.EntityFramework**
 
 A specialized library within the **Franz Framework** that integrates **Entity Framework Core** with **ASP.NET Core** applications. This package simplifies transactional handling, dependency injection, and middleware configurations, enhancing database operations in HTTP-based services.
 
@@ -6,39 +12,49 @@ A specialized library within the **Franz Framework** that integrates **Entity Fr
 
 ## **Features**
 
-- **Transactional Filters**:
-  - `TransactionFilter` for managing database transactions seamlessly in API requests.
-- **Service Registration**:
-  - `ServiceCollectionExtensions` for registering database contexts and transactional filters.
-- **Entity Framework Core Integration**:
-  - Built-in support for relational database operations.
-- **Modular Design**:
-  - Compatible with other **Franz Framework** Entity Framework components, such as `Franz.Common.EntityFramework.MariaDB`.
+* **Transactional Filters**:
+
+  * `TransactionFilter` for managing database transactions seamlessly in API requests.
+* **Service Registration**:
+
+  * `ServiceCollectionExtensions` for registering database contexts and transactional filters.
+* **Entity Framework Core Integration**:
+
+  * Built-in support for relational database operations.
+* **Multi-Database Provider Support** *(new in 1.3.4)*:
+
+  * Easily configure **MariaDB**, **Postgres**, **Oracle**, or **SQL Server** via `appsettings.json`.
+* **Modular Design**:
+
+  * Compatible with other **Franz Framework** Entity Framework components, such as `Franz.Common.EntityFramework.MariaDB`, `Franz.Common.EntityFramework.Postgres`, etc.
 
 ---
 
 ## **Version Information**
 
-- **Current Version**: 1.3.3
-- Part of the private **Franz Framework** ecosystem.
+* **Current Version**: 1.3.4
+* Part of the private **Franz Framework** ecosystem.
 
 ---
 
 ## **Dependencies**
 
 This package relies on:
-- **Microsoft.EntityFrameworkCore** (8.0.0): Core EF functionality for database access.
-- **Microsoft.EntityFrameworkCore.Relational** (8.0.0): For relational database support.
-- **Microsoft.AspNetCore.Mvc** (2.2.0): For integrating EF with ASP.NET Core MVC applications.
-- **Franz.Common.DependencyInjection**: Simplifies dependency injection.
-- **Franz.Common.EntityFramework.MariaDB**: Extends MariaDB-specific configurations and utilities.
+
+* **Microsoft.EntityFrameworkCore** (8.0.0)
+* **Microsoft.EntityFrameworkCore.Relational** (8.0.0)
+* **Microsoft.AspNetCore.Mvc** (2.2.0)
+* **Franz.Common.DependencyInjection**
+* **Franz.Common.EntityFramework.MariaDB**
+* **Franz.Common.EntityFramework.Postgres**
+* **Franz.Common.EntityFramework.Oracle**
+* **Franz.Common.EntityFramework.SQLServer**
 
 ---
 
 ## **Installation**
 
 ### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
 
 ```bash
 dotnet nuget add source "https://your-private-feed-url" \
@@ -51,33 +67,39 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Http.EntityFramework  
+dotnet add package Franz.Common.Http.EntityFramework
 ```
 
 ---
 
 ## **Usage**
 
-### **1. Register Database Contexts**
+### **1. Configure Provider in appsettings.json**
 
-Use `ServiceCollectionExtensions` to register EF Core database contexts:
-
-```csharp
-using Franz.Common.Http.EntityFramework.Extensions;
-
-public class Startup
+```json
 {
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddDatabaseContext<MyDbContext>(options =>
-            options.UseSqlServer("YourConnectionString"));
-    }
+  "Database": {
+    "Provider": "Postgres",
+    "ConnectionString": "Host=localhost;Database=mydb;Username=myuser;Password=mypass"
+  }
 }
 ```
 
-### **2. Enable Transaction Filters**
+Supported providers: `MariaDb`, `Postgres`, `Oracle`, `SqlServer`.
 
-Apply the `TransactionFilter` to ensure transactional consistency:
+---
+
+### **2. Register Database Context**
+
+```csharp
+builder.Services.AddDatabase<MyDbContext>(builder.Environment, builder.Configuration);
+```
+
+---
+
+### **3. Enable Transaction Filters**
+
+Automatically applied by default, but can be explicitly added:
 
 ```csharp
 using Franz.Common.Http.EntityFramework.Transactions;
@@ -88,52 +110,44 @@ services.AddControllers(options =>
 });
 ```
 
-### **3. Middleware Configuration**
-
-Integrate EF Core into the middleware pipeline:
-
-```csharp
-using Franz.Common.Http.EntityFramework.Extensions;
-
-app.UseEntityFrameworkMiddleware();
-```
-
 ---
 
 ## **Integration with Franz Framework**
 
 The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
-- **Franz.Common.EntityFramework**: Provides shared EF utilities and repository patterns.
-- **Franz.Common.EntityFramework.MariaDB**: Offers MariaDB-specific configurations.
-- **Franz.Common.DependencyInjection**: Simplifies service registration and dependency management.
 
-Ensure these dependencies are installed to leverage the full capabilities of the library.
-
----
-
-## **Contributing**
-
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
-
-## **License**
-
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
+* **Franz.Common.EntityFramework**
+* **Franz.Common.EntityFramework.MariaDB**
+* **Franz.Common.EntityFramework.Postgres**
+* **Franz.Common.EntityFramework.Oracle**
+* **Franz.Common.EntityFramework.SQLServer**
+* **Franz.Common.DependencyInjection**
 
 ---
 
 ## **Changelog**
 
-### Version 1.2.65
-- Upgrade version to .net 9
+### Version 1.3.4
 
+* Added **multi-database provider support** (MariaDB, Postgres, Oracle, SQL Server).
+* Provider selection now handled via `appsettings.json` (`Database:Provider`).
+* Simplified registration: `AddDatabase<TDbContext>(env, config)`.
 
 ### Version 1.3
 - Upgraded to **.NET 9.0.8**
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
+### Version 1.2.65
+- Upgrade version to .net 9
+---
+
+⚡ This way your README reflects the new **multi-db capability** front and center.
+
+Do you want me to also draft a **configuration schema section** (like a JSON schema snippet or table) that documents all possible keys for `Database` (Provider, ConnectionString, maybe future options like Schema, PoolSize, MigrationsAssembly)?
+
+
+
+
+
