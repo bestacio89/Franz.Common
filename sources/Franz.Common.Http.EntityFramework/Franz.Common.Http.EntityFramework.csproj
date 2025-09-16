@@ -15,6 +15,9 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
 	  <ProjectReference Include="..\Franz.Common.EntityFramework.MariaDB\Franz.Common.EntityFramework.MariaDB.csproj" />
+	  <ProjectReference Include="..\Franz.Common.EntityFramework.Oracle\Franz.Common.EntityFramework.Oracle.csproj" />
+	  <ProjectReference Include="..\Franz.Common.EntityFramework.PostGres\Franz.Common.EntityFramework.PostGres.csproj" />
+	  <ProjectReference Include="..\Franz.Common.EntityFramework.SQLServer\Franz.Common.EntityFramework.SQLServer.csproj" />
 	</ItemGroup>
 
 </Project>

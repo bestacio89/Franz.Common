@@ -57,24 +57,16 @@ namespace Franz.Common.Mediator.Extensions
       services.AddScoped(typeof(IPipeline<,>), typeof(ValidationPipeline<,>));
 
       // Resilience
-      services.AddScoped(typeof(IPipeline<,>), sp => new RetryPipeline<object, object>(options.Retry));
-      services.AddScoped(typeof(IPipeline<,>), sp => new TimeoutPipeline<object, object>(options.Timeout));
-      services.AddScoped(typeof(IPipeline<,>), sp => new CircuitBreakerPipeline<object, object>(options.CircuitBreaker));
-      services.AddScoped(typeof(IPipeline<,>), sp => new BulkheadPipeline<object, object>(options.Bulkhead));
+      services.AddScoped(typeof(IPipeline<,>), typeof(RetryPipeline<,>));
+      services.AddScoped(typeof(IPipeline<,>), typeof(TimeoutPipeline<,>));
+      services.AddScoped(typeof(IPipeline<,>), typeof(CircuitBreakerPipeline<,>));
+      services.AddScoped(typeof(IPipeline<,>), typeof(BulkheadPipeline<,>));
 
       // Transaction
-      services.AddScoped(typeof(IPipeline<,>), sp =>
-      {
-        var uow = sp.GetRequiredService<IUnitOfWork>();
-        return new TransactionPipeline<object, object>(uow, options.Transaction);
-      });
+      services.AddScoped(typeof(IPipeline<,>), typeof(TransactionPipeline<,>));
 
       // Caching
-      services.AddScoped(typeof(IPipeline<,>), sp =>
-      {
-        var cache = sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
-        return new CachingPipeline<object, object>(cache, options.Caching);
-      });
+      services.AddScoped(typeof(IPipeline<,>), typeof(CachingPipeline<,>));
 
       // Notification pipelines
       services.AddScoped(typeof(INotificationPipeline<>), typeof(NotificationLoggingPipeline<>));

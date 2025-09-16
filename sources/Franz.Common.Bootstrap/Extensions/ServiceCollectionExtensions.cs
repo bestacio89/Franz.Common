@@ -41,8 +41,6 @@ public static class ServiceCollectionExtensions
     // Register any optional dependencies
     services.AddDependencies();
 
-    // Register AutoMapper
-    services.AddAutoMapper(assemblies);
 
     return services;
   }
