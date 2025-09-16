@@ -21,7 +21,7 @@ A private utility library for seamless integration of **Entity Framework Core** 
 
 ## **Version Information**
 
-- **Current Version**: `1.3.2`
+- **Current Version**: `1.3.3`
 - This package and all related `Franz` packages are under active development and maintained privately.
 
 ---
@@ -84,7 +84,7 @@ SslEnforcement sslOption = SslEnforcement.Required;
 
 ## **Dependencies**
 
-This package is built to work with the following Franz Framework packages (all versioned `1.3.2`):
+This package is built to work with the following Franz Framework packages (all versioned `1.3.3`):
 - `Franz.Common.EntityFramework`
 - `Franz.Common.MultiTenancy`
 

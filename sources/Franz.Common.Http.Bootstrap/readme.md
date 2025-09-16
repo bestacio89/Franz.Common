@@ -24,7 +24,7 @@ A comprehensive library within the **Franz Framework**, designed to centralize a
 
 ## **Version Information**
 
-- **Current Version**: 1.3.2
+- **Current Version**: 1.3.3
 - Part of the private **Franz Framework** ecosystem.
 
 ---

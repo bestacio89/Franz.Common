@@ -330,4 +330,15 @@ MIT
 * Default `ConsoleMediatorObserver` for demo/testing.
 
 ---
+## [1.3.3] - 2025-09-15
+### Added
+- Introduced `Error` value object (`Franz.Common.Mediator.Errors.Error`) with factory helpers:
+  - `Error.NotFound`, `Error.Validation`, `Error.Conflict`, `Error.Unexpected`.
+- Added `ErrorCodes` constants for consistency.
+- Updated `Result` and `Result<T>` to integrate with `Error`.
+- Updated ASP.NET Core adapter to map `Error` codes to proper HTTP responses:
+  - NotFound → 404
+  - Validation → 400
+  - Conflict → 409
+  - Unexpected/default → 500
 

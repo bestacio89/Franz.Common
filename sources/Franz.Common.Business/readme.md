@@ -1,12 +1,4 @@
-﻿Got it ✅ — your doc currently repeats some concepts (entities, value objects, aggregates) both under **Features** and **Usage**, and the changelog also shows up twice. I’ll restructure it so it:
-
-* Keeps the **novelties** (like aggregates being event-sourced in `1.3.2`, mediator separation in `1.3`).
-* Explains each feature **once**, with examples where useful.
-* Flows in a clean order: *Overview → Features → Usage → Dependencies → Installation → Contribution → License → Changelog*.
-
-Here’s a cleaned-up version:
-
----
+﻿---
 
 # **Franz.Common.Business**
 
@@ -204,7 +196,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 ```
 
 ```bash
-dotnet add package Franz.Common.Business --Version 1.3
+dotnet add package Franz.Common.Business --Version 
 ```
 
 ---
