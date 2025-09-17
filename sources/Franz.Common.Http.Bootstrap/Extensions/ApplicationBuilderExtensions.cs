@@ -1,4 +1,8 @@
-﻿namespace Microsoft.AspNetCore.Builder;
+﻿using Franz.Common.Http;
+using Microsoft.AspNetCore.Builder;
+using Franz.Common.Http.Documentation.Extensions;
+
+namespace Franz.Common.Http.Bootstrap.Extensions;
 
 public static class ApplicationBuilderExtensions
 {
