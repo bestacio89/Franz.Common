@@ -2,7 +2,7 @@ using Franz.Common.Business.Domain;
 using Franz.Common.Business.Events;
 
 public abstract class AggregateRoot<TEvent> : Entity<Guid>, IAggregateRoot
-    where TEvent : BaseEvent
+    where TEvent : BaseDomainEvent
 {
   private readonly List<TEvent> _changes = new();
   public int Version { get; private set; } = -1;
