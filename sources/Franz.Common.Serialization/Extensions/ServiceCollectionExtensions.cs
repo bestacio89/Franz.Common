@@ -1,7 +1,9 @@
+using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.Serialization.Extensions;
 public static class ServiceCollectionExtensions
 {
   public static IServiceCollection AddSerializers(this IServiceCollection services)

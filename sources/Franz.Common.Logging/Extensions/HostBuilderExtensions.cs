@@ -8,8 +8,8 @@ using Elastic.Apm; // gives you Agent
 using Elastic.Apm.NetCoreAll;
 #endif
 
-namespace Microsoft.Extensions.Hosting
-{
+namespace Franz.Common.Logging.Extensions;
+
   public static class HostBuilderExtensions
   {
     public static IHostBuilder UseLog(this IHostBuilder hostBuilder)
@@ -36,5 +36,5 @@ namespace Microsoft.Extensions.Hosting
 
       return hostBuilder;
     }
-  }
+  
 }

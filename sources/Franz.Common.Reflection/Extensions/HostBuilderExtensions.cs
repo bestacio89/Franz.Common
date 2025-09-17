@@ -1,6 +1,7 @@
-﻿using System.Reflection;
+﻿using Microsoft.Extensions.Hosting;
+using System.Reflection;
 
-namespace Microsoft.Extensions.Hosting;
+namespace Franz.Common.Reflection.Extensions;
 public static class HostBuilderExtensions
 {
   public static IHostBuilder LoadAssemblyReferencedNotLoaded(this IHostBuilder hostBuilder, Assembly entryAssembly)
