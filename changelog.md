@@ -49,3 +49,10 @@
 * Responsibility for object mapping now belongs to the **Application layer**.
 * Framework remains reflection-free and adapter-friendly.
 * Cleaner separation of concerns, lighter dependencies, more flexible.
+
+###  Version 1.3.5
+* Fixed open generic pipeline registration (no more object,object hack).
+* Transaction & caching pipelines now DI-friendly with proper constructors.
+* Resilience pipelines (Retry, Timeout, CircuitBreaker, Bulkhead) fully configurable via FranzMediatorOptions.
+* README updated with pipeline usage and configuration examples.
+* Smoother onboarding: one-line AddFranzMediator() setup with options delegate.

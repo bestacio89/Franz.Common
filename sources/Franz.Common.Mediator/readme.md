@@ -1,8 +1,4 @@
-﻿Here’s a **full draft of a `README.md`** for `Franz.Common.Mediator` that captures *everything we’ve built together* — enterprise-grade mediator with options, pipelines, observability, context, results, testing, and extensibility. It’s written as a clean, developer-friendly doc with code snippets inline.
-
----
-
-# Franz.Common.Mediator
+﻿# Franz.Common.Mediator
 
 Franz.Common.Mediator is a **production-grade mediator library** for .NET that goes beyond MediatR.
 It’s **framework-agnostic, configurable, observable, resilient, and testable** — built for real enterprise systems.
@@ -48,16 +44,22 @@ public class CreateUserHandler : ICommandHandler<CreateUserCommand, Result<Guid>
 ### 2. Wire Mediator in DI
 
 ```csharp
-services.AddFranzMediator(options =>
-{
-    options.Retry.MaxAttempts = 3;
-    options.Timeout.Duration = TimeSpan.FromSeconds(2);
-    options.CircuitBreaker.FailureThreshold = 5;
-    options.Bulkhead.MaxConcurrentRequests = 20;
-    options.Caching.DefaultTtl = TimeSpan.FromMinutes(5);
+using Franz.Common.Mediator.Extensions;
+using System.Reflection;
 
-    options.EnableDefaultConsoleObserver = true; // for demo/test
-});
+services.AddFranzMediator(
+    new[] { Assembly.GetExecutingAssembly() },
+    options =>
+    {
+        options.Retry.MaxRetries = 3;
+        options.Timeout.Duration = TimeSpan.FromSeconds(2);
+        options.CircuitBreaker.FailuresAllowedBeforeBreaking = 5;
+        options.Bulkhead.MaxParallelization = 20;
+        options.Transaction.IsolationLevel = System.Data.IsolationLevel.ReadCommitted;
+        options.Caching.Duration = TimeSpan.FromMinutes(5);
+
+        options.EnableDefaultConsoleObserver = true;
+    });
 ```
 
 ### 3. Dispatch from your app
@@ -69,72 +71,6 @@ if (result.IsSuccess)
     Console.WriteLine($"Created user {result.Value}");
 else
     Console.WriteLine($"Failed: {result.Error.Message}");
-```
-
----
-
-## 🔧 Features
-
-### ✅ Commands & Queries
-
-```csharp
-public record GetUserQuery(Guid Id) : IQuery<Result<User>>;
-
-public class GetUserHandler : IQueryHandler<GetUserQuery, Result<User>>
-{
-    public Task<Result<User>> Handle(GetUserQuery query, CancellationToken ct) =>
-        Task.FromResult(Result<User>.Success(new User(query.Id, "bob")));
-}
-```
-
-### 📣 Notifications
-
-```csharp
-public record UserCreatedEvent(Guid Id, string Email) : INotification;
-
-public class SendWelcomeEmailHandler : INotificationHandler<UserCreatedEvent>
-{
-    public Task Handle(UserCreatedEvent ev, CancellationToken ct)
-    {
-        Console.WriteLine($"Welcome {ev.Email}!");
-        return Task.CompletedTask;
-    }
-}
-```
-
-Dispatcher supports:
-
-* Sequential or Parallel publish strategies.
-* Error policies (`StopOnFirstFailure` / `ContinueOnError`).
-* Per-handler telemetry.
-
-```csharp
-await dispatcher.PublishAsync(new UserCreatedEvent(userId, email),
-    PublishStrategy.Parallel,
-    NotificationErrorHandling.ContinueOnError);
-```
-
-### 🌊 Streaming Queries
-
-```csharp
-public record GetNumbersStream(int Count) : IStreamQuery<int>;
-
-public class GetNumbersStreamHandler : IStreamQueryHandler<GetNumbersStream, int>
-{
-    public async IAsyncEnumerable<int> Handle(GetNumbersStream q, [EnumeratorCancellation] CancellationToken ct)
-    {
-        for (int i = 0; i < q.Count; i++)
-        {
-            yield return i;
-            await Task.Delay(100, ct);
-        }
-    }
-}
-```
-
-```csharp
-await foreach (var n in dispatcher.Stream(new GetNumbersStream(5)))
-    Console.WriteLine(n);
 ```
 
 ---
@@ -152,7 +88,7 @@ Franz ships with many built-in pipelines, all **options-driven**:
 * **CachingPipeline** → cache query results.
 * **TransactionPipeline** → commit/rollback with `IUnitOfWork`.
 
-Example:
+Example pipeline:
 
 ```csharp
 public class RetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
@@ -163,10 +99,10 @@ public class RetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 
     public async Task<TResponse> Handle(TRequest request, CancellationToken ct, Func<Task<TResponse>> next)
     {
-        for (int i = 0; i < _options.MaxAttempts; i++)
+        for (int i = 0; i < _options.MaxRetries; i++)
         {
             try { return await next(); }
-            catch when (i < _options.MaxAttempts - 1)
+            catch when (i < _options.MaxRetries - 1)
             {
                 await Task.Delay(_options.Delay, ct);
             }
@@ -180,20 +116,83 @@ public class RetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 
 ## 📋 Options Pattern
 
-All pipelines are driven by central options:
+All pipeline settings are configured centrally with `FranzMediatorOptions`:
 
 ```csharp
-public class FranzMediatorOptions
+namespace Franz.Common.Mediator.Options
 {
-    public RetryOptions Retry { get; set; } = new();
-    public TimeoutOptions Timeout { get; set; } = new();
-    public CircuitBreakerOptions CircuitBreaker { get; set; } = new();
-    public BulkheadOptions Bulkhead { get; set; } = new();
-    public CachingOptions Caching { get; set; } = new();
-    public TransactionOptions Transaction { get; set; } = new();
+    public class FranzMediatorOptions
+    {
+        public RetryOptions Retry { get; set; } = new();
+        public TimeoutOptions Timeout { get; set; } = new();
+        public CircuitBreakerOptions CircuitBreaker { get; set; } = new();
+        public BulkheadOptions Bulkhead { get; set; } = new();
+        public CachingOptions Caching { get; set; } = new();
+        public TransactionOptions Transaction { get; set; } = new();
+        public ConsoleObserverOptions ConsoleObserver { get; set; } = new();
 
-    public bool EnableDefaultConsoleObserver { get; set; }
+        public bool EnableDefaultConsoleObserver { get; set; } = false;
+    }
 }
+```
+
+---
+
+## ⚙️ Configuring Pipelines with Options
+
+In `Program.cs`:
+
+```csharp
+builder.Services.AddFranzMediator(
+    new[] { Assembly.GetExecutingAssembly() },
+    options =>
+    {
+        // Resilience
+        options.Retry.MaxRetries = 3;
+        options.Timeout.Duration = TimeSpan.FromSeconds(10);
+        options.CircuitBreaker.FailuresAllowedBeforeBreaking = 5;
+        options.Bulkhead.MaxParallelization = 20;
+
+        // Transaction & caching
+        options.Transaction.IsolationLevel = System.Data.IsolationLevel.ReadCommitted;
+        options.Caching.Duration = TimeSpan.FromMinutes(5);
+
+        // Observer
+        options.EnableDefaultConsoleObserver = true;
+    });
+```
+
+### Dependency Injection of Options
+
+`AddFranzMediator` wires up sub-options so pipelines can resolve them:
+
+```csharp
+services.AddSingleton(franzOptions);
+
+services.AddScoped(sp => sp.GetRequiredService<FranzMediatorOptions>().Retry);
+services.AddScoped(sp => sp.GetRequiredService<FranzMediatorOptions>().Timeout);
+services.AddScoped(sp => sp.GetRequiredService<FranzMediatorOptions>().CircuitBreaker);
+services.AddScoped(sp => sp.GetRequiredService<FranzMediatorOptions>().Bulkhead);
+services.AddScoped(sp => sp.GetRequiredService<FranzMediatorOptions>().Transaction);
+services.AddScoped(sp => sp.GetRequiredService<FranzMediatorOptions>().Caching);
+services.AddScoped(sp => sp.GetRequiredService<FranzMediatorOptions>().ConsoleObserver);
+```
+
+Each pipeline then requests its own options via constructor injection.
+
+---
+
+### Visual Map
+
+```mermaid
+flowchart TD
+    O[FranzMediatorOptions] --> R[RetryOptions] --> RP[RetryPipeline]
+    O --> T[TimeoutOptions] --> TP[TimeoutPipeline]
+    O --> C[CircuitBreakerOptions] --> CBP[CircuitBreakerPipeline]
+    O --> B[BulkheadOptions] --> BP[BulkheadPipeline]
+    O --> TR[TransactionOptions] --> TRP[TransactionPipeline]
+    O --> CA[CachingOptions] --> CAP[CachingPipeline]
+    O --> CO[ConsoleObserverOptions] --> OBS[ConsoleMediatorObserver]
 ```
 
 ---
@@ -209,28 +208,19 @@ public class ConsoleMediatorObserver : IMediatorObserver
         Task.Run(() => Console.WriteLine($"➡ {req.Name} started [{correlationId}]"));
 
     public Task OnRequestCompleted(Type req, string correlationId, TimeSpan duration) =>
-        Task.Run(() => Console.WriteLine($"✅ {req.Name} completed in {duration.TotalMs()} ms"));
+        Task.Run(() => Console.WriteLine($"✅ {req.Name} completed in {duration.TotalMilliseconds} ms"));
 
     public Task OnRequestFailed(Type req, string correlationId, Exception ex) =>
         Task.Run(() => Console.WriteLine($"❌ {req.Name} failed: {ex.Message}"));
 }
 ```
 
-### MediatorContext
-
-Available everywhere in pipelines/handlers:
+`MediatorContext` is available everywhere (pipelines, handlers):
 
 ```csharp
 MediatorContext.Current.UserId
 MediatorContext.Current.TenantId
-MediatorContext.Current.Culture
 MediatorContext.Current.CorrelationId
-```
-
-Populate automatically with ASP.NET Core middleware:
-
-```csharp
-app.UseMediatorContext();
 ```
 
 ---
@@ -240,22 +230,6 @@ app.UseMediatorContext();
 Every handler returns a `Result` or `Result<T>`.
 
 ```csharp
-public class Result
-{
-    public bool IsSuccess { get; }
-    public Error? Error { get; }
-    // ...
-}
-
-public class Result<T> : Result
-{
-    public T? Value { get; }
-}
-```
-
-### Example
-
-```csharp
 if (!result.IsSuccess)
 {
     Console.WriteLine(result.Error.Code);     // e.g., "ValidationError"
@@ -263,19 +237,16 @@ if (!result.IsSuccess)
 }
 ```
 
-Errors carry codes and metadata for structured responses.
-
 ---
 
 ## 🧪 Testing
 
-Use the `TestDispatcher` to run handlers without DI or full setup.
+Use `TestDispatcher` to run handlers without DI:
 
 ```csharp
 var dispatcher = new TestDispatcher()
     .WithHandler(new CreateUserHandler())
-    .WithPipeline(new LoggingPipeline<,>())
-    .WithPreProcessor(new LoggingPreProcessor<>());
+    .WithPipeline(new LoggingPipeline<,>());
 
 var result = await dispatcher.Send(new CreateUserCommand("bob", "bob@example.com"));
 
@@ -285,8 +256,6 @@ Assert.True(result.IsSuccess);
 ---
 
 ## 🌐 ASP.NET Core Integration
-
-In a Web API, convert mediator results to HTTP results with an adapter:
 
 ```csharp
 app.MapPost("/users", async (CreateUserCommand cmd, IDispatcher dispatcher) =>
@@ -300,12 +269,11 @@ app.MapPost("/users", async (CreateUserCommand cmd, IDispatcher dispatcher) =>
 
 ## 📐 Design Principles
 
-* **Framework-agnostic** → core never references ASP.NET, EF, Mongo, etc.
-* **Contracts only** → no adapters included, devs own infra details.
-* **Options-driven** → configure via DI/appsettings.
-* **Observable** → correlation IDs, telemetry hooks, multi-tenant context.
-* **Resilient** → retries, timeouts, bulkheads, circuit breakers built-in.
-* **Testable** → TestDispatcher and fakes included.
+* **Framework-agnostic**
+* **Contracts only** (no infra hardcoding)
+* **Options-driven**
+* **Observable & resilient**
+* **Testable**
 
 ---
 
@@ -317,28 +285,16 @@ MIT
 
 ## 📝 Changelog
 
-### v1.3.4
+### v1.3.5 – 2025-09-17
 
-* Introduced Options pattern (`Retry`, `Timeout`, `CircuitBreaker`, `Bulkhead`, `Caching`, `Transaction`).
+* Fixed pipeline registration (open generics for DI).
+* Registered sub-options for DI (Retry, Timeout, CircuitBreaker, Bulkhead, Transaction, Caching, Observer).
+* Updated README with DI & options example.
+
+### v1.3.4 – 2025-09-15
+
+* Introduced Options pattern.
 * Upgraded pipelines to be options-aware.
-* Added `MediatorContext` with user/tenant/culture.
-* Expanded observability with `IMediatorObserver` and per-handler telemetry.
-* Unified `Result`/`Result<T>` error handling.
-* Added Validation with structured errors + FluentValidation adapter.
-* Introduced `TestDispatcher` for unit testing.
-* Added `AddFranzMediator()` DI extension with automatic scanning.
-* Default `ConsoleMediatorObserver` for demo/testing.
-
----
-## [1.3.3] - 2025-09-15
-### Added
-- Introduced `Error` value object (`Franz.Common.Mediator.Errors.Error`) with factory helpers:
-  - `Error.NotFound`, `Error.Validation`, `Error.Conflict`, `Error.Unexpected`.
-- Added `ErrorCodes` constants for consistency.
-- Updated `Result` and `Result<T>` to integrate with `Error`.
-- Updated ASP.NET Core adapter to map `Error` codes to proper HTTP responses:
-  - NotFound → 404
-  - Validation → 400
-  - Conflict → 409
-  - Unexpected/default → 500
+* Added MediatorContext & observability.
+* Introduced TestDispatcher.
 

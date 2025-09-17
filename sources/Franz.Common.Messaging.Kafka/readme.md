@@ -27,7 +27,7 @@ A Kafka integration library within the **Franz Framework** designed to simplify 
 
 ## **Version Information**
 
-- **Current Version**: 1.3.4
+- **Current Version**:  1.3.5
 - Part of the private **Franz Framework** ecosystem.
 
 ---
