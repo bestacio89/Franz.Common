@@ -1,7 +1,8 @@
 using Franz.Common.Http.Documentation.Routing;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 
-namespace Microsoft.AspNetCore.Mvc;
+namespace Franz.Common.Http.Documentation.Extensions;
 
 public static class MvcOptionsExtensions
 {
