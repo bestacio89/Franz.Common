@@ -1,30 +1,29 @@
 using Franz.Common.EntityFramework.Extensions;
-using MediatR;
+using Franz.Common.Mediator;
+using Franz.Common.Mediator.Dispatchers;
 using Microsoft.EntityFrameworkCore;
 
 namespace Franz.Common.EntityFramework;
+
 public class DbContextBase : DbContext
 {
-  private readonly IMediator mediator = default!;
+  private readonly IDispatcher dispatcher = default!;
 
-  public DbContextBase(DbContextOptions dbContextOptions, IMediator mediator)
-    : base(dbContextOptions)
+  public DbContextBase(DbContextOptions dbContextOptions, IDispatcher dispatcher)
+      : base(dbContextOptions)
   {
-    this.mediator = mediator;
+    this.dispatcher = dispatcher;
   }
 
-  protected DbContextBase()
-    : base()
-  {
-  }
+  protected DbContextBase() : base() { }
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
 
     modelBuilder
-      .ApplyConfigurationsFromAssembly(GetType().Assembly)
-      .ConvertEnumeration();
+        .ApplyConfigurationsFromAssembly(GetType().Assembly)
+        .ConvertEnumeration();
   }
 
   public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -41,7 +40,7 @@ public class DbContextBase : DbContext
   {
     await SaveChangesAsync(cancellationToken);
 
-    await mediator.DispatchDomainEventsAsync(this, cancellationToken);
+    await dispatcher.DispatchDomainEventsAsync(this, cancellationToken);
 
     return true;
   }

@@ -1,4 +1,5 @@
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Franz.Common.EntityFramework.Extensions;
