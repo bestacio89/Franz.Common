@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Localization;
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Localization;
 using System.Globalization;
 
-namespace Microsoft.AspNetCore.Builder;
+namespace Franz.Common.Http;
 
 public static class ApplicationBuilderExtensions
 {

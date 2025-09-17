@@ -1,4 +1,6 @@
-namespace Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
+
+namespace Franz.Common.Http.Extensions;
 
 public static class HttpContextExtensions
 {
