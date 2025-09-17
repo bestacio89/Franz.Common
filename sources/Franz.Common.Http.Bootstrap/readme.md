@@ -24,7 +24,7 @@ A comprehensive library within the **Franz Framework**, designed to centralize a
 
 ## **Version Information**
 
-- **Current Version**:  1.3.5
+- **Current Version**:  1.3.6
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -153,3 +153,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ### Version 1.3.4
 - Eliminated dependency on `Franz.Common.Bootstrap` to Automapper
+
+### Version 1.3.6
+- Compatible with Franz 1.3.6 stack.
+- Self-contained middleware bootstrap (UseHttpArchitecture).
+- Swagger & pipeline setup hidden behind Franz extensions.

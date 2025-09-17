@@ -30,7 +30,7 @@ A messaging abstraction library within the **Franz Framework** that simplifies t
 
 ## **Version Information**
 
-- **Current Version**:  1.3.5
+- **Current Version**:  1.3.6
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -171,3 +171,9 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
+### Version 1.3.6
+- Integrated with Franz.Mediator (no MediatR).
+- MessagingPublisher.Publish is now async Task.
+- MessagingInitializer scans INotificationHandler<> for events.
+- Kafka topics auto-created for all integration events.

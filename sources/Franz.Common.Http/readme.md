@@ -24,7 +24,7 @@ A library within the **Franz Framework** designed to simplify HTTP-related opera
 
 ## **Version Information**
 
-- **Current Version**:  1.3.5
+- **Current Version**:  1.3.6
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -162,3 +162,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
+### Version 1.3.6
+- Compatible with Franz 1.3.6 stack.
+- Self-contained middleware bootstrap (UseHttpArchitecture).
+- Swagger & pipeline setup hidden behind Franz extensions.

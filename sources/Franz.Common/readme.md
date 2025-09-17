@@ -40,7 +40,7 @@ A foundational library in the **Franz Framework** designed to provide core utili
 
 ## **Version Information**
 
-- **Current Version**: `1.3.5`
+- **Current Version**:  1.3.6
 - Part of the private Franz Framework suite, hosted on a private Azure NuGet feed.
 
 ---
@@ -213,4 +213,3 @@ This library is private and governed by the Franz Framework's internal licensing
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
 ---
-

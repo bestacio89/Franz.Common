@@ -265,7 +265,7 @@ Licensed under the [MIT License](LICENSE.md).
 
   * HTTP and Messaging now share the same contracts and patterns.
 
-1.3.2
+Version 1.3.2
 
 Introduced Error abstraction with Error class and standard codes (NotFound, Validation, Conflict, Unexpected).
 
@@ -273,20 +273,44 @@ Extended Result<T> to integrate seamlessly with Error.
 
 Added ResultExtensions for ergonomic .ToFailure<T>() and .ToResult() conversions.
 
-1.3.3
+Version 1.3.3
 
 Refined Validation pipeline with FluentValidation adapter.
 
 Improved Transaction pipeline with options support (rollback rules).
 
-Bugfixes: ensured streaming dispatcher yields with observability.
+Bugfixes: ensured streaming dispatcher yields properly with observability.
 
-1.3.4
+Version 1.3.4
 
 🔥 Removed AutoMapper coupling from the framework.
 
-Responsibility for object mapping now belongs to the Application layer.
+Mapping responsibilities now belong to the Application layer.
 
-Framework remains reflection-free and adapter-friendly.
+Framework remains reflection-free, adapter-friendly, and lighter.
 
-Cleaner separation of concerns, lighter dependencies, more flexible.
+Cleaner separation of concerns, more flexible design.
+
+Version 1.3.5
+
+Began migration away from MediatR to native Franz.Mediator.
+
+Rewired MessagingPublisher and MessagingInitializer to use Franz abstractions.
+
+Updated DI extensions to reduce tight coupling to Microsoft.Extensions.DependencyInjection.
+
+Fixed ServiceCollection extension failures, ensuring registrations are isolated in Franz.Common.DependencyInjection.Extensions.
+
+Version 1.3.6
+
+🚀 Completed full removal of MediatR dependency.
+
+IIntegrationEvent now inherits from INotification, enabling seamless mediator + Kafka pipelines.
+
+MessagingPublisher.Publish is now Task-based (async/await support, proper error propagation).
+
+MessagingInitializer scans Franz.Mediator.INotificationHandler<> instead of MediatR handlers.
+
+Core libraries are now DI-free — adapters exist for MS.DI and can be extended to others (Autofac, Lamar, etc.).
+
+Minimal rewiring required outside of DI + Messaging, proving strong architectural boundaries.

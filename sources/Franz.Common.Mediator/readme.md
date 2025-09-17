@@ -298,3 +298,9 @@ MIT
 * Added MediatorContext & observability.
 * Introduced TestDispatcher.
 
+### v1.3.6 – 2025-09-15
+* Removed MediatR → now fully Franz.Mediator.
+* IIntegrationEvent : INotification for clean event flow.
+* IDispatcher.PublishAsync powers event handling & pipelines.
+* Works standalone, no DI required.
+

@@ -56,3 +56,44 @@
 * Resilience pipelines (Retry, Timeout, CircuitBreaker, Bulkhead) fully configurable via FranzMediatorOptions.
 * README updated with pipeline usage and configuration examples.
 * Smoother onboarding: one-line AddFranzMediator() setup with options delegate.
+
+###  Franz.Common v1.3.6
+🔹 Mediator Core
+
+Removed MediatR dependency completely.
+
+All notifications and handlers now use Franz.Mediator (INotification, INotificationHandler<>, IDispatcher).
+
+IIntegrationEvent now inherits from INotification → seamless pipeline + messaging integration.
+
+🔹 Messaging (Kafka)
+
+MessagingPublisher updated:
+
+Now uses _dispatcher.PublishAsync() to process integration events through mediator pipelines before publishing to Kafka.
+
+Publish method signature changed from void → Task for proper async/await handling.
+
+MessagingInitializer updated:
+
+Scans for Franz.Mediator.Handlers.INotificationHandler<> instead of MediatR handlers.
+
+Detects all event types implementing IIntegrationEvent and ensures topics are initialized accordingly.
+
+Dead-letter & subscription topics creation logic streamlined with Franz’s naming conventions (ExchangeNamer, HeaderNamer).
+
+🔹 Dependency Injection
+
+All DI extensions isolated into Franz.Common.DependencyInjection.Extensions.
+
+MS.DI is now just an adapter — core libraries are DI-free.
+
+Clear separation: Franz works without DI, adapters exist for convenience.
+
+🔹 Framework Integrity
+
+Minimal rewiring outside of DI + Messaging:
+
+Only 3 main classes required changes (MessagingPublisher, MessagingInitializer, DI extensions).
+
+All domain events, pipelines, processors, and observers remain unchanged — proving Franz’s abstractions were clean.
