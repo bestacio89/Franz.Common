@@ -6,49 +6,66 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MySqlConnector;
+using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 
-namespace Franz.Common.EntityFramework.MariaDB.Extensions;  
+namespace Franz.Common.EntityFramework.MariaDB.Extensions;
+
 public static class ServiceCollectionExtensions
 {
   private const string DefaultServerName = "localhost";
-  private const string DatabaseNamePattern = "{dbName}";
+  private const string DefaultDatabaseName = "library";
   private const string DefaultUserName = "root";
   private const string DefaultPassword = "password";
-  private const string SslDefaultMode = "Preferred";
+  private const int DefaultPort = 3306; // real MariaDB default
+  private const string DefaultSslMode = "None";
 
-  public static IServiceCollection AddMariaDatabase<TDbContext>(this IServiceCollection services, IConfiguration configuration)
-    where TDbContext : DbContextBase
+  public static IServiceCollection AddMariaDatabase<TDbContext>(
+      this IServiceCollection services,
+      IConfiguration configuration)
+      where TDbContext : DbContextBase
   {
     services
-      .AddDatabaseOptions(configuration)
-      .AddDbContext<TDbContext>((serviceProvider, dbContextBuilder) =>
-      {
-        var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>();
-
-        var mySqlConnectionStringBuilder = new MySqlConnectionStringBuilder
+        .AddDatabaseOptions(configuration)
+        .AddDbContext<TDbContext>((serviceProvider, dbContextBuilder) =>
         {
-          Server = databaseOptions.Value.ServerName ?? DefaultServerName,
-          Database = databaseOptions.Value.DatabaseName ?? DatabaseNamePattern,
-          UserID = databaseOptions.Value.UserName ?? DefaultUserName,
-          Password = databaseOptions.Value.Password ?? DefaultPassword,
-          Port = databaseOptions.Value.Port ?? 3308,
-          SslMode = Enum.Parse<MySqlSslMode>(databaseOptions.Value.SslMode ?? SslDefaultMode, true),
-        };
+          var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
 
-        var connectionString = mySqlConnectionStringBuilder.ConnectionString;
+          var mySqlConnectionStringBuilder = new MySqlConnectionStringBuilder
+          {
+            Server = string.IsNullOrWhiteSpace(databaseOptions.ServerName) ? DefaultServerName : databaseOptions.ServerName,
+            Database = string.IsNullOrWhiteSpace(databaseOptions.DatabaseName) ? DefaultDatabaseName : databaseOptions.DatabaseName,
+            UserID = string.IsNullOrWhiteSpace(databaseOptions.UserName) ? DefaultUserName : databaseOptions.UserName,
+            Password = string.IsNullOrWhiteSpace(databaseOptions.Password) ? DefaultPassword : databaseOptions.Password,
+            Port = (uint)(databaseOptions.Port > 0 ? databaseOptions.Port : DefaultPort),
+            SslMode = Enum.Parse<MySqlSslMode>(
+                                string.IsNullOrWhiteSpace(databaseOptions.SslMode)
+                                    ? DefaultSslMode
+                                    : databaseOptions.SslMode,
+                                ignoreCase: true)
+          };
 
-        var domainContextAccessor = serviceProvider.GetService<IDomainContextAccessor>();
+          var connectionString = mySqlConnectionStringBuilder.ConnectionString;
 
-        var domainId = domainContextAccessor?.GetCurrentDomainId();
-        connectionString = domainId.HasValue
-          ? connectionString.Replace(DatabaseNamePattern, domainId!.Value.ToString())
-          : connectionString.Replace($"_{DatabaseNamePattern}", string.Empty);
+          // Multi-tenant database name substitution
+          var domainContextAccessor = serviceProvider.GetService<IDomainContextAccessor>();
+          var domainId = domainContextAccessor?.GetCurrentDomainId();
 
-        dbContextBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+          connectionString = domainId.HasValue
+                  ? connectionString.Replace("{dbName}", domainId.Value.ToString())
+                  : connectionString.Replace($"_{"{dbName}"}", string.Empty);
 
-        dbContextBuilder.EnableSensitiveDataLogging();
-      })
-      .AddScoped<DbContextBase>(serviceProvider => serviceProvider.GetRequiredService<TDbContext>());
+          // Force MariaDB 11.4 (avoid AutoDetect issues)
+          dbContextBuilder.UseMySql(
+                  connectionString,
+                  ServerVersion.Create(new Version(11, 4, 0), ServerType.MariaDb));
+
+          dbContextBuilder.EnableSensitiveDataLogging();
+
+          // Debugging aid (mask password)
+          var masked = connectionString.Replace(databaseOptions.Password, "***");
+          Console.WriteLine($"[DB] Using connection string: {masked}");
+        })
+        .AddScoped<DbContextBase>(sp => sp.GetRequiredService<TDbContext>());
 
     return services;
   }

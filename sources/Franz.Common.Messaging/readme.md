@@ -30,7 +30,7 @@ A messaging abstraction library within the **Franz Framework** that simplifies t
 
 ## **Version Information**
 
-- **Current Version**:  1.3.8
+- **Current Version**:  1.3.9
 - Part of the private **Franz Framework** ecosystem.
 
 ---

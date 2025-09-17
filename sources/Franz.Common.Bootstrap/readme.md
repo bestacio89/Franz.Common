@@ -22,7 +22,7 @@ A foundational library within the **Franz Framework**, designed to simplify the 
 
 ## **Version Information**
 
-- **Current Version**:  1.3.8
+- **Current Version**:  1.3.9
 - Part of the private **Franz Framework** ecosystem.
 
 ---
