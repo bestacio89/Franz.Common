@@ -1,4 +1,6 @@
-namespace Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting;
+
+namespace Franz.Common.Extensions;
 
 public static class HostEnvironmentExtensions
 {
@@ -8,22 +10,16 @@ public static class HostEnvironmentExtensions
 
   public static bool IsIntegration(this IHostEnvironment hostEnvironment)
   {
-    var result = hostEnvironment.IsEnvironment(INTEGRATION);
-
-    return result;
+    return hostEnvironment.IsEnvironment(INTEGRATION);
   }
 
   public static bool IsValidation(this IHostEnvironment hostEnvironment)
   {
-    var result = hostEnvironment.IsEnvironment(VALIDATION);
-
-    return result;
+    return hostEnvironment.IsEnvironment(VALIDATION);
   }
 
   public static bool IsPreProduction(this IHostEnvironment hostEnvironment)
   {
-    var result = hostEnvironment.IsEnvironment(PREPRODUCTION);
-
-    return result;
+    return hostEnvironment.IsEnvironment(PREPRODUCTION);
   }
 }
