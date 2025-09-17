@@ -1,5 +1,5 @@
 using Franz.Common.Business.Events;
-
+using Franz.Common.Mediator;
 using Newtonsoft.Json;
 
 namespace Franz.Common.Messaging.Factories;

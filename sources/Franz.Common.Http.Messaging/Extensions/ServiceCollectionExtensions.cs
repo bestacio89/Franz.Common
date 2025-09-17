@@ -4,6 +4,7 @@ using Confluent.Kafka;
 using Franz.Common.Http.Messaging.Transactions;
 using Microsoft.Extensions.Configuration;
 using Franz.Common.DependencyInjection.Extensions;
+using Franz.Common.Messaging.Kafka.Extensions;
 namespace Franz.Common.Http.Messaging.Extensions;
 
   public static class ServiceCollectionExtensions

@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using System.Reflection;
+using Franz.Common.Reflection.Extensions;
 
 namespace Franz.Common.Http.Bootstrap.Extensions;
 

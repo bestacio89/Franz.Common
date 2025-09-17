@@ -1,3 +1,4 @@
+using Franz.Common.Extensions;
 using Franz.Common.Headers;
 using Microsoft.Extensions.Primitives;
 

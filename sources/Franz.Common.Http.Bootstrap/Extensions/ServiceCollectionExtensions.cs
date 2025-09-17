@@ -1,10 +1,15 @@
 ﻿using Franz.Common.Bootstrap.Extensions;
 using Franz.Common.Http;
+using Franz.Common.Http.Authentication.Extensions;
 using Franz.Common.Http.MultiTenancy.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Reflection;
+using Franz.Common.Http.Headers.Extensions;
+using Franz.Common.Http.Identity.Extensions;
+using Franz.Common.Serialization.Extensions;
+using Franz.Common.Http.Documentation.Extensions;
 
 namespace Franz.Common.Http.Bootstrap.Extensions;
 public static class ServiceCollectionExtensions

@@ -7,6 +7,7 @@ using Franz.Common.EntityFramework.Properties;
 using Franz.Common.EntityFramework.Repositories;
 using Franz.Common.Errors;
 using Franz.Common.Mediator.Pipelines.Core;
+using Franz.Common.Reflection.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;

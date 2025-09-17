@@ -5,6 +5,7 @@ using Franz.Common.Http.Client;
 using Franz.Common.Http.Client.Delegating;
 using Franz.Common.Http.Client.Properties;
 using Franz.Common.Reflection;
+using Franz.Common.Serialization.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;

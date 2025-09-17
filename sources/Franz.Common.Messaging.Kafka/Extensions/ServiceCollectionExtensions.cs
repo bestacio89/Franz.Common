@@ -11,9 +11,11 @@ using Franz.Common.Messaging.Kafka;
 using Franz.Common.Messaging.Kafka.Hosting;
 using Franz.Common.Messaging.Kafka.Modeling;
 using Franz.Common.Messaging.Kafka.Transactions;
+using Microsoft.Extensions.DependencyInjection;
+using Franz.Common.DependencyInjection.Extensions;
+using Franz.Common.Messaging.Extensions;
 
-
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.Messaging.Kafka.Extensions;
 
 public static class ServiceCollectionExtensions
 {

@@ -4,9 +4,11 @@ using Franz.Common.Messaging.Hosting;
 using Franz.Common.Messaging.Hosting.Properties;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using System.Reflection;
+using Franz.Common.Reflection.Extensions;
 
-namespace Microsoft.Extensions.Hosting;
+namespace Franz.Common.Messaging.Hosting.Extensions;
 
 public static class HostBuilderExtensions
 {
