@@ -304,3 +304,5 @@ MIT
 * IDispatcher.PublishAsync powers event handling & pipelines.
 * Works standalone, no DI required.
 
+### v1.3.7 – 2025-09-17
+* Pipelines are now opt-in
