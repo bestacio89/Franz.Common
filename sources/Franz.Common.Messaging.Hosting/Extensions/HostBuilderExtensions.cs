@@ -1,4 +1,5 @@
 using Franz.Common.Errors;
+using Franz.Common.Logging.Extensions;
 using Franz.Common.Messaging.Hosting;
 using Franz.Common.Messaging.Hosting.Properties;
 using Microsoft.Extensions.Configuration;

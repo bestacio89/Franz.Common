@@ -6,5 +6,5 @@ public interface IMessagingStrategyExecuter : IScopedDependency
 {
   Task<bool> CanExecuteAsync(Message message);
 
-  Task ExecuteEsync(Message message);
+  Task ExecuteAsync(Message message);
 }
