@@ -16,40 +16,42 @@ public static class ServiceCollectionExtensions
   private const string DefaultPassword = "password";
   private const string SslDefaultMode = "Preferred";
 
-  public static IServiceCollection AddPostgresDatabase<TDbContext>(this IServiceCollection services, IConfiguration configuration)
-      where TDbContext : DbContextBase
+  public static IServiceCollection AddPostgresDatabase<TDbContext>(
+    this IServiceCollection services,
+    IConfiguration configuration)
+    where TDbContext : DbContextBase
   {
     services
-      .AddDatabaseOptions(configuration)
-      .AddDbContext<TDbContext>((serviceProvider, dbContextBuilder) =>
-      {
-        var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>();
-        var npgsqlConnectionStringBuilder = new NpgsqlConnectionStringBuilder
+        .AddDatabaseOptions(configuration)
+        .AddDbContext<TDbContext>((serviceProvider, dbContextBuilder) =>
         {
-          Host = databaseOptions.Value.ServerName ?? DefaultServerName,
-          Database = databaseOptions.Value.DatabaseName ?? DatabaseNamePattern,
-          Username = databaseOptions.Value.UserName ?? DefaultUserName,
-          Password = databaseOptions.Value.Password ?? DefaultPassword,
-          Port = (int)(databaseOptions.Value.Port ?? 3308),
-          //Encryption options if there any 
-        };
-        var connectionString = npgsqlConnectionStringBuilder.ConnectionString;
+          var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>();
 
-        var domainContextAccessor = serviceProvider.GetService<IDomainContextAccessor>();
+          var npgsqlConnectionStringBuilder = new NpgsqlConnectionStringBuilder
+          {
+            Host = databaseOptions.Value.ServerName ?? DefaultServerName,
+            Database = databaseOptions.Value.DatabaseName ?? DatabaseNamePattern,
+            Username = databaseOptions.Value.UserName ?? "postgres",
+            Password = databaseOptions.Value.Password ?? DefaultPassword,
+            Port = (int)(databaseOptions.Value.Port ?? 5432),
+            SslMode = SslMode.Disable // or Prefer, depending on your setup
+          };
 
-        var domainId = domainContextAccessor?.GetCurrentDomainId();
-        connectionString = domainId.HasValue
-                  ? connectionString.Replace(DatabaseNamePattern, domainId!.Value.ToString())
-                  : connectionString.Replace($"_{DatabaseNamePattern}", string.Empty);
+          var connectionString = npgsqlConnectionStringBuilder.ConnectionString;
 
-        dbContextBuilder.UseNpgsql(npgsqlConnectionStringBuilder.ConnectionString);
+          var domainContextAccessor = serviceProvider.GetService<IDomainContextAccessor>();
+          var domainId = domainContextAccessor?.GetCurrentDomainId();
 
-        dbContextBuilder.EnableSensitiveDataLogging();
-      })
-      .AddScoped<DbContextBase>(serviceProvider => serviceProvider.GetRequiredService<TDbContext>());
+          connectionString = domainId.HasValue
+              ? connectionString.Replace(DatabaseNamePattern, domainId.Value.ToString())
+              : connectionString.Replace($"_{DatabaseNamePattern}", string.Empty);
+
+          dbContextBuilder.UseNpgsql(connectionString);
+          dbContextBuilder.EnableSensitiveDataLogging();
+        })
+        .AddScoped<DbContextBase>(sp => sp.GetRequiredService<TDbContext>());
 
     return services;
-
   }
 
 }
