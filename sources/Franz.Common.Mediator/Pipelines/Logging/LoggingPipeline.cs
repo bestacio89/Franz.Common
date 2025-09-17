@@ -1,6 +1,7 @@
 ﻿using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,35 +21,38 @@ namespace Franz.Common.Mediator.Pipelines.Logging
       Func<Task<TResponse>> next,
       CancellationToken cancellationToken = default)
     {
-      // ✅ Use runtime type of the request instead of generic TRequest
-      var requestName = request?.GetType().FullName ?? typeof(TRequest).FullName ?? typeof(TRequest).Name;
+      // ✅ Use runtime type to catch *concrete* command/query names
+      var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
 
-      // ✅ Add correlation ID to tie together all log entries for this request
-      var correlationId = Guid.NewGuid();
+      // Optional: tag as Command/Query if suffix matches
+      var prefix = requestName.EndsWith("Query", StringComparison.OrdinalIgnoreCase)
+        ? "Query"
+        : requestName.EndsWith("Command", StringComparison.OrdinalIgnoreCase)
+          ? "Command"
+          : "Request";
 
-      _logger.LogInformation("Starting {RequestName} [{CorrelationId}]", requestName, correlationId);
+      var correlationId = Guid.NewGuid().ToString("N");
+      var stopwatch = Stopwatch.StartNew();
 
-      var start = DateTime.UtcNow;
+      _logger.LogInformation("[{Prefix}] {RequestName} [{CorrelationId}] started",
+        prefix, requestName, correlationId);
+
       try
       {
         var response = await next();
 
-        var duration = DateTime.UtcNow - start;
-        _logger.LogInformation(
-          "Finished {RequestName} [{CorrelationId}] in {Duration}ms",
-          requestName,
-          correlationId,
-          duration.TotalMilliseconds);
+        stopwatch.Stop();
+        _logger.LogInformation("[{Prefix}] {RequestName} [{CorrelationId}] finished in {Elapsed} ms",
+          prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds);
 
         return response;
       }
       catch (Exception ex)
       {
-        _logger.LogError(
-          ex,
-          "Error handling {RequestName} [{CorrelationId}]",
-          requestName,
-          correlationId);
+        stopwatch.Stop();
+        _logger.LogError(ex,
+          "[{Prefix}] {RequestName} [{CorrelationId}] failed after {Elapsed} ms",
+          prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds);
 
         throw;
       }

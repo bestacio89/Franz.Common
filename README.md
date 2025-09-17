@@ -314,3 +314,51 @@ MessagingInitializer scans Franz.Mediator.INotificationHandler<> instead of Medi
 Core libraries are now DI-free — adapters exist for MS.DI and can be extended to others (Autofac, Lamar, etc.).
 
 Minimal rewiring required outside of DI + Messaging, proving strong architectural boundaries.
+
+v1.3.9 – Database Stability Fixes
+
+Fixed incorrect default port fallback (3308 → now correct defaults per provider: MariaDB 3306, Postgres 5432, SQL Server 1433, Oracle 1521).
+
+Connection string builder now uses 127.0.0.1 instead of localhost to avoid socket/TCP mismatches.
+
+Proper SslMode=None applied by default to avoid unwanted SSL negotiation failures.
+
+Masked passwords in logs for safe diagnostics.
+
+v1.3.10 – Scoped DbContext & Lifecycle
+
+Enforced DbContext resolution through DI scope, preventing “phantom DB” issues.
+
+Corrected EnsureCreated vs Migrate lifecycle usage:
+
+Dev/Test → EnsureDeleted + EnsureCreated
+
+Prod → Migrate() only
+
+Added options to configure drop/create/migrate behavior via DatabaseOptions.
+
+v1.3.11 – Seed & Lifecycle Cleanup
+
+Fixed duplicate seed issues caused by mixing EnsureCreated + Migrate.
+
+Clarified seeding strategy:
+
+Use HasData only once (migrations path).
+
+For dev/test, prefer manual or conditional seeding.
+
+Introduced environment-aware DB lifecycle defaults (no more accidental reseeds).
+
+v1.3.12 – Verbose Logging & Observability
+
+Added LoggingPreProcessor and LoggingPostProcessor with runtime request type detection.
+
+Prefixed logs with [Command], [Query], [Request] for clear business-level observability.
+
+Unified logging across pipelines → no more generic ICommand\1orIQuery`1` names.
+
+Lightweight verbose logs:
+
+Pre → Pipeline → Post lifecycle traced with request names.
+
+Keeps focus on Commands/Queries, not raw SQL noise.

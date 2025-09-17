@@ -306,3 +306,12 @@ MIT
 
 ### v1.3.7 – 2025-09-17
 * Pipelines are now opt-in
+
+### v1.3.12 -2025-09-18
+* LoggingPreProcessor now logs using the actual runtime request name instead of generic ICommand\1/IQuery`1`.
+
+* LoggingPostProcessor enriched with prefixes → [Post-Command], [Post-Query], [Post-Request].
+
+* Both Pre/Post processors now provide business-level observability (Command vs Query vs Request).
+
+* Logs are lightweight, clean, and consistent across the full request lifecycle.

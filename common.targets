@@ -8,9 +8,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
 
     <!-- Versioning -->
-    <Version>1.3.11</Version>
-    <AssemblyVersion>1.3.11.0</AssemblyVersion>
-    <FileVersion>1.3.11.0</FileVersion>
+    <Version>1.3.12</Version>
+    <AssemblyVersion>1.3.12.0</AssemblyVersion>
+    <FileVersion>1.3.12.0</FileVersion>
 
     <!-- Author -->
     <Authors>Bernardo Estacio Abreu</Authors>
