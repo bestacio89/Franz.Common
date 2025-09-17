@@ -1,8 +1,9 @@
 using Franz.Common.Reflection;
+using Scrutor;
 using System.Reflection;
 
-namespace Scrutor;
 
+namespace Franz.Common.DependencyInjection.Extensions;
 public static class ITypeSourceSelectorExtensions
 {
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
