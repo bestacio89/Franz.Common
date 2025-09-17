@@ -1,36 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-	<PropertyGroup>
-		<TargetFramework>net9.0</TargetFramework>
-		<LangVersion>latest</LangVersion>
-		<Nullable>disable</Nullable>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Version>1.3.5</Version>
-		<Authors> Bernardo Estacio Abreu</Authors>
-	</PropertyGroup>
+  <PropertyGroup>
+    <!-- Target Framework -->
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
 
-	<PropertyGroup>
-		<RunSettingsFilePath>$(MSBuildProjectDirectory)\..\..\test.runsettings</RunSettingsFilePath>
-	</PropertyGroup>
+    <!-- Versioning -->
+    <Version>1.3.6</Version>
+    <AssemblyVersion>1.3.6.0</AssemblyVersion>
+    <FileVersion>1.3.6.0</FileVersion>
 
-	<PropertyGroup>
-		<!-- NuGet Metadata -->
-		<PackageId>$(MSBuildProjectName)</PackageId>
-		<Description>Shared utility library for the Franz Framework.</Description>
-		<Copyright>Copyright © 2025 Bernardo Estacio Abreu</Copyright>
-		<RepositoryUrl>https://dev.azure.com/AjnaTellus/Franz/_git/Franz.Common</RepositoryUrl>
-		<RepositoryType>git</RepositoryType>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
-		<PackageTags>Franz;Common;Utilities</PackageTags>
-		<PackageReadmeFile>readme.md</PackageReadmeFile>
-		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-	</PropertyGroup>
+    <!-- Author -->
+    <Authors>Bernardo Estacio Abreu</Authors>
+  </PropertyGroup>
 
-	<!-- Include README File -->
-	<ItemGroup>
-		<!-- Ensure README is included during packaging -->
-		<None Include="$(MSBuildProjectDirectory)\readme.md" Pack="true" PackagePath="" />
-	</ItemGroup>
+  <PropertyGroup>
+    <!-- Test Settings -->
+    <RunSettingsFilePath>$(MSBuildProjectDirectory)\..\..\test.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
 
-	
+  <PropertyGroup>
+    <!-- NuGet Metadata -->
+    <PackageId>$(MSBuildProjectName)</PackageId>
+    <Description>Shared utility library for the Franz Framework.</Description>
+    <Copyright>Copyright © 2025 Bernardo Estacio Abreu</Copyright>
+    <RepositoryUrl>https://dev.azure.com/AjnaTellus/Franz/_git/Franz.Common</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryBranch>main</RepositoryBranch>
+    <RepositoryCommit>$(SourceRevisionId)</RepositoryCommit>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>Franz;Common;Utilities;Mediator;Kafka;Microservices</PackageTags>
+    <PackageReadmeFile>readme.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <!-- Include README File -->
+  <ItemGroup>
+    <None Include="$(MSBuildProjectDirectory)\readme.md" Pack="true" PackagePath="" />
+  </ItemGroup>
 </Project>
