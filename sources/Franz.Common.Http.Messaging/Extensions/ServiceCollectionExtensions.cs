@@ -3,9 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Confluent.Kafka;
 using Franz.Common.Http.Messaging.Transactions;
 using Microsoft.Extensions.Configuration;
+using Franz.Common.DependencyInjection.Extensions;
+namespace Franz.Common.Http.Messaging.Extensions;
 
-namespace Microsoft.Extensions.DependencyInjection
-{
   public static class ServiceCollectionExtensions
   {
     public static IServiceCollection AddMessagingInHttpContext(this IServiceCollection services, IConfiguration configuration)
@@ -50,4 +50,3 @@ namespace Microsoft.Extensions.DependencyInjection
       return services;
     }
   }
-}

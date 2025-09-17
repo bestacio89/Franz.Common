@@ -1,12 +1,14 @@
+using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Errors;
 using Franz.Common.Headers;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Properties;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.Messaging.Extensions;
 
 public static class ServiceCollectionExtensions
 {

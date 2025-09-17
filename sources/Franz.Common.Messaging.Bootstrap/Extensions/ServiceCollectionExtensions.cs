@@ -1,7 +1,8 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Franz.Common.Bootstrap.Extensions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using System.Reflection;
-
+using Franz.Common.Messaging.Extensions;
 namespace Microsoft.Extensions.DependencyInjection;
 
 public static class ServiceCollectionExtensions

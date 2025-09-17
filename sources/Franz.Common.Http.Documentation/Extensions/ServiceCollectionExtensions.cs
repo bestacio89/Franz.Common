@@ -2,9 +2,10 @@ using Franz.Common.Http.Documentation.Configuration;
 using Franz.Common.Http.Documentation.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
+using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.Http.Documentation.Extensions;
 public static class ServiceCollectionExtensions
 {
   public static IServiceCollection AddDocumentation(this IServiceCollection services)

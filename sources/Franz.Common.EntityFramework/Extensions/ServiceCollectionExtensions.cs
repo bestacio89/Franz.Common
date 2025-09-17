@@ -1,11 +1,12 @@
 using Franz.Common.Business.Domain;
 using Franz.Common.Business.Events;
+using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.EntityFramework.Behaviors;
 using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.EntityFramework.Properties;
 using Franz.Common.EntityFramework.Repositories;
 using Franz.Common.Errors;
-using MediatR;
+using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
@@ -87,7 +88,7 @@ public static class ServiceCollectionExtensions
 
   public static IServiceCollection AddAggregateRepositories<TDbContext, TEvent>(this IServiceCollection services)
     where TDbContext : DbContext
-    where TEvent : BaseEvent
+    where TEvent : BaseDomainEvent
   {
     services = services.AddScoped<DbContext>(sp => sp.GetRequiredService<TDbContext>());
 
@@ -125,7 +126,7 @@ public static class ServiceCollectionExtensions
 
   public static IServiceCollection AddBehaviors(this IServiceCollection services)
   {
-    services.AddScoped(typeof(IPipelineBehavior<,>), typeof(PersistenceBehavior<,>));
+    services.AddScoped(typeof(IPipeline<,>), typeof(PersistenceBehavior<,>));
 
     return services;
   }

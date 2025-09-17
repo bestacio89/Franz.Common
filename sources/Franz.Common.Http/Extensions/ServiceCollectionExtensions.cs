@@ -6,9 +6,10 @@ using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
-
-namespace Microsoft.Extensions.DependencyInjection;
+using Franz.Common.DependencyInjection.Extensions;
+namespace Franz.Common.Http;
 
 public static class ServiceCollectionExtensions
 {

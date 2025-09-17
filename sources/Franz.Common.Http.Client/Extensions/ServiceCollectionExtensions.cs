@@ -1,13 +1,15 @@
 using Franz.Common;
+using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Errors;
 using Franz.Common.Http.Client;
 using Franz.Common.Http.Client.Delegating;
 using Franz.Common.Http.Client.Properties;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.Http.Client.Extensions;
 
 public static class ServiceCollectionExtensions
 {

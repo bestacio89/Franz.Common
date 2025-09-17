@@ -1,9 +1,12 @@
-﻿using Franz.Common.Http.MultiTenancy.Extensions;
+﻿using Franz.Common.Bootstrap.Extensions;
+using Franz.Common.Http;
+using Franz.Common.Http.MultiTenancy.Extensions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Reflection;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.Http.Bootstrap.Extensions;
 public static class ServiceCollectionExtensions
 {
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.

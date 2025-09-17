@@ -2,7 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 
-namespace Microsoft.Extensions.DependencyInjection
+namespace Franz.Common.AutoMapper.Extensions
 {
   public static class ServiceCollectionExtensions
   {

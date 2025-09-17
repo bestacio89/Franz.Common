@@ -1,7 +1,9 @@
 using Franz.Common.Http.Identity;
 using Franz.Common.Identity;
+using Franz.Common.DependencyInjection.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.Http.Identity.Extensions;
 public static class ServiceCollectionExtensions
 {
 

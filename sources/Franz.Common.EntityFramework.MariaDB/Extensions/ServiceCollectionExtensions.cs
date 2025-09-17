@@ -3,10 +3,11 @@ using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MySqlConnector;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.EntityFramework.MariaDB.Extensions;  
 public static class ServiceCollectionExtensions
 {
   private const string DefaultServerName = "localhost";

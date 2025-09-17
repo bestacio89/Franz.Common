@@ -1,12 +1,15 @@
+using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.EntityFramework;
+using Franz.Common.EntityFramework.MariaDB.Extensions;
 using Franz.Common.EntityFramework.Oracle.Extensions;
 using Franz.Common.EntityFramework.Postgres.Extensions;
 using Franz.Common.EntityFramework.SQLServer.Extensions;
 using Franz.Common.Http.EntityFramework.Transactions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.Http.EntityFramework.Extensions;
 public static class ServiceCollectionExtensions
 {
 
