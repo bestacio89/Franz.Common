@@ -91,6 +91,12 @@ namespace Franz.Common.Mediator.Extensions
       return services;
     }
 
+    public static IServiceCollection AddFranzSerilogLoggingPipeline(this IServiceCollection services)
+    {
+      services.AddScoped(typeof(IPipeline<,>), typeof(SerilogLoggingPipeline<,>));
+      return services;
+    }
+
     public static IServiceCollection AddFranzTransactionPipeline(this IServiceCollection services)
     {
       services.AddScoped(typeof(IPipeline<,>), typeof(TransactionPipeline<,>));

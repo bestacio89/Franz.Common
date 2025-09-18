@@ -1,4 +1,6 @@
 ﻿using Franz.Common.Mediator.Pipelines.Core;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,21 +9,23 @@ using System.Threading.Tasks;
 
 namespace Franz.Common.Mediator.Pipelines.Validation
 {
-  public interface INotificationValidator<in TNotification>
-  {
-    Task<IEnumerable<string>> ValidateAsync(
-        TNotification notification,
-        CancellationToken cancellationToken = default);
-  }
+
 
   public class NotificationValidationPipeline<TNotification> : INotificationPipeline<TNotification>
       where TNotification : Messages.INotification
   {
     private readonly IEnumerable<INotificationValidator<TNotification>> _validators;
+    private readonly ILogger<NotificationValidationPipeline<TNotification>> _logger;
+    private readonly IHostEnvironment _env;
 
-    public NotificationValidationPipeline(IEnumerable<INotificationValidator<TNotification>> validators)
+    public NotificationValidationPipeline(
+      IEnumerable<INotificationValidator<TNotification>> validators,
+      ILogger<NotificationValidationPipeline<TNotification>> logger,
+      IHostEnvironment env)
     {
       _validators = validators;
+      _logger = logger;
+      _env = env;
     }
 
     public async Task Handle(
@@ -34,11 +38,35 @@ namespace Franz.Common.Mediator.Pipelines.Validation
       foreach (var validator in _validators)
       {
         var result = await validator.ValidateAsync(notification, cancellationToken);
-        failures.AddRange(result);
+        if (result != null)
+          failures.AddRange(result);
       }
 
       if (failures.Any())
+      {
+        var notificationName = notification?.GetType().Name ?? typeof(TNotification).Name;
+
+        if (_env.IsDevelopment())
+        {
+          // 🔥 Dev: log all validation failures
+          _logger.LogWarning("[NotificationValidation] {NotificationName} failed with errors: {@Errors}",
+              notificationName, failures);
+        }
+        else
+        {
+          // 🟢 Prod: log only count
+          _logger.LogWarning("[NotificationValidation] {NotificationName} failed with {ErrorCount} errors",
+              notificationName, failures.Count);
+        }
+
         throw new NotificationValidationException(failures);
+      }
+
+      if (_env.IsDevelopment())
+      {
+        var notificationName = notification?.GetType().Name ?? typeof(TNotification).Name;
+        _logger.LogInformation("[NotificationValidation] {NotificationName} passed", notificationName);
+      }
 
       await next();
     }
