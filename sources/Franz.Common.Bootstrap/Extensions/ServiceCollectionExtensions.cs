@@ -40,7 +40,6 @@ public static class ServiceCollectionExtensions
       services.AddFranzMediator(new[] { assembly }); // registers dispatcher, handlers, Franz pipelines
     }
 
-    services.AddDependencies(); // registers services with [Injectable] attribute
 
     return services;
   }
