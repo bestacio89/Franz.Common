@@ -1,6 +1,6 @@
 using Franz.Common.Business.Domain;
 
-namespace System;
+namespace Franz.Common.Business.Extensions;
 public static class TypeExtensions
 {
   public static bool IsEnumerationClass(this Type type)

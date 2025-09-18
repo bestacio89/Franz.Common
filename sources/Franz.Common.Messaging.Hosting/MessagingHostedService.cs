@@ -45,7 +45,7 @@ public class MessagingHostedService : IHostedService
         if (messagingStrategyExecuter == null)
             throw new TechnicalException(Resources.StrategyExecuterNotFoundException);
 
-        messagingStrategyExecuter.ExecuteEsync(message).Wait();
+        messagingStrategyExecuter.ExecuteAsync(message).Wait();
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)

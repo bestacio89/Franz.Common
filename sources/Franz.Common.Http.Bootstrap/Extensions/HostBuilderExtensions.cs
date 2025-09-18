@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Hosting;
+﻿using Franz.Common.Logging.Extensions;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
 using System.Reflection;
+using Franz.Common.Reflection.Extensions;
 
-namespace Microsoft.Extensions.Hosting;
+namespace Franz.Common.Http.Bootstrap.Extensions;
 
 public static class HostBuilderExtensions
 {

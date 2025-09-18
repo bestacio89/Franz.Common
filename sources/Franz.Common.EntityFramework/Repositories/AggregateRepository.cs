@@ -1,4 +1,5 @@
 using Franz.Common.Business.Domain;
+using Franz.Common.EntityFramework.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 public abstract class AggregateRepository<TDbContext, TAggregateRoot> : IAggregateRepository<TAggregateRoot>

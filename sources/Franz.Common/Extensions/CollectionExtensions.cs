@@ -1,4 +1,5 @@
-namespace System.Collections.Generic;
+namespace France.Common.Extensions;
+
 
 public static class CollectionExtensions
 {

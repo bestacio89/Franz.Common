@@ -190,5 +190,10 @@ namespace Franz.Common.Mediator.Testing
         yield return item;
       }
     }
+
+    public Task Send(INotification notification, CancellationToken cancellationToken = default)
+    {
+      throw new NotImplementedException();
+    }
   }
 }

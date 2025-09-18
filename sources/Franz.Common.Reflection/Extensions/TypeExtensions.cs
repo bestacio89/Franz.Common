@@ -1,4 +1,4 @@
-﻿namespace System;
+﻿namespace Franz.Common.Reflection.Extensions;
 
 public static class TypeExtensions
 {

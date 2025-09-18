@@ -1,8 +1,9 @@
 using Franz.Common.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Scrutor;
 using System.Reflection;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.DependencyInjection.Extensions;  
 
 public static class ServiceCollectionExtensions
 {

@@ -1,27 +1,21 @@
-using MediatR;
+﻿using Franz.Common.EntityFramework;
+using Franz.Common.Mediator.Dispatchers;
 using Microsoft.EntityFrameworkCore;
 
-namespace Franz.Common.EntityFramework;
 [Obsolete("Use DbContextBase instead of DbContextMultiDatabase")]
 public class DbContextMultiDatabase : DbContext
 {
-  private readonly IMediator mediator = default!;
+  private readonly IDispatcher dispatcher;
 
-  public DbContextMultiDatabase(DbContextOptions dbContextOptions, IMediator mediator)
-    : base(dbContextOptions)
+  public DbContextMultiDatabase(DbContextOptions dbContextOptions, IDispatcher dispatcher)
+      : base(dbContextOptions)
   {
-    this.mediator = mediator;
-  }
-
-  protected DbContextMultiDatabase()
-    : base()
-  {
+    this.dispatcher = dispatcher;
   }
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
-
     modelBuilder.ApplyConfigurationsFromAssembly(GetType().Assembly);
   }
 
@@ -30,16 +24,15 @@ public class DbContextMultiDatabase : DbContext
     if (Database.CurrentTransaction is null)
       await Database.BeginTransactionAsync();
 
-    var result = await base.SaveChangesAsync(cancellationToken);
-
-    return result;
+    return await base.SaveChangesAsync(cancellationToken);
   }
 
   public async Task<bool> SaveEntitiesAsync(CancellationToken cancellationToken = default)
   {
     await SaveChangesAsync(cancellationToken);
 
-    await mediator.DispatchDomainEventsAsync(this, cancellationToken);
+    // 🔹 Use the extension method here
+    await dispatcher.DispatchDomainEventsAsync(this, cancellationToken);
 
     return true;
   }

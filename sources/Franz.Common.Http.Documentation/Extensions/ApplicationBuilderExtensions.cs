@@ -1,25 +1,29 @@
 ﻿using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Builder; // only for Swagger
 using System.Reflection;
 
-namespace Microsoft.AspNetCore.Builder;
+namespace Franz.Common.Http.Bootstrap.Extensions;
+
 public static class ApplicationBuilderExtensions
 {
-  public static IApplicationBuilder UseDocumentation(this IApplicationBuilder applicationBuilder)
+  public static IApplicationBuilder UseDocumentation(this IApplicationBuilder app)
   {
-    var apiVersionDescriptionProvider = applicationBuilder.ApplicationServices.GetRequiredService<IApiVersionDescriptionProvider>();
-    applicationBuilder.UseSwagger();
-    applicationBuilder.UseSwaggerUI(options =>
+    var apiVersionProvider = app.ApplicationServices.GetRequiredService<IApiVersionDescriptionProvider>();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
     {
       var apiName = Assembly.GetEntryAssembly()!.GetName().Name;
 
-      foreach (var apiVersionDescription in apiVersionDescriptionProvider.ApiVersionDescriptions)
+      foreach (var version in apiVersionProvider.ApiVersionDescriptions)
       {
-        var versionName = apiVersionDescription.GroupName;
-        options.SwaggerEndpoint($"/swagger/{versionName}/swagger.json", $"{apiName} {versionName.ToUpperInvariant()}");
+        options.SwaggerEndpoint(
+          $"/swagger/{version.GroupName}/swagger.json",
+          $"{apiName} {version.GroupName.ToUpperInvariant()}"
+        );
       }
     });
 
-    return applicationBuilder;
+    return app;
   }
 }

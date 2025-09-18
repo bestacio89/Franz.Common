@@ -1,10 +1,11 @@
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Headers;
 
 using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Messaging;
 
-public class Message
+public class Message : INotification
 {
     public Message()
     {

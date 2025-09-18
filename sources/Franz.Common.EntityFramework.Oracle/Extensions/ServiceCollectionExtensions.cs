@@ -12,44 +12,49 @@ public static class ServiceCollectionExtensions
 {
   private const string DefaultServerName = "localhost";
   private const string DatabaseNamePattern = "{dbName}";
-  private const string DefaultUserName = "root";
-  private const string DefaultPassword = "password";
-  private const string SslDefaultMode = "Preferred";
+  private const string DefaultUserName = "system";
+  private const string DefaultPassword = "oracle";
+  private const int DefaultPort = 1521;
 
-  public static IServiceCollection AddOracleDatabase<TDbContext>(this IServiceCollection services, IConfiguration configuration)
+  public static IServiceCollection AddOracleDatabase<TDbContext>(
+      this IServiceCollection services,
+      IConfiguration configuration)
       where TDbContext : DbContextBase
   {
     services
-      .AddDatabaseOptions(configuration)
-      .AddDbContext<TDbContext>((serviceProvider, dbContextBuilder) =>
-      {
-        var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>();
-        var oracleConnectionStringBuilder = new OracleConnectionStringBuilder
+        .AddDatabaseOptions(configuration)
+        .AddDbContext<TDbContext>((serviceProvider, dbContextBuilder) =>
         {
-          DataSource = databaseOptions.Value.ServerName ?? DefaultServerName,
-          UserID = databaseOptions.Value.UserName ?? DefaultUserName,
-          Password = databaseOptions.Value.Password ?? DefaultPassword,
-          //Encryption options if there any 
-        };
+          var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>();
 
-        var connectionString = oracleConnectionStringBuilder.ConnectionString;
+          // Build proper DataSource string: host:port/serviceName
+          var host = databaseOptions.Value.ServerName ?? DefaultServerName;
+          var port = databaseOptions.Value.Port > 0 ? databaseOptions.Value.Port.Value : DefaultPort;
+          var serviceName = databaseOptions.Value.DatabaseName ?? DatabaseNamePattern;
 
-        var domainContextAccessor = serviceProvider.GetService<IDomainContextAccessor>();
+          var oracleConnectionStringBuilder = new OracleConnectionStringBuilder
+          {
+            DataSource = $"{host}:{port}/{serviceName}",
+            UserID = databaseOptions.Value.UserName ?? DefaultUserName,
+            Password = databaseOptions.Value.Password ?? DefaultPassword
+          };
 
-        var domainId = domainContextAccessor?.GetCurrentDomainId();
-        connectionString = domainId.HasValue
-                  ? connectionString.Replace(DatabaseNamePattern, domainId!.Value.ToString())
+          var connectionString = oracleConnectionStringBuilder.ConnectionString;
+
+          // Apply domain replacement if needed
+          var domainContextAccessor = serviceProvider.GetService<IDomainContextAccessor>();
+          var domainId = domainContextAccessor?.GetCurrentDomainId();
+
+          connectionString = domainId.HasValue
+                  ? connectionString.Replace(DatabaseNamePattern, domainId.Value.ToString())
                   : connectionString.Replace($"_{DatabaseNamePattern}", string.Empty);
 
-        dbContextBuilder.UseOracle(connectionString);
+          dbContextBuilder.UseOracle(connectionString);
 
-        dbContextBuilder.EnableSensitiveDataLogging();
-      })
-      .AddScoped<DbContextBase>(serviceProvider => serviceProvider.GetRequiredService<TDbContext>());
+          dbContextBuilder.EnableSensitiveDataLogging();
+        })
+        .AddScoped<DbContextBase>(sp => sp.GetRequiredService<TDbContext>());
 
     return services;
-
   }
-
 }
-

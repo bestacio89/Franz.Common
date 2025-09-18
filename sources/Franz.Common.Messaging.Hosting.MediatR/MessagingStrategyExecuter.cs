@@ -1,41 +1,39 @@
 using Franz.Common.Business.Events;
-
 using Franz.Common.Errors;
+using Franz.Common.Mediator;
+using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Hosting.Delegating;
 using Franz.Common.Messaging.Hosting.Executing;
-using Franz.Common.Messaging.Hosting.MediatR.Properties;
-
-using MediatR;
 
 using Newtonsoft.Json;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
-namespace Franz.Common.Messaging.Hosting.MediatR;
+namespace Franz.Common.Messaging.Hosting;
 
 public class MessagingStrategyExecuter : IMessagingStrategyExecuter
 {
   private readonly IEnumerator<IAsyncMessageActionFilter> messagingFilters;
-  private readonly IMediator mediator;
+  private readonly IDispatcher dispatcher;
 
   private MessageActionExecutingContext messageActionExecutingContext = null!;
   private MessageActionExecutedContext messageActionExecutedContext = null!;
   private Func<Task> action = null!;
 
-  public MessagingStrategyExecuter(IEnumerable<IAsyncMessageActionFilter> messagingFilters, IMediator mediator)
+  public MessagingStrategyExecuter(IEnumerable<IAsyncMessageActionFilter> messagingFilters, IDispatcher dispatcher)
   {
     this.messagingFilters = messagingFilters.GetEnumerator();
-    this.mediator = mediator;
+    this.dispatcher = dispatcher;
   }
 
   public Task<bool> CanExecuteAsync(Message message)
   {
     var result = message.Headers.ContainsKey(MessagingConstants.ClassName);
-
     return Task.FromResult(result);
   }
 
-  public async Task ExecuteEsync(Message message)
+  public async Task ExecuteAsync(Message message)
   {
     messageActionExecutingContext = new MessageActionExecutingContext(message);
     messageActionExecutedContext = new MessageActionExecutedContext(message);
@@ -75,20 +73,34 @@ public class MessagingStrategyExecuter : IMessagingStrategyExecuter
   {
     var classMessage = GetParameter(message);
 
-    if (classMessage is IIntegrationEvent integrationEvent)
-      await mediator.Publish(integrationEvent);
-    else if (classMessage is ICommand commandBaseRequest)
-      await mediator.Send(commandBaseRequest);
-    else
-      throw new TechnicalException(string.Format(Resources.MessagingStrategyExecuterParameterNotImplementedException, $"{nameof(IIntegrationEvent)} or {nameof(ICommand)}"));
+    switch (classMessage)
+    {
+      case IIntegrationEvent integrationEvent:
+        // Events go through dispatcher.Send
+        await dispatcher.Send(integrationEvent);
+        break;
+
+      case ICommand command:
+        await dispatcher.Send(command);
+        break;
+
+      case IQuery<object> query:
+        await dispatcher.Send(query);
+        break;
+
+      default:
+        throw new TechnicalException(
+            $"Unsupported message type. Must be {nameof(IIntegrationEvent)}, {nameof(ICommand)}, or {nameof(IQuery<object>)}");
+    }
   }
 
   private static object GetParameter(Message message)
   {
     var parameterType = GetParameterType(message);
 
-    var json = message.Body ?? throw new TechnicalException(Resources.MessagingStrategyExecuterParameterNullException);
-    var result = JsonConvert.DeserializeObject(json, parameterType) ?? throw new TechnicalException(Resources.MessagingStrategyExecuterParameterDeserializationException);
+    var json = message.Body ?? throw new TechnicalException("Message body is null");
+    var result = JsonConvert.DeserializeObject(json, parameterType)
+                 ?? throw new TechnicalException("Failed to deserialize message body");
 
     return result;
   }
@@ -96,7 +108,8 @@ public class MessagingStrategyExecuter : IMessagingStrategyExecuter
   private static Type GetParameterType(Message message)
   {
     var className = message.Headers.GetClassName();
-    var result = Type.GetType(className) ?? throw new TechnicalException(Resources.MessagingStrategyExecuterParameterException);
+    var result = Type.GetType(className)
+                 ?? throw new TechnicalException($"Message type '{className}' could not be resolved");
 
     return result;
   }

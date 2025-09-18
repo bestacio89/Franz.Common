@@ -355,6 +355,23 @@ namespace Franz.Common.Mediator.Dispatchers
       }
     }
 
+    public Task Send(INotification notification, CancellationToken cancellationToken = default)
+    {
+      // Delegate directly to PublishAsync<TNotification> 
+      // Default: sequential execution, stop on first failure
+      var method = typeof(FranzDispatcher)
+          .GetMethod(nameof(PublishAsync))
+          !.MakeGenericMethod(notification.GetType());
+
+      return (Task)method.Invoke(this, new object[]
+      {
+        notification,
+        cancellationToken,
+        PublishStrategy.Sequential,
+        NotificationErrorHandling.StopOnFirstFailure
+      })!;
+    }
+
     // -------------------- EXECUTION WRAPPER --------------------
 
     private async Task<TResult> ExecuteWithObservability<TResult>(

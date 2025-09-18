@@ -1,9 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.IdentityModel.Tokens.Jwt;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.Http.Authentication.Extensions;
 public static class ServiceCollectionExtensions
 {
   public static IServiceCollection AddFranzAuthentication(this IServiceCollection services)

@@ -16,20 +16,20 @@ public abstract class Entity<TId> : IEntity
 #pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
   public Guid PersistantId { get; set; }
 
-  private readonly List<IEvent> events;
-  public IReadOnlyCollection<IEvent> Events => events.AsReadOnly();
+  private readonly List<IDomainEvent> events;
+  public IReadOnlyCollection<IDomainEvent> Events => events.AsReadOnly();
 
   public Entity()
   {
-    events = new List<IEvent>();
+    events = new List<IDomainEvent>();
   }
 
-  public void AddEvent(IEvent eventItem)
+  public void AddEvent(IDomainEvent eventItem)
   {
     events.Add(eventItem);
   }
 
-  public void RemoveEvent(IEvent eventItem)
+  public void RemoveEvent(IDomainEvent eventItem)
   {
     events.Remove(eventItem);
   }

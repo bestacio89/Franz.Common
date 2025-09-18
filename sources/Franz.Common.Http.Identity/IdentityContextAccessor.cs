@@ -1,4 +1,5 @@
 using Franz.Common.Headers;
+using Franz.Common.Http.Extensions;
 using Franz.Common.Identity;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;

@@ -1,3 +1,5 @@
+using Franz.Common.Extensions;
+
 namespace Franz.Common.Http.Client.Delegating;
 
 public class RequestBuilderDelegatingHandler : DelegatingHandler

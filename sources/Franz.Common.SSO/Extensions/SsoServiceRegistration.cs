@@ -7,6 +7,7 @@ using Franz.Common.EntityFramework;
 using Franz.Common.SSO;
 using Franz.Common.SSO.Interfaces;
 
+namespace Franz.Common.SSO.Extensions;
 public static class SsoServiceRegistration
 {
   public static void AddSsoManager<TDbContext>(this IServiceCollection services) where TDbContext : DbContextBase

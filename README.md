@@ -35,6 +35,23 @@ Whether you’re creating a new microservice from scratch or adding Kafka suppor
 
 ---
 
+## Why Franz?
+
+Franz doesn’t aim to replace MediatR out of disrespect — in fact, MediatR inspired much of its early design.  
+Where MediatR shines as a lean, battle-tested mediator library, Franz extends those concepts with features
+that modern enterprise systems demand out-of-the-box:
+
+- ✅ **Pipelines included**: logging, validation, caching, transactions, resilience.  
+- ✅ **Environment-aware observability**: verbose in development, lean in production.  
+- ✅ **Multi-database adapters**: Postgres, MariaDB, SQL Server, Oracle with safe connection builders.  
+- ✅ **Messaging first-class**: Kafka since v1.2.65, designed to plug into RabbitMQ, Azure Service Bus, Redis, gRPC.  
+- ✅ **Lean core, optional add-ons**: no hidden dependencies, with integrations (Polly, Serilog, etc.) available as opt-ins.  
+
+Think of Franz as **the next step after MediatR** — still keeping the mediator spirit, but built to be batteries-included
+for event-driven, multi-tenant .NET applications.
+
+---
+
 ## Getting Started
 
 ### Installation
@@ -232,61 +249,16 @@ Licensed under the [MIT License](LICENSE.md).
 ---
 
 ## Changelog
+## Changelog (Recent)
 
-### Version 1.3.1
+### v1.3.13 – Environment-Aware Validation & Audit Logging
+- Environment-aware logging across validation and audit pipelines.
+- Dev → full payloads & errors. Prod → lean status + error counts.
+- Added NotificationValidationPipeline and upgraded AuditPostProcessor.
 
-* **Multi-Tenancy Enhancements**
+### v1.3.12 – Verbose Logging & Observability
+- LoggingPreProcessor / PostProcessor with runtime request names.
+- Unified log prefixes: [Command], [Query], [Request].
+- Lightweight lifecycle tracing without SQL noise.
 
-  * Canonical `TenantResolutionResult` (with `Succeeded`, `TenantInfo`, `Source`, `Message`).
-  * Added `TenantResolutionSource.Property` for message property–based resolution.
-  * Refactored all HTTP resolvers to use canonical models.
-  * Refactored all Messaging resolvers to resolve against `TenantInfo` via `ITenantStore`.
-  * Implemented **DefaultTenantResolutionPipeline** and **DefaultDomainResolutionPipeline** for HTTP and Messaging.
-  * Added **middleware** for automatic resolution.
-  * Extended `Message` with a `Properties` dictionary and safe accessors.
-  
-  
-* **Mediator**
-  * Initial release of Franz.Common.Mediator.
-  * Core Dispatcher, Commands, Queries, Notifications.
-  * Basic Pipelines (Logging, Validation).
-  * EF integration with DbContextBase.
-  * Added Observability hooks (MediatorContext, IMediatorObserver).
-  * Console observer provided for testing/demo.
-  * Support for optional telemetry (tracing/correlation).
-
-
-
-* **Diagnostics**
-
-  * Structured results for better logging and observability.
-
-* **Consistency**
-
-  * HTTP and Messaging now share the same contracts and patterns.
-
-1.3.2
-
-Introduced Error abstraction with Error class and standard codes (NotFound, Validation, Conflict, Unexpected).
-
-Extended Result<T> to integrate seamlessly with Error.
-
-Added ResultExtensions for ergonomic .ToFailure<T>() and .ToResult() conversions.
-
-1.3.3
-
-Refined Validation pipeline with FluentValidation adapter.
-
-Improved Transaction pipeline with options support (rollback rules).
-
-Bugfixes: ensured streaming dispatcher yields with observability.
-
-1.3.4
-
-🔥 Removed AutoMapper coupling from the framework.
-
-Responsibility for object mapping now belongs to the Application layer.
-
-Framework remains reflection-free and adapter-friendly.
-
-Cleaner separation of concerns, lighter dependencies, more flexible.
+➡️ See [CHANGELOG.md](CHANGELOG.md) for the full version history (1.2.65+).

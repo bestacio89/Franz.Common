@@ -1,7 +1,7 @@
 using Franz.Common.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace System;
+namespace Franz.Common.Hosting.Extensions;
 
 public static class ServiceProviderExtensions
 {

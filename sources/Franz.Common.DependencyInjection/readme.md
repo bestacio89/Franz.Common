@@ -28,7 +28,7 @@ A core library within the **Franz Framework**, designed to simplify and enhance 
 
 ## **Version Information**
 
-- **Current Version**: `1.3.4`
+- - **Current Version**: 1.3.13
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -182,3 +182,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ---
 
+### Version 1.3.6
+
+- DI glue isolated here — core is DI-free.
+- AddFranzMediator(), AddFranzMessaging(), etc. live here.
+- Microsoft DI = optional adapter (others possible).

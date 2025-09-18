@@ -22,7 +22,8 @@ namespace Franz.Common.Mediator.Extensions
   public static class MediatorServiceCollectionExtensions
   {
     /// <summary>
-    /// Registers Franz Mediator with dispatcher, handlers, pipelines, processors, and observers.
+    /// Registers Franz Mediator core (dispatcher + handlers).
+    /// Pipelines are opt-in via the AddFranzXxxPipeline extensions.
     /// </summary>
     public static IServiceCollection AddFranzMediator(
         this IServiceCollection services,
@@ -51,47 +52,64 @@ namespace Franz.Common.Mediator.Extensions
               .AsImplementedInterfaces().WithScopedLifetime()
       );
 
-      // -------------------- PIPELINES --------------------
-      // Core
-      services.AddScoped(typeof(IPipeline<,>), typeof(LoggingPipeline<,>));
-      services.AddScoped(typeof(IPipeline<,>), typeof(ValidationPipeline<,>));
-
-      // Resilience
-      services.AddScoped(typeof(IPipeline<,>), sp => new RetryPipeline<object, object>(options.Retry));
-      services.AddScoped(typeof(IPipeline<,>), sp => new TimeoutPipeline<object, object>(options.Timeout));
-      services.AddScoped(typeof(IPipeline<,>), sp => new CircuitBreakerPipeline<object, object>(options.CircuitBreaker));
-      services.AddScoped(typeof(IPipeline<,>), sp => new BulkheadPipeline<object, object>(options.Bulkhead));
-
-      // Transaction
-      services.AddScoped(typeof(IPipeline<,>), sp =>
-      {
-        var uow = sp.GetRequiredService<IUnitOfWork>();
-        return new TransactionPipeline<object, object>(uow, options.Transaction);
-      });
-
-      // Caching
-      services.AddScoped(typeof(IPipeline<,>), sp =>
-      {
-        var cache = sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
-        return new CachingPipeline<object, object>(cache, options.Caching);
-      });
-
-      // Notification pipelines
-      services.AddScoped(typeof(INotificationPipeline<>), typeof(NotificationLoggingPipeline<>));
-      services.AddScoped(typeof(INotificationPipeline<>), typeof(NotificationValidationPipeline<>));
-
-      // -------------------- PROCESSORS --------------------
-      services.AddScoped(typeof(IPreProcessor<>), typeof(LoggingPreProcessor<>));
-      services.AddScoped(typeof(IPostProcessor<,>), typeof(LoggingPostProcessor<,>));
-      services.AddScoped(typeof(IPreProcessor<>), typeof(ValidationPreProcessor<>));
-      services.AddScoped(typeof(IPostProcessor<,>), typeof(AuditPostProcessor<,>));
-
-      // -------------------- OBSERVERS --------------------
+      // Observers (optional, but default console observer can be enabled)
       if (options.EnableDefaultConsoleObserver)
       {
         services.AddSingleton<IMediatorObserver, ConsoleMediatorObserver>();
       }
 
+      return services;
+    }
+
+    // -------------------- PIPELINE EXTENSIONS --------------------
+
+    public static IServiceCollection AddFranzLoggingPipeline(this IServiceCollection services)
+    {
+      services.AddScoped(typeof(IPipeline<,>), typeof(LoggingPipeline<,>));
+      services.AddScoped(typeof(INotificationPipeline<>), typeof(NotificationLoggingPipeline<>));
+
+      services.AddScoped(typeof(IPreProcessor<>), typeof(LoggingPreProcessor<>));
+      services.AddScoped(typeof(IPostProcessor<,>), typeof(LoggingPostProcessor<,>));
+      return services;
+    }
+
+    public static IServiceCollection AddFranzValidationPipeline(this IServiceCollection services)
+    {
+      services.AddScoped(typeof(IPipeline<,>), typeof(ValidationPipeline<,>));
+      services.AddScoped(typeof(INotificationPipeline<>), typeof(NotificationValidationPipeline<>));
+
+      services.AddScoped(typeof(IPreProcessor<>), typeof(ValidationPreProcessor<>));
+      return services;
+    }
+
+    public static IServiceCollection AddFranzResiliencePipelines(this IServiceCollection services)
+    {
+      services.AddScoped(typeof(IPipeline<,>), typeof(RetryPipeline<,>));
+      services.AddScoped(typeof(IPipeline<,>), typeof(TimeoutPipeline<,>));
+      services.AddScoped(typeof(IPipeline<,>), typeof(CircuitBreakerPipeline<,>));
+      services.AddScoped(typeof(IPipeline<,>), typeof(BulkheadPipeline<,>));
+      return services;
+    }
+
+    public static IServiceCollection AddFranzSerilogLoggingPipeline(this IServiceCollection services)
+    {
+      services.AddScoped(typeof(IPipeline<,>), typeof(SerilogLoggingPipeline<,>));
+      return services;
+    }
+
+    public static IServiceCollection AddFranzTransactionPipeline(this IServiceCollection services)
+    {
+      services.AddScoped(typeof(IPipeline<,>), typeof(TransactionPipeline<,>));
+      return services;
+    }
+
+    public static IServiceCollection AddFranzCachingPipeline(this IServiceCollection services, Action<CachingOptions>? configure = null)
+    {
+      var options = new CachingOptions();
+      configure?.Invoke(options);
+      services.AddSingleton(options);
+
+      services.AddScoped(typeof(IPipeline<,>), typeof(CachingPipeline<,>));
       return services;
     }
   }

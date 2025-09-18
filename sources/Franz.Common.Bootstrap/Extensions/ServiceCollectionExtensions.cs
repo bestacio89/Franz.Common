@@ -3,7 +3,9 @@ using Microsoft.Extensions.Configuration;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Franz.Common.Reflection.Extensions;
+using Franz.Common.DependencyInjection.Extensions;
 
+namespace Franz.Common.Bootstrap.Extensions;
 public static class ServiceCollectionExtensions
 {
 #pragma warning disable CS8632
@@ -37,9 +39,6 @@ public static class ServiceCollectionExtensions
     {
       services.AddFranzMediator(new[] { assembly }); // registers dispatcher, handlers, Franz pipelines
     }
-
-    // Register any optional dependencies
-    services.AddDependencies();
 
 
     return services;

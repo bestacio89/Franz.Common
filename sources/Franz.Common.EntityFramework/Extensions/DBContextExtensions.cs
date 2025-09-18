@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System.Linq.Expressions;
-
+namespace Franz.Common.EntityFramework.Extensions;
 public static class DbContextExtensions
 {
   public static IQueryable<T> IncludeAllRelationships<T>(this IQueryable<T> query, DbContext context)
