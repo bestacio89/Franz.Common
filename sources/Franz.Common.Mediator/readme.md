@@ -315,3 +315,41 @@ MIT
 * Both Pre/Post processors now provide business-level observability (Command vs Query vs Request).
 
 * Logs are lightweight, clean, and consistent across the full request lifecycle.
+
+### v1.3.13 – Environment-Aware Validation & Audit Logging
+
+* Validation Pipeline
+
+* Enhanced ValidationPipeline<TRequest, TResponse> to include environment-aware logging.
+
+* Development → logs full error details and “passed” messages.
+
+* Production → logs only error counts, no success noise.
+
+* Notification Validation
+
+* Added NotificationValidationPipeline<TNotification> with matching Dev/Prod logging strategy.
+
+* Introduced NotificationValidationException carrying validation errors.
+
+* Audit Post Processor
+
+Replaced Console.WriteLine with structured ILogger logging.
+
+Added environment-aware verbosity:
+
+Development → logs request + full response.
+
+Production → logs only request completion.
+
+Validation Pre Processor
+
+Upgraded ValidationPreProcessor<TRequest> to log validation outcomes consistently.
+
+Development → logs all validation errors or “passed” messages.
+
+Production → logs only error counts.
+
+Consistency
+
+All validation and audit processors now align with the same Dev = verbose / Prod = lean logging pattern used across pipelines.

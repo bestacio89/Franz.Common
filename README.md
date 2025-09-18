@@ -35,6 +35,23 @@ Whether you’re creating a new microservice from scratch or adding Kafka suppor
 
 ---
 
+## Why Franz?
+
+Franz doesn’t aim to replace MediatR out of disrespect — in fact, MediatR inspired much of its early design.  
+Where MediatR shines as a lean, battle-tested mediator library, Franz extends those concepts with features
+that modern enterprise systems demand out-of-the-box:
+
+- ✅ **Pipelines included**: logging, validation, caching, transactions, resilience.  
+- ✅ **Environment-aware observability**: verbose in development, lean in production.  
+- ✅ **Multi-database adapters**: Postgres, MariaDB, SQL Server, Oracle with safe connection builders.  
+- ✅ **Messaging first-class**: Kafka since v1.2.65, designed to plug into RabbitMQ, Azure Service Bus, Redis, gRPC.  
+- ✅ **Lean core, optional add-ons**: no hidden dependencies, with integrations (Polly, Serilog, etc.) available as opt-ins.  
+
+Think of Franz as **the next step after MediatR** — still keeping the mediator spirit, but built to be batteries-included
+for event-driven, multi-tenant .NET applications.
+
+---
+
 ## Getting Started
 
 ### Installation
@@ -232,133 +249,16 @@ Licensed under the [MIT License](LICENSE.md).
 ---
 
 ## Changelog
+## Changelog (Recent)
 
-### Version 1.3.1
+### v1.3.13 – Environment-Aware Validation & Audit Logging
+- Environment-aware logging across validation and audit pipelines.
+- Dev → full payloads & errors. Prod → lean status + error counts.
+- Added NotificationValidationPipeline and upgraded AuditPostProcessor.
 
-* **Multi-Tenancy Enhancements**
+### v1.3.12 – Verbose Logging & Observability
+- LoggingPreProcessor / PostProcessor with runtime request names.
+- Unified log prefixes: [Command], [Query], [Request].
+- Lightweight lifecycle tracing without SQL noise.
 
-  * Canonical `TenantResolutionResult` (with `Succeeded`, `TenantInfo`, `Source`, `Message`).
-  * Added `TenantResolutionSource.Property` for message property–based resolution.
-  * Refactored all HTTP resolvers to use canonical models.
-  * Refactored all Messaging resolvers to resolve against `TenantInfo` via `ITenantStore`.
-  * Implemented **DefaultTenantResolutionPipeline** and **DefaultDomainResolutionPipeline** for HTTP and Messaging.
-  * Added **middleware** for automatic resolution.
-  * Extended `Message` with a `Properties` dictionary and safe accessors.
-  
-  
-* **Mediator**
-  * Initial release of Franz.Common.Mediator.
-  * Core Dispatcher, Commands, Queries, Notifications.
-  * Basic Pipelines (Logging, Validation).
-  * EF integration with DbContextBase.
-  * Added Observability hooks (MediatorContext, IMediatorObserver).
-  * Console observer provided for testing/demo.
-  * Support for optional telemetry (tracing/correlation).
-
-
-
-* **Diagnostics**
-
-  * Structured results for better logging and observability.
-
-* **Consistency**
-
-  * HTTP and Messaging now share the same contracts and patterns.
-
-Version 1.3.2
-
-Introduced Error abstraction with Error class and standard codes (NotFound, Validation, Conflict, Unexpected).
-
-Extended Result<T> to integrate seamlessly with Error.
-
-Added ResultExtensions for ergonomic .ToFailure<T>() and .ToResult() conversions.
-
-Version 1.3.3
-
-Refined Validation pipeline with FluentValidation adapter.
-
-Improved Transaction pipeline with options support (rollback rules).
-
-Bugfixes: ensured streaming dispatcher yields properly with observability.
-
-Version 1.3.4
-
-🔥 Removed AutoMapper coupling from the framework.
-
-Mapping responsibilities now belong to the Application layer.
-
-Framework remains reflection-free, adapter-friendly, and lighter.
-
-Cleaner separation of concerns, more flexible design.
-
-Version 1.3.5
-
-Began migration away from MediatR to native Franz.Mediator.
-
-Rewired MessagingPublisher and MessagingInitializer to use Franz abstractions.
-
-Updated DI extensions to reduce tight coupling to Microsoft.Extensions.DependencyInjection.
-
-Fixed ServiceCollection extension failures, ensuring registrations are isolated in Franz.Common.DependencyInjection.Extensions.
-
-Version 1.3.6
-
-🚀 Completed full removal of MediatR dependency.
-
-IIntegrationEvent now inherits from INotification, enabling seamless mediator + Kafka pipelines.
-
-MessagingPublisher.Publish is now Task-based (async/await support, proper error propagation).
-
-MessagingInitializer scans Franz.Mediator.INotificationHandler<> instead of MediatR handlers.
-
-Core libraries are now DI-free — adapters exist for MS.DI and can be extended to others (Autofac, Lamar, etc.).
-
-Minimal rewiring required outside of DI + Messaging, proving strong architectural boundaries.
-
-v1.3.9 – Database Stability Fixes
-
-Fixed incorrect default port fallback (3308 → now correct defaults per provider: MariaDB 3306, Postgres 5432, SQL Server 1433, Oracle 1521).
-
-Connection string builder now uses 127.0.0.1 instead of localhost to avoid socket/TCP mismatches.
-
-Proper SslMode=None applied by default to avoid unwanted SSL negotiation failures.
-
-Masked passwords in logs for safe diagnostics.
-
-v1.3.10 – Scoped DbContext & Lifecycle
-
-Enforced DbContext resolution through DI scope, preventing “phantom DB” issues.
-
-Corrected EnsureCreated vs Migrate lifecycle usage:
-
-Dev/Test → EnsureDeleted + EnsureCreated
-
-Prod → Migrate() only
-
-Added options to configure drop/create/migrate behavior via DatabaseOptions.
-
-v1.3.11 – Seed & Lifecycle Cleanup
-
-Fixed duplicate seed issues caused by mixing EnsureCreated + Migrate.
-
-Clarified seeding strategy:
-
-Use HasData only once (migrations path).
-
-For dev/test, prefer manual or conditional seeding.
-
-Introduced environment-aware DB lifecycle defaults (no more accidental reseeds).
-
-v1.3.12 – Verbose Logging & Observability
-
-Added LoggingPreProcessor and LoggingPostProcessor with runtime request type detection.
-
-Prefixed logs with [Command], [Query], [Request] for clear business-level observability.
-
-Unified logging across pipelines → no more generic ICommand\1orIQuery`1` names.
-
-Lightweight verbose logs:
-
-Pre → Pipeline → Post lifecycle traced with request names.
-
-Keeps focus on Commands/Queries, not raw SQL noise.
+➡️ See [CHANGELOG.md](CHANGELOG.md) for the full version history (1.2.65+).

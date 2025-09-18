@@ -1,6 +1,12 @@
 # 📈 Changelog
 
 ---
+### Version 1.2.65
+* Everything related to kafka 
+* Distributed Messaging bootstrapping
+* Multiple Database Bootstrapping
+* MultiDatabase Support
+* NoSql Support
 
 ### Version 1.3.1
 

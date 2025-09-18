@@ -1,5 +1,5 @@
 ﻿# **Franz.Common.Http.Bootstrap**
-- - **Current Version**:  1.3.12
+- - **Current Version**: 1.3.13
 A comprehensive library within the **Franz Framework**, designed to centralize and simplify the configuration of **ASP.NET Core** applications. This package provides a unified setup for HTTP-related features, such as authentication, headers, documentation, and multi-tenancy, by leveraging other **Franz Framework** components.
 
 ---
@@ -24,7 +24,7 @@ A comprehensive library within the **Franz Framework**, designed to centralize a
 
 ## **Version Information**
 
-- - **Current Version**:  1.3.12
+- - **Current Version**: 1.3.13
 - Part of the private **Franz Framework** ecosystem.
 
 ---
