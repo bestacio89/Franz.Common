@@ -334,22 +334,53 @@ MIT
 
 * Audit Post Processor
 
-Replaced Console.WriteLine with structured ILogger logging.
+* Replaced Console.WriteLine with structured ILogger logging.
 
-Added environment-aware verbosity:
+* Added environment-aware verbosity:
 
-Development → logs request + full response.
+* Development → logs request + full response.
 
-Production → logs only request completion.
+* Production → logs only request completion.
 
-Validation Pre Processor
+* Validation Pre Processor
 
-Upgraded ValidationPreProcessor<TRequest> to log validation outcomes consistently.
+* Upgraded ValidationPreProcessor<TRequest> to log validation outcomes consistently.
 
-Development → logs all validation errors or “passed” messages.
+* Development → logs all validation errors or “passed” messages.
 
-Production → logs only error counts.
+* Production → logs only error counts.
 
-Consistency
+* Consistency
 
-All validation and audit processors now align with the same Dev = verbose / Prod = lean logging pattern used across pipelines.
+* All validation and audit processors now align with the same Dev = verbose / Prod = lean logging pattern used across pipelines.
+
+### Version 1.3.14
+
+
+* Correlation IDs
+
+* Unified correlation ID handling across all mediator pipelines (PreProcessor, CorePipeline, PostProcessor, and NotificationPipeline).
+
+* Introduced consistent correlation propagation using Franz.Common.Logging.CorrelationId.
+
+* Correlation IDs now flow automatically through all logs (ILogger + Serilog).
+
+* Support for reusing an existing correlation ID (e.g. incoming X-Correlation-ID header) or generating a new one when missing.
+
+* Logging Enhancements
+
+* Added correlation ID output to pre-, post-, and pipeline logs, ensuring end-to-end traceability.
+
+* Improved SerilogLoggingPipeline with LogContext.PushProperty so correlation metadata enriches all log events in scope.
+
+* Development vs Production modes respected:
+
+* Dev → full request/response payloads logged.
+
+* Prod → minimal structured logs with correlation ID + request name.
+
+🛠️ Internal
+
+* Centralized CorrelationId into Franz.Common.Logging namespace for reuse across all processors and pipelines.
+
+* Removed duplicate/inline correlation ID generators from individual pipelines.

@@ -40,7 +40,7 @@ A foundational library in the **Franz Framework** designed to provide core utili
 
 ## **Version Information**
 
-- - **Current Version**: 1.3.13
+- - **Current Version**: 1.3.14
 - Part of the private Franz Framework suite, hosted on a private Azure NuGet feed.
 
 ---

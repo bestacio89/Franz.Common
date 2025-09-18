@@ -19,7 +19,7 @@ A specialized library within the **Franz Framework** that extends **Entity Frame
 
 ## **Version Information**
 
-- - **Current Version**: 1.3.13
+- - **Current Version**: 1.3.14
 - Part of the private **Franz Framework** ecosystem.
 
 ---

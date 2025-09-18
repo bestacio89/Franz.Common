@@ -151,3 +151,17 @@ Lightweight verbose logs:
 Pre → Pipeline → Post lifecycle traced with request names.
 
 Keeps focus on Commands/Queries, not raw SQL noise.
+
+### v1.3.14 Correlaiton Id enhancements
+
+Unified correlation pipeline — correlation IDs now flow consistently across requests, notifications, and mediator pipelines.
+
+Automatic propagation — every log entry (request, DB query, notification, response) carries the same correlation ID.
+
+External ID support — accepts incoming X-Correlation-ID headers for distributed tracing across services.
+
+Centralized handling — correlation ID logic moved into Franz.Common.Logging for reuse and consistency.
+
+Scoped logging — integrated with ILogger.BeginScope and Serilog’s LogContext to enrich all logs automatically.
+
+Environment-aware output — detailed payload logs in development, structured correlation-focused logs in production.

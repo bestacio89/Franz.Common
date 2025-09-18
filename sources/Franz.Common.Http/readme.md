@@ -24,7 +24,7 @@ A library within the **Franz Framework** designed to simplify HTTP-related opera
 
 ## **Version Information**
 
-- - **Current Version**: 1.3.13
+- - **Current Version**: 1.3.14
 - Part of the private **Franz Framework** ecosystem.
 
 ---
