@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -27,51 +28,66 @@ namespace Franz.Common.Mediator.Pipelines.Logging
         CancellationToken cancellationToken = default)
     {
       var notificationName = typeof(TNotification).Name;
-      var start = DateTime.UtcNow;
 
-      if (_env.IsDevelopment())
+      // ✅ Use existing correlation ID if available, otherwise generate one
+      var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
+      CorrelationId.Current = correlationId;
+
+      var stopwatch = Stopwatch.StartNew();
+
+      using (_logger.BeginScope(new { CorrelationId = correlationId }))
       {
-        // 🔥 Dev mode: log full payload
-        _logger.LogInformation("Starting notification {NotificationName} with payload {@Notification}",
-          notificationName, notification);
-      }
-      else
-      {
-        // 🟢 Prod mode: minimal info
-        _logger.LogInformation("Starting notification {NotificationName}", notificationName);
-      }
-
-      try
-      {
-        await next();
-
-        var duration = DateTime.UtcNow - start;
-
-        if (_env.IsDevelopment())
+        try
         {
-          _logger.LogInformation("Finished notification {NotificationName} in {Duration}ms with payload {@Notification}",
-              notificationName, duration.TotalMilliseconds, notification);
-        }
-        else
-        {
-          _logger.LogInformation("Finished notification {NotificationName} in {Duration}ms",
-              notificationName, duration.TotalMilliseconds);
-        }
-      }
-      catch (Exception ex)
-      {
-        if (_env.IsDevelopment())
-        {
-          _logger.LogError(ex, "Error handling notification {NotificationName} with payload {@Notification}",
-              notificationName, notification);
-        }
-        else
-        {
-          _logger.LogError("Error handling notification {NotificationName}: {ErrorMessage}",
-              notificationName, ex.Message);
-        }
+          if (_env.IsDevelopment())
+          {
+            _logger.LogInformation(
+              "[Notification] {NotificationName} [{CorrelationId}] started with payload {@Notification}",
+              notificationName, correlationId, notification);
+          }
+          else
+          {
+            _logger.LogInformation(
+              "[Notification] {NotificationName} [{CorrelationId}] started",
+              notificationName, correlationId);
+          }
 
-        throw;
+          await next();
+
+          stopwatch.Stop();
+
+          if (_env.IsDevelopment())
+          {
+            _logger.LogInformation(
+              "[Notification] {NotificationName} [{CorrelationId}] finished in {Elapsed} ms with payload {@Notification}",
+              notificationName, correlationId, stopwatch.ElapsedMilliseconds, notification);
+          }
+          else
+          {
+            _logger.LogInformation(
+              "[Notification] {NotificationName} [{CorrelationId}] finished in {Elapsed} ms",
+              notificationName, correlationId, stopwatch.ElapsedMilliseconds);
+          }
+        }
+        catch (Exception ex)
+        {
+          stopwatch.Stop();
+
+          if (_env.IsDevelopment())
+          {
+            _logger.LogError(ex,
+              "[Notification] {NotificationName} [{CorrelationId}] failed after {Elapsed} ms with payload {@Notification}",
+              notificationName, correlationId, stopwatch.ElapsedMilliseconds, notification);
+          }
+          else
+          {
+            _logger.LogError(
+              "[Notification] {NotificationName} [{CorrelationId}] failed after {Elapsed} ms with {ErrorMessage}",
+              notificationName, correlationId, stopwatch.ElapsedMilliseconds, ex.Message);
+          }
+
+          throw;
+        }
       }
     }
   }

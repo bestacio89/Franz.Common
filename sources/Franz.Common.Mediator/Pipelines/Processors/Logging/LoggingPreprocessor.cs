@@ -1,5 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,17 +29,26 @@ namespace Franz.Common.Mediator.Pipelines.Processors.Logging
               ? "Query"
               : "Request";
 
-      if (_env.IsDevelopment())
+      // ✅ Reuse or generate correlation ID
+      var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
+      CorrelationId.Current = correlationId;
+
+      using (_logger.BeginScope(new { CorrelationId = correlationId }))
       {
-        // 🔥 Dev: full payload
-        _logger.LogInformation("[Pre-{Prefix}] Handling {RequestName} with payload {@Request}",
-            prefix, requestType, request);
-      }
-      else
-      {
-        // 🟢 Prod: type only
-        _logger.LogInformation("[Pre-{Prefix}] Handling {RequestName}",
-            prefix, requestType);
+        if (_env.IsDevelopment())
+        {
+          // 🔥 Dev: full payload
+          _logger.LogInformation(
+            "[Pre-{Prefix}] Handling {RequestName} [{CorrelationId}] with payload {@Request}",
+            prefix, requestType, correlationId, request);
+        }
+        else
+        {
+          // 🟢 Prod: minimal
+          _logger.LogInformation(
+            "[Pre-{Prefix}] Handling {RequestName} [{CorrelationId}]",
+            prefix, requestType, correlationId);
+        }
       }
 
       return Task.CompletedTask;

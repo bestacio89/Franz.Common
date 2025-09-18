@@ -1,5 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Franz.Common.Mediator.Pipelines; // 👈 your shared CorrelationId
+using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,19 +30,24 @@ namespace Franz.Common.Mediator.Pipelines.Processors.Logging
               ? "Query"
               : "Request";
 
-      if (_env.IsDevelopment())
+      // ✅ Pull from shared CorrelationId
+      var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
+      CorrelationId.Current = correlationId;
+
+      using (_logger.BeginScope(new { CorrelationId = correlationId }))
       {
-        // 🔥 Dev mode: log full response payload
-        _logger.LogInformation(
-          "[Post-{Prefix}] {RequestName} produced response {@Response}",
-          prefix, requestType, response);
-      }
-      else
-      {
-        // 🟢 Prod mode: only log status
-        _logger.LogInformation(
-          "[Post-{Prefix}] {RequestName} completed successfully",
-          prefix, requestType);
+        if (_env.IsDevelopment())
+        {
+          _logger.LogInformation(
+            "[Post-{Prefix}] {RequestName} [{CorrelationId}] produced response {@Response}",
+            prefix, requestType, correlationId, response);
+        }
+        else
+        {
+          _logger.LogInformation(
+            "[Post-{Prefix}] {RequestName} [{CorrelationId}] completed successfully",
+            prefix, requestType, correlationId);
+        }
       }
 
       return Task.CompletedTask;

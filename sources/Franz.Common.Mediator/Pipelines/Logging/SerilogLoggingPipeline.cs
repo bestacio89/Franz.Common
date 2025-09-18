@@ -20,32 +20,38 @@ namespace Franz.Common.Mediator.Pipelines.Logging
         CancellationToken cancellationToken)
     {
       var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
-      var correlationId = Guid.NewGuid().ToString("N");
+
+      // ✅ Reuse existing correlation ID if already set
+      var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
+      CorrelationId.Current = correlationId; // ensure it's available downstream
+
       var stopwatch = Stopwatch.StartNew();
 
       using (LogContext.PushProperty("FranzRequest", requestName))
       using (LogContext.PushProperty("FranzCorrelationId", correlationId))
       {
-        _logger.LogInformation("▶️ Handling {Request}", requestName);
+        _logger.LogInformation("▶️ Handling {Request} [{CorrelationId}]",
+            requestName, correlationId);
 
         try
         {
           var response = await next();
 
           stopwatch.Stop();
-          _logger.LogInformation("✅ {Request} completed in {Elapsed}ms",
-              requestName, stopwatch.ElapsedMilliseconds);
+          _logger.LogInformation("✅ {Request} [{CorrelationId}] completed in {Elapsed}ms",
+              requestName, correlationId, stopwatch.ElapsedMilliseconds);
 
           return response;
         }
         catch (Exception ex)
         {
           stopwatch.Stop();
-          _logger.LogError(ex, "❌ {Request} failed after {Elapsed}ms",
-              requestName, stopwatch.ElapsedMilliseconds);
+          _logger.LogError(ex, "❌ {Request} [{CorrelationId}] failed after {Elapsed}ms",
+              requestName, correlationId, stopwatch.ElapsedMilliseconds);
           throw;
         }
       }
     }
   }
+
 }

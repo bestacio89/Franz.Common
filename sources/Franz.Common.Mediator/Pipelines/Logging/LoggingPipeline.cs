@@ -1,6 +1,6 @@
 ﻿using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Hosting; // 👈 needed for IHostEnvironment
+using Microsoft.Extensions.Hosting;
 using System;
 using System.Diagnostics;
 using System.Threading;
@@ -13,6 +13,7 @@ namespace Franz.Common.Mediator.Pipelines.Logging
     private readonly ILogger<LoggingPipeline<TRequest, TResponse>> _logger;
     private readonly IHostEnvironment _env;
 
+    // 👇 You could inject a CorrelationIdAccessor if you want to grab it from HTTP context later
     public LoggingPipeline(
       ILogger<LoggingPipeline<TRequest, TResponse>> logger,
       IHostEnvironment env)
@@ -34,64 +35,71 @@ namespace Franz.Common.Mediator.Pipelines.Logging
           ? "Command"
           : "Request";
 
-      var correlationId = Guid.NewGuid().ToString("N");
+      // ✅ Use existing correlation ID if available (e.g. from HTTP headers), otherwise generate new
+      var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
+      CorrelationId.Current = correlationId; // make sure it's accessible globally for this scope
+
       var stopwatch = Stopwatch.StartNew();
 
-      if (_env.IsDevelopment())
+      using (_logger.BeginScope(new { CorrelationId = correlationId }))
       {
-        // 🔥 Full Dev log
-        _logger.LogInformation(
-          "[{Prefix}] {RequestName} [{CorrelationId}] started with payload {@Request}",
-          prefix, requestName, correlationId, request);
-      }
-      else
-      {
-        // 🟢 Lean Prod log
-        _logger.LogInformation(
-          "[{Prefix}] {RequestName} [{CorrelationId}] started",
-          prefix, requestName, correlationId);
-      }
-
-      try
-      {
-        var response = await next();
-
-        stopwatch.Stop();
-
-        if (_env.IsDevelopment())
+        try
         {
-          _logger.LogInformation(
-            "[{Prefix}] {RequestName} [{CorrelationId}] finished in {Elapsed} ms with response {@Response}",
-            prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds, response);
-        }
-        else
-        {
-          _logger.LogInformation(
-            "[{Prefix}] {RequestName} [{CorrelationId}] finished in {Elapsed} ms",
-            prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds);
-        }
+          if (_env.IsDevelopment())
+          {
+            _logger.LogInformation(
+              "[{Prefix}] {RequestName} [{CorrelationId}] started with payload {@Request}",
+              prefix, requestName, correlationId, request);
+          }
+          else
+          {
+            _logger.LogInformation(
+              "[{Prefix}] {RequestName} [{CorrelationId}] started",
+              prefix, requestName, correlationId);
+          }
 
-        return response;
-      }
-      catch (Exception ex)
-      {
-        stopwatch.Stop();
+          var response = await next();
 
-        if (_env.IsDevelopment())
-        {
-          _logger.LogError(ex,
-            "[{Prefix}] {RequestName} [{CorrelationId}] failed after {Elapsed} ms",
-            prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds);
-        }
-        else
-        {
-          _logger.LogError(
-            "[{Prefix}] {RequestName} [{CorrelationId}] failed after {Elapsed} ms with {ErrorMessage}",
-            prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds, ex.Message);
-        }
+          stopwatch.Stop();
 
-        throw;
+          if (_env.IsDevelopment())
+          {
+            _logger.LogInformation(
+              "[{Prefix}] {RequestName} [{CorrelationId}] finished in {Elapsed} ms with response {@Response}",
+              prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds, response);
+          }
+          else
+          {
+            _logger.LogInformation(
+              "[{Prefix}] {RequestName} [{CorrelationId}] finished in {Elapsed} ms",
+              prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds);
+          }
+
+          return response;
+        }
+        catch (Exception ex)
+        {
+          stopwatch.Stop();
+
+          if (_env.IsDevelopment())
+          {
+            _logger.LogError(ex,
+              "[{Prefix}] {RequestName} [{CorrelationId}] failed after {Elapsed} ms",
+              prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds);
+          }
+          else
+          {
+            _logger.LogError(
+              "[{Prefix}] {RequestName} [{CorrelationId}] failed after {Elapsed} ms with {ErrorMessage}",
+              prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds, ex.Message);
+          }
+
+          throw;
+        }
       }
     }
   }
+
+
+
 }
