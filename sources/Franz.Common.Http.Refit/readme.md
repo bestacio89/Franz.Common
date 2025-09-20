@@ -1,7 +1,7 @@
 ﻿# Franz.Common.Http.Refit
 
 **Package**: `Franz.Common.Http.Refit`
-**Version**: 1.4.0
+**Version**: 1.4.1
 
 Refit integration for the Franz Framework — production-oriented, small-surface, high-value.
 Provides typed Refit clients pre-wired with: correlation & tenant header propagation, optional token injection, Polly policy integration, Serilog-friendly logging, and OpenTelemetry-friendly annotations & lightweight metrics.
@@ -33,7 +33,7 @@ Provides typed Refit clients pre-wired with: correlation & tenant header propaga
 ### Add package
 
 ```bash
-dotnet add package Franz.Common.Http.Refit --version 1.4.0
+dotnet add package Franz.Common.Http.Refit --version 1.4.1
 # Ensure host references Refit.HttpClientFactory and Polly packages (see Dependencies)
 ```
 
@@ -184,7 +184,7 @@ public async Task SendAsync_AddsCorrelationAndTenantHeaders()
 
 ## Changelog (recent)
 
-* **v1.4.0**
+* **v1.4.1**
 
   * New: `AddFranzRefit<TClient>()` extension for typed Refit clients.
   * New: `FranzRefitHeadersHandler` — correlation/tenant headers, logging, OTEL tags, metrics.
@@ -195,7 +195,7 @@ public async Task SendAsync_AddsCorrelationAndTenantHeaders()
 
 ## Publishing & Release Checklist
 
-* Bump package version to `1.4.0`.
+* Bump package version to `1.4.1`.
 * Build & run unit tests.
 * `dotnet pack -c Release` → produce `.nupkg`.
 * `dotnet nuget push ./bin/Release/*.nupkg -k $NUGET_API_KEY -s <feed>` (or use your private feed).

@@ -387,7 +387,7 @@ MIT
 
 * Removed duplicate/inline correlation ID generators from individual pipelines.
 
-### v1.4.0 – 2025-09-20
+### v1.4.1 – 2025-09-20
 Major Refinements to Resilience & Pipeline Architecture
 
 This release focuses on hardening the core mediator pipelines to be more predictable, thread-safe, and robust for production environments.

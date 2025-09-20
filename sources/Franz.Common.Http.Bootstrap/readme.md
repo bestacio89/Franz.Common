@@ -1,7 +1,7 @@
 ﻿# Franz.Common.Http.Bootstrap
 
 **Package**: `Franz.Common.Http.Bootstrap`
-**Current Version**: 1.4.0
+**Current Version**: 1.4.1
 
 Opinionated HTTP bootstrapper for the Franz Framework.
 Centralizes common ASP.NET Core HTTP wiring (controllers, auth, headers, docs, serialization, health checks, multi-tenancy) and optionally registers config-driven Refit clients so applications get consistent, production-ready defaults with minimal boilerplate.
@@ -29,7 +29,7 @@ dotnet nuget add source "https://your-private-feed-url" \
   --password "<pass>" \
   --store-password-in-clear-text
 
-dotnet add package Franz.Common.Http.Bootstrap --version 1.4.0
+dotnet add package Franz.Common.Http.Bootstrap --version 1.4.1
 ```
 
 ### Minimal wiring (Program.cs)
@@ -153,7 +153,7 @@ builder.Services.AddFranzRefit<MyApp.ApiClients.IWeatherApi>(
 
 ## Changelog (recent)
 
-* **v1.4.0**
+* **v1.4.1**
 
   * Added optional Refit client registration via the HTTP bootstrapper (config-driven).
   * Refit clients registered by the bootstrapper support correlation header injection, optional token injection, and Polly policy wiring.

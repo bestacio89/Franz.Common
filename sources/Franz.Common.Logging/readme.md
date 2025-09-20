@@ -19,7 +19,7 @@ A comprehensive logging library within the **Franz Framework**, designed to enha
 
 ## **Version Information**
 
-- **Current Version**: 1.4.0
+- **Current Version**: 1.4.1
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -139,7 +139,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-Version 1.4.0
+Version 1.4.1
 
 Introduced environment-aware logging defaults via UseLog() extension.
 

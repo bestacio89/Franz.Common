@@ -4,7 +4,7 @@ A core library of the **Franz Framework**, designed to facilitate **Domain-Drive
 It provides abstractions, utilities, and patterns for building scalable, maintainable, and testable business logic.
 
 ---
-- **Current Version**: 1.4.0
+- **Current Version**: 1.4.1
 ---
 ## **Features**
 
@@ -268,7 +268,7 @@ On startup you’ll see log messages confirming bootstrap:
 
 ---
 
-## **New in 1.4.0**
+## **New in 1.4.1**
 
 * 🆕 Independent from MediatR → runs fully on **Franz.Common.Mediator**.
 * 🆕 Entities & Aggregates: lifecycle tracking (audit fields, soft delete, optimistic concurrency).
@@ -291,10 +291,10 @@ On startup you’ll see log messages confirming bootstrap:
 ## **Installation**
 
 ```bash
-dotnet add package Franz.Common.Business --version 1.4.0
+dotnet add package Franz.Common.Business --version 1.4.1
 ```
 
-> ⚠️ From **1.4.0**, **MediatR is no longer required**.
+> ⚠️ From **1.4.1**, **MediatR is no longer required**.
 > `Franz.Common.Business` uses **Franz.Common.Mediator** internally.
 
 ---
@@ -312,7 +312,7 @@ Authorized contributors:
 
 ## **Changelog**
 
-### **1.4.0**
+### **1.4.1**
 
 * Removed dependency on MediatR → replaced by **Franz.Common.Mediator**.
 * Entities & Aggregates: lifecycle tracking, soft delete, domain events deduplication.

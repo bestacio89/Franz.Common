@@ -123,7 +123,7 @@ This library is licensed under the MIT License. See the LICENSE file for more de
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
 
-### Version 1.4.0
+### Version 1.4.1
 - 🚀 Introduced **TestExceptions** for chaos engineering & demos  
   - `BananaRepublicException` (EN/FR)  
   - `MonsterException` (EN/FR)  
