@@ -8,7 +8,7 @@ using Franz.Common.Messaging.Hosting.Delegating;
 using Franz.Common.Messaging.Hosting.Executing;
 
 using Newtonsoft.Json;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
+
 
 namespace Franz.Common.Messaging.Hosting;
 
