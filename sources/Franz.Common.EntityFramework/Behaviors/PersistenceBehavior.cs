@@ -29,7 +29,7 @@ namespace Franz.Common.EntityFramework.Behaviors
 
       _logger.LogInformation($"Persistence handled {typeof(TResponse).Name}");
 
-      await _dbContextBase.SaveEntitiesAsync(cancellationToken);
+      await _dbContextBase.SaveChangesAsync(cancellationToken);
 
       return response;
     }
