@@ -1,4 +1,4 @@
-using Franz.Common.Logging.Tracing;
+﻿using Franz.Common.Logging.Tracing;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -12,80 +12,88 @@ namespace Franz.Common.Logging.Extensions
 {
   public static class HostBuilderExtensions
   {
+    /// <summary>
+    /// Strict environment-aware logging (hardcoded sinks).
+    /// Dev → Console + Debug + File
+    /// Prod → Console + JSON + File
+    /// </summary>
     public static IHostBuilder UseLog(this IHostBuilder hostBuilder)
     {
-      // Early bootstrap console logging (TraceHelper)
+      // Early bootstrap console logging
       TraceHelper.LogConsole();
 
-      hostBuilder.UseSerilog((context, services, _) =>
+      hostBuilder.UseSerilog((context, services, configuration) =>
       {
         var env = context.HostingEnvironment;
 
-        var config = new LoggerConfiguration()
-          .ReadFrom.Configuration(context.Configuration)
-          .ReadFrom.Services(services)
-          .Enrich.FromLogContext()
-          .Enrich.WithProperty("Application", env.ApplicationName)
-          .Enrich.WithProperty("Environment", env.EnvironmentName);
+        configuration
+            .ReadFrom.Configuration(context.Configuration)
+            .ReadFrom.Services(services)
+            .Enrich.FromLogContext()
+            .Enrich.WithProperty("Application", env.ApplicationName)
+            .Enrich.WithProperty("Environment", env.EnvironmentName);
 
         if (env.IsDevelopment())
         {
-          // DEV: verbose, human-friendly
-          config.MinimumLevel.Debug()
-                .WriteTo.Console(
-                  outputTemplate:
-                    "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}"
-                )
-                .WriteTo.Debug(
-                  outputTemplate:
-                    "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}"
-                )
-                .WriteTo.File(
-                  "logs/dev-.log",
-                  rollingInterval: RollingInterval.Day,
-                  retainedFileCountLimit: 7,
-                  shared: true,
-                  flushToDiskInterval: TimeSpan.FromSeconds(1),
-                  outputTemplate:
-                    "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}"
-                );
+          configuration.MinimumLevel.Debug()
+              .WriteTo.Console(
+                  outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
+              .WriteTo.Debug()
+              .WriteTo.File("logs/dev-.log", rollingInterval: RollingInterval.Day);
         }
         else if (env.IsProduction())
         {
-          // PROD: clean, structured, longer retention
-          config.MinimumLevel.Information()
-                .WriteTo.Console(
-                  outputTemplate:
-                    "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"
-                )
-                .WriteTo.File(
+          configuration.MinimumLevel.Information()
+              .WriteTo.Console(
+                  outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+              .WriteTo.File(
                   path: "logs/prod-.json",
                   rollingInterval: RollingInterval.Day,
                   retainedFileCountLimit: 30,
-                  shared: true,
-                  flushToDiskInterval: TimeSpan.FromSeconds(5),
-                  formatter: new Serilog.Formatting.Json.JsonFormatter() // structured logs for ingestion
-                )
-                .WriteTo.File(
+                  formatter: new Serilog.Formatting.Json.JsonFormatter())
+              .WriteTo.File(
                   path: "logs/prod-.log",
                   rollingInterval: RollingInterval.Day,
-                  retainedFileCountLimit: 30,
-                  shared: true,
-                  flushToDiskInterval: TimeSpan.FromSeconds(5),
-                  outputTemplate:
-                    "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}"
-                );
+                  retainedFileCountLimit: 30);
         }
-
-        Log.Logger = config.CreateLogger();
       });
 
 #if DEBUG
-      // Enable Elastic APM diagnostics in debug builds
-      hostBuilder.ConfigureServices((_, __) =>
+            hostBuilder.ConfigureServices((_, __) =>
+            {
+                Agent.Setup(new AgentComponents());
+            });
+#endif
+
+      return hostBuilder;
+    }
+
+    /// <summary>
+    /// Hybrid logging: read sinks from appsettings.json (Development/Production),
+    /// only enforce enrichers + app/env fields in code.
+    /// </summary>
+    public static IHostBuilder UseHybridLog(this IHostBuilder hostBuilder)
+    {
+      // Early bootstrap console logging
+      TraceHelper.LogConsole();
+
+      hostBuilder.UseSerilog((context, services, configuration) =>
       {
-        Agent.Setup(new AgentComponents());
+        var env = context.HostingEnvironment;
+
+        configuration
+            .ReadFrom.Configuration(context.Configuration) // all sinks from JSON
+            .ReadFrom.Services(services)
+            .Enrich.FromLogContext()
+            .Enrich.WithProperty("Application", env.ApplicationName)
+            .Enrich.WithProperty("Environment", env.EnvironmentName);
       });
+
+#if DEBUG
+            hostBuilder.ConfigureServices((_, __) =>
+            {
+                Agent.Setup(new AgentComponents());
+            });
 #endif
 
       return hostBuilder;

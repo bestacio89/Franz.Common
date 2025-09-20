@@ -9,7 +9,7 @@ namespace Franz.Common.Mediator.Polly.Options
     /// Collection of policies to register in the PolicyRegistry.
     /// The key is the policy name, the value is the policy itself.
     /// </summary>
-    public IDictionary<string, IAsyncPolicy> Policies { get; }
-        = new Dictionary<string, IAsyncPolicy>();
+    public IDictionary<string, IAsyncPolicy<HttpResponseMessage>> Policies { get; }
+        = new Dictionary<string, IAsyncPolicy<HttpResponseMessage>>();
   }
 }
