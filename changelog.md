@@ -169,3 +169,27 @@
 - Unified logging model across pipelines.
 - Reduced boilerplate with highly opinionated bootstrappers for Database and Messaging providers.
 - Clearer DX: resilience, caching, and tracing are now one-liners to enable.
+
+Version 1.4.1 – Patch & Documentation
+
+📚 Documentation refinements across Business and EntityFramework packages.
+
+🛠 Minor fixes in bootstrapper examples (registration alignment).
+
+🔧 Adjusted resilience configuration snippets in README for clarity.
+
+✅ Internal consistency updates across subpackages (no breaking changes).
+
+Version 1.4.2 – Cleanup & Consolidation
+
+🗑️ Removed obsolete code:
+
+SaveEntitiesAsync → fully merged into SaveChangesAsync (audit + domain events handled automatically).
+
+DbContextMultiDatabase → deleted in favor of DbContextBase.
+
+🧹 Handlers updated to use SaveChangesAsync directly.
+
+🔄 Tightened alignment between Business and EntityFramework packages.
+
+📚 README + CHANGELOG updates to reflect simplified context model.

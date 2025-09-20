@@ -4,7 +4,7 @@ A core library of the **Franz Framework**, designed to facilitate **Domain-Drive
 It provides abstractions, utilities, and patterns for building scalable, maintainable, and testable business logic.
 
 ---
-- **Current Version**: 1.4.1
+- **Current Version**: 1.4.2
 ---
 ## **Features**
 

@@ -1,226 +1,193 @@
-# Franz.Common
-
-**Franz.Common** is a lightweight, modular framework designed to streamline the development and maintenance of **Kafka-based microservices**. It provides common abstractions, utilities, and patterns that make building reliable, scalable, and maintainable event-driven systems simpler and more consistent across projects.
+Here’s the **polished README.md for Franz.Common v1.4.2**:
 
 ---
 
-## Table of Contents
+# **Franz.Common**
 
-1. [Introduction](#introduction)
-2. [Getting Started](#getting-started)
+**Franz.Common** is the heart of the **Franz Framework** — a lightweight, modular framework that streamlines the development of **event-driven microservices**.
+It was born to reduce boilerplate and architectural complexity in modern .NET systems, with **Kafka-first** design, but extensible to **RabbitMQ, Azure Service Bus, Redis, and HTTP APIs**.
 
-   1. [Installation](#installation)
-   2. [Software Dependencies](#software-dependencies)
-   3. [Latest Releases](#latest-releases)
-   4. [API References](#api-references)
-3. [Sub-Repositories](#sub-repositories)
-4. [Usage: Multi-Tenancy](#usage-multi-tenancy)
-5. [Build and Test](#build-and-test)
-6. [Contribute](#contribute)
-7. [License](#license)
-8. [Changelog](#changelog)
+Franz provides **DDD + CQRS building blocks**, **resilience pipelines**, **auditing**, and **multi-tenancy** support across HTTP and messaging layers — batteries included, but modular.
 
 ---
 
-## Introduction
+## 📦 Subpackages
 
-**Franz.Common** was born out of a need to reduce boilerplate and complexity when working with [Apache Kafka](https://kafka.apache.org/) in microservices architectures. The project’s primary objective is to:
+Franz is modular: install only what you need.
 
-* Provide **common abstractions** for Kafka producers and consumers.
-* Offer **shared utilities** for message serialization, logging, retries, and error handling.
-* Enable a **consistent developer experience** across different microservices.
-* Provide **robust multi-tenancy support** across both HTTP and Messaging layers.
-
-Whether you’re creating a new microservice from scratch or adding Kafka support to an existing system, **Franz.Common** aims to simplify your development process by offering well-tested building blocks and patterns.
-
----
-
-## Why Franz?
-
-Franz doesn’t aim to replace MediatR out of disrespect — in fact, MediatR inspired much of its early design.  
-Where MediatR shines as a lean, battle-tested mediator library, Franz extends those concepts with features
-that modern enterprise systems demand out-of-the-box:
-
-- ✅ **Pipelines included**: logging, validation, caching, transactions, resilience.  
-- ✅ **Environment-aware observability**: verbose in development, lean in production.  
-- ✅ **Multi-database adapters**: Postgres, MariaDB, SQL Server, Oracle with safe connection builders.  
-- ✅ **Messaging first-class**: Kafka since v1.2.65, designed to plug into RabbitMQ, Azure Service Bus, Redis, gRPC.  
-- ✅ **Lean core, optional add-ons**: no hidden dependencies, with integrations (Polly, Serilog, etc.) available as opt-ins.  
-
-Think of Franz as **the next step after MediatR** — still keeping the mediator spirit, but built to be batteries-included
-for event-driven, multi-tenant .NET applications.
+* **Franz.Common.Business** → DDD + CQRS abstractions, domain events, resilience pipelines.
+* **Franz.Common.EntityFramework** → DbContextBase with auditing, soft deletes, domain event dispatching.
+* **Franz.Common.Mediator** → Lightweight Mediator with pipelines for caching, logging, validation, resilience.
+* **Franz.Common.Http.Bootstrap** → ASP.NET Core bootstrapper (DI, config, pipelines).
+* **Franz.Common.Http.Refit** → Refit integration with Polly, logging, tenant/correlation headers.
+* **Franz.Common.Logging** → Correlation ID propagation + structured logging with Serilog.
+* **Franz.Common.MultiTenancy** → Tenant/domain resolution across HTTP and messaging.
+* **Franz.Common.Errors** → Unified error handling models.
 
 ---
 
-## Getting Started
+## 🚀 Why Franz?
+
+Franz doesn’t reinvent the wheel. It builds on proven ideas from **MediatR** and **Polly**, but **extends them into a cohesive framework** for modern microservices.
+
+* ✅ **Pipelines included** → Logging, validation, caching, transactions, resilience.
+* ✅ **Environment-aware observability** → verbose in dev, lean in prod.
+* ✅ **Multi-database adapters** → Postgres, MariaDB, SQL Server, Oracle.
+* ✅ **Messaging first-class** → Kafka out-of-the-box, designed to extend.
+* ✅ **Lean core, optional add-ons** → nothing hidden, integrations are opt-in.
+
+Think of Franz as **Spring Boot for .NET microservices** — a batteries-included starter kit.
+
+---
+
+## 🛠 Getting Started
 
 ### Installation
 
-For a .NET environment, you can include **Franz.Common** via NuGet:
+Add the core library:
 
 ```bash
-dotnet add package Franz.Common --version <latest_version>
+dotnet add package Franz.Common --version 1.4.2
+```
+
+Or install subpackages (e.g., `Business` + `EntityFramework`):
+
+```bash
+dotnet add package Franz.Common.Business --version 1.4.2
+dotnet add package Franz.Common.EntityFramework --version 1.4.2
 ```
 
 ### Software Dependencies
 
-* **.NET 9+** (with support for .NET 9 in latest versions)
-* **Kafka 2.6+** (earlier versions may work, but not officially supported)
-* **Confluent.Kafka** client library (or any Kafka client library your environment supports)
-* **Docker** (optional) for containerized local development and testing
-
-### Latest Releases
-
-Check the [Releases](https://github.com/your-org/franz.common/releases) section for:
-
-* Release notes
-* New features and breaking changes
-* Beta or pre-release packages
-
-### API References
-
-Detailed API documentation is available here:
-
-* [Franz.Common Documentation](https://github.com/your-org/franz.common/wiki)
-* Generate docs locally:
-
-  ```bash
-  dotnet build
-  ```
+* **.NET 9+**
+* **Kafka 2.6+** (or RabbitMQ/Azure Service Bus with adapters)
+* **Confluent.Kafka** client (for Kafka transport)
+* **Docker** (for integration testing)
 
 ---
 
-## Sub-Repositories
+## ⚙️ Core Features
 
-Franz.Common is part of a suite of repositories that collectively provide full coverage for Kafka-based microservices:
+### 1. Multi-Tenancy
 
-1. **Franz.Producer** – handles message production with batching, serialization, and retry mechanisms.
-2. **Franz.Consumer** – simplifies consumer group management, message handling, and parallel processing.
-3. **Franz.Utils** – provides shared utility classes, logging integrations, serialization helpers, and custom middleware.
-4. **Franz.Sample** – sample microservice demonstrating real-world usage.
-
----
-
-## Usage: Multi-Tenancy
-
-Multi-tenancy support is built into both **HTTP** and **Messaging** components of the framework.
-
-### 1. Register Services
+Works across **HTTP** and **Messaging**.
 
 ```csharp
-using Franz.Common.Http.MultiTenancy.Extensions;
-using Franz.Common.Messaging.MultiTenancy.Extensions;
+// Startup.cs
+services.AddFranzMultiTenancy()
+        .AddFranzHttpMultiTenancy()
+        .AddFranzMessagingMultiTenancy();
 
-public void ConfigureServices(IServiceCollection services)
+app.UseFranzMultiTenancy();
+```
+
+* HTTP resolvers: `HostTenantResolver`, `HeaderTenantResolver`, `JwtClaimTenantResolver`.
+* Messaging resolvers: `HeaderTenantResolver`, `MessagePropertyTenantResolver`.
+
+Access anywhere:
+
+```csharp
+var tenantId = _tenantContextAccessor.GetCurrentTenantId();
+var domainId = _domainContextAccessor.GetCurrentDomainId();
+```
+
+---
+
+### 2. Business Layer (DDD + CQRS)
+
+```csharp
+builder.Services.AddFranzPlatform(
+    typeof(Program).Assembly,
+    options => options.DefaultTimeout = TimeSpan.FromSeconds(30));
+```
+
+* Entities, Value Objects, Enumerations.
+* Aggregates with event sourcing.
+* Domain + integration events.
+* CQRS support with commands/queries.
+
+---
+
+### 3. Entity Framework Integration
+
+Use `DbContextBase` instead of plain `DbContext`:
+
+* Auditing (`CreatedBy`, `LastModifiedBy`, timestamps).
+* Soft deletes (`IsDeleted`, `DeletedOn`, `DeletedBy`).
+* Domain event dispatch.
+* Global query filters.
+
+```csharp
+public class AppDbContext : DbContextBase
 {
-    // Core multi-tenancy
-    services.AddFranzMultiTenancy();
-
-    // HTTP resolvers and pipeline
-    services.AddFranzHttpMultiTenancy();
-
-    // Messaging resolvers and pipeline
-    services.AddFranzMessagingMultiTenancy();
+    public AppDbContext(DbContextOptions<AppDbContext> options, IDispatcher dispatcher, ICurrentUserService user)
+        : base(options, dispatcher, user) { }
 }
 ```
 
 ---
 
-### 2. Use HTTP Multi-Tenancy
+### 4. Resilience Pipelines (via Mediator)
 
-```csharp
-using Franz.Common.Http.MultiTenancy.Middleware;
+Automatically registered with `AddFranzPlatform`:
 
-public void Configure(IApplicationBuilder app)
-{
-    // Resolve tenant/domain once per request
-    app.UseFranzMultiTenancy();
+* 🔄 Retry
+* ⛔ CircuitBreaker
+* ⏱ Timeout
+* 🚦 Bulkhead
 
-    app.UseRouting();
-    app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
-}
-```
+Configurable in `appsettings.json`:
 
-Available resolvers:
-
-* `HostTenantResolver`
-* `HeaderTenantResolver`
-* `QueryStringTenantResolver`
-* `JwtClaimTenantResolver`
-
----
-
-### 3. Use Messaging Multi-Tenancy
-
-```csharp
-using Franz.Common.Messaging.MultiTenancy.Middleware;
-
-public class MessagingPipeline
-{
-    public void Configure(IMessagePipelineBuilder pipeline)
-    {
-        pipeline.Use<TenantResolutionMiddleware>();
-        pipeline.Use<DomainResolutionMiddleware>();
-    }
-}
-```
-
-Available resolvers:
-
-* `HeaderTenantResolver`
-* `MessagePropertyTenantResolver`
-* `HeaderDomainResolver`
-* `MessagePropertyDomainResolver`
-
----
-
-### 4. Access Tenant/Domain Context
-
-```csharp
-using Franz.Common.MultiTenancy;
-
-public class MyService
-{
-    private readonly ITenantContextAccessor _tenantContextAccessor;
-    private readonly IDomainContextAccessor _domainContextAccessor;
-
-    public MyService(ITenantContextAccessor tenantContextAccessor, IDomainContextAccessor domainContextAccessor)
-    {
-        _tenantContextAccessor = tenantContextAccessor;
-        _domainContextAccessor = domainContextAccessor;
-    }
-
-    public void PrintContext()
-    {
-        var tenantId = _tenantContextAccessor.GetCurrentTenantId();
-        var domainId = _domainContextAccessor.GetCurrentDomainId();
-
-        Console.WriteLine($"Tenant: {tenantId}, Domain: {domainId}");
-    }
+```json
+"Franz": {
+  "Resilience": {
+    "Retry": { "Enabled": true, "RetryCount": 3 },
+    "CircuitBreaker": { "Enabled": true, "FailureThreshold": 5 },
+    "Timeout": { "Enabled": true, "TimeoutSeconds": 15 },
+    "Bulkhead": { "Enabled": true, "MaxParallelization": 50 }
+  }
 }
 ```
 
 ---
 
-## Build and Test
+### 5. Observability
 
-### Build
+* **Logging** → Serilog integration, correlation IDs flow automatically.
+* **Caching** → Memory, Distributed, Redis providers.
+* **Tracing** → OpenTelemetry spans enriched with Franz tags (tenant, request type, pipeline).
+
+---
+
+### 6. HTTP & Refit Integration
+
+Enable typed Refit clients with config-only setup:
+
+```json
+"Franz": {
+  "HttpClients": {
+    "EnableRefit": true,
+    "Clients": [
+      { "Name": "OrdersApi", "BaseUrl": "https://orders.local", "Policy": "RetryPolicy" }
+    ]
+  }
+}
+```
+
+Franz injects correlation/tenant headers, applies Polly policies, and enriches with OTEL + Serilog.
+
+---
+
+## 🧪 Build & Test
 
 ```bash
-git clone https://github.com/your-org/franz.common.git
-cd franz.common
+git clone https://github.com/bestacio89/Franz.Common.git
+cd Franz.Common
 dotnet build
-```
-
-### Test
-
-Run all tests:
-
-```bash
 dotnet test
 ```
 
-Run integration tests with Kafka (requires Docker):
+Integration tests with Kafka:
 
 ```bash
 docker-compose up -d
@@ -229,83 +196,59 @@ dotnet test --filter Category=Integration
 
 ---
 
-## Contribute
+## 🤝 Contributing
 
-Contributions are welcome!
+Contributions are welcome (internal team preferred).
 
-1. Submit issues for bugs or feature requests.
-2. Fork the repo and create feature branches (`feature/<desc>` or `bugfix/<desc>`).
-3. Submit pull requests for review.
-4. Update documentation and tests when contributing features.
+1. Clone repo.
+2. Create a feature branch (`feature/<desc>`).
+3. Submit PR.
+4. Add tests + docs.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
----
-
-## License
-
-Licensed under the [MIT License](LICENSE.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-# 🚀 Franz Framework 1.4.0 – The Observability & Resilience Release
+## 📜 License
 
-Franz Framework isn’t just utilities anymore — it’s a **production-ready microservice starter kit for .NET**, Kafka-first but extensible to RabbitMQ.  
-With **1.4.0**, Franz delivers resilience, caching, and observability **out of the box**.
-
----
-
-## 🌟 Highlights in 1.4.0
-
-- 🔄 **Resilience with Polly**
-  - Pipelines for **Retry, CircuitBreaker, Timeout, Bulkhead**.
-  - Policies resolved by name from a shared registry.
-  - Unified, enriched Serilog logging (correlation ID, request type, policy, elapsed time).
-  - Opt-in with a one-liner: `services.AddMediatorPollyRetry("RetryPolicy")`.
-
-- 🗄️ **Caching Everywhere**
-  - Providers: **Memory**, **Distributed**, **Redis**.
-  - Flexible cache key strategies (default, namespaced).
-  - Mediator pipeline with automatic **HIT/MISS detection**.
-  - Built-in observability: cache hits/misses logged and exported as OTEL metrics.
-  - Settings cache for app flags and long-lived configuration values.
-
-- 🔭 **Distributed Tracing with OpenTelemetry**
-  - Automatic **root span per Mediator request**.
-  - Enriched with Franz tags: correlation ID, tenant, environment, pipeline.
-  - Errors automatically tagged and surfaced in traces.
-  - Lightweight by design: Franz produces signals, your app chooses exporters (Jaeger, Zipkin, AppInsights, etc.).
-
-  ✅ **Franz.Common.Http.Refit** support: optional, config-driven Refit client registration via the HTTP bootstrapper.
-  - Enable in appsettings: `Franz:HttpClients:EnableRefit = true`.
-  - Register typed Refit clients automatically from config (base URL, optional policy, interface type).
-  - Works with shared Polly policy registry, correlation/tenant header injection, optional token provider, Serilog + OTEL annotations.
-
-
-- ⚙️ **Framework Improvements**
-  - Opinionated bootstrappers for **Database** and **Messaging** providers (Kafka or RabbitMQ) — config decides, code stays clean.
-  - Unified logging model across all pipelines.
-  - Reduced boilerplate: resilience, caching, and tracing are now one-liners.
+Licensed under the **MIT License**.
 
 ---
 
-Franz 1.4.0 is your **Spring Boot-style starter for .NET microservices** —  
-batteries included: Mediator, Kafka/Rabbit, Polly, Caching, OpenTelemetry, Serilog, EF, multi-tenancy.
+# 🆕 Franz Framework 1.4.x – The Observability & Resilience Era
 
+### 🌟 Highlights
 
+* Polly-based pipelines: Retry, CircuitBreaker, Timeout, Bulkhead.
+* Unified caching layer (Memory, Distributed, Redis).
+* OpenTelemetry tracing with Franz tags.
+* Correlation ID propagation (Franz.Common.Logging).
+* ASP.NET Core bootstrappers for HTTP + Refit clients.
+* `DbContextBase`: auditing + soft deletes + event dispatch.
 
 ---
-### Franz.Common.Logging – Correlation ID Enhancements (v1.3.14)
-- 🔗 **Unified pipeline**: correlation IDs flow consistently across requests, notifications, and mediator pipelines.  
-- 📡 **Automatic propagation**: every log entry (requests, DB queries, notifications, responses) carries the same correlation ID.  
-- 🌍 **External ID support**: accepts incoming `X-Correlation-ID` headers for distributed tracing across services.  
-- 🏛️ **Centralized handling**: correlation ID logic consolidated in `Franz.Common.Logging` for reuse and consistency.  
-- 🧵 **Scoped logging**: integrated with `ILogger.BeginScope` and Serilog’s `LogContext` to enrich all logs automatically.  
-- ⚙️ **Environment-aware output**: detailed payload logs in development, correlation-focused structured logs in production.  
 
-###   Franz.Common.Http.Refit support: optional, config-driven Refit client registration via the HTTP bootstrapper.
-  - Enable in appsettings: `Franz:HttpClients:EnableRefit = true`.
-  - Register typed Refit clients automatically from config (base URL, optional policy, interface type).
-  - Works with shared Polly policy registry, correlation/tenant header injection, optional token provider, Serilog + OTEL annotations.
+## 📌 Changelog
 
-➡️ See [CHANGELOG.md](CHANGELOG.md) for the full version history (1.2.65+).
+### **1.4.2**
+
+* Removed `SaveEntitiesAsync` → everything flows through `SaveChangesAsync`.
+* Removed obsolete `DbContextMultiDatabase`.
+* Alignment with EntityFramework & Business packages.
+
+### **1.4.1**
+
+* Patch bump, doc updates.
+
+### **1.4.0**
+
+* Migrated to **C# 12 typing conventions**.
+* Resilience pipelines integrated.
+* Observability (Serilog + OTEL) baked in.
+
+➡️ See [CHANGELOG.md](CHANGELOG.md) for full history (1.2.65+).
+
+---
+
+🔥 With `Franz.Common`, you can bootstrap a Kafka-ready, resilient, multi-tenant .NET microservice with **one line of code**.
+
