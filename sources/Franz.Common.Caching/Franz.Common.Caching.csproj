@@ -11,11 +11,4 @@
     <ProjectReference Include="..\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="readme.md">
-      <PackagePath></PackagePath>
-      <Pack>true</Pack>
-    </None>
-  </ItemGroup>
-
 </Project>
