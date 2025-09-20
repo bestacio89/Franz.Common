@@ -2,12 +2,11 @@ using System.Reflection;
 
 namespace Franz.Common.Business.Domain;
 
-public abstract class Enumeration<TId> : IComparable<TId>
-  where TId : notnull
+public abstract class Enumeration<TId> : IComparable<Enumeration<TId>>
+    where TId : notnull, IComparable<TId>
 {
-  public string Name { get; private set; }
-
-  public TId Id { get; private set; }
+  public string Name { get; }
+  public TId Id { get; }
 
   protected Enumeration(TId id, string name)
   {
@@ -15,84 +14,72 @@ public abstract class Enumeration<TId> : IComparable<TId>
     Name = name;
   }
 
-  public override string ToString()
+  public override string ToString() => Name;
+
+  private static readonly Dictionary<Type, object> _cache = new();
+
+  public static IReadOnlyCollection<TEnumeration> GetAll<TEnumeration>()
+      where TEnumeration : Enumeration<TId>
   {
-    return Name.ToString();
+    var type = typeof(TEnumeration);
+
+    if (_cache.TryGetValue(type, out var cached))
+      return (IReadOnlyCollection<TEnumeration>)cached;
+
+    var fields = type
+        .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+        .Where(f => type.IsAssignableFrom(f.FieldType))
+        .Select(f => f.GetValue(null))
+        .Cast<TEnumeration>()
+        .ToArray();
+
+    _cache[type] = fields;
+
+    return fields;
   }
 
-  public static IEnumerable<TEnumeration> GetAll<TEnumeration>() where TEnumeration : Enumeration<TId>
-  {
-    var fields = typeof(TEnumeration).GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly);
-
-    return fields.Select(f => f.GetValue(null)).Cast<TEnumeration>();
-  }
-
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
   public override bool Equals(object? obj)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
   {
-    if (obj is not Enumeration<TId> otherValue)
-      return false;
+    if (obj is not Enumeration<TId> other) return false;
 
-    var typeMatches = GetType().Equals(obj.GetType());
-    var valueMatches = Id.Equals(otherValue.Id);
-
-    var result = typeMatches && valueMatches;
-
-    return result;
+    return GetType() == other.GetType() && EqualityComparer<TId>.Default.Equals(Id, other.Id);
   }
 
-  public override int GetHashCode()
-  {
-    return Id.GetHashCode();
-  }
-
-  public static int AbsoluteDifference(Enumeration firstValue, Enumeration secondValue)
-  {
-    var result = Math.Abs(firstValue.Id - secondValue.Id);
-
-    return result;
-  }
+  public override int GetHashCode() => Id.GetHashCode();
 
   public static TEnumeration FromValue<TEnumeration>(TId value)
-    where TEnumeration : Enumeration<TId>
+      where TEnumeration : Enumeration<TId>
   {
-    var result = Parse<TEnumeration, TId>(value, "value", item => item.Id.Equals(value));
-
-    return result;
+    return Parse<TEnumeration, TId>(value, "value", item => item.Id.Equals(value));
   }
 
   public static TEnumeration FromDisplayName<TEnumeration>(string displayName)
-    where TEnumeration : Enumeration<TId>
+      where TEnumeration : Enumeration<TId>
   {
-    var result = Parse<TEnumeration, string>(displayName, "display name", item => item.Name == displayName);
-
-    return result;
+    return Parse<TEnumeration, string>(displayName, "display name", item => item.Name == displayName);
   }
 
   private static T Parse<T, K>(K value, string description, Func<T, bool> predicate)
-    where T : Enumeration<TId>
+      where T : Enumeration<TId>
   {
     var enumeration = GetAll<T>().FirstOrDefault(predicate);
 
-    var result = enumeration ?? throw new InvalidOperationException($"'{value}' is not a valid {description} in {typeof(T)}");
-
-    return result;
+    return enumeration ?? throw new InvalidOperationException(
+        $"'{value}' is not a valid {description} in {typeof(T)}");
   }
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public int CompareTo(TId? other)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  public int CompareTo(Enumeration<TId>? other)
   {
-    var result = other == null ? 1 : Name.CompareTo(other);
-
-    return result;
+    if (other is null) return 1;
+    return Id.CompareTo(other.Id);
   }
+
+  // Numeric-only utility
+  public static int AbsoluteDifference(Enumeration<int> first, Enumeration<int> second)
+      => Math.Abs(first.Id - second.Id);
 }
 
 public abstract class Enumeration : Enumeration<int>
 {
-  protected Enumeration(int id, string name) : base(id, name)
-  {
-  }
+  protected Enumeration(int id, string name) : base(id, name) { }
 }

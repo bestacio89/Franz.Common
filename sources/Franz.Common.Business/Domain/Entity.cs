@@ -4,98 +4,97 @@ namespace Franz.Common.Business.Domain;
 
 public abstract class Entity<TId> : IEntity
 {
-  private int? requestedHashCode;
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public TId? Id { get; protected set; }
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public DateTime DateCreated { get; set; }
-  public DateTime LastModifiedDate { get; set; }
-  public string CreatedBy { get; set; } = string.Empty;
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public string? LastModifiedBy { get; set; }
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public Guid PersistantId { get; set; }
+  private int? _requestedHashCode;
+  private readonly List<IDomainEvent> _events = new();
 
-  private readonly List<IDomainEvent> events;
-  public IReadOnlyCollection<IDomainEvent> Events => events.AsReadOnly();
+  public TId Id { get; protected set; } = default!;
+  public Guid PersistentId { get; private set; } = Guid.NewGuid();
 
-  public Entity()
-  {
-    events = new List<IDomainEvent>();
-  }
+  // Audit
+  public DateTime DateCreated { get; private set; }
+  public DateTime LastModifiedDate { get; private set; }
+  public string CreatedBy { get; private set; } = string.Empty;
+  public string? LastModifiedBy { get; private set; }
 
+  // Lifecycle
+  public bool IsDeleted { get; private set; }
+  public DateTime? DateDeleted { get; private set; }
+  public string? DeletedBy { get; private set; }
+
+  public IReadOnlyCollection<IDomainEvent> Events => _events.AsReadOnly();
+
+  protected Entity() { }
+
+  #region Domain Events
   public void AddEvent(IDomainEvent eventItem)
   {
-    events.Add(eventItem);
+    if (!_events.Contains(eventItem))
+      _events.Add(eventItem);
   }
 
-  public void RemoveEvent(IDomainEvent eventItem)
+  public void RemoveEvent(IDomainEvent eventItem) => _events.Remove(eventItem);
+
+  public void ClearEvents() => _events.Clear();
+  #endregion
+
+  #region Audit Methods
+  public void MarkCreated(string createdBy)
   {
-    events.Remove(eventItem);
+    DateCreated = DateTime.UtcNow;
+    CreatedBy = createdBy;
   }
 
-  public void ClearEvents()
+  public void MarkUpdated(string modifiedBy)
   {
-    events.Clear();
+    LastModifiedDate = DateTime.UtcNow;
+    LastModifiedBy = modifiedBy;
   }
 
-  public bool IsTransient()
+  public void MarkDeleted(string deletedBy)
   {
-    return EqualityComparer<TId>.Default.Equals(Id, default);
+    IsDeleted = true;
+    DateDeleted = DateTime.UtcNow;
+    DeletedBy = deletedBy;
   }
+  #endregion
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  public bool IsTransient() => EqualityComparer<TId>.Default.Equals(Id, default!);
+
+  #region Equality
   public override bool Equals(object? obj)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
   {
-    if (obj is not Entity<TId>)
-    {
+    if (obj is not Entity<TId> other)
       return false;
-    }
 
-    if (ReferenceEquals(this, obj))
-    {
+    if (ReferenceEquals(this, other))
       return true;
-    }
 
-    if (GetType() != obj.GetType())
-    {
+    if (GetType() != other.GetType())
       return false;
-    }
 
-    var item = (Entity<TId>)obj;
+    if (IsTransient() || other.IsTransient())
+      return false;
 
-    return !item.IsTransient() && !IsTransient() && item.Id!.Equals(Id);
+    return EqualityComparer<TId>.Default.Equals(Id, other.Id);
   }
 
   public override int GetHashCode()
   {
     if (!IsTransient())
     {
-      if (!requestedHashCode.HasValue)
-      {
-        requestedHashCode = Id!.GetHashCode() ^ 31; // XOR for random distribution (http://blogs.msdn.com/b/ericlippert/archive/2011/02/28/guidelines-and-rules-for-gethashcode.aspx)
-      }
-
-      return requestedHashCode.Value;
+      _requestedHashCode ??= Id!.GetHashCode() ^ 31;
+      return _requestedHashCode.Value;
     }
-    else
-    {
-      return base.GetHashCode();
-    }
+
+    return base.GetHashCode();
   }
 
-  public static bool operator ==(Entity<TId> left, Entity<TId> right)
-  {
-    return Equals(left, null) ? Equals(right, null) : left.Equals(right);
-  }
+  public static bool operator ==(Entity<TId>? left, Entity<TId>? right)
+      => left is null ? right is null : left.Equals(right);
 
-  public static bool operator !=(Entity<TId> left, Entity<TId> right)
-  {
-    return !(left == right);
-  }
+  public static bool operator !=(Entity<TId>? left, Entity<TId>? right)
+      => !(left == right);
+  #endregion
 }
 
-public abstract class Entity : Entity<int>
-{
-}
+public abstract class Entity : Entity<int> { }
