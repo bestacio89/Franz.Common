@@ -5,7 +5,7 @@ It provides abstractions, utilities, and patterns for building scalable, maintai
 
 ---
 
-* **Current Version**: 1.4.2
+* **Current Version**: 1.4.3
 
 ---
 
