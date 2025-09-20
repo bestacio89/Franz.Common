@@ -1,35 +1,38 @@
 ﻿using Franz.Common.Mediator.Options;
 using Franz.Common.Mediator.Pipelines.Core;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Franz.Common.Mediator.Pipelines.Resilience
 {
-  public class RetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
+
+
+  // Pipeline (selective)
+  public sealed class RetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
     where TRequest : notnull
   {
-    private readonly int _maxAttempts;
-    private readonly TimeSpan _delay;
+    private readonly RetryOptions _options;
+    private readonly ILogger<TRequest> _logger;
+    private readonly IHostEnvironment _env;
 
-    public RetryPipeline(RetryOptions options)
+    public RetryPipeline(IOptions<RetryOptions> options, ILogger<TRequest> logger, IHostEnvironment env)
     {
-      if (options.MaxAttempts <= 0)
-        throw new ArgumentOutOfRangeException(nameof(options.MaxAttempts),
-          "MaxAttempts must be greater than zero.");
+      _options = options.Value;
+      _logger = logger;
+      _env = env;
 
-      if (options.Delay < TimeSpan.Zero)
-        throw new ArgumentOutOfRangeException(nameof(options.Delay),
-          "Delay must be a non-negative duration.");
-
-      _maxAttempts = options.MaxAttempts;
-      _delay = options.Delay;
+      if (_options.MaxAttempts <= 0) throw new ArgumentOutOfRangeException(nameof(_options.MaxAttempts));
+      if (_options.BaseDelay < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(_options.BaseDelay));
     }
 
     public async Task<TResponse> Handle(
         TRequest request,
         Func<Task<TResponse>> next,
-        CancellationToken cancellationToken = default)
+        CancellationToken ct = default)
     {
       var attempt = 0;
 
@@ -39,12 +42,32 @@ namespace Franz.Common.Mediator.Pipelines.Resilience
         {
           return await next();
         }
-        catch when (attempt < _maxAttempts - 1) // allow retries until last attempt
+        catch (Exception ex) when (
+            attempt < _options.MaxAttempts - 1 &&
+            !_canceled(ct, ex) &&
+            (_options.ShouldRetry?.Invoke(ex) ?? false))
         {
           attempt++;
-          await Task.Delay(_delay, cancellationToken);
+          var delay = _options.ComputeDelay?.Invoke(attempt, _options.BaseDelay) ?? _options.BaseDelay;
+
+          if (_env.IsDevelopment() || _env.IsStaging())
+          {
+            _logger.LogWarning(ex,
+              "Retry {Attempt}/{MaxAttempts} in {Delay} because: {Message}",
+              attempt, _options.MaxAttempts, delay, ex.Message);
+          }
+          else if (_env.IsProduction())
+          {
+            // log less detail in prod
+            _logger.LogWarning("Retry {Attempt}/{MaxAttempts} after {Delay}", attempt, _options.MaxAttempts, delay);
+          }
+
+          await Task.Delay(delay, ct);
         }
       }
+
+      static bool _canceled(CancellationToken token, Exception ex) =>
+          token.IsCancellationRequested || ex is OperationCanceledException;
     }
   }
 }

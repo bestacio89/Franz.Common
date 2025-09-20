@@ -10,15 +10,15 @@ using System.Threading.Tasks;
 
 namespace Franz.Common.Mediator.Pipelines.Validation
 {
-  public sealed class ValidationPreProcessor<TRequest> : IPreProcessor<TRequest>
+  public sealed class AuditPreProcessor<TRequest> : IPreProcessor<TRequest>
   {
     private readonly IEnumerable<IValidator<TRequest>> _validators;
-    private readonly ILogger<ValidationPreProcessor<TRequest>> _logger;
+    private readonly ILogger<AuditPreProcessor<TRequest>> _logger;
     private readonly IHostEnvironment _env;
 
-    public ValidationPreProcessor(
+    public AuditPreProcessor(
       IEnumerable<IValidator<TRequest>> validators,
-      ILogger<ValidationPreProcessor<TRequest>> logger,
+      ILogger<AuditPreProcessor<TRequest>> logger,
       IHostEnvironment env)
     {
       _validators = validators;

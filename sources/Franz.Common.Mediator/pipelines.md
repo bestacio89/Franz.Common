@@ -177,3 +177,111 @@ When `CreateOrderCommand` is dispatched, the pipeline chain executes as:
 5. **Handler** → actually executes
 
 ---
+
+
+# Franz Mediator with Resilience Pipelines
+
+Franz Mediator allows you to compose request/response pipelines with opt-in behaviors like validation, logging, transactions, and resilience (retry, circuit breaker, timeout, bulkhead).
+
+## 🔧 Installation
+
+```csharp
+dotnet add package Franz.Common.Mediator
+```
+
+---
+
+## 📑 Configuration (appsettings.json)
+
+```jsonc
+{
+  "Resilience": {
+    "Retry": {
+      "MaxAttempts": 3,
+      "BaseDelay": "00:00:02",     // 2 seconds
+      "VerboseLogging": true,
+      "Disabled": false
+    },
+    "CircuitBreaker": {
+      "FailureThreshold": 5,
+      "OpenDuration": "00:00:10", // stays open 10s after trip
+      "VerboseLogging": true,
+      "Disabled": false
+    },
+    "Timeout": {
+      "Duration": "00:00:05",
+      "VerboseLogging": true,
+      "Disabled": false
+    },
+    "Bulkhead": {
+      "MaxConcurrentRequests": 10,
+      "MaxQueueLength": 50,
+      "VerboseLogging": true,
+      "Disabled": false
+    }
+  }
+}
+```
+
+---
+
+## 🏗 Program.cs Setup
+
+```csharp
+using Franz.Common.Mediator.Extensions;
+using Franz.Common.Mediator.Pipelines.Resilience;
+using Microsoft.Extensions.DependencyInjection;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Bind resilience options from configuration
+builder.Services.Configure<RetryOptions>(
+    builder.Configuration.GetSection("Resilience:Retry"));
+builder.Services.Configure<CircuitBreakerOptions>(
+    builder.Configuration.GetSection("Resilience:CircuitBreaker"));
+builder.Services.Configure<TimeoutOptions>(
+    builder.Configuration.GetSection("Resilience:Timeout"));
+builder.Services.Configure<BulkheadOptions>(
+    builder.Configuration.GetSection("Resilience:Bulkhead"));
+
+// Register Franz Mediator + pipelines
+builder.Services.AddFranzMediator(
+    new[] { typeof(Program).Assembly } // scan handlers in this assembly
+);
+
+builder.Services
+    .AddFranzRetryPipeline()
+    .AddFranzCircuitBreakerPipeline()
+    .AddFranzTimeoutPipeline()
+    .AddFranzBulkheadPipeline()
+    .AddFranzValidationPipeline()
+    .AddFranzLoggingPipeline();
+
+var app = builder.Build();
+app.Run();
+```
+
+---
+
+## 📊 Example Logs (with a chaos exception)
+
+```txt
+[Pipeline:Retry] Attempt 1/3 after 2s due to 🍌 Banana Republic Exception: simulated DB meltdown!
+[Pipeline:Retry] Attempt 2/3 after 4s due to 🍌 Banana Republic Exception: simulated DB meltdown!
+[Pipeline:CircuitBreaker] OPEN after 5 consecutive failures
+[Pipeline:Timeout] Request failed after 5s (timeout exceeded)
+[Pipeline:Bulkhead] Rejected request — too many concurrent executions
+```
+
+---
+
+## ✅ Summary
+
+* **Config-driven** resilience options (`appsettings.json`).
+* **Opt-in pipelines** via `AddFranzXxxPipeline()` extension methods.
+* **Unified logging** integrated with `ILogger`/Serilog.
+* Perfect for demos, tests, or chaos engineering (with “Banana Republic Exception” 😅).
+
+---
+
+👉 Do you want me to also include a **short handler example** (`GetBookByIdQueryHandler`) that throws one of your chaos exceptions so the retries/circuit breaker demo makes sense right in the README?

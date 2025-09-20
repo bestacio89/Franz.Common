@@ -2,14 +2,10 @@
 {
   public class CircuitBreakerOptions
   {
-    /// <summary>
-    /// Number of consecutive failures before opening the circuit.
-    /// </summary>
     public int FailureThreshold { get; set; } = 5;
+    public TimeSpan OpenDuration { get; set; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>
-    /// How long the circuit remains open before allowing attempts again.
-    /// </summary>
-    public TimeSpan OpenDuration { get; set; } = TimeSpan.FromSeconds(60);
+    public bool VerboseLogging { get; set; } = false; // detailed info in dev
+    public bool Disabled { get; set; } = false;       // disable breaker in tests
   }
 }

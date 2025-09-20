@@ -4,7 +4,6 @@ using Franz.Common.Mediator.Handlers;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Observers;
 using Franz.Common.Mediator.Options;
-using Franz.Common.Mediator.Pipelines.Caching;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Mediator.Pipelines.Processors;
@@ -78,39 +77,67 @@ namespace Franz.Common.Mediator.Extensions
       services.AddScoped(typeof(IPipeline<,>), typeof(ValidationPipeline<,>));
       services.AddScoped(typeof(INotificationPipeline<>), typeof(NotificationValidationPipeline<>));
 
-      services.AddScoped(typeof(IPreProcessor<>), typeof(ValidationPreProcessor<>));
+      services.AddScoped(typeof(IPreProcessor<>), typeof(AuditPreProcessor<>));
       return services;
     }
 
-    public static IServiceCollection AddFranzResiliencePipelines(this IServiceCollection services)
-    {
-      services.AddScoped(typeof(IPipeline<,>), typeof(RetryPipeline<,>));
-      services.AddScoped(typeof(IPipeline<,>), typeof(TimeoutPipeline<,>));
-      services.AddScoped(typeof(IPipeline<,>), typeof(CircuitBreakerPipeline<,>));
+   
+     public static IServiceCollection AddFranzBulkheadPipeline(this IServiceCollection services)
+     {
       services.AddScoped(typeof(IPipeline<,>), typeof(BulkheadPipeline<,>));
       return services;
-    }
-
-    public static IServiceCollection AddFranzSerilogLoggingPipeline(this IServiceCollection services)
+     }
+    public static IServiceCollection AddFranzCircuitBreakerPipeline(this IServiceCollection services)
     {
-      services.AddScoped(typeof(IPipeline<,>), typeof(SerilogLoggingPipeline<,>));
+      services.AddScoped(typeof(IPipeline<,>), typeof(CircuitBreakerPipeline<,>));
+      return services;
+    }
+    public static IServiceCollection AddFranzRetryPipeline(this IServiceCollection services)
+    {
+      services.AddScoped(typeof(IPipeline<,>), typeof(RetryPipeline<,>));
       return services;
     }
 
+    public static IServiceCollection AddFranzTimeoutPipeline(this IServiceCollection services)
+    {
+      services.AddScoped(typeof(IPipeline<,>), typeof(TimeoutPipeline<,>));
+      return services;
+    }
+
+
+  
     public static IServiceCollection AddFranzTransactionPipeline(this IServiceCollection services)
     {
       services.AddScoped(typeof(IPipeline<,>), typeof(TransactionPipeline<,>));
       return services;
     }
 
-    public static IServiceCollection AddFranzCachingPipeline(this IServiceCollection services, Action<CachingOptions>? configure = null)
+    public static IServiceCollection AddFranzSerilogLoggingPipeline(this IServiceCollection services)
     {
-      var options = new CachingOptions();
-      configure?.Invoke(options);
-      services.AddSingleton(options);
+      // Core Serilog logging pipeline
+      services.AddScoped(typeof(IPipeline<,>), typeof(SerilogLoggingPipeline<,>));
+      services.AddScoped(typeof(INotificationPipeline<>), typeof(NotificationLoggingPipeline<>));
 
-      services.AddScoped(typeof(IPipeline<,>), typeof(CachingPipeline<,>));
+      // Pre/Post with Serilog context enrichment
+      services.AddScoped(typeof(IPreProcessor<>), typeof(SerilogLoggingPreProcessor<>));
+      services.AddScoped(typeof(IPostProcessor<,>), typeof(SerilogLoggingPostProcessor<,>));
+
       return services;
     }
+
+    public static IServiceCollection AddFranzSerilogAuditPipeline(this IServiceCollection services)
+    {
+      // Validation pipeline itself
+      services.AddScoped(typeof(IPipeline<,>), typeof(ValidationPipeline<,>));
+      services.AddScoped(typeof(INotificationPipeline<>), typeof(NotificationValidationPipeline<>));
+
+      // Pre/Post with Serilog context enrichment
+      services.AddScoped(typeof(IPreProcessor<>), typeof(SerilogAuditPreProcessor<>));
+      services.AddScoped(typeof(IPostProcessor<,>), typeof(SerilogAuditPostProcessor<,>));
+
+      return services;
+    }
+
+
   }
 }
