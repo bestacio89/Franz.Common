@@ -248,31 +248,64 @@ Licensed under the [MIT License](LICENSE.md).
 
 ---
 
-## Changelog
-## Changelog (Recent)
+# 🚀 Franz Framework 1.4.0 – The Observability & Resilience Release
 
-### v1.3.14 Correlaiton Id enhancements
+Franz Framework isn’t just utilities anymore — it’s a **production-ready microservice starter kit for .NET**, Kafka-first but extensible to RabbitMQ.  
+With **1.4.0**, Franz delivers resilience, caching, and observability **out of the box**.
 
-Unified correlation pipeline — correlation IDs now flow consistently across requests, notifications, and mediator pipelines.
+---
 
-Automatic propagation — every log entry (request, DB query, notification, response) carries the same correlation ID.
+## 🌟 Highlights in 1.4.0
 
-External ID support — accepts incoming X-Correlation-ID headers for distributed tracing across services.
+- 🔄 **Resilience with Polly**
+  - Pipelines for **Retry, CircuitBreaker, Timeout, Bulkhead**.
+  - Policies resolved by name from a shared registry.
+  - Unified, enriched Serilog logging (correlation ID, request type, policy, elapsed time).
+  - Opt-in with a one-liner: `services.AddMediatorPollyRetry("RetryPolicy")`.
 
-Centralized handling — correlation ID logic moved into Franz.Common.Logging for reuse and consistency.
+- 🗄️ **Caching Everywhere**
+  - Providers: **Memory**, **Distributed**, **Redis**.
+  - Flexible cache key strategies (default, namespaced).
+  - Mediator pipeline with automatic **HIT/MISS detection**.
+  - Built-in observability: cache hits/misses logged and exported as OTEL metrics.
+  - Settings cache for app flags and long-lived configuration values.
 
-Scoped logging — integrated with ILogger.BeginScope and Serilog’s LogContext to enrich all logs automatically.
+- 🔭 **Distributed Tracing with OpenTelemetry**
+  - Automatic **root span per Mediator request**.
+  - Enriched with Franz tags: correlation ID, tenant, environment, pipeline.
+  - Errors automatically tagged and surfaced in traces.
+  - Lightweight by design: Franz produces signals, your app chooses exporters (Jaeger, Zipkin, AppInsights, etc.).
 
-Environment-aware output — detailed payload logs in development, structured correlation-focused logs in production.
+  ✅ **Franz.Common.Http.Refit** support: optional, config-driven Refit client registration via the HTTP bootstrapper.
+  - Enable in appsettings: `Franz:HttpClients:EnableRefit = true`.
+  - Register typed Refit clients automatically from config (base URL, optional policy, interface type).
+  - Works with shared Polly policy registry, correlation/tenant header injection, optional token provider, Serilog + OTEL annotations.
 
-### v1.3.13 – Environment-Aware Validation & Audit Logging
-- Environment-aware logging across validation and audit pipelines.
-- Dev → full payloads & errors. Prod → lean status + error counts.
-- Added NotificationValidationPipeline and upgraded AuditPostProcessor.
 
-### v1.3.12 – Verbose Logging & Observability
-- LoggingPreProcessor / PostProcessor with runtime request names.
-- Unified log prefixes: [Command], [Query], [Request].
-- Lightweight lifecycle tracing without SQL noise.
+- ⚙️ **Framework Improvements**
+  - Opinionated bootstrappers for **Database** and **Messaging** providers (Kafka or RabbitMQ) — config decides, code stays clean.
+  - Unified logging model across all pipelines.
+  - Reduced boilerplate: resilience, caching, and tracing are now one-liners.
+
+---
+
+Franz 1.4.0 is your **Spring Boot-style starter for .NET microservices** —  
+batteries included: Mediator, Kafka/Rabbit, Polly, Caching, OpenTelemetry, Serilog, EF, multi-tenancy.
+
+
+
+---
+### Franz.Common.Logging – Correlation ID Enhancements (v1.3.14)
+- 🔗 **Unified pipeline**: correlation IDs flow consistently across requests, notifications, and mediator pipelines.  
+- 📡 **Automatic propagation**: every log entry (requests, DB queries, notifications, responses) carries the same correlation ID.  
+- 🌍 **External ID support**: accepts incoming `X-Correlation-ID` headers for distributed tracing across services.  
+- 🏛️ **Centralized handling**: correlation ID logic consolidated in `Franz.Common.Logging` for reuse and consistency.  
+- 🧵 **Scoped logging**: integrated with `ILogger.BeginScope` and Serilog’s `LogContext` to enrich all logs automatically.  
+- ⚙️ **Environment-aware output**: detailed payload logs in development, correlation-focused structured logs in production.  
+
+###   Franz.Common.Http.Refit support: optional, config-driven Refit client registration via the HTTP bootstrapper.
+  - Enable in appsettings: `Franz:HttpClients:EnableRefit = true`.
+  - Register typed Refit clients automatically from config (base URL, optional policy, interface type).
+  - Works with shared Polly policy registry, correlation/tenant header injection, optional token provider, Serilog + OTEL annotations.
 
 ➡️ See [CHANGELOG.md](CHANGELOG.md) for the full version history (1.2.65+).

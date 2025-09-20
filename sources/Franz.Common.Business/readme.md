@@ -1,12 +1,11 @@
-﻿---
-
-# **Franz.Common.Business**
+﻿# **Franz.Common.Business**
 
 A core library of the **Franz Framework**, designed to facilitate **Domain-Driven Design (DDD)** and **CQRS (Command Query Responsibility Segregation)** in .NET applications.
 It provides abstractions, utilities, and patterns for building scalable, maintainable, and testable business logic.
 
 ---
-
+- **Current Version**: 1.4.0
+---
 ## **Features**
 
 ### **1. Domain-Driven Design (DDD) Building Blocks**
@@ -16,7 +15,7 @@ It provides abstractions, utilities, and patterns for building scalable, maintai
 * **Enumerations**: Strongly typed enums with behavior and metadata.
 * **Repositories**: Interfaces for persistence (`IAggregateRepository<TAggregateRoot>`, `IReadRepository<T>`).
 
-Example **Entity**:
+**Entity Example:**
 
 ```csharp
 public class Order : Entity<Guid>
@@ -33,7 +32,7 @@ public class Order : Entity<Guid>
 }
 ```
 
-Example **Value Object**:
+**Value Object Example:**
 
 ```csharp
 public class Address : ValueObject
@@ -107,7 +106,6 @@ public class Product : EventSourcedAggregateRoot<ProductEvent>
 ### **3. Events**
 
 Supports both **domain events** and **integration events**.
-Core abstractions:
 
 * `IEvent`
 * `IEventHandler<TEvent>`
@@ -139,7 +137,7 @@ public class OrderCreatedHandler : IEventHandler<OrderCreatedEvent>
 * **Commands** (`ICommandRequest<T>`, `ICommandHandler<TCommand,TResponse>`)
 * **Queries** (`IQueryRequest<T>`, `IQueryHandler<TQuery,TResponse>`)
 
-Command Example:
+**Command Example:**
 
 ```csharp
 public class CreateOrderCommand : ICommandRequest<Guid>
@@ -161,15 +159,123 @@ public class CreateOrderHandler : ICommandHandler<CreateOrderCommand, Guid>
 
 ---
 
-### **5. Extensions & Utilities**
+### **5. Registration Examples**
 
-* **`ServiceCollectionExtensions`**: Registers command, query, and event handlers with DI.
-* **`HandlerCollector`**: Auto-discovers handlers.
-* **`TypeExtensions`**: Reflection and type utilities.
+The Business layer integrates seamlessly with the **Mediator** and resilience pipelines.
+
+#### **a) AddBusinessWithMediator**
+
+Strict registration – will throw if your `*.Application` assembly is not found.
 
 ```csharp
-services.AddBusinessServices(); // Registers all handlers automatically
+builder.Services.AddBusinessWithMediator(typeof(Program).Assembly);
 ```
+
+#### **b) TryAddBusinessWithMediator**
+
+Soft registration – logs a warning but continues if the application assembly is missing.
+
+```csharp
+builder.Services.TryAddBusinessWithMediator(typeof(Program).Assembly);
+```
+
+#### **c) AddFranzPlatform**
+
+Full-stack registration – Business + Mediator + Logging + Resilience pipelines.
+
+```csharp
+builder.Services.AddFranzPlatform(
+    typeof(Program).Assembly,
+    options =>
+    {
+        // Optional: override mediator defaults
+        options.DefaultTimeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+---
+
+### **6. Resilience Pipelines (via Mediator)**
+
+When you call `AddFranzPlatform`, `Franz.Common.Business` wires up the following **Mediator pipelines**:
+
+* ✅ `RetryPipeline<TRequest, TResponse>`
+* ✅ `CircuitBreakerPipeline<TRequest, TResponse>`
+* ✅ `TimeoutPipeline<TRequest, TResponse>`
+* ✅ `BulkheadPipeline<TRequest, TResponse>`
+
+> These pipelines are implemented in **`Franz.Common.Mediator.Pipelines.Resilience`**.
+> `Franz.Common.Business` just **activates them** for you.
+
+---
+
+### **7. appsettings.json Configuration**
+
+Each pipeline reads its **Options** from configuration. Example:
+
+```json
+{
+  "Franz": {
+    "Resilience": {
+      "Retry": {
+        "Enabled": true,
+        "RetryCount": 3,
+        "BaseDelayMilliseconds": 200
+      },
+      "CircuitBreaker": {
+        "Enabled": true,
+        "FailureThreshold": 5,
+        "OpenDurationSeconds": 60
+      },
+      "Timeout": {
+        "Enabled": true,
+        "TimeoutSeconds": 15
+      },
+      "Bulkhead": {
+        "Enabled": true,
+        "MaxParallelization": 50,
+        "MaxQueuingActions": 100
+      }
+    }
+  }
+}
+```
+
+---
+
+### **8. Options Mapping**
+
+The configuration maps directly into Mediator options classes:
+
+* `Retry` → `RetryOptions`
+* `CircuitBreaker` → `CircuitBreakerOptions`
+* `Timeout` → `TimeoutOptions`
+* `Bulkhead` → `BulkheadOptions`
+
+Each pipeline consumes its corresponding options at runtime, deciding whether to execute, skip, or short-circuit requests.
+
+---
+
+### **9. Logging**
+
+On startup you’ll see log messages confirming bootstrap:
+
+```
+[INF] ✅ Franz.Business bootstrapped with MyProduct.Application, Version=1.0.0.0
+[INF] 🛡️ Resilience pipelines registered: Retry, CircuitBreaker, Timeout, Bulkhead
+[WRN] ⚠️ No Application assembly found for MyProduct.Application, Business layer not registered.
+```
+
+---
+
+## **New in 1.4.0**
+
+* 🆕 Independent from MediatR → runs fully on **Franz.Common.Mediator**.
+* 🆕 Entities & Aggregates: lifecycle tracking (audit fields, soft delete, optimistic concurrency).
+* 🆕 Value Objects: strongly typed equality (`IEquatable<T>`), improved hash safety.
+* 🆕 Enumerations: cached reflection, type-safe comparisons.
+* 🆕 Domain Events: immutable with `init` properties, enriched with metadata for structured logs.
+* 🆕 Scrutor-powered DI: auto-discovery of handlers and services with zero boilerplate.
 
 ---
 
@@ -177,26 +283,19 @@ services.AddBusinessServices(); // Registers all handlers automatically
 
 * **Scrutor** (4.2.2) – assembly scanning & DI.
 * **Microsoft.Extensions.DependencyInjection** (9.0.0) – DI support.
-* **Franz.Common.DependencyInjection** – core DI patterns.
+* **Franz.Common.Mediator** – CQRS + pipelines.
 * **Franz.Common.Errors** – standardized error handling.
 
 ---
 
 ## **Installation**
 
-### From Private Azure Feed
-
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.Business --version 1.4.0
 ```
 
-```bash
-dotnet add package Franz.Common.Business --Version 
-```
+> ⚠️ From **1.4.0**, **MediatR is no longer required**.
+> `Franz.Common.Business` uses **Franz.Common.Mediator** internally.
 
 ---
 
@@ -213,14 +312,25 @@ Authorized contributors:
 
 ## **Changelog**
 
+### **1.4.0**
+
+* Removed dependency on MediatR → replaced by **Franz.Common.Mediator**.
+* Entities & Aggregates: lifecycle tracking, soft delete, domain events deduplication.
+* Value Objects: strongly typed generics, safer equality & hash codes.
+* Enumerations: type-safe comparison, cached reflection.
+* Domain Events: immutable (`init`), enriched with metadata (`EventId`, `CorrelationId`).
+* Scrutor-powered auto-discovery of handlers.
+* Clearer separation between **Business** and **Mediator** layers.
+
 ### **1.3**
 
-* Upgraded to .NET 9
-* Compatible with in-house mediator library & MediatR
-* Clear separation between **business** and **mediator** concepts
+* Upgraded to .NET 9.
+* Compatible with in-house mediator library & MediatR.
 
 ### **1.2.65**
 
-* Aggregates redesigned to use **event sourcing**
-* All aggregates now require a `Guid` identifier
+* Aggregates redesigned to use **event sourcing**.
+* All aggregates now require a `Guid` identifier.
+
+---
 

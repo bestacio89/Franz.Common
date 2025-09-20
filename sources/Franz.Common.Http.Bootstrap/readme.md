@@ -1,160 +1,167 @@
-﻿# **Franz.Common.Http.Bootstrap**
-- - **Current Version**: 1.3.14
-A comprehensive library within the **Franz Framework**, designed to centralize and simplify the configuration of **ASP.NET Core** applications. This package provides a unified setup for HTTP-related features, such as authentication, headers, documentation, and multi-tenancy, by leveraging other **Franz Framework** components.
+﻿# Franz.Common.Http.Bootstrap
+
+**Package**: `Franz.Common.Http.Bootstrap`
+**Current Version**: 1.4.0
+
+Opinionated HTTP bootstrapper for the Franz Framework.
+Centralizes common ASP.NET Core HTTP wiring (controllers, auth, headers, docs, serialization, health checks, multi-tenancy) and optionally registers config-driven Refit clients so applications get consistent, production-ready defaults with minimal boilerplate.
 
 ---
 
-## **Features**
+## Why use this package
 
-- **Centralized Bootstrap**:
-  - Combines HTTP-related functionality into a single streamlined configuration process.
-- **Integrated Extensions**:
-  - `ApplicationBuilderExtensions` and `HostBuilderExtensions` for pipeline and hosting customization.
-  - `ServiceCollectionExtensions` for dependency injection setup.
-- **Modular Integration**:
-  - Seamlessly integrates with:
-    - `Franz.Common.Http`
-    - `Franz.Common.Http.Authentication`
-    - `Franz.Common.Http.Headers`
-    - `Franz.Common.Http.Documentation`
-    - `Franz.Common.Http.Identity`
-    - `Franz.Common.Http.MultiTenancy`
+* One-line HTTP architecture wiring for consistent apps across teams.
+* Plugs into Franz primitives (multi-tenancy, header context, identity, docs).
+* Config-driven optional features (Refit clients) keep `Program.cs` tidy.
+* Reduces boilerplate and enforces best practices (correlation, tenant propagation, policy reuse).
 
 ---
 
-## **Version Information**
+## Quickstart
 
-- - **Current Version**: 1.3.14
-- Part of the private **Franz Framework** ecosystem.
-
----
-
-## **Dependencies**
-
-This package depends on the following **Franz Framework** components:
-- **Franz.Common.Bootstrap**: For application initialization and modular configuration.
-- **Franz.Common.Http**: Core HTTP utilities.
-- **Franz.Common.Http.Authentication**: Simplified JWT authentication setup.
-- **Franz.Common.Http.Headers**: HTTP header utilities and extensions.
-- **Franz.Common.Http.Documentation**: API documentation utilities (e.g., Swagger).
-- **Franz.Common.Http.Identity**: Identity management for HTTP-based applications.
-- **Franz.Common.Http.MultiTenancy**: Multi-tenant configurations for HTTP services.
-
----
-
-## **Installation**
-
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+### Install (private feed)
 
 ```bash
+# Example: add private feed (adjust your feed credentials)
 dotnet nuget add source "https://your-private-feed-url" \
   --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
+  --username "<user>" \
+  --password "<pass>" \
   --store-password-in-clear-text
+
+dotnet add package Franz.Common.Http.Bootstrap --version 1.4.0
 ```
 
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Http.Bootstrap  
-```
-
----
-
-## **Usage**
-
-### **1. Unified HTTP Bootstrap**
-
-Use the `ServiceCollectionExtensions` to bootstrap HTTP-related functionality in one step:
+### Minimal wiring (Program.cs)
 
 ```csharp
 using Franz.Common.Http.Bootstrap.Extensions;
 
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddHttpBootstrap(); // Registers all HTTP-related services
-    }
+var builder = WebApplication.CreateBuilder(args);
 
-    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-    {
-        app.UseHttpBootstrap(); // Configures middleware pipeline
+// Adds controllers, auth, headers, docs, multi-tenancy, serialization, health, etc.
+builder.Services.AddHttpArchitecture(builder.Environment, builder.Configuration, typeof(Program).Assembly);
+
+var app = builder.Build();
+app.UseHttpArchitecture(); // optional pipeline helper if provided
+app.MapControllers();
+app.Run();
+```
+
+`AddHttpArchitecture(...)` wires the canonical Franz HTTP stack. If Refit is enabled in configuration it will also register Refit clients automatically.
+
+---
+
+## Refit (optional) — what the bootstrapper does
+
+When `Franz:HttpClients:EnableRefit` is `true`, the bootstrapper will:
+
+* Read `Franz:HttpClients:Apis` from configuration.
+* Resolve each typed Refit interface (prefer `InterfaceType` — assembly-qualified; falls back to assembly scan).
+* Invoke `AddFranzRefit<TClient>(...)` reflectively to register the typed client.
+* For each client it wires:
+
+  * Base address
+  * `FranzRefitHeadersHandler` (adds `X-Correlation-ID`, `X-Tenant-Id`, optional `X-User-Id`)
+  * Optional `FranzRefitAuthHandler` (if an `ITokenProvider` is registered)
+  * Optional Polly policy attachment (by name, via the host's policy registry)
+
+### appsettings.json example (Refit)
+
+```json
+{
+  "Franz": {
+    "HttpClients": {
+      "EnableRefit": true,
+      "Apis": {
+        "Weather": {
+          "InterfaceType": "MyApp.ApiClients.IWeatherApi, MyApp",
+          "BaseUrl": "https://api.weather.local",
+          "Policy": "DefaultHttpRetry"
+        }
+      }
     }
+  }
 }
 ```
 
-### **2. Customizing Host Configuration**
+**Notes**
 
-Extend `HostBuilder` to customize hosting initialization:
+* `InterfaceType` (assembly-qualified) is recommended for deterministic resolution.
+* `Policy` is optional — if present the bootstrapper will attach the named policy from the host's `IPolicyRegistry<string>`.
+
+---
+
+## Features (at a glance)
+
+* Registers controllers, Swagger documentation, and health checks.
+* Authentication and identity context wiring.
+* Header context utilities and header-based capabilities.
+* Multi-tenancy integration via `Franz.Common.Http.MultiTenancy`.
+* Optional, config-driven Refit client registration with correlation, auth, Polly, and OTEL-friendly annotations.
+* Opinionated, production-friendly defaults to reduce friction.
+
+---
+
+## Host project dependencies (when using Refit)
+
+When enabling Refit you must ensure the host project references the Refit integration and related primitives:
+
+* `Franz.Common.Http.Refit` (the Refit integration package)
+* `Refit.HttpClientFactory` (provides `AddRefitClient<T>()`) or an equivalent Refit package exposing factory helpers
+* `Microsoft.Extensions.Http`
+* `Polly` & `Microsoft.Extensions.Http.Polly` (if you want policy integration)
+* `Serilog` (recommended for enriched logging)
+* `OpenTelemetry.Api` (optional; used to tag `Activity.Current`)
+
+> The bootstrapper itself depends on other Franz packages (http modules). Make sure those Franz packages are available to the host.
+
+---
+
+## Troubleshooting
+
+* **Refit clients not registered**:
+
+  * Ensure `"Franz:HttpClients:EnableRefit": true` and that `Franz.Common.Http.Refit` is referenced in the host project.
+* **Typed interface cannot be resolved**:
+
+  * Add `InterfaceType` with the assembly-qualified type name (e.g. `MyApp.ApiClients.IWeatherApi, MyApp`) to the config entry or ensure the interface is in the assembly passed to `AddHttpArchitecture`.
+* **`AddRefitClient<T>()` not found**:
+
+  * Confirm `Refit.HttpClientFactory` (or the Refit package exposing the factory) is referenced in the project that performs the registration, and add `using Refit;` where needed.
+* **Polly policy not applied**:
+
+  * Register policies in `IPolicyRegistry<string>` (`services.AddPolicyRegistry().Add("MyPolicy", policy)`).
+
+---
+
+## Example: manual Refit registration (if you prefer code)
 
 ```csharp
-using Franz.Common.Http.Bootstrap.Extensions;
+builder.Services.AddPolicyRegistry()
+  .Add("DefaultHttpRetry", HttpPolicyExtensions
+    .HandleTransientHttpError()
+    .WaitAndRetryAsync(new[] { TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(300) }));
 
-var host = Host.CreateDefaultBuilder(args)
-    .UseHttpBootstrap() // Adds Franz HTTP hosting configuration
-    .Build();
-
-await host.RunAsync();
+builder.Services.AddFranzRefit<MyApp.ApiClients.IWeatherApi>(
+    name: "Weather",
+    baseUrl: "https://api.weather.local",
+    policyName: "DefaultHttpRetry");
 ```
 
-### **3. Modular Integration**
+---
 
-Use this package to integrate functionality from other HTTP-related **Franz Framework** libraries:
-- **Authentication**: Easily set up JWT authentication.
-- **Headers**: Manage custom headers.
-- **Documentation**: Enable Swagger for API documentation.
-- **MultiTenancy**: Support tenant-specific HTTP configurations.
+## Changelog (recent)
+
+* **v1.4.0**
+
+  * Added optional Refit client registration via the HTTP bootstrapper (config-driven).
+  * Refit clients registered by the bootstrapper support correlation header injection, optional token injection, and Polly policy wiring.
+
+For full changelog/history see the repository `CHANGELOG.md`.
 
 ---
 
-## **Integration with Franz Framework**
+## Contributing & License
 
-The **Franz.Common.Http.Bootstrap** package acts as a central hub for integrating and configuring HTTP-related components. It relies on and integrates seamlessly with:
-- **Franz.Common.Bootstrap**
-- **Franz.Common.Http**
-- **Franz.Common.Http.Authentication**
-- **Franz.Common.Http.Headers**
-- **Franz.Common.Http.Documentation**
-- **Franz.Common.Http.Identity**
-- **Franz.Common.Http.MultiTenancy**
-
-Ensure these dependencies are installed to fully leverage the library's capabilities.
-
----
-
-## **Contributing**
-
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
-
-## **License**
-
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
-
----
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.3.4
-- Eliminated dependency on `Franz.Common.Bootstrap` to Automapper
-
-### Version 1.3.6
-- Compatible with Franz 1.3.6 stack.
-- Self-contained middleware bootstrap (UseHttpArchitecture).
-- Swagger & pipeline setup hidden behind Franz extensions.
+This package is part of the private Franz Framework. Contributions are internal; follow your team’s contribution guidelines. Licensed under MIT.

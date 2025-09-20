@@ -285,11 +285,6 @@ MIT
 
 ## 📝 Changelog
 
-### v1.3.5 – 2025-09-17
-
-* Fixed pipeline registration (open generics for DI).
-* Registered sub-options for DI (Retry, Timeout, CircuitBreaker, Bulkhead, Transaction, Caching, Observer).
-* Updated README with DI & options example.
 
 ### v1.3.4 – 2025-09-15
 
@@ -297,6 +292,13 @@ MIT
 * Upgraded pipelines to be options-aware.
 * Added MediatorContext & observability.
 * Introduced TestDispatcher.
+
+
+### v1.3.5 – 2025-09-17
+
+* Fixed pipeline registration (open generics for DI).
+* Registered sub-options for DI (Retry, Timeout, CircuitBreaker, Bulkhead, Transaction, Caching, Observer).
+* Updated README with DI & options example.
 
 ### v1.3.6 – 2025-09-15
 * Removed MediatR → now fully Franz.Mediator.
@@ -384,3 +386,42 @@ MIT
 * Centralized CorrelationId into Franz.Common.Logging namespace for reuse across all processors and pipelines.
 
 * Removed duplicate/inline correlation ID generators from individual pipelines.
+
+### v1.4.0 – 2025-09-20
+Major Refinements to Resilience & Pipeline Architecture
+
+This release focuses on hardening the core mediator pipelines to be more predictable, thread-safe, and robust for production environments.
+
+🛠️ Core Pipeline & Dependency Injection
+
+Opt-In Pipeline Registration: All pipelines are now registered individually (AddFranzRetryPipeline, etc.). This gives the consuming application explicit control over the pipeline order, ensuring predictable behavior and avoiding the critical flaw of fixed, implicit ordering.
+
+Simplified DI: Removed the AddFranzResiliencePipelines method to enforce explicit registration.
+
+Resilience Pipelines
+
+RetryPipeline
+
+Flexible Retry Logic: The catch (Exception) has been replaced with a configurable ShouldRetry predicate. This correctly handles only transient exceptions and prevents the anti-pattern of retrying on permanent failures (e.g., ArgumentException).
+
+Custom Delay Strategies: Added a ComputeDelay delegate to support custom backoff strategies (e.g., exponential backoff), making the pipeline highly adaptable.
+
+Cancellation Handling: Added an explicit check for OperationCanceledException to fail fast when a request is intentionally canceled by the caller.
+
+BulkheadPipeline
+
+Correct Queue Limiting: The logic for handling MaxQueueLength was corrected. The pipeline now uses a non-blocking SemaphoreSlim.WaitAsync(TimeSpan.Zero) to check for available slots, correctly implementing a queue limit and preventing the "thundering herd" problem.
+
+CircuitBreakerPipeline
+
+Thread-Safety & Deadlock Prevention: The long-held lock was removed. The pipeline now uses a lock-free design for the core execution block. This prevents performance bottlenecks under high concurrency and eliminates the risk of deadlocks.
+
+Half-Open State: Implemented the correct Half-Open state, where a single request is allowed to test the waters after the circuit has been open. This is a critical feature for a proper circuit breaker.
+
+State Management: Moved state management logic into a dedicated, thread-safe helper method to ensure consistent behavior.
+
+General Enhancements
+
+Improved Observability: All pipelines and processors are now more tightly integrated with IMediatorObserver to provide consistent, end-to-end traceability of requests, including their final outcomes (success or failure).
+
+This update transforms the mediator from a functional library into a highly reliable and architecturally sound framework.

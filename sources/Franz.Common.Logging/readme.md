@@ -19,7 +19,7 @@ A comprehensive logging library within the **Franz Framework**, designed to enha
 
 ## **Version Information**
 
-- - **Current Version**: 1.3.14
+- **Current Version**: 1.4.0
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -139,11 +139,32 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## **Changelog**
 
-### Version 1.2.65
-- Upgrade version to .net 9
+Version 1.4.0
 
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
+Introduced environment-aware logging defaults via UseLog() extension.
+
+Development → Verbose console + rolling file logs (7-day retention).
+
+Production → Concise console + structured JSON rolling logs (30-day retention).
+
+Bound static Serilog.Log.Logger to ensure logs from Polly callbacks and other static calls flow through configured sinks.
+
+Improved Serilog + Elastic APM integration with correlation IDs and structured enrichments.
+
+Added rolling file support with automatic daily log rotation.
+
+Enhanced TraceHelper with support for correlation context propagation.
+
+Version 1.3
+
+Upgraded to .NET 9.0.8
+
+Added new features and improvements
+
+Separated business concepts from mediator concepts
+
+Now compatible with both the in-house mediator and MediatR
+
+Version 1.2.65
+
+Upgrade version to .NET 9

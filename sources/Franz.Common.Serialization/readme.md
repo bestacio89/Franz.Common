@@ -20,7 +20,7 @@ A serialization utility library within the **Franz Framework** that simplifies J
 
 ## **Version Information**
 
-- - **Current Version**: 1.3.14
+- **Current Version**: 1.4.0
 - Part of the private **Franz Framework** ecosystem.
 
 ---

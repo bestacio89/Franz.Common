@@ -115,10 +115,21 @@ This library is licensed under the MIT License. See the LICENSE file for more de
 ## **Changelog**
 
 ### Version 1.2.065
--- Upgrade to .net 9
+- Upgrade to .NET 9
 
 ### Version 1.3
 - Upgraded to **.NET 9.0.8**
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
+### Version 1.4.0
+- 🚀 Introduced **TestExceptions** for chaos engineering & demos  
+  - `BananaRepublicException` (EN/FR)  
+  - `MonsterException` (EN/FR)  
+  - `VodkaCoffeePotException` (EN/FR)  
+  - `FriendlyReminderException` (EN/FR)  
+- 🎭 **Bilingual Support**: every test exception available in **English & French**  
+- 🧩 **Consistent API**: wrapped under `TestExceptions` static class  
+- 🤡 Purpose: make resilience demos, test failures, and dev workshops **fun & obvious**  
+- 🛠 No impact on production code — these are **opt-in chaos exceptions**  
