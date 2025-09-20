@@ -193,3 +193,14 @@ DbContextMultiDatabase → deleted in favor of DbContextBase.
 🔄 Tightened alignment between Business and EntityFramework packages.
 
 📚 README + CHANGELOG updates to reflect simplified context model.
+
+
+##   Franz 1.4.4 — Stability Meets Firepower
+
+🚀 Massive improvements in logging & hybrid config
+
+🔧 Cleaner DI registration across the board
+
+📊 Elastic APM opt-in for production scenarios
+
+⚡ Performance boosts in mediator pipelines

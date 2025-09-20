@@ -13,7 +13,7 @@ No extra wiring. No extra boilerplate. Just plug and go.
 
 ---
 
-* **Current Version**: 1.4.3
+* **Current Version**: 1.4.4
 
 ---
 
@@ -178,4 +178,9 @@ Each pipeline resolves its named policy from the `IReadOnlyPolicyRegistry<string
 
 ---
 
+## **Changelog**
 
+version 1.4.4
+
+- Corrected Polly policy registry to use generic IAsyncPolicy<HttpResponseMessage>, avoiding invalid cast exceptions
+- Ensured pipeline registrations handle generic types cleanly

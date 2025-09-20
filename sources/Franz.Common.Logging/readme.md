@@ -1,44 +1,62 @@
-﻿# **Franz.Common.Logging**
+﻿Perfect, thanks for dropping the **actual `HostBuilderExtensions` class** 🙌
+Now I see clearly:
 
-A comprehensive logging library within the **Franz Framework**, designed to enhance application monitoring and diagnostics using **Serilog** and **Elastic APM**. This package provides tools for centralized logging, tracing, and seamless integration with ASP.NET Core applications.
+* You have **two distinct strategies**:
+
+  1. `UseLog()` → strict, hardcoded, **environment-aware logging** (dev vs prod).
+  2. `UseHybridLog()` → flexible, **appsettings.json-driven logging**, only enforcing enrichers.
+
+I’ve refined the README so it matches exactly what this code does, with **clear separation and usage examples**.
+
+---
+
+# **Franz.Common.Logging**
+
+A comprehensive logging library within the **Franz Framework**, designed to enhance application monitoring and diagnostics using **Serilog** and **Elastic APM**.
+This package provides tools for centralized logging, tracing, and seamless integration with ASP.NET Core applications.
 
 ---
 
 ## **Features**
 
-- **Centralized Logging**:
-  - Integrates with **Serilog** for structured and enriched logging.
-- **Tracing Utilities**:
-  - `TraceHelper` for advanced tracing support in distributed applications.
-- **Host Extensions**:
-  - `HostBuilderExtensions` for configuring logging and tracing in application startup.
-- **Elastic APM Integration**:
-  - Provides support for **Elastic APM** to monitor application performance and detect issues.
+* **Centralized Logging**
+
+  * Integration with **Serilog** for structured and enriched logs.
+* **Tracing Utilities**
+
+  * `TraceHelper` for advanced tracing support in distributed applications.
+* **Host Extensions**
+
+  * `UseLog()` for strict, environment-aware logging.
+  * `UseHybridLog()` for flexible, configuration-driven logging.
+* **Elastic APM Integration**
+
+  * Full support for **Elastic APM** (enabled automatically in DEBUG).
 
 ---
 
 ## **Version Information**
 
-- **Current Version**: 1.4.3
-- Part of the private **Franz Framework** ecosystem.
+* **Current Version**: 1.4.4
+* Part of the private **Franz Framework** ecosystem.
 
 ---
 
 ## **Dependencies**
 
-This package relies on:
-- **Elastic.Apm.NetCoreAll** (1.25.1): Full integration with Elastic APM for application performance monitoring.
-- **Elastic.Apm.SerilogEnricher** (8.6.1): Enriches Serilog logs with Elastic APM trace data.
-- **Serilog.AspNetCore** (8.0.0): Enables Serilog integration in ASP.NET Core applications.
-- **Serilog.Enrichers.Demystifier** (1.0.2): Enhances log messages by providing demystified stack traces.
-- **Serilog.Enrichers.Environment** (2.3.0): Adds environment-based enrichments to log data.
+* **Elastic.Apm.NetCoreAll** (1.25.1) – APM agent integration.
+* **Elastic.Apm.SerilogEnricher** (8.6.1) – Correlates APM traces with logs.
+* **Serilog.AspNetCore** (8.0.0) – ASP.NET Core logging provider.
+* **Serilog.Enrichers.Demystifier** (1.0.2) – Clean stack traces in logs.
+* **Serilog.Enrichers.Environment** (2.3.0) – Environment metadata enrichment.
 
 ---
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+### From Private Azure Feed
+
+Configure your NuGet client:
 
 ```bash
 dotnet nuget add source "https://your-private-feed-url" \
@@ -51,56 +69,91 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Logging  
+dotnet add package Franz.Common.Logging
 ```
 
 ---
 
 ## **Usage**
 
-### **1. Configure Logging in Host Builder**
+### 1. Strict Environment-Aware Logging (`UseLog`)
 
-Use `HostBuilderExtensions` to configure logging and tracing:
+Hardcoded sinks with enforced dev/prod differences:
 
 ```csharp
 using Franz.Common.Logging.Extensions;
 
 var host = Host.CreateDefaultBuilder(args)
-    .UseLoggingWithElasticApm() // Configures Serilog and Elastic APM
+    .UseLog() // Dev → Console + Debug + File
+              // Prod → Console + JSON file + Log file
     .Build();
 
 await host.RunAsync();
 ```
 
-### **2. Add Custom Tracing**
+* **Development**
 
-Leverage `TraceHelper` to add custom tracing to your application:
+  * Verbose console logs
+  * Debug sink
+  * Daily rolling file logs (`logs/dev-.log`)
+
+* **Production**
+
+  * Concise console logs
+  * JSON structured logs (`logs/prod-.json`, 30-day retention)
+  * Plain text logs (`logs/prod-.log`, 30-day retention)
+
+---
+
+### 2. Hybrid Logging (`UseHybridLog`)
+
+Configuration-driven sinks (from `appsettings.json`), with enrichers always enforced:
+
+```csharp
+using Franz.Common.Logging.Extensions;
+
+var host = Host.CreateDefaultBuilder(args)
+    .UseHybridLog() // Reads sinks from appsettings.json
+    .Build();
+
+await host.RunAsync();
+```
+
+In `appsettings.json`, configure sinks per environment:
+
+```json
+{
+  "Serilog": {
+    "Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
+    "MinimumLevel": "Debug",
+    "WriteTo": [
+      { "Name": "Console" },
+      {
+        "Name": "File",
+        "Args": { "path": "logs/app-.log", "rollingInterval": "Day" }
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 3. Custom Tracing
 
 ```csharp
 using Franz.Common.Logging.Tracing;
 
 TraceHelper.TraceInformation("Starting application initialization...");
-
-// Add custom trace messages as needed
 TraceHelper.TraceWarning("Potential configuration issue detected.");
 ```
 
-### **3. Enrich Log Data**
+---
 
-Take advantage of Serilog enrichers for enhanced log metadata:
+### 4. Elastic APM (Enabled in DEBUG builds)
 
-```csharp
-Log.Logger = new LoggerConfiguration()
-    .Enrich.WithEnvironmentName()
-    .Enrich.WithDemystifiedStackTraces()
-    .Enrich.WithElasticApmCorrelationInfo()
-    .WriteTo.Console()
-    .CreateLogger();
-```
-
-### **4. Monitor Performance with Elastic APM**
-
-Ensure Elastic APM is set up and logs include performance-related trace data. Add Elastic APM server configurations in `appsettings.json`:
+`Agent.Setup(new AgentComponents())` is automatically registered in DEBUG mode.
+To enable Elastic APM in production, configure `ElasticApm` in `appsettings.json`:
 
 ```json
 {
@@ -113,19 +166,31 @@ Ensure Elastic APM is set up and logs include performance-related trace data. Ad
 
 ---
 
+## **Comparison of Logging Modes**
+
+| Mode             | Sinks Defined | Environment Aware | Configurable via JSON | APM Setup  |
+| ---------------- | ------------- | ----------------- | --------------------- | ---------- |
+| `UseLog()`       | Hardcoded     | ✅ Yes (Dev/Prod)  | ❌ No                  | DEBUG only |
+| `UseHybridLog()` | appsettings   | ❌ No              | ✅ Yes                 | DEBUG only |
+
+---
+
 ## **Integration with Franz Framework**
 
-The **Franz.Common.Logging** package integrates seamlessly with:
-- **Franz Framework**: Acts as the central logging mechanism for all Franz libraries.
-- **Elastic APM**: Enables distributed tracing and performance monitoring.
-- **Serilog**: Provides structured logging and enrichments for ASP.NET Core applications.
+* Acts as the **central logging mechanism** for all Franz libraries.
+* Enables **distributed tracing** and **performance monitoring** via Elastic APM.
+* Provides **structured, environment-aware logging** through Serilog.
 
 ---
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
+This package is private to the Franz Framework. Contributions are limited to the internal development team.
+
+If you have access:
+
+1. Clone the repository:
+   `https://github.com/bestacio89/Franz.Common/`
 2. Create a feature branch.
 3. Submit a pull request for review.
 
@@ -133,38 +198,55 @@ This package is part of a private framework. Contributions are limited to the in
 
 ## **License**
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
+This library is licensed under the **MIT License**. See the `LICENSE` file for more details.
 
 ---
 
 ## **Changelog**
 
-Version 1.4.1
+### **1.4.4**
 
-Introduced environment-aware logging defaults via UseLog() extension.
+* Added `UseHybridLog()` for appsettings-driven configuration.
+* Fixed Serilog provider wiring to respect `appsettings.json`.
+* Improved console/file/Elastic sink environment awareness.
 
-Development → Verbose console + rolling file logs (7-day retention).
+### **1.4.1**
 
-Production → Concise console + structured JSON rolling logs (30-day retention).
+* Introduced **environment-aware logging defaults** via `UseLog()`.
 
-Bound static Serilog.Log.Logger to ensure logs from Polly callbacks and other static calls flow through configured sinks.
+  * Development → Verbose console + daily rolling file (7-day retention).
+  * Production → Concise console + structured JSON (30-day retention).
+* Bound `Serilog.Log.Logger` for static logging (e.g., Polly callbacks).
+* Improved Elastic APM correlation IDs + structured enrichments.
+* Added automatic daily log rotation.
+* Enhanced `TraceHelper` with correlation context propagation.
 
-Improved Serilog + Elastic APM integration with correlation IDs and structured enrichments.
+### **1.3**
 
-Added rolling file support with automatic daily log rotation.
+* Upgraded to **.NET 9.0.8**.
+* Separated business concepts from mediator concepts.
+* Compatible with both in-house **Mediator** and **MediatR**.
 
-Enhanced TraceHelper with support for correlation context propagation.
+### **1.2.65**
 
-Version 1.3
+* First upgrade to **.NET 9**.
 
-Upgraded to .NET 9.0.8
+---
 
-Added new features and improvements
+## **Best Practices**
 
-Separated business concepts from mediator concepts
+* Use `UseLog()` for **strict, environment-aware logging** in most applications (APIs, background services).
+* Use `UseHybridLog()` when you need **flexible, configuration-driven logging**, usually in enterprise apps with strong DevOps pipelines.
+* Elastic APM in **production** is always **opt-in** — wire it yourself if your infra requires it. Franz only enables APM automatically in **DEBUG** to help with local testing.
 
-Now compatible with both the in-house mediator and MediatR
+---
 
-Version 1.2.65
+## **Comparison of Logging Modes**
 
-Upgrade version to .NET 9
+| Mode             | Sinks Defined | Environment Aware | Configurable via JSON | APM Setup  |
+| ---------------- | ------------- | ----------------- | --------------------- | ---------- |
+| `UseLog()`       | Hardcoded     | ✅ Yes (Dev/Prod)  | ❌ No                  | DEBUG only |
+| `UseHybridLog()` | appsettings   | ❌ No              | ✅ Yes                 | DEBUG only |
+
+---
+

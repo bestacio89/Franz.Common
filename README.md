@@ -229,6 +229,12 @@ Licensed under the **MIT License**.
 ---
 
 ## 📌 Changelog
+### **1.4.4** — Stability Meets Firepower
+
+* Massive improvements in logging & hybrid config
+* Cleaner DI registration across the board
+* Elastic APM opt-in for production scenarios
+* Performance boosts in mediator pipelines
 
 ### **1.4.2**
 
