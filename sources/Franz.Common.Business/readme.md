@@ -4,13 +4,16 @@ A core library of the **Franz Framework**, designed to facilitate **Domain-Drive
 It provides abstractions, utilities, and patterns for building scalable, maintainable, and testable business logic.
 
 ---
-- **Current Version**: 1.4.2
+
+* **Current Version**: 1.4.2
+
 ---
+
 ## **Features**
 
 ### **1. Domain-Driven Design (DDD) Building Blocks**
 
-* **Entities**: Represent unique objects identified by a primary key.
+* **Entities**: Represent unique objects identified by a primary key, with auditing + soft delete built-in.
 * **Value Objects**: Immutable, equality-driven domain concepts.
 * **Enumerations**: Strongly typed enums with behavior and metadata.
 * **Repositories**: Interfaces for persistence (`IAggregateRepository<TAggregateRoot>`, `IReadRepository<T>`).
@@ -188,7 +191,6 @@ builder.Services.AddFranzPlatform(
     typeof(Program).Assembly,
     options =>
     {
-        // Optional: override mediator defaults
         options.DefaultTimeout = TimeSpan.FromSeconds(30);
     });
 ```
@@ -204,14 +206,14 @@ When you call `AddFranzPlatform`, `Franz.Common.Business` wires up the following
 * ✅ `TimeoutPipeline<TRequest, TResponse>`
 * ✅ `BulkheadPipeline<TRequest, TResponse>`
 
-> These pipelines are implemented in **`Franz.Common.Mediator.Pipelines.Resilience`**.
+> These are implemented in **`Franz.Common.Mediator.Pipelines.Resilience`**.
 > `Franz.Common.Business` just **activates them** for you.
 
 ---
 
 ### **7. appsettings.json Configuration**
 
-Each pipeline reads its **Options** from configuration. Example:
+Each pipeline reads its **Options** from configuration:
 
 ```json
 {
@@ -245,14 +247,10 @@ Each pipeline reads its **Options** from configuration. Example:
 
 ### **8. Options Mapping**
 
-The configuration maps directly into Mediator options classes:
-
 * `Retry` → `RetryOptions`
 * `CircuitBreaker` → `CircuitBreakerOptions`
 * `Timeout` → `TimeoutOptions`
 * `Bulkhead` → `BulkheadOptions`
-
-Each pipeline consumes its corresponding options at runtime, deciding whether to execute, skip, or short-circuit requests.
 
 ---
 
@@ -268,14 +266,11 @@ On startup you’ll see log messages confirming bootstrap:
 
 ---
 
-## **New in 1.4.1**
+## **What’s New in 1.4.2**
 
-* 🆕 Independent from MediatR → runs fully on **Franz.Common.Mediator**.
-* 🆕 Entities & Aggregates: lifecycle tracking (audit fields, soft delete, optimistic concurrency).
-* 🆕 Value Objects: strongly typed equality (`IEquatable<T>`), improved hash safety.
-* 🆕 Enumerations: cached reflection, type-safe comparisons.
-* 🆕 Domain Events: immutable with `init` properties, enriched with metadata for structured logs.
-* 🆕 Scrutor-powered DI: auto-discovery of handlers and services with zero boilerplate.
+* 🗑️ Removed **`SaveEntitiesAsync`** → all auditing + domain event dispatching happens in `SaveChangesAsync`.
+* ✅ Aligned with **DbContextBase** from `Franz.Common.EntityFramework`.
+* 🧹 Internal cleanup and consistency improvements.
 
 ---
 
@@ -291,18 +286,17 @@ On startup you’ll see log messages confirming bootstrap:
 ## **Installation**
 
 ```bash
-dotnet add package Franz.Common.Business --version 1.4.1
+dotnet add package Franz.Common.Business --version 1.4.2
 ```
 
-> ⚠️ From **1.4.1**, **MediatR is no longer required**.
-> `Franz.Common.Business` uses **Franz.Common.Mediator** internally.
+> ⚠️ Since **1.4.1**, **MediatR is no longer required**.
+> Uses **Franz.Common.Mediator** internally.
 
 ---
 
 ## **Contributing**
 
 This package is part of the private **Franz Framework**.
-Authorized contributors:
 
 1. Clone [repo](https://github.com/bestacio89/Franz.Common/).
 2. Create a feature branch.
@@ -310,27 +304,35 @@ Authorized contributors:
 
 ---
 
+## **License**
+
+Licensed under the **MIT License**.
+
+---
+
 ## **Changelog**
+
+### **1.4.2**
+
+* Removed `SaveEntitiesAsync` → replaced with `SaveChangesAsync` in `DbContextBase`.
+* Improved alignment with `EntityFramework` package (auditing + domain events).
 
 ### **1.4.1**
 
-* Removed dependency on MediatR → replaced by **Franz.Common.Mediator**.
-* Entities & Aggregates: lifecycle tracking, soft delete, domain events deduplication.
-* Value Objects: strongly typed generics, safer equality & hash codes.
-* Enumerations: type-safe comparison, cached reflection.
-* Domain Events: immutable (`init`), enriched with metadata (`EventId`, `CorrelationId`).
-* Scrutor-powered auto-discovery of handlers.
-* Clearer separation between **Business** and **Mediator** layers.
+* Independent from MediatR → runs on `Franz.Common.Mediator`.
+* Lifecycle tracking for entities & aggregates.
+* Stronger value object equality.
+* Enriched domain events with metadata.
+* Scrutor-powered DI auto-discovery.
 
 ### **1.3**
 
 * Upgraded to .NET 9.
-* Compatible with in-house mediator library & MediatR.
+* Compatible with both in-house mediator & MediatR.
 
 ### **1.2.65**
 
-* Aggregates redesigned to use **event sourcing**.
-* All aggregates now require a `Guid` identifier.
+* Aggregates redesigned to use event sourcing.
+* All aggregates now require `Guid` identifiers.
 
 ---
-
