@@ -15,7 +15,7 @@ A foundational library within the **Franz Framework** that provides tools for ma
 
 ## **Version Information**
 
-- **Current Version**: 1.5.2
+- **Current Version**: 1.5.3
 - Part of the private **Franz Framework** ecosystem.
 
 ---
