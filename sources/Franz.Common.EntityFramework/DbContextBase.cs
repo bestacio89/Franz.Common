@@ -74,7 +74,7 @@ public abstract class DbContextBase : DbContext
 
       foreach (var domainEvent in events)
       {
-        await _dispatcher.Send(domainEvent);
+        await _dispatcher.PublishAsync(domainEvent);
       }
     }
   }

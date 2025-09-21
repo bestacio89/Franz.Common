@@ -24,6 +24,6 @@ public static class DomainEventDispatcherExtensions
             entity.ClearDomainEvents();
 
         foreach (var domainEvent in domainEvents)
-            await dispatcher.Send(domainEvent, cancellationToken);
+            await dispatcher.PublishAsync(domainEvent, cancellationToken);
     }
 }
