@@ -1,43 +1,40 @@
 ﻿using Franz.Common.Mapping.Abstractions;
-using System.Linq.Expressions;
 
-namespace Franz.Common.Mapping.Core
+namespace Franz.Common.Mapping.Core;
+
+public class FranzMapper : IFranzMapper
 {
-  public class FranzMapper : IFranzMapper
+  private readonly MappingConfiguration _config;
+
+  public FranzMapper(MappingConfiguration config) => _config = config;
+
+  public TDestination Map<TSource, TDestination>(TSource source)
   {
-    private readonly MappingConfiguration _config;
+    if (source == null) throw new ArgumentNullException(nameof(source));
 
-    public FranzMapper(MappingConfiguration config)
+    if (_config.TryGetMapping<TSource, TDestination>(out var expression))
+      return ApplyMapping(source, expression!);
+
+    return DefaultMap<TSource, TDestination>(source);
+  }
+
+  private static TDestination ApplyMapping<TSource, TDestination>(
+      TSource source,
+      MappingExpression<TSource, TDestination> expression)
+  {
+    // Construct destination
+    var dest = expression.Constructor != null
+        ? expression.Constructor(source)
+        : Activator.CreateInstance<TDestination>();
+
+    foreach (var prop in typeof(TDestination).GetProperties().Where(p => p.CanWrite))
     {
-      _config = config;
-    }
+      if (expression.Ignored.Contains(prop.Name))
+        continue;
 
-    public TDestination Map<TSource, TDestination>(TSource source)
-    {
-      if (source == null) throw new ArgumentNullException(nameof(source));
-
-      if (_config.TryGetMapping<TSource, TDestination>(out var expression))
+      if (expression.MemberMap.TryGetValue(prop.Name, out var sourceName))
       {
-        return ApplyMapping(source, expression!);
-      }
-
-      // Default by-name mapping
-      return DefaultMap<TSource, TDestination>(source);
-    }
-
-    private TDestination ApplyMapping<TSource, TDestination>(
-        TSource source,
-        MappingExpression<TSource, TDestination> expression)
-    {
-      var dest = Activator.CreateInstance<TDestination>();
-
-      foreach (var prop in typeof(TDestination).GetProperties().Where(p => p.CanWrite))
-      {
-        if (expression.Ignored.Contains(prop.Name))
-          continue;
-
-        string sourceName = expression.MemberMap.TryGetValue(prop.Name, out var mapped) ? mapped : prop.Name;
-
+        // Look up the source property by name
         var sourceProp = typeof(TSource).GetProperty(sourceName);
         if (sourceProp != null)
         {
@@ -45,16 +42,9 @@ namespace Franz.Common.Mapping.Core
           prop.SetValue(dest, value);
         }
       }
-
-      return dest!;
-    }
-
-    private static TDestination DefaultMap<TSource, TDestination>(TSource source)
-    {
-      var dest = Activator.CreateInstance<TDestination>();
-
-      foreach (var prop in typeof(TDestination).GetProperties().Where(p => p.CanWrite))
+      else
       {
+        // Fallback: same-name mapping
         var sourceProp = typeof(TSource).GetProperty(prop.Name);
         if (sourceProp != null)
         {
@@ -62,8 +52,23 @@ namespace Franz.Common.Mapping.Core
           prop.SetValue(dest, value);
         }
       }
-
-      return dest!;
     }
+
+
+    return dest!;
+  }
+
+  private static TDestination DefaultMap<TSource, TDestination>(TSource source)
+  {
+    var dest = Activator.CreateInstance<TDestination>();
+
+    foreach (var prop in typeof(TDestination).GetProperties().Where(p => p.CanWrite))
+    {
+      var sourceProp = typeof(TSource).GetProperty(prop.Name);
+      if (sourceProp != null)
+        prop.SetValue(dest, sourceProp.GetValue(source));
+    }
+
+    return dest!;
   }
 }
