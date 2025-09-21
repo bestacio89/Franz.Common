@@ -14,6 +14,10 @@ Unlike minimal mediators, Franz ships with:
 
 ---
 
+* **Current Version**: 1.5.0
+
+---
+
 ## 📦 Installation
 
 ```bash
@@ -285,143 +289,84 @@ MIT
 
 ## 📝 Changelog
 
-
 ### v1.3.4 – 2025-09-15
 
-* Introduced Options pattern.
-* Upgraded pipelines to be options-aware.
-* Added MediatorContext & observability.
-* Introduced TestDispatcher.
+* Introduced **Options pattern**.
+* Pipelines upgraded to be options-aware.
+* Added `MediatorContext` & observability.
+* Introduced `TestDispatcher`.
 
+---
 
 ### v1.3.5 – 2025-09-17
 
 * Fixed pipeline registration (open generics for DI).
-* Registered sub-options for DI (Retry, Timeout, CircuitBreaker, Bulkhead, Transaction, Caching, Observer).
+* Registered sub-options for DI.
 * Updated README with DI & options example.
 
+---
+
 ### v1.3.6 – 2025-09-15
-* Removed MediatR → now fully Franz.Mediator.
-* IIntegrationEvent : INotification for clean event flow.
-* IDispatcher.PublishAsync powers event handling & pipelines.
+
+* Removed MediatR → now fully `Franz.Mediator`.
+* `IIntegrationEvent : INotification` for clean event flow.
+* `PublishAsync` powers event handling & pipelines.
 * Works standalone, no DI required.
 
+---
+
 ### v1.3.7 – 2025-09-17
-* Pipelines are now opt-in
 
-### v1.3.12 -2025-09-18
-* LoggingPreProcessor now logs using the actual runtime request name instead of generic ICommand\1/IQuery`1`.
+* Pipelines are now **opt-in**.
 
-* LoggingPostProcessor enriched with prefixes → [Post-Command], [Post-Query], [Post-Request].
+---
 
-* Both Pre/Post processors now provide business-level observability (Command vs Query vs Request).
+### v1.3.12 – 2025-09-18
 
-* Logs are lightweight, clean, and consistent across the full request lifecycle.
+* LoggingPreProcessor logs actual runtime request names.
+* LoggingPostProcessor adds prefixes → `[Post-Command]`, `[Post-Query]`, `[Post-Request]`.
+* Pre/Post processors provide **business-level observability**.
+* Logs are lightweight, clean, and consistent.
 
-### v1.3.13 – Environment-Aware Validation & Audit Logging
+---
 
-* Validation Pipeline
+### v1.3.13 – 2025-09-18
 
-* Enhanced ValidationPipeline<TRequest, TResponse> to include environment-aware logging.
+* Validation pipelines upgraded with environment-aware logging (Dev = verbose, Prod = lean).
+* Added `NotificationValidationPipeline<TNotification>` and `NotificationValidationException`.
+* Audit logging upgraded to structured `ILogger` with environment awareness.
+* Validation PreProcessor logs validation outcomes consistently.
 
-* Development → logs full error details and “passed” messages.
+---
 
-* Production → logs only error counts, no success noise.
+### v1.3.14
 
-* Notification Validation
+* Unified **Correlation ID handling** across all pipelines.
+* Correlation IDs now flow automatically (reuse incoming or generate new).
+* Serilog pipeline enriched with `LogContext.PushProperty`.
+* Centralized correlation handling into `Franz.Common.Logging`.
 
-* Added NotificationValidationPipeline<TNotification> with matching Dev/Prod logging strategy.
-
-* Introduced NotificationValidationException carrying validation errors.
-
-* Audit Post Processor
-
-* Replaced Console.WriteLine with structured ILogger logging.
-
-* Added environment-aware verbosity:
-
-* Development → logs request + full response.
-
-* Production → logs only request completion.
-
-* Validation Pre Processor
-
-* Upgraded ValidationPreProcessor<TRequest> to log validation outcomes consistently.
-
-* Development → logs all validation errors or “passed” messages.
-
-* Production → logs only error counts.
-
-* Consistency
-
-* All validation and audit processors now align with the same Dev = verbose / Prod = lean logging pattern used across pipelines.
-
-### Version 1.3.14
-
-
-* Correlation IDs
-
-* Unified correlation ID handling across all mediator pipelines (PreProcessor, CorePipeline, PostProcessor, and NotificationPipeline).
-
-* Introduced consistent correlation propagation using Franz.Common.Logging.CorrelationId.
-
-* Correlation IDs now flow automatically through all logs (ILogger + Serilog).
-
-* Support for reusing an existing correlation ID (e.g. incoming X-Correlation-ID header) or generating a new one when missing.
-
-* Logging Enhancements
-
-* Added correlation ID output to pre-, post-, and pipeline logs, ensuring end-to-end traceability.
-
-* Improved SerilogLoggingPipeline with LogContext.PushProperty so correlation metadata enriches all log events in scope.
-
-* Development vs Production modes respected:
-
-* Dev → full request/response payloads logged.
-
-* Prod → minimal structured logs with correlation ID + request name.
-
-🛠️ Internal
-
-* Centralized CorrelationId into Franz.Common.Logging namespace for reuse across all processors and pipelines.
-
-* Removed duplicate/inline correlation ID generators from individual pipelines.
+---
 
 ### v1.4.1 – 2025-09-20
-Major Refinements to Resilience & Pipeline Architecture
 
-This release focuses on hardening the core mediator pipelines to be more predictable, thread-safe, and robust for production environments.
+* **Opt-in pipeline registration** (`AddFranzRetryPipeline`, etc.).
+* Removed `AddFranzResiliencePipelines` (forced explicit registration).
+* **RetryPipeline** → transient errors only, custom backoff, cancellation support.
+* **BulkheadPipeline** → correct queue limiting, prevents “thundering herd”.
+* **CircuitBreakerPipeline** → lock-free, proper Half-Open, thread-safe state.
+* **Observability** → pipelines integrated with `IMediatorObserver`.
 
-🛠️ Core Pipeline & Dependency Injection
+---
 
-Opt-In Pipeline Registration: All pipelines are now registered individually (AddFranzRetryPipeline, etc.). This gives the consuming application explicit control over the pipeline order, ensuring predictable behavior and avoiding the critical flaw of fixed, implicit ordering.
+### v1.4.5 – 2025-09-21
 
-Simplified DI: Removed the AddFranzResiliencePipelines method to enforce explicit registration.
+Patch release aligning **commands, queries, and events** with proper semantics:
 
-Resilience Pipelines
+* **Commands/Queries** → `SendAsync` (single handler, request/response).
+* **Events (Domain + Integration)** → `PublishAsync` (fan-out, fire-and-forget).
+* Fixed bug where integration events were incorrectly dispatched via `Send`.
+* Updated `Franz.Common.Business`, `EntityFramework`, `Messaging.Hosting.Mediator`, and `Messaging.Kafka` to enforce correct notification semantics.
+* Standardized on **publish/notify** for integration events across all layers.
 
-RetryPipeline
-
-Flexible Retry Logic: The catch (Exception) has been replaced with a configurable ShouldRetry predicate. This correctly handles only transient exceptions and prevents the anti-pattern of retrying on permanent failures (e.g., ArgumentException).
-
-Custom Delay Strategies: Added a ComputeDelay delegate to support custom backoff strategies (e.g., exponential backoff), making the pipeline highly adaptable.
-
-Cancellation Handling: Added an explicit check for OperationCanceledException to fail fast when a request is intentionally canceled by the caller.
-
-BulkheadPipeline
-
-Correct Queue Limiting: The logic for handling MaxQueueLength was corrected. The pipeline now uses a non-blocking SemaphoreSlim.WaitAsync(TimeSpan.Zero) to check for available slots, correctly implementing a queue limit and preventing the "thundering herd" problem.
-
-CircuitBreakerPipeline
-
-Thread-Safety & Deadlock Prevention: The long-held lock was removed. The pipeline now uses a lock-free design for the core execution block. This prevents performance bottlenecks under high concurrency and eliminates the risk of deadlocks.
-
-Half-Open State: Implemented the correct Half-Open state, where a single request is allowed to test the waters after the circuit has been open. This is a critical feature for a proper circuit breaker.
-
-State Management: Moved state management logic into a dedicated, thread-safe helper method to ensure consistent behavior.
-
-General Enhancements
-
-Improved Observability: All pipelines and processors are now more tightly integrated with IMediatorObserver to provide consistent, end-to-end traceability of requests, including their final outcomes (success or failure).
-
-This update transforms the mediator from a functional library into a highly reliable and architecturally sound framework.
+---

@@ -312,6 +312,67 @@ Licensed under the **MIT License**.
 
 ## **Changelog**
 
+Got it ✅ — let’s package those changes into a **README-style changelog log** so you can drop it straight into the repo alongside the code.
+
+Here’s a draft for `Franz.Common.Business v1.4.5`:
+
+---
+
+# **Franz.Common.Business — Release Notes**
+
+## **Version 1.4.5**
+
+*A maintenance release focusing on consistency and event publishability.*
+
+### 🔹 Changes
+
+#### **AggregateRoot\<TEvent>**
+
+* Enforced **publishable events** by constraining
+
+  ```csharp
+  where TEvent : BaseDomainEvent, INotification
+  ```
+
+  Ensures all domain events can be published via the Mediator pipeline.
+
+* Updated `GetUncommittedChanges()` signature:
+
+  ```csharp
+  public IReadOnlyCollection<BaseDomainEvent> GetUncommittedChanges()
+  ```
+
+  * Previously returned `IEnumerable<TEvent>`.
+  * Now returns an immutable, standardized collection of `BaseDomainEvent`.
+
+---
+
+#### **IAggregateRoot**
+
+* Updated contract for `GetUncommittedChanges()`:
+
+  ```csharp
+  IReadOnlyCollection<BaseDomainEvent> GetUncommittedChanges();
+  ```
+
+  Guarantees consistency with `AggregateRoot`.
+
+* Retains:
+
+  * `void MarkChangesAsCommitted();`
+  * `Guid Id { get; }`
+
+---
+
+### ✅ Benefits
+
+* **Consistency** across AggregateRoot and IAggregateRoot.
+* **Safety** via `IReadOnlyCollection` (prevents external mutation).
+* **Alignment** with MediatR’s `INotification` pattern, enforcing correct event semantics.
+
+---
+
+
 ### **1.4.2**
 
 * Removed `SaveEntitiesAsync` → replaced with `SaveChangesAsync` in `DbContextBase`.
@@ -325,14 +386,78 @@ Licensed under the **MIT License**.
 * Enriched domain events with metadata.
 * Scrutor-powered DI auto-discovery.
 
-### **1.3**
+Got it ✅ — let’s make **individual README entries** for each package you’ve patched in `v1.4.5`.
+You’ll be able to drop these into each project’s README (under a **Release Notes** or **Changelog** section).
 
-* Upgraded to .NET 9.
-* Compatible with both in-house mediator & MediatR.
+---
 
-### **1.2.65**
+## 📌 `Franz.Common.Business`
 
-* Aggregates redesigned to use event sourcing.
-* All aggregates now require `Guid` identifiers.
+### **v1.4.5**
+
+*Consistency and publishability improvements for AggregateRoots.*
+
+* Enforced **publishable events** by requiring `TEvent : BaseDomainEvent, INotification`.
+* Updated `GetUncommittedChanges()` to return `IReadOnlyCollection<BaseDomainEvent>` instead of `IEnumerable<TEvent>`.
+* Updated `IAggregateRoot` contract for consistency with `AggregateRoot`.
+* Improved safety (read-only collections) and **alignment with MediatR’s `INotification` pattern**.
+
+---
+
+## 📌 `Franz.Common.EntityFramework`
+
+### **v1.4.5**
+
+*Fixed event dispatch semantics for domain persistence.*
+
+* Replaced `dispatcher.Send(...)` with `dispatcher.PublishAsync(...)` when dispatching domain events.
+* Applied fix to both standard and cancellation-token aware variants.
+* Ensures domain events behave as **fan-out notifications** instead of commands.
+
+---
+
+## 📌 `Franz.Common.Mediator`
+
+### **v1.4.5**
+
+*Corrected mediator semantics for commands, queries, and events.*
+
+* Introduced clear split:
+
+  * **Commands/Queries** → `SendAsync` (single handler, request/response).
+  * **Events (Domain + Integration)** → `PublishAsync` (fan-out, fire-and-forget).
+* Fixed mis-implementation where integration events were incorrectly treated as commands.
+* Ensures **consistent message handling semantics** across the framework.
+
+---
+
+## 📌 `Franz.Common.Messaging.Hosting.Mediator`
+
+### **v1.4.5**
+
+*Fixed event dispatch handling in hosting layer.*
+
+* `IIntegrationEvent` now dispatched via `PublishAsync(...)` instead of `Send(...)`.
+* Commands and queries remain dispatched via `SendAsync(...)`.
+* Aligns hosting mediator with proper notification semantics.
+
+---
+
+## 📌 `Franz.Common.Messaging.Kafka`
+
+### **v1.4.5**
+
+*Corrected Kafka integration event pipeline.*
+
+* Changed mediator dispatch from `Send(message)` to `PublishAsync(message)`.
+* Ensures Kafka-published integration events follow **publish/notify semantics** instead of command semantics.
+* Provides consistent event behavior across transports.
+
+---
+
+⚡ That way, each project’s README stays self-contained and explains the **exact scope** of what changed in `1.4.5`.
+
+Do you also want me to generate a **root-level consolidated `CHANGELOG.md`** that includes all of these in one place (for repo-wide documentation)?
+
 
 ---

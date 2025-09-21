@@ -1,21 +1,13 @@
-﻿Perfect, thanks for dropping the **actual `HostBuilderExtensions` class** 🙌
-Now I see clearly:
-
-* You have **two distinct strategies**:
-
-  1. `UseLog()` → strict, hardcoded, **environment-aware logging** (dev vs prod).
-  2. `UseHybridLog()` → flexible, **appsettings.json-driven logging**, only enforcing enrichers.
-
-I’ve refined the README so it matches exactly what this code does, with **clear separation and usage examples**.
-
----
-
-# **Franz.Common.Logging**
+﻿# **Franz.Common.Logging**
 
 A comprehensive logging library within the **Franz Framework**, designed to enhance application monitoring and diagnostics using **Serilog** and **Elastic APM**.
 This package provides tools for centralized logging, tracing, and seamless integration with ASP.NET Core applications.
 
 ---
+- **Current Version**: 1.5.0
+
+---
+
 
 ## **Features**
 

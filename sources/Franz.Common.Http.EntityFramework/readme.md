@@ -1,7 +1,4 @@
-﻿🔥 Nice — you’ve got a clean README already, but now that **1.3.4** introduces **multi-provider support**, the changelog and features need a little update.
-
-Here’s how I’d rewrite it for **v1.3.4**:
-
+﻿
 ---
 
 # **Franz.Common.Http.EntityFramework**
@@ -32,7 +29,8 @@ A specialized library within the **Franz Framework** that integrates **Entity Fr
 
 ## **Version Information**
 
-* **Current Version**: 1.3.13
+- **Current Version**: 1.5.0
+
 * Part of the private **Franz Framework** ecosystem.
 
 ---

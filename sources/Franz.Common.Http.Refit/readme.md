@@ -1,10 +1,13 @@
 ﻿# Franz.Common.Http.Refit
 
 **Package**: `Franz.Common.Http.Refit`
-**Version**: 1.4.1
+
 
 Refit integration for the Franz Framework — production-oriented, small-surface, high-value.
 Provides typed Refit clients pre-wired with: correlation & tenant header propagation, optional token injection, Polly policy integration, Serilog-friendly logging, and OpenTelemetry-friendly annotations & lightweight metrics.
+
+---
+- **Current Version**: 1.5.0
 
 ---
 

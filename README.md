@@ -1,11 +1,11 @@
-Here’s the **polished README.md for Franz.Common v1.4.2**:
+Here’s the **full updated README**:
 
 ---
 
 # **Franz.Common**
 
 **Franz.Common** is the heart of the **Franz Framework** — a lightweight, modular framework that streamlines the development of **event-driven microservices**.
-It was born to reduce boilerplate and architectural complexity in modern .NET systems, with **Kafka-first** design, but extensible to **RabbitMQ, Azure Service Bus, Redis, and HTTP APIs**.
+It was born to reduce boilerplate and architectural complexity in modern .NET systems, with a **Kafka-first** design, but extensible to **RabbitMQ, Azure Service Bus, Redis, and HTTP APIs**.
 
 Franz provides **DDD + CQRS building blocks**, **resilience pipelines**, **auditing**, and **multi-tenancy** support across HTTP and messaging layers — batteries included, but modular.
 
@@ -47,14 +47,14 @@ Think of Franz as **Spring Boot for .NET microservices** — a batteries-include
 Add the core library:
 
 ```bash
-dotnet add package Franz.Common --version 1.4.2
+dotnet add package Franz.Common --version 1.5.0
 ```
 
 Or install subpackages (e.g., `Business` + `EntityFramework`):
 
 ```bash
-dotnet add package Franz.Common.Business --version 1.4.2
-dotnet add package Franz.Common.EntityFramework --version 1.4.2
+dotnet add package Franz.Common.Business --version 1.5.0
+dotnet add package Franz.Common.EntityFramework --version 1.5.0
 ```
 
 ### Software Dependencies
@@ -215,46 +215,47 @@ Licensed under the **MIT License**.
 
 ---
 
-# 🆕 Franz Framework 1.4.x – The Observability & Resilience Era
+# 🆕 Franz Framework 1.4.x → 1.5.0
 
-### 🌟 Highlights
-
-* Polly-based pipelines: Retry, CircuitBreaker, Timeout, Bulkhead.
-* Unified caching layer (Memory, Distributed, Redis).
-* OpenTelemetry tracing with Franz tags.
-* Correlation ID propagation (Franz.Common.Logging).
-* ASP.NET Core bootstrappers for HTTP + Refit clients.
-* `DbContextBase`: auditing + soft deletes + event dispatch.
+### **The Observability & Simplicity Era**
 
 ---
 
 ## 📌 Changelog
-### **1.4.4** — Stability Meets Firepower
 
-* Massive improvements in logging & hybrid config
-* Cleaner DI registration across the board
-* Elastic APM opt-in for production scenarios
-* Performance boosts in mediator pipelines
+### **1.5.0** — *“When Aras Becomes Simple”*
 
-### **1.4.2**
+* Completed Aras integration with simplified abstractions.
+* Clear separation of **Commands, Queries, Domain Events, Integration Events**.
+* Full stack alignment: Business, EF, Mediator, Messaging all enforce proper semantics.
+* Integration events are now **pure notifications** (fan-out) instead of commands.
+* Kafka + Hosting layers use `PublishAsync` for events consistently.
+* Foundation for polyglot messaging in future 1.5.x releases.
 
-* Removed `SaveEntitiesAsync` → everything flows through `SaveChangesAsync`.
-* Removed obsolete `DbContextMultiDatabase`.
-* Alignment with EntityFramework & Business packages.
+---
 
-### **1.4.1**
+### **1.4.5** — *Patch Release: Event Semantics*
 
-* Patch bump, doc updates.
+* **Franz.Common.Business** → AggregateRoot enforces `INotification` on events, `GetUncommittedChanges()` returns `IReadOnlyCollection<BaseDomainEvent>`.
+* **Franz.Common.EntityFramework** → Fixed bug where domain events were dispatched with `Send` instead of `PublishAsync`.
+* **Franz.Common.Mediator** → Clear split between `SendAsync` (commands/queries) and `PublishAsync` (events).
+* **Franz.Common.Messaging.Hosting.Mediator** → Integration events published via `PublishAsync`.
+* **Franz.Common.Messaging.Kafka** → Kafka events dispatched with `PublishAsync` (notification semantics).
 
-### **1.4.0**
+---
 
-* Migrated to **C# 12 typing conventions**.
-* Resilience pipelines integrated.
-* Observability (Serilog + OTEL) baked in.
+### **Older Versions** (summary)
 
-➡️ See [CHANGELOG.md](CHANGELOG.md) for full history (1.2.65+).
+* **1.4.4** — Logging improvements, hybrid config, Elastic APM opt-in, perf boosts.
+* **1.4.2** — Removed `SaveEntitiesAsync`; removed obsolete multi-database DbContext; alignment with EF & Business.
+* **1.4.1** — Patch bump & docs.
+* **1.4.0** — Migrated to C# 12 conventions; resilience pipelines; observability with Serilog + OTEL.
+
+➡️ Full history available in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
 🔥 With `Franz.Common`, you can bootstrap a Kafka-ready, resilient, multi-tenant .NET microservice with **one line of code**.
+
+---
 
