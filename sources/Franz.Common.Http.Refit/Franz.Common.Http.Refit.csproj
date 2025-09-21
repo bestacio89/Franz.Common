@@ -21,8 +21,7 @@
      <!-- OpenTelemetry API (your module annotates Activity.Current; host configures exporters) -->
      <PackageReference Include="OpenTelemetry.Api" Version="1.12.0" />
      <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.9" />
-     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.9" />     <!-- or, if your repo policy prefers the single Refit package, include Refit as well -->
-  </ItemGroup>
+    </ItemGroup>
   <Import Project="..\..\common.targets" />  
 
   <ItemGroup>
