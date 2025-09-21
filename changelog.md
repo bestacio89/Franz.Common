@@ -250,3 +250,12 @@ Tested and validated in the Book API integration project to ensure real-world re
 Ecosystem consistency — Franz now provides mapping without external dependencies.
 
 Framework is closer to being a self-contained, end-to-end enterprise stack.
+## Version 1.5.2 – Reverse Mapping Unlocked 🔄
+
+### 🔧 Fixed
+- Corrected `ReverseMap()` to properly generate reverse mappings.  
+- Switched mapping storage to string-based property resolution for simplicity.  
+- Updated ApplyMapping to use reflection for property assignment.  
+- Ensured fallback to convention-based mapping when no explicit rule is defined.  
+
+---
