@@ -1,5 +1,6 @@
-using Franz.Common.Business.Domain;
+﻿using Franz.Common.Business.Domain;
 using Franz.Common.Business.Events;
+using Franz.Common.Mediator.Messages; // 🔹 For INotification
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
@@ -11,7 +12,7 @@ namespace Franz.Common.Business
   /// applying events through registered handlers, and replaying history.
   /// </summary>
   public abstract class AggregateRoot<TEvent> : Entity<Guid>, IAggregateRoot
-      where TEvent : BaseDomainEvent
+      where TEvent : BaseDomainEvent, INotification // 🔹 enforce publishable events
   {
     private readonly List<TEvent> _changes = new();
     private readonly Dictionary<Type, Action<TEvent>> _handlers = new();
@@ -31,7 +32,7 @@ namespace Franz.Common.Business
     /// <summary>
     /// Get uncommitted changes (events raised since last commit).
     /// </summary>
-    public IEnumerable<TEvent> GetUncommittedChanges() => _changes.AsReadOnly();
+    public IReadOnlyCollection<BaseDomainEvent> GetUncommittedChanges() => _changes.AsReadOnly();
 
     /// <summary>
     /// Clear tracked changes after persistence.
