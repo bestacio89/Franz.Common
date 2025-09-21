@@ -114,6 +114,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Http.Refit", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Aras", "sources\Franz.Common.Aras\Franz.Common.Aras.csproj", "{CB1C9482-BDF3-47F8-8FAE-06B6952F166E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Mapping", "sources\Franz.Common.Mapping\Franz.Common.Mapping.csproj", "{53E235D2-EC16-4070-80D2-018982A2A97E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -316,6 +318,10 @@ Global
 		{CB1C9482-BDF3-47F8-8FAE-06B6952F166E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CB1C9482-BDF3-47F8-8FAE-06B6952F166E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CB1C9482-BDF3-47F8-8FAE-06B6952F166E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{53E235D2-EC16-4070-80D2-018982A2A97E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{53E235D2-EC16-4070-80D2-018982A2A97E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{53E235D2-EC16-4070-80D2-018982A2A97E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{53E235D2-EC16-4070-80D2-018982A2A97E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -371,6 +377,7 @@ Global
 		{F939E965-8CCF-43A3-93A2-0F41E5048E9E} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 		{6D2340D8-D6D6-4B8E-9601-D09ED57CFFF3} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 		{CB1C9482-BDF3-47F8-8FAE-06B6952F166E} = {2A34967E-2D10-4703-BFB0-D4883859D440}
+		{53E235D2-EC16-4070-80D2-018982A2A97E} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {069A32C7-587A-42C8-B9D2-9CF7EE93E2BD}

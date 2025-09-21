@@ -13,7 +13,7 @@ No extra wiring. No extra boilerplate. Just plug and go.
 
 ---
 
-* **Current Version**: 1.5.0
+* **Current Version**: 1.5.1
 
 ---
 

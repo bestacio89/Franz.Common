@@ -232,3 +232,21 @@ Here’s the cleaned-up **full changelog including 1.4.5 and 1.5.0**:
 
 * Prepared for **polyglot messaging** in upcoming 1.5.x releases.
 
+Version 1.5.1 – AutoMapper++ Arrives 🚀
+✨ Added
+
+Introduced Franz.Common.Mapping as a lightweight, Franz-native alternative to AutoMapper.
+
+Support for profiles (FranzMapProfile) with CreateMap, ForMember, and Ignore.
+
+Default by-name mapping when no explicit profile exists.
+
+Dependency injection support with services.AddFranzMapping(...).
+
+Tested and validated in the Book API integration project to ensure real-world readiness.
+
+🔧 Improved
+
+Ecosystem consistency — Franz now provides mapping without external dependencies.
+
+Framework is closer to being a self-contained, end-to-end enterprise stack.

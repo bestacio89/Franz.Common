@@ -215,7 +215,11 @@ Licensed under the **MIT License**.
 
 ---
 
-# 🆕 Franz Framework 1.4.x → 1.5.0
+Perfect — here’s the **main README updated with v1.5.1** so it flows right after 1.5.0:
+
+---
+
+# 🆕 Franz Framework 1.4.x → 1.5.x
 
 ### **The Observability & Simplicity Era**
 
@@ -223,7 +227,18 @@ Licensed under the **MIT License**.
 
 ## 📌 Changelog
 
-### **1.5.0** — *“When Aras Becomes Simple”*
+### **1.5.1** — *“AutoMapper++ Arrives 🚀”*
+
+* Introduced **Franz.Common.Mapping** — a Franz-native alternative to AutoMapper.
+* Support for **profiles** (`FranzMapProfile`) with `CreateMap`, `ForMember`, and `Ignore`.
+* Provides **by-name mapping** fallback when no profile is registered.
+* Integrated with **dependency injection** via `AddFranzMapping(...)`.
+* Tested and validated in the **Book API** to ensure production readiness.
+* Framework now offers **end-to-end enterprise building blocks** without external orchestration/mapping libs.
+
+---
+
+### **1.5.0** — *“When Aras Becomes Simple ✨”*
 
 * Completed Aras integration with simplified abstractions.
 * Clear separation of **Commands, Queries, Domain Events, Integration Events**.
@@ -256,6 +271,4 @@ Licensed under the **MIT License**.
 ---
 
 🔥 With `Franz.Common`, you can bootstrap a Kafka-ready, resilient, multi-tenant .NET microservice with **one line of code**.
-
----
 
