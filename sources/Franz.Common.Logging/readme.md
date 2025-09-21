@@ -4,7 +4,7 @@ A comprehensive logging library within the **Franz Framework**, designed to enha
 This package provides tools for centralized logging, tracing, and seamless integration with ASP.NET Core applications.
 
 ---
-- **Current Version**: 1.5.1
+- **Current Version**: 1.5.2
 
 ---
 
@@ -29,7 +29,7 @@ This package provides tools for centralized logging, tracing, and seamless integ
 
 ## **Version Information**
 
-* **Current Version**: 1.4.4
+
 * Part of the private **Franz Framework** ecosystem.
 
 ---
