@@ -87,7 +87,7 @@ namespace Franz.Common.Mediator.Testing
 
     // -------------------- COMMANDS --------------------
 
-    public async Task<TResponse> Send<TResponse>(ICommand<TResponse> command, CancellationToken cancellationToken = default)
+    public async Task<TResponse> SendAsync<TResponse>(ICommand<TResponse> command, CancellationToken cancellationToken = default)
     {
       if (!_handlers.TryGetValue(command.GetType(), out var handler))
         throw new InvalidOperationException($"No handler registered for {command.GetType().Name}");
@@ -114,14 +114,14 @@ namespace Franz.Common.Mediator.Testing
       return result;
     }
 
-    public Task Send(ICommand command, CancellationToken cancellationToken = default)
-        => Send<Unit>(new WrapperCommand(command), cancellationToken);
+    public Task SendAsync(ICommand command, CancellationToken cancellationToken = default)
+        => SendAsync<Unit>(new WrapperCommand(command), cancellationToken);
 
     private record WrapperCommand(ICommand Inner) : ICommand<Unit>;
 
     // -------------------- QUERIES --------------------
 
-    public async Task<TResponse> Send<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken = default)
+    public async Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken = default)
     {
       if (!_handlers.TryGetValue(query.GetType(), out var handler))
         throw new InvalidOperationException($"No handler registered for {query.GetType().Name}");

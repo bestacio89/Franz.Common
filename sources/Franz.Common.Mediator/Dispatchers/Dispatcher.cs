@@ -27,7 +27,7 @@ namespace Franz.Common.Mediator.Dispatchers
 
     // -------------------- COMMANDS --------------------
 
-    public Task<TResponse> Send<TResponse>(ICommand<TResponse> command, CancellationToken cancellationToken = default)
+    public Task<TResponse> SendAsync<TResponse>(ICommand<TResponse> command, CancellationToken cancellationToken = default)
     {
       return ExecuteWithObservability(command, async () =>
       {
@@ -47,7 +47,7 @@ namespace Franz.Common.Mediator.Dispatchers
       }, cancellationToken);
     }
 
-    public Task Send(ICommand command, CancellationToken cancellationToken = default)
+    public Task SendAsync(ICommand command, CancellationToken cancellationToken = default)
     {
       return ExecuteWithObservability(command, async () =>
       {
@@ -69,7 +69,7 @@ namespace Franz.Common.Mediator.Dispatchers
 
     // -------------------- QUERIES --------------------
 
-    public Task<TResponse> Send<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken = default)
+    public Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken = default)
     {
       return ExecuteWithObservability(query, async () =>
       {
@@ -355,22 +355,7 @@ namespace Franz.Common.Mediator.Dispatchers
       }
     }
 
-    public Task Send(INotification notification, CancellationToken cancellationToken = default)
-    {
-      // Delegate directly to PublishAsync<TNotification> 
-      // Default: sequential execution, stop on first failure
-      var method = typeof(FranzDispatcher)
-          .GetMethod(nameof(PublishAsync))
-          !.MakeGenericMethod(notification.GetType());
-
-      return (Task)method.Invoke(this, new object[]
-      {
-        notification,
-        cancellationToken,
-        PublishStrategy.Sequential,
-        NotificationErrorHandling.StopOnFirstFailure
-      })!;
-    }
+   
 
     // -------------------- EXECUTION WRAPPER --------------------
 
