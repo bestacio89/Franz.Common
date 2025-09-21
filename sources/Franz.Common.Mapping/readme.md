@@ -8,7 +8,7 @@ Here’s the **finalized README** for `Franz.Common.Mapping`:
 
 *A lightweight, fast, and extensible object mapping library for the Franz ecosystem.*
 
-**Current Version**: `1.5.1`
+**Current Version**: `1.5.2`
 
 ---
 
