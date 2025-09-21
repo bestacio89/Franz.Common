@@ -1,10 +1,4 @@
-﻿Got it 👍 — let’s align the README with the correct versioning. Since this is **v1.5.1**, it slots right after your **v1.5.0 milestone** (Aras + event semantics).
-
-Here’s the **finalized README** for `Franz.Common.Mapping`:
-
----
-
-# **Franz.Common.Mapping**
+﻿# **Franz.Common.Mapping**
 
 *A lightweight, fast, and extensible object mapping library for the Franz ecosystem.*
 
@@ -41,18 +35,36 @@ dotnet add package Franz.Common.Mapping --version 1.5.1
 using Franz.Common.Mapping.Core;
 using Franz.Common.Mapping.Profiles;
 
-public class BookProfile : FranzMapProfile
-{
-    public override void Configure(MappingConfiguration config)
-    {
-        var expr = CreateMap<Book, BookDto>()
-            .ForMember(nameof(BookDto.Title), nameof(Book.Name))
-            .ForMember(nameof(BookDto.ISBN), nameof(Book.Isbn))
-            .Ignore(nameof(BookDto.SecretNotes));
+public ApplicationProfile()
+        {
+            // Book <-> BookDto
+            CreateMap<Book, BookDto>()
+                .ForMember(dest => dest.Isbn, opt => opt.MapFrom(src => src.Isbn.Value))
+                .ForMember(dest => dest.Title, opt => opt.MapFrom(src => src.Title.Value))
+                .ForMember(dest => dest.Author, opt => opt.MapFrom(src => src.Author.Value))
+                .ForMember(dest => dest.PublishedOn, opt => opt.MapFrom(src => src.PublishedOn))
+                .ForMember(dest => dest.CopiesAvailable, opt => opt.MapFrom(src => src.CopiesAvailable))
+                .ReverseMap()
+                .ConstructUsing(dto => new Book(
+                    new ISBN(dto.Isbn),
+                    new Title(dto.Title),
+                    new Author(dto.Author),
+                    dto.PublishedOn,
+                    dto.CopiesAvailable
+                ));
 
-        config.Register(expr);
+            // Member <-> MemberDto
+            CreateMap<Member, MemberDto>()
+                .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.Name.Value))
+                .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email.Value))
+                .ForMember(dest => dest.BorrowedBooksCount, opt => opt.MapFrom(src => src.BorrowedBooks.Count))
+                .ReverseMap()
+                .ConstructUsing(dto => new Member(
+                    new FullName(dto.FullName),
+                    new Email(dto.Email)
+                ));
+        }
     }
-}
 
 public class Book 
 { 
@@ -73,11 +85,11 @@ public class BookDto
 ### 2. Register in DI
 
 ```csharp
-services.AddFranzMapping(cfg =>
-{
-    var profile = new BookProfile();
-    profile.Configure(cfg);
-});
+services.AddAutoMapper(
+            config => { }, // no extra config needed
+            Assembly.GetExecutingAssembly()
+        );
+
 ```
 
 ---
