@@ -76,16 +76,15 @@ public class MessagingStrategyExecuter : IMessagingStrategyExecuter
     switch (classMessage)
     {
       case IIntegrationEvent integrationEvent:
-        // Events go through dispatcher.Send
-        await dispatcher.Send(integrationEvent);
+        await dispatcher.PublishAsync(integrationEvent);
         break;
 
       case ICommand command:
-        await dispatcher.Send(command);
+        await dispatcher.SendAsync(command);
         break;
 
       case IQuery<object> query:
-        await dispatcher.Send(query);
+        await dispatcher.SendAsync(query);
         break;
 
       default:

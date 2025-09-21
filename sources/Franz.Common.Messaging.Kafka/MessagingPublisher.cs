@@ -39,7 +39,7 @@ public class MessagingPublisher : IMessagingPublisher
     var message = _messageFactory.Build(integrationEvent);
 
     // Run through Franz mediator pipeline (instead of IMessageHandler / MediatR)
-    await _dispatcher.Send(message);
+    await _dispatcher.PublishAsync(message);
 
     // Resolve Kafka topic
     var integrationEventAssembly = integrationEvent.GetType().Assembly;
