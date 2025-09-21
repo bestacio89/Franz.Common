@@ -2,7 +2,7 @@
 
 *A lightweight, fast, and extensible object mapping library for the Franz ecosystem.*
 
-**Current Version**: `1.5.2`
+**Current Version**: `1.5.4`
 
 ---
 
