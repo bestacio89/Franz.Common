@@ -258,7 +258,15 @@ Framework is closer to being a self-contained, end-to-end enterprise stack.
 - Updated ApplyMapping to use reflection for property assignment.  
 - Ensured fallback to convention-based mapping when no explicit rule is defined.  
 
----## Version 1.5.4 - Maintenance
-* Dependencies updated
-
----
+## Version 1.5.4 - Maintenance Nullability Cleanup
+- Dependencies updated
+- Documentation Upgrade
+- Documentation Cleanup
+- Upgraded core package dependencies
+- Removed redundant Business.HandlerCollector
+- Normalized nullability across bootstrap, messaging, Kafka layers
+- Refactored MessagingSender to async-safe implementation
+- Structured logging via ILogger (Serilog ready)
+- Cleaned ServiceCollectionExtensions with fail-fast guards
+- Kafka consumer: fail-fast on invalid payloads, structured exception logging
+- Consistent DDD exception usage (NotFoundException, TechnicalException)
