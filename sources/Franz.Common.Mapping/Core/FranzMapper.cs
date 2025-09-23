@@ -1,4 +1,5 @@
-﻿using Franz.Common.Mapping.Abstractions;
+﻿using System.Collections;
+using Franz.Common.Mapping.Abstractions;
 
 namespace Franz.Common.Mapping.Core;
 
@@ -12,9 +13,17 @@ public class FranzMapper : IFranzMapper
   {
     if (source == null) throw new ArgumentNullException(nameof(source));
 
+    // Handle collection interface mappings dynamically
+    if (IsCollectionInterface(typeof(TDestination)))
+    {
+      return (TDestination)MapCollection(typeof(TSource), typeof(TDestination), source!);
+    }
+
+    // Handle explicitly configured mappings
     if (_config.TryGetMapping<TSource, TDestination>(out var expression))
       return ApplyMapping(source, expression!);
 
+    // Fallback default mapping
     return DefaultMap<TSource, TDestination>(source);
   }
 
@@ -54,7 +63,6 @@ public class FranzMapper : IFranzMapper
       }
     }
 
-
     return dest!;
   }
 
@@ -70,5 +78,45 @@ public class FranzMapper : IFranzMapper
     }
 
     return dest!;
+  }
+
+  private static bool IsCollectionInterface(Type type)
+  {
+    if (!type.IsGenericType) return false;
+
+    var def = type.GetGenericTypeDefinition();
+    return def == typeof(IEnumerable<>) ||
+           def == typeof(ICollection<>) ||
+           def == typeof(IReadOnlyCollection<>) ||
+           def == typeof(IList<>);
+  }
+
+  private object MapCollection(Type sourceType, Type destType, object source)
+  {
+    var sourceEnumerable = source as IEnumerable;
+    if (sourceEnumerable == null)
+      throw new InvalidOperationException($"Source {sourceType} is not enumerable");
+
+    var elementType = destType.GetGenericArguments()[0];
+    var listType = typeof(List<>).MakeGenericType(elementType);
+    var list = (IList)Activator.CreateInstance(listType)!;
+
+    foreach (var item in sourceEnumerable)
+    {
+      // Call Map<TSourceElement, TDestElement>
+      var mappedItem = typeof(FranzMapper)
+          .GetMethod(nameof(Map), new[] { item.GetType() })!
+          .MakeGenericMethod(item.GetType(), elementType)
+          .Invoke(this, new[] { item });
+
+      list.Add(mappedItem!);
+    }
+
+    // If target type is interface, return as is
+    if (IsCollectionInterface(destType))
+      return list;
+
+    // Otherwise cast to requested concrete type
+    return Convert.ChangeType(list, destType);
   }
 }

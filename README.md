@@ -226,8 +226,17 @@ Perfect — here’s the **main README updated with v1.5.1** so it flows right a
 ---
 
 ## 📌 Changelog
+**Latest Version:** `1.5.6`
 
-## Version 1.5.4 - Maintenance Nullability Cleanup
+### ✨ Highlights
+- ⚡ By-name fallback mapping (zero config).
+- 📑 Profiles with `CreateMap`, `ForMember`, `Ignore`, `ReverseMap`, and `ConstructUsing`.
+- 🧩 Expression-based mapping (cached, reflection-minimal).
+- 🔧 DI integration with `AddFranzMapping`.
+- 🛠 **NEW in 1.5.6** → Assembly scanning for auto-registration of profiles.
+
+
+## Version 1.5.4 and 1.5.5 - Maintenance Nullability Cleanup
 - Dependencies updated
 - Documentation Upgrade
 - Documentation Cleanup

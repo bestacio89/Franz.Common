@@ -26,7 +26,7 @@ A specialized library within the **Franz Framework** that integrates **Entity Fr
 
 ## **Version Information**
 
-- **Current Version**: 1.5.4
+- **Current Version**: 1.5.6
 
 * Part of the private **Franz Framework** ecosystem.
 

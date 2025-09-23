@@ -21,7 +21,7 @@ A private utility library for seamless integration of **Entity Framework Core** 
 
 ## **Version Information**
 
-- **Current Version**: 1.5.4
+- **Current Version**: 1.5.6
 - This package and all related `Franz` packages are under active development and maintained privately.
 
 ---
