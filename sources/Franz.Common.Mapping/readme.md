@@ -133,5 +133,3 @@ Console.WriteLine(dto.ISBN);  // "978-0261103344"
 MIT — free to use, modify, and distribute.
 
 ---
-
-👉 Want me to also add a **CHANGELOG entry** for `v1.5.1` that matches the style of your previous Franz releases (so it drops in clean with 1.4.5 and 1.5.0)?

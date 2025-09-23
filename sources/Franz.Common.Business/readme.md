@@ -453,11 +453,3 @@ You’ll be able to drop these into each project’s README (under a **Release N
 * Ensures Kafka-published integration events follow **publish/notify semantics** instead of command semantics.
 * Provides consistent event behavior across transports.
 
----
-
-⚡ That way, each project’s README stays self-contained and explains the **exact scope** of what changed in `1.4.5`.
-
-Do you also want me to generate a **root-level consolidated `CHANGELOG.md`** that includes all of these in one place (for repo-wide documentation)?
-
-
----

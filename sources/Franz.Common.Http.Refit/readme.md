@@ -211,9 +211,4 @@ public async Task SendAsync_AddsCorrelationAndTenantHeaders()
 Part of the private Franz Framework. Follow internal contribution guidelines.
 Licensed under the MIT License.
 
----
 
-If you want, I can also:
-
-* Create the ready-to-commit file contents for `Franz.Common.Http.Refit/README.md` (one-shot), or
-* Generate the `Franz.Common.Http.Refit` project scaffold (files from our earlier spec) so you can drop it into the repo. Which next?

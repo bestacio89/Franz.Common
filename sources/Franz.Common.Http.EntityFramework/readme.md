@@ -1,7 +1,4 @@
-﻿
----
-
-# **Franz.Common.Http.EntityFramework**
+﻿# **Franz.Common.Http.EntityFramework**
 
 A specialized library within the **Franz Framework** that integrates **Entity Framework Core** with **ASP.NET Core** applications. This package simplifies transactional handling, dependency injection, and middleware configurations, enhancing database operations in HTTP-based services.
 
@@ -140,12 +137,5 @@ The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
 ### Version 1.2.65
 - Upgrade version to .net 9
 ---
-
-⚡ This way your README reflects the new **multi-db capability** front and center.
-
-Do you want me to also draft a **configuration schema section** (like a JSON schema snippet or table) that documents all possible keys for `Database` (Provider, ConnectionString, maybe future options like Schema, PoolSize, MigrationsAssembly)?
-
-
-
 
 
