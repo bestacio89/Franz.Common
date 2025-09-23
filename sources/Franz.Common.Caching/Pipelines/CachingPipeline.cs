@@ -11,6 +11,8 @@ using System.Diagnostics;
 namespace Franz.Common.Caching.Pipelines
 {
   public class CachingPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
+  where  TRequest : notnull
+  where TResponse : class
   {
     private readonly ICacheProvider _cache;
     private readonly ILogger<CachingPipeline<TRequest, TResponse>> _logger;

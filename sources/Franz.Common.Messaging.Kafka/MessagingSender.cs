@@ -3,7 +3,11 @@ using Confluent.Kafka;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Factories;
+using Franz.Common.Errors;
+using Microsoft.Extensions.Logging;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.Kafka
 {
@@ -13,63 +17,94 @@ namespace Franz.Common.Messaging.Kafka
     private readonly IMessageHandler _messageHandler;
     private readonly IMessagingTransaction _messagingTransaction;
     private readonly IMessageFactory _messageFactory;
+    private readonly ILogger<MessagingSender> _logger;
 
-    
-      public MessagingSender(
+    public MessagingSender(
         IProducer<string, byte[]> producer,
         IMessageHandler messageHandler,
         IMessagingTransaction messagingTransaction,
-        IMessageFactory messageFactory)
+        IMessageFactory messageFactory,
+        ILogger<MessagingSender> logger)
     {
-      _producer = producer;
-      _messageHandler = messageHandler;
-      _messagingTransaction = messagingTransaction;
-      _messageFactory = messageFactory;
+      _producer = producer ?? throw new ArgumentNullException(nameof(producer));
+      _messageHandler = messageHandler ?? throw new ArgumentNullException(nameof(messageHandler));
+      _messagingTransaction = messagingTransaction ?? throw new ArgumentNullException(nameof(messagingTransaction));
+      _messageFactory = messageFactory ?? throw new ArgumentNullException(nameof(messageFactory));
+      _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public void Send<TCommandBaseRequest>(TCommandBaseRequest command) where TCommandBaseRequest : ICommand
+    public async Task SendAsync<TCommandBaseRequest>(TCommandBaseRequest command, CancellationToken cancellationToken = default)
+        where TCommandBaseRequest : ICommand
     {
+      if (command is null)
+        throw new TechnicalException("Cannot send a null command.");
+
       var message = _messageFactory.Build(command);
 
       _messageHandler.Process(message);
 
-      Send(command, message);
+      await SendInternalAsync(command, message, cancellationToken);
     }
 
-    private void Send(ICommand command, Message message)
+    private async Task SendInternalAsync(ICommand command, Message message, CancellationToken cancellationToken)
     {
-      if (_producer is null)
-        throw new InvalidOperationException("Kafka producer is not initialized.");
-
       var topicName = TopicNamer.GetTopicName(command.GetType().Assembly);
-      var headers = BuildHeaders(message) ?? new Confluent.Kafka.Headers(); // fallback to empty headers
-      var body = BuildBody(message) ?? Array.Empty<byte>();                 // fallback to empty body
+      var headers = BuildHeaders(message);
+      var body = BuildBody(message);
 
-      _messagingTransaction?.Begin();
+      if (body is null || body.Length == 0)
+        throw new TechnicalException($"Message body for {command.GetType().Name} is empty.");
 
-      // ProduceAsync returns a Task, we should await it if this method becomes async
-      _producer.ProduceAsync(topicName, new Confluent.Kafka.Message<string, byte[]>
+      _messagingTransaction.Begin();
+
+      try
       {
-        Headers = headers,
-        Value = body
-      });
+        var kafkaMessage = new Confluent.Kafka.Message<string, byte[]>
+        {
+          Headers = headers,
+          Value = body
+        };
 
-      _producer.Flush();
+        var result = await _producer.ProduceAsync(topicName, kafkaMessage, cancellationToken);
+
+        _logger.LogInformation(
+            "Message published to {Topic} [{Partition}] @ {Offset}",
+            result.Topic,
+            result.Partition.Value,
+            result.Offset.Value);
+      }
+      catch (ProduceException<string, byte[]> ex)
+      {
+        _logger.LogError(ex, "Kafka publish failed for {Command}", command.GetType().Name);
+        throw new TechnicalException($"Failed to publish {command.GetType().Name}", ex);
+      }
     }
 
     private Confluent.Kafka.Headers BuildHeaders(Message message)
     {
       var headers = new Confluent.Kafka.Headers();
+
       foreach (var header in message.Headers)
       {
-        headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value.ToString()));
+        // Convert StringValues to string
+        var strValue = header.Value.ToString();
+
+        if (!string.IsNullOrEmpty(strValue))
+        {
+          headers.Add(header.Key, Encoding.UTF8.GetBytes(strValue));
+        }
       }
+
       return headers;
     }
 
-    private byte[]? BuildBody(Message message)
+
+    private byte[] BuildBody(Message message)
     {
-      return message.Body != null ? Encoding.UTF8.GetBytes(message.Body) : null;
+      if (string.IsNullOrEmpty(message.Body))
+        throw new TechnicalException("Message body cannot be null or empty.");
+
+      return Encoding.UTF8.GetBytes(message.Body);
     }
   }
 }

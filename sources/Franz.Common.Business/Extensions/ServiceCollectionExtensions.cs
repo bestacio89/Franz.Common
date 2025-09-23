@@ -91,7 +91,11 @@ public static class ServiceCollectionExtensions
     return AppDomain.CurrentDomain
         .GetAssemblies()
         .FirstOrDefault(assembly =>
-            assembly.GetName().Name is not null &&
-            assembly.GetName().Name.Equals(applicationAssemblyName, StringComparison.InvariantCultureIgnoreCase));
+        {
+          var name = assembly.GetName().Name
+                     ?? throw new TechnicalException("Assembly without a name encountered.");
+          return name.Equals(applicationAssemblyName, StringComparison.InvariantCultureIgnoreCase);
+        });
   }
+
 }
