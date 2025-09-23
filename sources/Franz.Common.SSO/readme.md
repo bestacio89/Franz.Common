@@ -1,4 +1,4 @@
-﻿# **Franz.Common.SSO**
+# **Franz.Common.SSO**
 
 A library within the **Franz Framework** designed to provide streamlined support for Single Sign-On (SSO) using ASP.NET Core Identity and Entity Framework Core. This package includes interfaces and implementations for managing SSO providers and configuring SSO services.
 
@@ -18,7 +18,7 @@ A library within the **Franz Framework** designed to provide streamlined support
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

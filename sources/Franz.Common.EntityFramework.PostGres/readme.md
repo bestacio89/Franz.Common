@@ -1,4 +1,4 @@
-﻿# **Franz.Common.EntityFramework.Postgres**
+# **Franz.Common.EntityFramework.Postgres**
 
 A dedicated library within the **Franz Framework** that extends **Entity Framework Core** support for **PostgreSQL** using the **Npgsql.EntityFrameworkCore.PostgreSQL** provider. This package simplifies PostgreSQL configuration and integration for .NET applications, supporting both single-tenant and multi-tenant environments.
 
@@ -19,7 +19,7 @@ A dedicated library within the **Franz Framework** that extends **Entity Framewo
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -148,4 +148,5 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
 

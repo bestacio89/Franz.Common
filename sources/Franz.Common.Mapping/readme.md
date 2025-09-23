@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Mapping**
+# **Franz.Common.Mapping**
 
 *A lightweight, fast, and extensible object mapping library for the Franz ecosystem.*
 
@@ -6,20 +6,20 @@
 
 ---
 
-## 🌟 Overview
+## ?? Overview
 
-`Franz.Common.Mapping` is designed as an **AutoMapper++ alternative** — type-safe, DI-friendly, and integrated with the **Franz Framework**.
+`Franz.Common.Mapping` is designed as an **AutoMapper++ alternative** � type-safe, DI-friendly, and integrated with the **Franz Framework**.
 It provides:
 
-* 🔹 **Simple by-name mapping** out of the box.
-* 🔹 **Profiles** with `CreateMap`, `ForMember`, and `Ignore`.
-* 🔹 **Configurable via DI** (`AddFranzMapping`).
-* 🔹 **Expression-based mapping** (fast, cached, reflection-minimal).
-* 🔹 **Extendable** with custom converters and profiles.
+* ?? **Simple by-name mapping** out of the box.
+* ?? **Profiles** with `CreateMap`, `ForMember`, and `Ignore`.
+* ?? **Configurable via DI** (`AddFranzMapping`).
+* ?? **Expression-based mapping** (fast, cached, reflection-minimal).
+* ?? **Extendable** with custom converters and profiles.
 
 ---
 
-## 📦 Installation
+## ?? Installation
 
 ```bash
 dotnet add package Franz.Common.Mapping --version 1.5.1
@@ -27,7 +27,7 @@ dotnet add package Franz.Common.Mapping --version 1.5.1
 
 ---
 
-## 🚀 Quick Start
+## ?? Quick Start
 
 ### 1. Define a Profile
 
@@ -108,28 +108,28 @@ Console.WriteLine(dto.ISBN);  // "978-0261103344"
 
 ---
 
-## 🛠 Features
+## ?? Features
 
-* ✅ **By-name mapping** fallback (zero config).
-* ✅ **Profiles** for explicit control.
-* ✅ **ForMember & Ignore** API.
-* ✅ **Immutable, cached mapping expressions** for performance.
-* ✅ **DI integration** with `AddFranzMapping`.
-* ✅ **Tested in the Franz Book API** to ensure real-world readiness.
-
----
-
-## 🧭 Roadmap
-
-* 🔹 Custom type converters (`ITypeConverter<TSource, TDest>`).
-* 🔹 Async mapping support for I/O heavy scenarios.
-* 🔹 Startup validation (fail-fast if mappings are incomplete).
-* 🔹 Roslyn analyzers to catch missing profiles at compile time.
+* ? **By-name mapping** fallback (zero config).
+* ? **Profiles** for explicit control.
+* ? **ForMember & Ignore** API.
+* ? **Immutable, cached mapping expressions** for performance.
+* ? **DI integration** with `AddFranzMapping`.
+* ? **Tested in the Franz Book API** to ensure real-world readiness.
 
 ---
 
-## 📄 License
+## ?? Roadmap
 
-MIT — free to use, modify, and distribute.
+* ?? Custom type converters (`ITypeConverter<TSource, TDest>`).
+* ?? Async mapping support for I/O heavy scenarios.
+* ?? Startup validation (fail-fast if mappings are incomplete).
+* ?? Roslyn analyzers to catch missing profiles at compile time.
+
+---
+
+## ?? License
+
+MIT � free to use, modify, and distribute.
 
 ---

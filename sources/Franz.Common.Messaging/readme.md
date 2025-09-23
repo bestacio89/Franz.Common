@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Messaging**
+# **Franz.Common.Messaging**
 
 A messaging abstraction library within the **Franz Framework** that simplifies the handling of messages, headers, and events for distributed systems. This package provides a comprehensive set of tools to build, send, and manage messages, with strong support for context propagation, delegation, and customizable strategies.
 
@@ -30,7 +30,7 @@ A messaging abstraction library within the **Franz Framework** that simplifies t
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

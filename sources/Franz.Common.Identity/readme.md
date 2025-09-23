@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Identity**
+# **Franz.Common.Identity**
 
 A foundational library within the **Franz Framework** that provides tools for managing identity context across **ASP.NET Core** applications. This package simplifies access to user identity information, supporting dependency injection for streamlined integration with other components.
 
@@ -15,7 +15,7 @@ A foundational library within the **Franz Framework** that provides tools for ma
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

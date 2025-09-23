@@ -1,4 +1,4 @@
-﻿# **Franz.Common.EntityFramework.Oracle**
+# **Franz.Common.EntityFramework.Oracle**
 
 A specialized library within the **Franz Framework** that extends **Entity Framework Core** support for **Oracle Database** using the **Oracle.EntityFrameworkCore** provider. This package simplifies the configuration and integration of Oracle databases in .NET applications, supporting both single-tenant and multi-tenant environments.
 
@@ -19,7 +19,7 @@ A specialized library within the **Franz Framework** that extends **Entity Frame
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

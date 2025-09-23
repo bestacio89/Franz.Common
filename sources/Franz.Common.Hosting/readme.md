@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Hosting**
+# **Franz.Common.Hosting**
 
 A utility library within the **Franz Framework** designed to simplify and enhance hosting configurations for .NET applications. This package provides powerful extensions for working with hosts and service providers, offering flexibility and consistency in application startup and lifecycle management.
 
@@ -19,7 +19,7 @@ A utility library within the **Franz Framework** designed to simplify and enhanc
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -149,4 +149,5 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
 

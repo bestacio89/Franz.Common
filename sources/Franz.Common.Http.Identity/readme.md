@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Http.Identity**
+# **Franz.Common.Http.Identity**
 
 A utility library within the **Franz Framework** that enhances **ASP.NET Core** identity management for HTTP-based applications. This package provides tools for accessing and managing identity context in a consistent and efficient manner.
 
@@ -15,7 +15,7 @@ A utility library within the **Franz Framework** that enhances **ASP.NET Core** 
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

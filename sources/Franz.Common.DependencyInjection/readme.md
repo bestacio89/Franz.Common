@@ -1,4 +1,4 @@
-﻿# **Franz.Common.DependencyInjection**
+# **Franz.Common.DependencyInjection**
 
 A core library within the **Franz Framework**, designed to simplify and enhance the usage of dependency injection in .NET applications. This package provides utilities and extensions for efficient registration of services, managing lifetimes, and ensuring clean dependency resolution.
 
@@ -28,7 +28,7 @@ A core library within the **Franz Framework**, designed to simplify and enhance 
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -184,6 +184,6 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ### Version 1.3.6
 
-- DI glue isolated here — core is DI-free.
+- DI glue isolated here � core is DI-free.
 - AddFranzMediator(), AddFranzMessaging(), etc. live here.
 - Microsoft DI = optional adapter (others possible).

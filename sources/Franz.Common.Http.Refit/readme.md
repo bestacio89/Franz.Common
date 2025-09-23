@@ -1,13 +1,13 @@
-ï»¿# Franz.Common.Http.Refit
+# Franz.Common.Http.Refit
 
 **Package**: `Franz.Common.Http.Refit`
 
 
-Refit integration for the Franz Framework â€” production-oriented, small-surface, high-value.
+Refit integration for the Franz Framework — production-oriented, small-surface, high-value.
 Provides typed Refit clients pre-wired with: correlation & tenant header propagation, optional token injection, Polly policy integration, Serilog-friendly logging, and OpenTelemetry-friendly annotations & lightweight metrics.
 
 ---
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 
 ---
 
@@ -21,7 +21,7 @@ Provides typed Refit clients pre-wired with: correlation & tenant header propaga
 
 ## Features
 
-* `AddFranzRefit<TClient>(...)` â€” single-line registration for typed Refit clients.
+* `AddFranzRefit<TClient>(...)` — single-line registration for typed Refit clients.
 * Automatic injection of `X-Correlation-ID`, `X-Tenant-Id`, and optional `X-User-Id` headers via `FranzRefitHeadersHandler`.
 * Optional `FranzRefitAuthHandler` driven by a pluggable `ITokenProvider` for Bearer tokens.
 * Optional Polly policy attachment using the host `IPolicyRegistry<string>` (via `AddPolicyHandlerFromRegistry`).
@@ -111,7 +111,7 @@ If `Franz.Common.Http.Bootstrap` is used and `Franz:HttpClients:EnableRefit = tr
 ```
 
 * `InterfaceType` (assembly-qualified) is recommended for deterministic resolution.
-* `Policy` is optional â€” if provided, Franz will attach the named policy from the host's policy registry.
+* `Policy` is optional — if provided, Franz will attach the named policy from the host's policy registry.
 
 ---
 
@@ -129,7 +129,7 @@ The host project should reference (or the package may include where appropriate)
 <PackageReference Include="OpenTelemetry.Api" Version="1.12.0" />
 ```
 
-> Lock versions per your mono-repo policy. `Refit.HttpClientFactory` provides `AddRefitClient<T>()` â€” ensure it is referenced in the **project that calls the registration**.
+> Lock versions per your mono-repo policy. `Refit.HttpClientFactory` provides `AddRefitClient<T>()` — ensure it is referenced in the **project that calls the registration**.
 
 ---
 
@@ -190,7 +190,7 @@ public async Task SendAsync_AddsCorrelationAndTenantHeaders()
 * **v1.4.1**
 
   * New: `AddFranzRefit<TClient>()` extension for typed Refit clients.
-  * New: `FranzRefitHeadersHandler` â€” correlation/tenant headers, logging, OTEL tags, metrics.
+  * New: `FranzRefitHeadersHandler` — correlation/tenant headers, logging, OTEL tags, metrics.
   * New: Optional `ITokenProvider` + `FranzRefitAuthHandler`.
   * New: Polly policy reuse via host `IPolicyRegistry<string>`.
 
@@ -200,7 +200,7 @@ public async Task SendAsync_AddsCorrelationAndTenantHeaders()
 
 * Bump package version to `1.4.1`.
 * Build & run unit tests.
-* `dotnet pack -c Release` â†’ produce `.nupkg`.
+* `dotnet pack -c Release` ? produce `.nupkg`.
 * `dotnet nuget push ./bin/Release/*.nupkg -k $NUGET_API_KEY -s <feed>` (or use your private feed).
 * Update top-level Franz changelog & bootstrap README to mention Refit integration.
 
@@ -210,5 +210,6 @@ public async Task SendAsync_AddsCorrelationAndTenantHeaders()
 
 Part of the private Franz Framework. Follow internal contribution guidelines.
 Licensed under the MIT License.
+
 
 

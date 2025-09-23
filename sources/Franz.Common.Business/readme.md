@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Business**
+# **Franz.Common.Business**
 
 A core library of the **Franz Framework**, designed to facilitate **Domain-Driven Design (DDD)** and **CQRS (Command Query Responsibility Segregation)** in .NET applications.
 It provides abstractions, utilities, and patterns for building scalable, maintainable, and testable business logic.
@@ -64,7 +64,7 @@ public class Address : ValueObject
 
 ### **2. Aggregates (Event-Sourced)**
 
-🆕 **Since 1.2.65**, aggregates follow a strict event-driven model:
+?? **Since 1.2.65**, aggregates follow a strict event-driven model:
 
 * Enforce consistency across related entities.
 * State is modified **only through events**.
@@ -168,7 +168,7 @@ The Business layer integrates seamlessly with the **Mediator** and resilience pi
 
 #### **a) AddBusinessWithMediator**
 
-Strict registration – will throw if your `*.Application` assembly is not found.
+Strict registration � will throw if your `*.Application` assembly is not found.
 
 ```csharp
 builder.Services.AddBusinessWithMediator(typeof(Program).Assembly);
@@ -176,7 +176,7 @@ builder.Services.AddBusinessWithMediator(typeof(Program).Assembly);
 
 #### **b) TryAddBusinessWithMediator**
 
-Soft registration – logs a warning but continues if the application assembly is missing.
+Soft registration � logs a warning but continues if the application assembly is missing.
 
 ```csharp
 builder.Services.TryAddBusinessWithMediator(typeof(Program).Assembly);
@@ -184,7 +184,7 @@ builder.Services.TryAddBusinessWithMediator(typeof(Program).Assembly);
 
 #### **c) AddFranzPlatform**
 
-Full-stack registration – Business + Mediator + Logging + Resilience pipelines.
+Full-stack registration � Business + Mediator + Logging + Resilience pipelines.
 
 ```csharp
 builder.Services.AddFranzPlatform(
@@ -201,10 +201,10 @@ builder.Services.AddFranzPlatform(
 
 When you call `AddFranzPlatform`, `Franz.Common.Business` wires up the following **Mediator pipelines**:
 
-* ✅ `RetryPipeline<TRequest, TResponse>`
-* ✅ `CircuitBreakerPipeline<TRequest, TResponse>`
-* ✅ `TimeoutPipeline<TRequest, TResponse>`
-* ✅ `BulkheadPipeline<TRequest, TResponse>`
+* ? `RetryPipeline<TRequest, TResponse>`
+* ? `CircuitBreakerPipeline<TRequest, TResponse>`
+* ? `TimeoutPipeline<TRequest, TResponse>`
+* ? `BulkheadPipeline<TRequest, TResponse>`
 
 > These are implemented in **`Franz.Common.Mediator.Pipelines.Resilience`**.
 > `Franz.Common.Business` just **activates them** for you.
@@ -247,39 +247,39 @@ Each pipeline reads its **Options** from configuration:
 
 ### **8. Options Mapping**
 
-* `Retry` → `RetryOptions`
-* `CircuitBreaker` → `CircuitBreakerOptions`
-* `Timeout` → `TimeoutOptions`
-* `Bulkhead` → `BulkheadOptions`
+* `Retry` ? `RetryOptions`
+* `CircuitBreaker` ? `CircuitBreakerOptions`
+* `Timeout` ? `TimeoutOptions`
+* `Bulkhead` ? `BulkheadOptions`
 
 ---
 
 ### **9. Logging**
 
-On startup you’ll see log messages confirming bootstrap:
+On startup you�ll see log messages confirming bootstrap:
 
 ```
-[INF] ✅ Franz.Business bootstrapped with MyProduct.Application, Version=1.0.0.0
-[INF] 🛡️ Resilience pipelines registered: Retry, CircuitBreaker, Timeout, Bulkhead
-[WRN] ⚠️ No Application assembly found for MyProduct.Application, Business layer not registered.
+[INF] ? Franz.Business bootstrapped with MyProduct.Application, Version=1.0.0.0
+[INF] ??? Resilience pipelines registered: Retry, CircuitBreaker, Timeout, Bulkhead
+[WRN] ?? No Application assembly found for MyProduct.Application, Business layer not registered.
 ```
 
 ---
 
-## **What’s New in 1.4.2**
+## **What�s New in 1.4.2**
 
-* 🗑️ Removed **`SaveEntitiesAsync`** → all auditing + domain event dispatching happens in `SaveChangesAsync`.
-* ✅ Aligned with **DbContextBase** from `Franz.Common.EntityFramework`.
-* 🧹 Internal cleanup and consistency improvements.
+* ??? Removed **`SaveEntitiesAsync`** ? all auditing + domain event dispatching happens in `SaveChangesAsync`.
+* ? Aligned with **DbContextBase** from `Franz.Common.EntityFramework`.
+* ?? Internal cleanup and consistency improvements.
 
 ---
 
 ## **Dependencies**
 
-* **Scrutor** (4.2.2) – assembly scanning & DI.
-* **Microsoft.Extensions.DependencyInjection** (9.0.0) – DI support.
-* **Franz.Common.Mediator** – CQRS + pipelines.
-* **Franz.Common.Errors** – standardized error handling.
+* **Scrutor** (4.2.2) � assembly scanning & DI.
+* **Microsoft.Extensions.DependencyInjection** (9.0.0) � DI support.
+* **Franz.Common.Mediator** � CQRS + pipelines.
+* **Franz.Common.Errors** � standardized error handling.
 
 ---
 
@@ -289,7 +289,7 @@ On startup you’ll see log messages confirming bootstrap:
 dotnet add package Franz.Common.Business --version 1.4.2
 ```
 
-> ⚠️ Since **1.4.1**, **MediatR is no longer required**.
+> ?? Since **1.4.1**, **MediatR is no longer required**.
 > Uses **Franz.Common.Mediator** internally.
 
 ---
@@ -312,19 +312,19 @@ Licensed under the **MIT License**.
 
 ## **Changelog**
 
-Got it ✅ — let’s package those changes into a **README-style changelog log** so you can drop it straight into the repo alongside the code.
+Got it ? � let�s package those changes into a **README-style changelog log** so you can drop it straight into the repo alongside the code.
 
-Here’s a draft for `Franz.Common.Business v1.4.5`:
+Here�s a draft for `Franz.Common.Business v1.4.5`:
 
 ---
 
-# **Franz.Common.Business — Release Notes**
+# **Franz.Common.Business � Release Notes**
 
 ## **Version 1.4.5**
 
 *A maintenance release focusing on consistency and event publishability.*
 
-### 🔹 Changes
+### ?? Changes
 
 #### **AggregateRoot\<TEvent>**
 
@@ -364,34 +364,34 @@ Here’s a draft for `Franz.Common.Business v1.4.5`:
 
 ---
 
-### ✅ Benefits
+### ? Benefits
 
 * **Consistency** across AggregateRoot and IAggregateRoot.
 * **Safety** via `IReadOnlyCollection` (prevents external mutation).
-* **Alignment** with MediatR’s `INotification` pattern, enforcing correct event semantics.
+* **Alignment** with MediatR�s `INotification` pattern, enforcing correct event semantics.
 
 ---
 
 
 ### **1.4.2**
 
-* Removed `SaveEntitiesAsync` → replaced with `SaveChangesAsync` in `DbContextBase`.
+* Removed `SaveEntitiesAsync` ? replaced with `SaveChangesAsync` in `DbContextBase`.
 * Improved alignment with `EntityFramework` package (auditing + domain events).
 
 ### **1.4.1**
 
-* Independent from MediatR → runs on `Franz.Common.Mediator`.
+* Independent from MediatR ? runs on `Franz.Common.Mediator`.
 * Lifecycle tracking for entities & aggregates.
 * Stronger value object equality.
 * Enriched domain events with metadata.
 * Scrutor-powered DI auto-discovery.
 
-Got it ✅ — let’s make **individual README entries** for each package you’ve patched in `v1.4.5`.
-You’ll be able to drop these into each project’s README (under a **Release Notes** or **Changelog** section).
+Got it ? � let�s make **individual README entries** for each package you�ve patched in `v1.4.5`.
+You�ll be able to drop these into each project�s README (under a **Release Notes** or **Changelog** section).
 
 ---
 
-## 📌 `Franz.Common.Business`
+## ?? `Franz.Common.Business`
 
 ### **v1.4.5**
 
@@ -400,11 +400,11 @@ You’ll be able to drop these into each project’s README (under a **Release N
 * Enforced **publishable events** by requiring `TEvent : BaseDomainEvent, INotification`.
 * Updated `GetUncommittedChanges()` to return `IReadOnlyCollection<BaseDomainEvent>` instead of `IEnumerable<TEvent>`.
 * Updated `IAggregateRoot` contract for consistency with `AggregateRoot`.
-* Improved safety (read-only collections) and **alignment with MediatR’s `INotification` pattern**.
+* Improved safety (read-only collections) and **alignment with MediatR�s `INotification` pattern**.
 
 ---
 
-## 📌 `Franz.Common.EntityFramework`
+## ?? `Franz.Common.EntityFramework`
 
 ### **v1.4.5**
 
@@ -416,7 +416,7 @@ You’ll be able to drop these into each project’s README (under a **Release N
 
 ---
 
-## 📌 `Franz.Common.Mediator`
+## ?? `Franz.Common.Mediator`
 
 ### **v1.4.5**
 
@@ -424,14 +424,14 @@ You’ll be able to drop these into each project’s README (under a **Release N
 
 * Introduced clear split:
 
-  * **Commands/Queries** → `SendAsync` (single handler, request/response).
-  * **Events (Domain + Integration)** → `PublishAsync` (fan-out, fire-and-forget).
+  * **Commands/Queries** ? `SendAsync` (single handler, request/response).
+  * **Events (Domain + Integration)** ? `PublishAsync` (fan-out, fire-and-forget).
 * Fixed mis-implementation where integration events were incorrectly treated as commands.
 * Ensures **consistent message handling semantics** across the framework.
 
 ---
 
-## 📌 `Franz.Common.Messaging.Hosting.Mediator`
+## ?? `Franz.Common.Messaging.Hosting.Mediator`
 
 ### **v1.4.5**
 
@@ -443,7 +443,7 @@ You’ll be able to drop these into each project’s README (under a **Release N
 
 ---
 
-## 📌 `Franz.Common.Messaging.Kafka`
+## ?? `Franz.Common.Messaging.Kafka`
 
 ### **v1.4.5**
 
@@ -452,4 +452,5 @@ You’ll be able to drop these into each project’s README (under a **Release N
 * Changed mediator dispatch from `Send(message)` to `PublishAsync(message)`.
 * Ensures Kafka-published integration events follow **publish/notify semantics** instead of command semantics.
 * Provides consistent event behavior across transports.
+
 

@@ -47,14 +47,14 @@ Think of Franz as **Spring Boot for .NET microservices** — a batteries-include
 Add the core library:
 
 ```bash
-dotnet add package Franz.Common --version 1.5.0
+dotnet add package Franz.Common --version 1.5.4
 ```
 
 Or install subpackages (e.g., `Business` + `EntityFramework`):
 
 ```bash
-dotnet add package Franz.Common.Business --version 1.5.0
-dotnet add package Franz.Common.EntityFramework --version 1.5.0
+dotnet add package Franz.Common.Business --version 1.5.4
+dotnet add package Franz.Common.EntityFramework --version 1.5.4
 ```
 
 ### Software Dependencies
@@ -261,4 +261,6 @@ Perfect — here’s the **main README updated with v1.5.1** so it flows right a
 ---
 
 🔥 With `Franz.Common`, you can bootstrap a Kafka-ready, resilient, multi-tenant .NET microservice with **one line of code**.
+
+
 

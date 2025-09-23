@@ -1,4 +1,4 @@
-﻿# **Franz.Common.EntityFramework.SQLServer**
+# **Franz.Common.EntityFramework.SQLServer**
 
 A private utility library for seamless integration of **Entity Framework Core** with **SQL Server**, designed as part of the **Franz Framework** ecosystem. This package is versioned as `1.2.65` and is hosted exclusively on a private Azure NuGet feed.
 
@@ -21,7 +21,7 @@ A private utility library for seamless integration of **Entity Framework Core** 
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - This package and all related `Franz` packages are under active development and maintained privately.
 
 ---

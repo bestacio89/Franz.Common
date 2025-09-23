@@ -1,9 +1,9 @@
-﻿# **Franz.Common.Errors**
+# **Franz.Common.Errors**
 
 A library for handling and standardizing errors and exceptions in .NET applications. This library simplifies error management, making it easier to implement structured and meaningful error responses.
 
 ---
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 
 ---
 
@@ -127,12 +127,13 @@ This library is licensed under the MIT License. See the LICENSE file for more de
 - Now compatible with both the **in-house mediator** and **MediatR**
 
 ### Version 1.4.1
-- 🚀 Introduced **TestExceptions** for chaos engineering & demos  
+- ?? Introduced **TestExceptions** for chaos engineering & demos  
   - `BananaRepublicException` (EN/FR)  
   - `MonsterException` (EN/FR)  
   - `VodkaCoffeePotException` (EN/FR)  
   - `FriendlyReminderException` (EN/FR)  
-- 🎭 **Bilingual Support**: every test exception available in **English & French**  
-- 🧩 **Consistent API**: wrapped under `TestExceptions` static class  
-- 🤡 Purpose: make resilience demos, test failures, and dev workshops **fun & obvious**  
-- 🛠 No impact on production code — these are **opt-in chaos exceptions**  
+- ?? **Bilingual Support**: every test exception available in **English & French**  
+- ?? **Consistent API**: wrapped under `TestExceptions` static class  
+- ?? Purpose: make resilience demos, test failures, and dev workshops **fun & obvious**  
+- ?? No impact on production code � these are **opt-in chaos exceptions**  
+

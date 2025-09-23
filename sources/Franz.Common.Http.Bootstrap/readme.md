@@ -1,4 +1,4 @@
-ï»¿# Franz.Common.Http.Bootstrap
+# Franz.Common.Http.Bootstrap
 
 **Package**: `Franz.Common.Http.Bootstrap`
 **Current Version**: 1.5.3
@@ -52,12 +52,12 @@ app.Run();
 
 ---
 
-## Refit (optional) â€” what the bootstrapper does
+## Refit (optional) — what the bootstrapper does
 
 When `Franz:HttpClients:EnableRefit` is `true`, the bootstrapper will:
 
 * Read `Franz:HttpClients:Apis` from configuration.
-* Resolve each typed Refit interface (prefer `InterfaceType` â€” assembly-qualified; falls back to assembly scan).
+* Resolve each typed Refit interface (prefer `InterfaceType` — assembly-qualified; falls back to assembly scan).
 * Invoke `AddFranzRefit<TClient>(...)` reflectively to register the typed client.
 * For each client it wires:
 
@@ -88,7 +88,7 @@ When `Franz:HttpClients:EnableRefit` is `true`, the bootstrapper will:
 **Notes**
 
 * `InterfaceType` (assembly-qualified) is recommended for deterministic resolution.
-* `Policy` is optional â€” if present the bootstrapper will attach the named policy from the host's `IPolicyRegistry<string>`.
+* `Policy` is optional — if present the bootstrapper will attach the named policy from the host's `IPolicyRegistry<string>`.
 
 ---
 
@@ -164,4 +164,5 @@ For full changelog/history see the repository `CHANGELOG.md`.
 
 ## Contributing & License
 
-This package is part of the private Franz Framework. Contributions are internal; follow your teamâ€™s contribution guidelines. Licensed under MIT.
+This package is part of the private Franz Framework. Contributions are internal; follow your team’s contribution guidelines. Licensed under MIT.
+

@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Messaging.Bootstrap**
+# **Franz.Common.Messaging.Bootstrap**
 
 A modular library within the **Franz Framework** designed to streamline the setup and integration of messaging components in distributed systems. This package provides a centralized configuration for messaging-related services, simplifying dependency injection and ensuring seamless interoperability across other **Franz Framework** messaging libraries.
 
@@ -17,7 +17,7 @@ A modular library within the **Franz Framework** designed to streamline the setu
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -127,3 +127,4 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+

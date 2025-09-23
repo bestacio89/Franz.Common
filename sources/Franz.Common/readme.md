@@ -1,9 +1,9 @@
-﻿# **Franz.Common**
+# **Franz.Common**
 
 A foundational library in the **Franz Framework** designed to provide core utilities, dependency injection abstractions, and common extensions for .NET applications. This library is part of the private Franz Framework ecosystem, versioned as `1.2.65`, and hosted on a private Azure NuGet feed.
 
 ---
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 --- 
 ## **Features**
 
@@ -41,7 +41,7 @@ A foundational library in the **Franz Framework** designed to provide core utili
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private Franz Framework suite, hosted on a private Azure NuGet feed.
 
 ---
@@ -214,3 +214,4 @@ This library is private and governed by the Franz Framework's internal licensing
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
 ---
+

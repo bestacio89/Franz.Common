@@ -258,4 +258,7 @@ Framework is closer to being a self-contained, end-to-end enterprise stack.
 - Updated ApplyMapping to use reflection for property assignment.  
 - Ensured fallback to convention-based mapping when no explicit rule is defined.  
 
+---## Version 1.5.4 - Maintenance
+* Dependencies updated
+
 ---

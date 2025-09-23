@@ -1,33 +1,33 @@
-﻿# Franz.Common.Caching
+# Franz.Common.Caching
 
 A full-featured caching module for the** Franz Framework**.  
 Provides pluggable cache providers(Memory, Distributed, Redis), request caching via Mediator pipelines, settings cache, and built-in observability with Serilog + OpenTelemetry.
 
 ---
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 ---
 
-## ✨ Features
+## ? Features
 
-- 🧠 ** Unified abstractions**: `ICacheProvider`, `ICacheKeyStrategy`, `ISettingsCache`.
-- ⚙️ ** Multiple providers out of the box**:
+- ?? ** Unified abstractions**: `ICacheProvider`, `ICacheKeyStrategy`, `ISettingsCache`.
+- ?? ** Multiple providers out of the box**:
   - `MemoryCacheProvider` (fast local)
   - `DistributedCacheProvider` (SQL Server, NCache, etc.)
   - `RedisCacheProvider` (scalable distributed caching).
-- 🔑 ** Flexible key strategies**:
+- ?? ** Flexible key strategies**:
   - Default(type + serialized payload)
   - Namespaced(domain separation)
   - Custom(plug in your own).
-- 🧵 ** Mediator pipeline**:
+- ?? ** Mediator pipeline**:
   - Automatic cache HIT/MISS detection
   - Transparent response caching
   - Per-request TTL + bypass
   - Consistent with CQRS(cache queries, skip commands).
-- 📊 ** Observability out of the box**:
+- ?? ** Observability out of the box**:
   - Enriched Serilog logs(`FranzCorrelationId`, `FranzCacheKey`, etc.)
   - OpenTelemetry** metrics**: hits, misses, lookup latency
   - OpenTelemetry** trace tags**: `franz.cache.*`
-- 🚀 ** Plug-and-play DI extensions**:
+- ?? ** Plug-and-play DI extensions**:
   - `AddFranzMemoryCaching()`
   - `AddFranzDistributedCaching<T>()`
   - `AddFranzRedisCaching()` (connection string or DI factory)
@@ -35,7 +35,7 @@ Provides pluggable cache providers(Memory, Distributed, Redis), request caching 
 
 ---
 
-## 🛠 Installation
+## ?? Installation
 
 ```bash
 dotnet add package Franz.Common.Caching
@@ -43,7 +43,7 @@ dotnet add package Franz.Common.Caching
 
 ---
 
-## ⚡ Quickstart
+## ? Quickstart
 
 ```csharp
 // Program.cs
@@ -61,14 +61,14 @@ builder.Services.AddFranzMediatorCaching(opts =>
 public record GetUserByIdQuery(int Id) : IQuery<User>;
 ```
 
-*First execution → MISS → fetch + cache
-* Subsequent executions with same input → HIT → return cached response
+*First execution ? MISS ? fetch + cache
+* Subsequent executions with same input ? HIT ? return cached response
 
 Logs and telemetry are produced automatically.
 
 ---
 
-## ⚙️ Providers
+## ?? Providers
 
 ### In-memory
 
@@ -98,7 +98,7 @@ services.AddFranzRedisCaching(sp =>
 
 ---
 
-## 📊 Observability
+## ?? Observability
 
 ### Serilog Logs
 
@@ -126,7 +126,7 @@ services.AddFranzRedisCaching(sp =>
 
 ---
 
-## 📌 Roadmap
+## ?? Roadmap
 
 * Support for **hashed cache keys** (short keys for Redis).
 * More built-in strategies (e.g., sliding expiration).
@@ -136,4 +136,5 @@ services.AddFranzRedisCaching(sp =>
 
 # Franz.Common.Caching is production-ready:
 
-⚡ Cache providers + Mediator integration + observability, all out of the box.
+? Cache providers + Mediator integration + observability, all out of the box.
+

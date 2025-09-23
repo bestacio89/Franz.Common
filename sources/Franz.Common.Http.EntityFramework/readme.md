@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Http.EntityFramework**
+# **Franz.Common.Http.EntityFramework**
 
 A specialized library within the **Franz Framework** that integrates **Entity Framework Core** with **ASP.NET Core** applications. This package simplifies transactional handling, dependency injection, and middleware configurations, enhancing database operations in HTTP-based services.
 
@@ -26,7 +26,7 @@ A specialized library within the **Franz Framework** that integrates **Entity Fr
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 
 * Part of the private **Franz Framework** ecosystem.
 
@@ -137,5 +137,6 @@ The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
 ### Version 1.2.65
 - Upgrade version to .net 9
 ---
+
 
 

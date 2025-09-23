@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Http.MultiTenancy**
+# **Franz.Common.Http.MultiTenancy**
 
 A library within the **Franz Framework** that extends multi-tenancy support for HTTP-based **ASP.NET Core** applications. This package provides tools for tenant-specific context management, dependency injection, and Swagger documentation enhancements, enabling seamless multi-tenant application development.
 
@@ -17,7 +17,7 @@ A library within the **Franz Framework** that extends multi-tenancy support for 
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

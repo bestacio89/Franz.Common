@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Messaging.Hosting**
+# **Franz.Common.Messaging.Hosting**
 
 A foundational library within the **Franz Framework** designed to enable and manage hosted messaging services in distributed applications. This package provides utilities for message execution strategies, delegation, transaction management, and seamless integration with **Microsoft.Extensions.Hosting**.
 
@@ -23,7 +23,7 @@ A foundational library within the **Franz Framework** designed to enable and man
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

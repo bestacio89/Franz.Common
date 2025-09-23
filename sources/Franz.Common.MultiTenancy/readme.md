@@ -1,4 +1,4 @@
-﻿# **Franz.Common.MultiTenancy**
+# **Franz.Common.MultiTenancy**
 
 A lightweight library within the **Franz Framework** designed to enable multi-tenancy support in .NET applications. This package provides interfaces for accessing and managing tenant and domain contexts, enabling seamless integration with multi-tenant architectures.
 
@@ -17,7 +17,7 @@ A lightweight library within the **Franz Framework** designed to enable multi-te
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Messaging.Kafka**
+# **Franz.Common.Messaging.Kafka**
 
 A Kafka integration library within the **Franz Framework** designed to simplify interaction with Kafka topics, producers, and consumers. This package provides tools for creating and managing Kafka connections, handling serialization, and integrating Kafka workflows into distributed systems.
 
@@ -27,7 +27,7 @@ A Kafka integration library within the **Franz Framework** designed to simplify 
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
