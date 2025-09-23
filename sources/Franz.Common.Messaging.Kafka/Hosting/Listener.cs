@@ -45,14 +45,32 @@ namespace Franz.Common.Messaging.Kafka.Hosting
             Body = consumeResult.Message.Value ?? string.Empty, // ✅ Ensure non-null
           };
 
+          _logger.LogInformation(
+              "Consumed message from topic {Topic}, partition {Partition}, offset {Offset}, key {Key}",
+              consumeResult.Topic,
+              consumeResult.Partition,
+              consumeResult.Offset,
+              "<ignore>" // ✅ since key is Confluent.Kafka.Ignore
+          );
+
           Received?.Invoke(this, new MessageEventArgs(message));
         }
         catch (ConsumeException e)
         {
-          _logger.LogError(e.Error.ToString(), null);
+          _logger.LogError(e,
+              "Kafka consume error on topic {Topic}, partition {Partition}: {Reason}",
+              e.ConsumerRecord?.Topic ?? _topicName,
+              e.ConsumerRecord?.Partition.Value ?? -1,
+              e.Error.Reason);
+        }
+        catch (Exception ex)
+        {
+          _logger.LogError(ex, "Unexpected error occurred in Kafka listener for topic {Topic}", _topicName);
         }
       }
     }
+
+
 
 
     public void StopListen()

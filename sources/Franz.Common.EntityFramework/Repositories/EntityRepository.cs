@@ -1,5 +1,6 @@
 ﻿// ✅ General CRUD repository for individual entities
 using Franz.Common.Business.Domain;
+using Franz.Common.Errors;
 using Microsoft.EntityFrameworkCore;
 
 public class EntityRepository<TDbContext, TEntity> : IEntityRepository<TEntity>
@@ -15,8 +16,11 @@ public class EntityRepository<TDbContext, TEntity> : IEntityRepository<TEntity>
 
   public async Task<TEntity> GetByIdAsync(int id, CancellationToken cancellationToken = default)
   {
-    return await DbContext.Set<TEntity>().FindAsync(new object[] { id }, cancellationToken);
+    var entity = await DbContext.Set<TEntity>().FindAsync(new object[] { id }, cancellationToken);
+
+    return entity ?? throw new NotFoundException($"Entity {typeof(TEntity).Name} with ID {id} not found.");
   }
+
 
   public async Task AddAsync(TEntity entity, CancellationToken cancellationToken = default)
   {

@@ -1,5 +1,6 @@
 using Franz.Common.Business.Domain;
 using Franz.Common.EntityFramework.Extensions;
+using Franz.Common.Errors;
 using Microsoft.EntityFrameworkCore;
 
 public abstract class AggregateRepository<TDbContext, TAggregateRoot> : IAggregateRepository<TAggregateRoot>
@@ -15,10 +16,13 @@ public abstract class AggregateRepository<TDbContext, TAggregateRoot> : IAggrega
 
   public async Task<TAggregateRoot> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
   {
-    return await DbContext.Set<TAggregateRoot>()
-        .IncludeAllRelationships(DbContext) // 
+    var entity = await DbContext.Set<TAggregateRoot>()
+        .IncludeAllRelationships(DbContext)
         .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+
+    return entity ?? throw new NotFoundException($"Entity {typeof(TAggregateRoot).Name} with ID {id} not found.");
   }
+
 
   public async Task AddAsync(TAggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
   {

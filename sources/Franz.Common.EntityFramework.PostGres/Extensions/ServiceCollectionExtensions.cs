@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.MultiTenancy;
@@ -27,6 +28,7 @@ public static class ServiceCollectionExtensions
         .AddDbContext<TDbContext>((serviceProvider, dbContextBuilder) =>
         {
           var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+          var logger = serviceProvider.GetRequiredService<ILogger<TDbContext>>();
 
           var npgsqlConnectionStringBuilder = new NpgsqlConnectionStringBuilder
           {
@@ -36,10 +38,10 @@ public static class ServiceCollectionExtensions
             Password = string.IsNullOrWhiteSpace(databaseOptions.Password) ? DefaultPassword : databaseOptions.Password,
             Port = (int)(databaseOptions.Port > 0 ? databaseOptions.Port.Value : DefaultPort),
             SslMode = Enum.Parse<SslMode>(
-                      string.IsNullOrWhiteSpace(databaseOptions.SslMode)
-                          ? SslDefaultMode
-                          : databaseOptions.SslMode,
-                      ignoreCase: true)
+                        string.IsNullOrWhiteSpace(databaseOptions.SslMode)
+                            ? SslDefaultMode
+                            : databaseOptions.SslMode,
+                        ignoreCase: true)
           };
 
           var connectionString = npgsqlConnectionStringBuilder.ConnectionString;
@@ -55,12 +57,12 @@ public static class ServiceCollectionExtensions
           dbContextBuilder.UseNpgsql(connectionString);
           dbContextBuilder.EnableSensitiveDataLogging();
 
-          // --- Logging ---
-          var actualConnectionString = connectionString; // what EF will really use
-          var maskedConnectionString = connectionString.Replace(databaseOptions.Password, "***");
+          // Mask password safely (no warnings!)
+          var masked = !string.IsNullOrEmpty(databaseOptions.Password)
+              ? connectionString.Replace(databaseOptions.Password, "***")
+              : connectionString;
 
-          Console.WriteLine($"[DB] Connection string (masked): {maskedConnectionString}");
-          Console.WriteLine($"[DB] Connection string (actual): {actualConnectionString}");
+          logger.LogDebug("[DB] Connection string (masked): {ConnectionString}", masked);
         })
         .AddScoped<DbContextBase>(sp => sp.GetRequiredService<TDbContext>());
 

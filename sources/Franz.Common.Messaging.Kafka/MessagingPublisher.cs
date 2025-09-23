@@ -7,6 +7,7 @@ using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Kafka.Modeling;
 using System.Text;
+using Franz.Common.Errors; // Assuming TechnicalException lives here
 
 namespace Franz.Common.Messaging.Kafka;
 
@@ -15,7 +16,7 @@ public class MessagingPublisher : IMessagingPublisher
   private readonly IProducer<string, byte[]> _producer;
   private readonly IMessagingInitializer _messagingInitializer;
   private readonly IMessageFactory _messageFactory;
-  private readonly IDispatcher _dispatcher; // Franz mediator dispatcher
+  private readonly IDispatcher _dispatcher;
 
   public MessagingPublisher(
       IProducer<string, byte[]> producer,
@@ -38,34 +39,49 @@ public class MessagingPublisher : IMessagingPublisher
     // Build message with Franz factory
     var message = _messageFactory.Build(integrationEvent);
 
-    // Run through Franz mediator pipeline (instead of IMessageHandler / MediatR)
+    // Run through Franz mediator pipeline
     await _dispatcher.PublishAsync(message);
 
     // Resolve Kafka topic
     var integrationEventAssembly = integrationEvent.GetType().Assembly;
     var topic = TopicNamer.GetTopicName(integrationEventAssembly);
 
-    // Map headers into Confluent format
-    var confluentHeaders = new Confluent.Kafka.Headers();
+    // Build Kafka headers
+    var confluentheaders = new Confluent.Kafka.Headers();
     foreach (var header in message.Headers)
     {
-      confluentHeaders.Add(header.Key, Encoding.UTF8.GetBytes(header.Value.ToString()!));
+      var strValue = header.Value.ToString();
+      if (!string.IsNullOrEmpty(strValue))
+      {
+        confluentheaders.Add(header.Key, Encoding.UTF8.GetBytes(strValue));
+      }
     }
 
-    // Send to Kafka
+    // Ensure body is not null
+    if (string.IsNullOrEmpty(message.Body))
+    {
+      throw new TechnicalException(
+          $"Cannot publish Kafka message: Body is null or empty for {typeof(TIntegrationEvent).Name}");
+    }
+
+    // Send to Kafka asynchronously
     try
     {
-      var deliveryResult = await _producer.ProduceAsync(topic, new Message<string, byte[]>
-      {
-        Headers = confluentHeaders,
-        Value = Encoding.UTF8.GetBytes(message.Body)
-      });
+      var deliveryResult = await _producer.ProduceAsync(
+          topic,
+          new Message<string, byte[]>
+          {
+            Headers = confluentheaders,
+            Value = Encoding.UTF8.GetBytes(message.Body)
+          });
 
-      _producer.Flush();
+      // Optional: log delivery
+      // _logger.LogInformation("Delivered {EventType} to {TopicPartitionOffset}", 
+      //     typeof(TIntegrationEvent).Name, deliveryResult.TopicPartitionOffset);
     }
     catch (Exception ex)
     {
-      throw new InvalidOperationException("Failed to publish event to Kafka", ex);
+      throw new TechnicalException("Failed to publish event to Kafka", ex);
     }
   }
 }

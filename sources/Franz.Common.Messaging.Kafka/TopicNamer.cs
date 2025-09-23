@@ -10,71 +10,65 @@ public static class TopicNamer
 
   public static string GetTopicName(Assembly assembly)
   {
-    // Check if the assembly contains a RequiredKafkaTopicAttribute
-    
-    var controllerType = assembly.GetTypes().Where(t => t.IsClass && !t.IsAbstract && typeof(ControllerBase).IsAssignableFrom(t)).First();
+    var controllerType = assembly.GetTypes()
+        .FirstOrDefault(t => t.IsClass && !t.IsAbstract && typeof(ControllerBase).IsAssignableFrom(t));
+
     if (controllerType != null)
     {
-      // Extract the topic name or format string from the attribute
       var attribute = controllerType.GetCustomAttribute<RequiredKafkaTopicAttribute>();
       if (attribute != null)
       {
-        // Use the format string and entity name if present
         if (!string.IsNullOrEmpty(attribute.Format))
         {
-          // Extract entity name from controller type (assuming single inheritance)
           var entityName = GetEntityNameFromController(controllerType);
           return string.Format(attribute.Format, entityName);
         }
         else
         {
-          // Use the provided topic name if no format string
           return attribute.Topic;
         }
       }
     }
 
-    // Fallback to existing logic (e.g., using assembly name)
-    return GetServiceName(assembly.GetName().Name) + TopicSuffixName;
+    // Null-safe assembly name check
+    if (assembly.GetName().Name is string assemblyName)
+    {
+      return GetServiceName(assemblyName) + TopicSuffixName;
+    }
+
+    throw new InvalidOperationException($"Assembly {assembly.FullName} has no valid name");
   }
 
   private static string GetEntityNameFromController(Type controllerType)
   {
-    var controllerName = controllerType.Name.Replace("Controller", "");
-    return controllerName;
+    return controllerType.Name.Replace("Controller", "");
   }
 
   private static string GetServiceName(string assemblyName)
   {
-    // Extract the service name from the second part of the assembly name (e.g., Franz.Common)
     var parts = assemblyName.Split('.');
     if (parts.Length >= 2)
     {
       return parts[1].ToLower();
     }
 
-    // Handle cases where the assembly name doesn't follow the expected format
-    throw new InvalidOperationException("Unable to extract service name from assembly name: " + assemblyName);
+    throw new InvalidOperationException($"Unable to extract service name from assembly name: {assemblyName}");
   }
+
   public static string GetDeadLetterTopicName(Assembly assembly)
   {
-    // Check if the assembly contains a RequiredKafkaTopicAttribute
-    var controllerType = assembly.GetTypes().FirstOrDefault(t => t.IsClass && !t.IsAbstract && typeof(ControllerBase).IsAssignableFrom(t));
+    var controllerType = assembly.GetTypes()
+        .FirstOrDefault(t => t.IsClass && !t.IsAbstract && typeof(ControllerBase).IsAssignableFrom(t));
 
     if (controllerType != null)
     {
       var attribute = controllerType.GetCustomAttribute<RequiredKafkaTopicAttribute>();
-      if (attribute != null)
+      if (attribute != null && !string.IsNullOrEmpty(attribute.DeadLetterTopic))
       {
-        // Use the DeadLetterTopic property from the attribute if present
-        if (!string.IsNullOrEmpty(attribute.DeadLetterTopic))
-        {
-          return attribute.DeadLetterTopic;
-        }
+        return attribute.DeadLetterTopic;
       }
     }
 
-    // Fallback to existing logic (appending suffix)
     return GetTopicName(assembly) + DeadLetterTopicSuffixName;
   }
 }

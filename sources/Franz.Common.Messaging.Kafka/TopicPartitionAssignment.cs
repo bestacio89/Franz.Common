@@ -4,6 +4,9 @@ internal class TopicPartitionAssignment
 {
   public TopicPartitionAssignment()
   {
+    Replicas = Array.Empty<int>();
+    Topic = string.Empty;
+    CustomHeaders = new Dictionary<string, object>();
   }
 
   public int Partition { get; set; }

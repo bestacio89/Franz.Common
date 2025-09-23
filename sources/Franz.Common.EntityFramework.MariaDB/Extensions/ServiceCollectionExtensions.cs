@@ -4,6 +4,7 @@ using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MySqlConnector;
 using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
@@ -29,6 +30,7 @@ public static class ServiceCollectionExtensions
         .AddDbContext<TDbContext>((serviceProvider, dbContextBuilder) =>
         {
           var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+          var logger = serviceProvider.GetRequiredService<ILogger<TDbContext>>();
 
           var mySqlConnectionStringBuilder = new MySqlConnectionStringBuilder
           {
@@ -38,32 +40,35 @@ public static class ServiceCollectionExtensions
             Password = string.IsNullOrWhiteSpace(databaseOptions.Password) ? DefaultPassword : databaseOptions.Password,
             Port = (uint)(databaseOptions.Port > 0 ? databaseOptions.Port : DefaultPort),
             SslMode = Enum.Parse<MySqlSslMode>(
-                                string.IsNullOrWhiteSpace(databaseOptions.SslMode)
-                                    ? DefaultSslMode
-                                    : databaseOptions.SslMode,
-                                ignoreCase: true)
+                              string.IsNullOrWhiteSpace(databaseOptions.SslMode)
+                                  ? DefaultSslMode
+                                  : databaseOptions.SslMode,
+                              ignoreCase: true)
           };
 
           var connectionString = mySqlConnectionStringBuilder.ConnectionString;
 
-          // Multi-tenant database name substitution
+          // Multi-tenant substitution
           var domainContextAccessor = serviceProvider.GetService<IDomainContextAccessor>();
           var domainId = domainContextAccessor?.GetCurrentDomainId();
 
           connectionString = domainId.HasValue
                   ? connectionString.Replace("{dbName}", domainId.Value.ToString())
-                  : connectionString.Replace($"_{"{dbName}"}", string.Empty);
+                  : connectionString.Replace($"_{{dbName}}", string.Empty);
 
-          // Force MariaDB 11.4 (avoid AutoDetect issues)
+          // Force MariaDB 11.4
           dbContextBuilder.UseMySql(
-                  connectionString,
-                  ServerVersion.Create(new Version(11, 4, 0), ServerType.MariaDb));
+              connectionString,
+              ServerVersion.Create(new Version(11, 4, 0), ServerType.MariaDb));
 
           dbContextBuilder.EnableSensitiveDataLogging();
 
-          // Debugging aid (mask password)
-          var masked = connectionString.Replace(databaseOptions.Password, "***");
-          Console.WriteLine($"[DB] Using connection string: {masked}");
+          // Mask password safely
+          var masked = !string.IsNullOrEmpty(databaseOptions.Password)
+              ? connectionString.Replace(databaseOptions.Password, "***")
+              : connectionString;
+
+          logger.LogDebug("[DB] Using connection string: {ConnectionString}", masked);
         })
         .AddScoped<DbContextBase>(sp => sp.GetRequiredService<TDbContext>());
 
