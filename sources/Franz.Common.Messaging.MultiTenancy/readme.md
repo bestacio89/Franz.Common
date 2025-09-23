@@ -1,6 +1,4 @@
-﻿---
-
-# **Franz.Common.Messaging.MultiTenancy**
+﻿# **Franz.Common.Messaging.MultiTenancy**
 
 A library within the **Franz Framework** that adds multi-tenancy support to messaging workflows. This package provides tools for managing tenant and domain-specific messaging contexts, enabling seamless integration of multi-tenancy in distributed systems.
 
@@ -221,5 +219,3 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 * Improved **service registration** via `AddFranzMessagingMultiTenancy`.
 
 ---
-
-Would you like me to also prepare a **NuGet-style release notes snippet** for version `1.3.1` (short, consumer-facing highlights) so you can publish it with your private feed alongside the README?

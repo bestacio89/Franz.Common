@@ -1,10 +1,4 @@
-﻿Perfect 💯 Let’s make this README **full, polished, and Franz-style** with policy registration + pipeline mapping, logs, and benefits all connected.
-
-Here’s the full file:
-
----
-
-# **Franz.Common.Mediator.Polly**
+﻿# **Franz.Common.Mediator.Polly**
 
 **Franz.Common.Mediator.Polly** extends [Franz.Common.Mediator](https://www.nuget.org/packages/Franz.Common.Mediator/) with **Polly-based resilience pipelines**.
 It gives you **retry, circuit breaker, timeout, bulkhead isolation, and advanced circuit breaker** for Mediator requests — all with **enriched Serilog logging built-in**.
