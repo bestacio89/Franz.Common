@@ -1,8 +1,8 @@
-version: 2
-updates:
-  - package-ecosystem: "nuget" # For .NET projects
-    directory: "/"            # Root directory of the project
-    schedule:
-      interval: "weekly"      # Weekly interval
-      day: "monday"           # Check every Monday
-      time: "01:00"           # UTC time
+# version: 2
+# updates:
+#  - package-ecosystem: "nuget" # For .NET projects
+#    directory: "/"            # Root directory of the project
+#    schedule:
+#      interval: "weekly"      # Weekly interval
+#      day: "monday"           # Check every Monday
+#      time: "01:00"           # UTC time

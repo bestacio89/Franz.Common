@@ -227,7 +227,19 @@ Perfect — here’s the **main README updated with v1.5.1** so it flows right a
 
 ## 📌 Changelog
 
-### **1.5.1** — *“AutoMapper++ Arrives 🚀”*
+## Version 1.5.4 - Maintenance Nullability Cleanup
+- Dependencies updated
+- Documentation Upgrade
+- Documentation Cleanup
+- Upgraded core package dependencies
+- Removed redundant Business.HandlerCollector
+- Normalized nullability across bootstrap, messaging, Kafka layers
+- Refactored MessagingSender to async-safe implementation
+- Structured logging via ILogger (Serilog ready)
+- Cleaned ServiceCollectionExtensions with fail-fast guards
+- Kafka consumer: fail-fast on invalid payloads, structured exception logging
+- Consistent DDD exception usage (NotFoundException, TechnicalException)
+
 
 ### Version 1.5.2 – Reverse Mapping Unlocked 🔄
 - Fixed `ReverseMap()` to correctly generate reverse mappings.  
@@ -235,22 +247,12 @@ Perfect — here’s the **main README updated with v1.5.1** so it flows right a
 - Simplified value assignment using reflection (no `.Compile()` errors).  
 - Ensured **convention-based mapping fallback** when no explicit map exists.  
 
-### Version 1.5.1 – Native Mapping Arrives 🚀
-- Introduced **Franz.Common.Mapping** as a Franz-native alternative to AutoMapper.  
-- Added profiles (`FranzMapProfile`) with `CreateMap`, `ForMember`, and `Ignore`.  
-- Default by-name mapping when no explicit profile exists.  
-- Integrated with DI via `services.AddFranzMapping(...)`.  
-- Tested in the Book API for production readiness.  
 
-### Version 1.5.0 – When Aras Becomes Simple ✨
-- Completed **Aras integration** with simplified abstractions.  
-- Full alignment across Business, EF, Mediator, Messaging.  
-- Integration events now **pure notifications** (fan-out).  
-- Kafka + Hosting layers unified on `PublishAsync`.  
----
 
 ### **Older Versions** (summary)
-### **1.4.5** — *Patch Release: Event Semantics*
+* **1.5.1** – Native Mapping Arrives 
+* **1.5.0** – When Aras Becomes Simple 
+* **1.4.5** — *Patch Release: Event Semantics*
 * **1.4.4** — Logging improvements, hybrid config, Elastic APM opt-in, perf boosts.
 * **1.4.2** — Removed `SaveEntitiesAsync`; removed obsolete multi-database DbContext; alignment with EF & Business.
 * **1.4.1** — Patch bump & docs.
