@@ -91,32 +91,66 @@ public class FranzMapper : IFranzMapper
            def == typeof(IList<>);
   }
 
-  private object MapCollection(Type sourceType, Type destType, object source)
+  private object MapCollection(Type sourceType, Type destType, object? source)
   {
-    var sourceEnumerable = source as IEnumerable;
-    if (sourceEnumerable == null)
-      throw new InvalidOperationException($"Source {sourceType} is not enumerable");
-
-    var elementType = destType.GetGenericArguments()[0];
-    var listType = typeof(List<>).MakeGenericType(elementType);
-    var list = (IList)Activator.CreateInstance(listType)!;
-
-    foreach (var item in sourceEnumerable)
+    // 1. Null-safe
+    if (source is null)
     {
-      // Call Map<TSourceElement, TDestElement>
-      var mappedItem = typeof(FranzMapper)
-          .GetMethod(nameof(Map), new[] { item.GetType() })!
-          .MakeGenericMethod(item.GetType(), elementType)
-          .Invoke(this, new[] { item });
-
-      list.Add(mappedItem!);
+      var elem = destType.GetGenericArguments().FirstOrDefault() ?? typeof(object);
+      if (destType.IsArray) return Array.CreateInstance(elem, 0);
+      return Activator.CreateInstance(typeof(List<>).MakeGenericType(elem))!;
     }
 
-    // If target type is interface, return as is
-    if (IsCollectionInterface(destType))
-      return list;
+    // 2. Ensure it's enumerable
+    if (source is not IEnumerable srcEnum)
+      throw new InvalidOperationException($"Source {sourceType} is not enumerable");
 
-    // Otherwise cast to requested concrete type
-    return Convert.ChangeType(list, destType);
+    // 3. Work out element types
+    var destElemType = destType.IsArray
+        ? destType.GetElementType()!
+        : destType.GetGenericArguments()[0];
+
+    // 4. Prepare a working List<destElemType>
+    var listType = typeof(List<>).MakeGenericType(destElemType);
+    var list = (IList)Activator.CreateInstance(listType)!;
+
+    // 5. Get open generic Map<TSource,TDest>
+    var mapMethod = typeof(FranzMapper)
+        .GetMethods()
+        .First(m => m.Name == nameof(Map) && m.IsGenericMethodDefinition && m.GetGenericArguments().Length == 2);
+
+    foreach (var item in srcEnum)
+    {
+      if (item is null) { list.Add(default!); continue; }
+
+      var concrete = mapMethod.MakeGenericMethod(item.GetType(), destElemType);
+      var mapped = concrete.Invoke(this, new[] { item });
+      list.Add(mapped!);
+    }
+
+    // 6. Shape output
+    if (destType.IsArray)
+    {
+      var arr = Array.CreateInstance(destElemType, list.Count);
+      list.CopyTo(arr, 0);
+      return arr;
+    }
+
+    if (destType.IsInterface)
+      return list; // e.g. IEnumerable<T>, IReadOnlyCollection<T>, IList<T>
+
+    if (destType.IsAssignableFrom(listType))
+      return list; // destination is List<T>
+
+    // Last resort: try to build the concrete destination and populate
+    var destCollection = Activator.CreateInstance(destType);
+    if (destCollection is IList destList)
+    {
+      foreach (var obj in list) destList.Add(obj);
+      return destList;
+    }
+
+    return list; // fallback
   }
+
 }

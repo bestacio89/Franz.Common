@@ -226,7 +226,7 @@ Perfect — here’s the **main README updated with v1.5.1** so it flows right a
 ---
 
 ## 📌 Changelog
-**Latest Version:** `1.5.6`
+**Latest Version:** `1.5.7`
 
 ### ✨ Highlights
 - ⚡ By-name fallback mapping (zero config).

@@ -270,7 +270,7 @@ Framework is closer to being a self-contained, end-to-end enterprise stack.
 - Cleaned ServiceCollectionExtensions with fail-fast guards
 - Kafka consumer: fail-fast on invalid payloads, structured exception logging
 - Consistent DDD exception usage (NotFoundException, TechnicalException)
-## 1.5.6 - 2025-09-23
+## 1.5.7 - 2025-09-23
 ### Added
 
 - `AddFranzMapping` overload with **assembly scanning** for automatic profile registration.

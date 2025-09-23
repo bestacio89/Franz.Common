@@ -4,7 +4,7 @@ A full-featured caching module for the** Franz Framework**.
 Provides pluggable cache providers(Memory, Distributed, Redis), request caching via Mediator pipelines, settings cache, and built-in observability with Serilog + OpenTelemetry.
 
 ---
-- **Current Version**: 1.5.6
+- **Current Version**: 1.5.7
 ---
 
 ## ? Features
