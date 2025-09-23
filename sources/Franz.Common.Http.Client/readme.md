@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Http.Client**
+# **Franz.Common.Http.Client**
 
 A powerful library within the **Franz Framework** that simplifies the creation, configuration, and management of HTTP clients in .NET applications. This package provides tools for handling HTTP requests, authentication, custom request builders, and error management, enabling consistent and efficient communication with external APIs.
 
@@ -31,7 +31,7 @@ A powerful library within the **Franz Framework** that simplifies the creation, 
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

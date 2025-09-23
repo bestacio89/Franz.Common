@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Http.Documentation**
+# **Franz.Common.Http.Documentation**
 
 A robust library within the **Franz Framework** designed to simplify and enhance API documentation for **ASP.NET Core** applications. This package provides seamless integration with Swagger, API versioning, and route conventions, enabling clear, versioned, and comprehensive API documentation.
 
@@ -21,7 +21,7 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

@@ -1,4 +1,4 @@
-﻿# **Franz.Common.IO**
+# **Franz.Common.IO**
 
 A utility library within the **Franz Framework** designed to simplify input/output operations in **.NET** applications. This package provides streamlined solutions for managing temporary files and file streams, ensuring efficient and clean file handling.
 
@@ -13,7 +13,7 @@ A utility library within the **Franz Framework** designed to simplify input/outp
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Messaging.MassTransit**
+# **Franz.Common.Messaging.MassTransit**
 
 A library within the **Franz Framework** that integrates **MassTransit** with messaging workflows. This package simplifies the setup and management of Kafka-based messaging using **MassTransit**, providing tools for producers, consumers, and client registrations.
 
@@ -19,7 +19,7 @@ A library within the **Franz Framework** that integrates **MassTransit** with me
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

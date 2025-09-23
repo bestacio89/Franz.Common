@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Messaging.Hosting.MediatR**
+# **Franz.Common.Messaging.Hosting.MediatR**
 
 An extension library within the **Franz Framework** that integrates **MediatR** with hosted messaging services. This package provides support for dispatching messages using **MediatR** pipelines within hosted services, enabling clean, decoupled, and testable messaging workflows.
 
@@ -17,7 +17,7 @@ An extension library within the **Franz Framework** that integrates **MediatR** 
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

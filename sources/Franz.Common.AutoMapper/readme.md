@@ -1,4 +1,4 @@
-﻿# **Franz.Common.AutoMapper**
+# **Franz.Common.AutoMapper**
 
 A utility library within the **Franz Framework** designed to streamline the integration and configuration of **AutoMapper** in .NET applications. This package includes helpful extensions for dependency injection, simplifying the setup and usage of AutoMapper profiles.
 
@@ -15,7 +15,7 @@ A utility library within the **Franz Framework** designed to streamline the inte
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -110,3 +110,4 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
 ---
+

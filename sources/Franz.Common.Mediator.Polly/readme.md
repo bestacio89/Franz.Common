@@ -1,7 +1,7 @@
-﻿# **Franz.Common.Mediator.Polly**
+# **Franz.Common.Mediator.Polly**
 
 **Franz.Common.Mediator.Polly** extends [Franz.Common.Mediator](https://www.nuget.org/packages/Franz.Common.Mediator/) with **Polly-based resilience pipelines**.
-It gives you **retry, circuit breaker, timeout, bulkhead isolation, and advanced circuit breaker** for Mediator requests — all with **enriched Serilog logging built-in**.
+It gives you **retry, circuit breaker, timeout, bulkhead isolation, and advanced circuit breaker** for Mediator requests � all with **enriched Serilog logging built-in**.
 
 No extra wiring. No extra boilerplate. Just plug and go.
 
@@ -11,14 +11,14 @@ No extra wiring. No extra boilerplate. Just plug and go.
 
 ---
 
-## ✨ Features
+## ? Features
 
-* 🔄 **Retry Pipeline**: automatic retries with backoff.
-* ⚡ **Circuit Breaker Pipeline**: stop flooding failing dependencies.
-* 🧠 **Advanced Circuit Breaker Pipeline**: trip based on failure rate in a rolling window.
-* ⏱️ **Timeout Pipeline**: abort long-running requests.
-* 🚧 **Bulkhead Pipeline**: limit concurrent executions.
-* 📝 **Enriched Logging**: every pipeline execution logs:
+* ?? **Retry Pipeline**: automatic retries with backoff.
+* ? **Circuit Breaker Pipeline**: stop flooding failing dependencies.
+* ?? **Advanced Circuit Breaker Pipeline**: trip based on failure rate in a rolling window.
+* ?? **Timeout Pipeline**: abort long-running requests.
+* ?? **Bulkhead Pipeline**: limit concurrent executions.
+* ?? **Enriched Logging**: every pipeline execution logs:
 
   * Correlation ID
   * Request type
@@ -31,7 +31,7 @@ Logs are pushed into **Serilog** with all the contextual properties you already 
 
 ---
 
-## 📦 Installation
+## ?? Installation
 
 ```bash
 dotnet add package Franz.Common.Mediator.Polly
@@ -39,7 +39,7 @@ dotnet add package Franz.Common.Mediator.Polly
 
 ---
 
-## ⚙️ Setup
+## ?? Setup
 
 ### 1. Centralized Policy Registration
 
@@ -51,7 +51,7 @@ using Franz.Common.Mediator.Polly.Extensions;
 
 builder.Services.AddFranzPollyPolicies(options =>
 {
-    // 🔁 Retry policy with exponential backoff
+    // ?? Retry policy with exponential backoff
     options.Policies["DefaultRetry"] = Policy
         .Handle<Exception>()
         .WaitAndRetryAsync(
@@ -59,7 +59,7 @@ builder.Services.AddFranzPollyPolicies(options =>
             sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))
         );
 
-    // 🚦 Circuit breaker (basic)
+    // ?? Circuit breaker (basic)
     options.Policies["DefaultCircuitBreaker"] = Policy
         .Handle<Exception>()
         .CircuitBreakerAsync(
@@ -67,7 +67,7 @@ builder.Services.AddFranzPollyPolicies(options =>
             durationOfBreak: TimeSpan.FromSeconds(30)
         );
 
-    // 🧠 Advanced circuit breaker (failure rate over time)
+    // ?? Advanced circuit breaker (failure rate over time)
     options.Policies["DefaultAdvancedBreaker"] = Policy
         .Handle<Exception>()
         .AdvancedCircuitBreakerAsync(
@@ -77,11 +77,11 @@ builder.Services.AddFranzPollyPolicies(options =>
             durationOfBreak: TimeSpan.FromSeconds(15)
         );
 
-    // ⏱ Timeout policy
+    // ? Timeout policy
     options.Policies["DefaultTimeout"] = Policy
         .TimeoutAsync(TimeSpan.FromSeconds(5));
 
-    // 🚧 Bulkhead isolation
+    // ?? Bulkhead isolation
     options.Policies["DefaultBulkhead"] = Policy
         .BulkheadAsync(
             maxParallelization: 10,
@@ -94,7 +94,7 @@ builder.Services.AddFranzPollyPolicies(options =>
 
 ### 2. Register Mediator + Pipelines
 
-Now wire policies into pipelines by name — the Franz way:
+Now wire policies into pipelines by name � the Franz way:
 
 ```csharp
 using Franz.Common.Mediator.Extensions;
@@ -109,7 +109,7 @@ builder.Services
     .AddFranzBulkheadPipeline("DefaultBulkhead");
 ```
 
-That’s it. One registry + one mapping = **full resilience layer** with enriched logging.
+That�s it. One registry + one mapping = **full resilience layer** with enriched logging.
 
 ---
 
@@ -118,26 +118,26 @@ That’s it. One registry + one mapping = **full resilience layer** with enriche
 When a request runs successfully:
 
 ```plaintext
-▶️ Handling GetBookQuery [correlationId=abc123] with policy DefaultRetry
-✅ GetBookQuery [correlationId=abc123] completed in 54ms (policy DefaultRetry)
+?? Handling GetBookQuery [correlationId=abc123] with policy DefaultRetry
+? GetBookQuery [correlationId=abc123] completed in 54ms (policy DefaultRetry)
 ```
 
 If retries fail and the circuit breaker opens:
 
 ```plaintext
-❌ GetBookQuery [correlationId=abc123] failed after 3 retries (policy DefaultRetry)
-⚡ Circuit opened for 30s (policy DefaultCircuitBreaker)
+? GetBookQuery [correlationId=abc123] failed after 3 retries (policy DefaultRetry)
+? Circuit opened for 30s (policy DefaultCircuitBreaker)
 ```
 
 If a timeout is triggered:
 
 ```plaintext
-⏱️ GetBookQuery [correlationId=abc123] timed out after 5s (policy DefaultTimeout)
+?? GetBookQuery [correlationId=abc123] timed out after 5s (policy DefaultTimeout)
 ```
 
 ---
 
-## 🧩 Pipelines Overview
+## ?? Pipelines Overview
 
 | Pipeline                | Options Class                                | Example Policy Key         |
 | ----------------------- | -------------------------------------------- | -------------------------- |
@@ -151,7 +151,7 @@ Each pipeline resolves its named policy from the `IReadOnlyPolicyRegistry<string
 
 ---
 
-## ✅ Benefits
+## ? Benefits
 
 * **Centralized** resilience policy registration.
 * **Opt-in**: only register the pipelines you need.
@@ -161,14 +161,14 @@ Each pipeline resolves its named policy from the `IReadOnlyPolicyRegistry<string
 
 ---
 
-## 🔮 Roadmap
+## ?? Roadmap
 
 * [ ] Policy composition helpers (chaining retry + circuit breaker).
 * [ ] Prebuilt default policy sets for common scenarios.
 
 ---
 
-👉 With `Franz.Common.Mediator.Polly`, using Polly inside Mediator is **frictionless**: resilience + structured logs, with just two extension calls.
+?? With `Franz.Common.Mediator.Polly`, using Polly inside Mediator is **frictionless**: resilience + structured logs, with just two extension calls.
 
 ---
 
@@ -178,3 +178,4 @@ version 1.4.4
 
 - Corrected Polly policy registry to use generic IAsyncPolicy<HttpResponseMessage>, avoiding invalid cast exceptions
 - Ensured pipeline registrations handle generic types cleanly
+

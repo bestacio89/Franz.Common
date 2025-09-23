@@ -1,10 +1,10 @@
-﻿# **Franz.Common.Logging**
+# **Franz.Common.Logging**
 
 A comprehensive logging library within the **Franz Framework**, designed to enhance application monitoring and diagnostics using **Serilog** and **Elastic APM**.
 This package provides tools for centralized logging, tracing, and seamless integration with ASP.NET Core applications.
 
 ---
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 
 ---
 
@@ -36,11 +36,11 @@ This package provides tools for centralized logging, tracing, and seamless integ
 
 ## **Dependencies**
 
-* **Elastic.Apm.NetCoreAll** (1.25.1) – APM agent integration.
-* **Elastic.Apm.SerilogEnricher** (8.6.1) – Correlates APM traces with logs.
-* **Serilog.AspNetCore** (8.0.0) – ASP.NET Core logging provider.
-* **Serilog.Enrichers.Demystifier** (1.0.2) – Clean stack traces in logs.
-* **Serilog.Enrichers.Environment** (2.3.0) – Environment metadata enrichment.
+* **Elastic.Apm.NetCoreAll** (1.25.1) � APM agent integration.
+* **Elastic.Apm.SerilogEnricher** (8.6.1) � Correlates APM traces with logs.
+* **Serilog.AspNetCore** (8.0.0) � ASP.NET Core logging provider.
+* **Serilog.Enrichers.Demystifier** (1.0.2) � Clean stack traces in logs.
+* **Serilog.Enrichers.Environment** (2.3.0) � Environment metadata enrichment.
 
 ---
 
@@ -76,8 +76,8 @@ Hardcoded sinks with enforced dev/prod differences:
 using Franz.Common.Logging.Extensions;
 
 var host = Host.CreateDefaultBuilder(args)
-    .UseLog() // Dev → Console + Debug + File
-              // Prod → Console + JSON file + Log file
+    .UseLog() // Dev ? Console + Debug + File
+              // Prod ? Console + JSON file + Log file
     .Build();
 
 await host.RunAsync();
@@ -162,8 +162,8 @@ To enable Elastic APM in production, configure `ElasticApm` in `appsettings.json
 
 | Mode             | Sinks Defined | Environment Aware | Configurable via JSON | APM Setup  |
 | ---------------- | ------------- | ----------------- | --------------------- | ---------- |
-| `UseLog()`       | Hardcoded     | ✅ Yes (Dev/Prod)  | ❌ No                  | DEBUG only |
-| `UseHybridLog()` | appsettings   | ❌ No              | ✅ Yes                 | DEBUG only |
+| `UseLog()`       | Hardcoded     | ? Yes (Dev/Prod)  | ? No                  | DEBUG only |
+| `UseHybridLog()` | appsettings   | ? No              | ? Yes                 | DEBUG only |
 
 ---
 
@@ -206,8 +206,8 @@ This library is licensed under the **MIT License**. See the `LICENSE` file for m
 
 * Introduced **environment-aware logging defaults** via `UseLog()`.
 
-  * Development → Verbose console + daily rolling file (7-day retention).
-  * Production → Concise console + structured JSON (30-day retention).
+  * Development ? Verbose console + daily rolling file (7-day retention).
+  * Production ? Concise console + structured JSON (30-day retention).
 * Bound `Serilog.Log.Logger` for static logging (e.g., Polly callbacks).
 * Improved Elastic APM correlation IDs + structured enrichments.
 * Added automatic daily log rotation.
@@ -229,7 +229,7 @@ This library is licensed under the **MIT License**. See the `LICENSE` file for m
 
 * Use `UseLog()` for **strict, environment-aware logging** in most applications (APIs, background services).
 * Use `UseHybridLog()` when you need **flexible, configuration-driven logging**, usually in enterprise apps with strong DevOps pipelines.
-* Elastic APM in **production** is always **opt-in** — wire it yourself if your infra requires it. Franz only enables APM automatically in **DEBUG** to help with local testing.
+* Elastic APM in **production** is always **opt-in** � wire it yourself if your infra requires it. Franz only enables APM automatically in **DEBUG** to help with local testing.
 
 ---
 
@@ -237,8 +237,9 @@ This library is licensed under the **MIT License**. See the `LICENSE` file for m
 
 | Mode             | Sinks Defined | Environment Aware | Configurable via JSON | APM Setup  |
 | ---------------- | ------------- | ----------------- | --------------------- | ---------- |
-| `UseLog()`       | Hardcoded     | ✅ Yes (Dev/Prod)  | ❌ No                  | DEBUG only |
-| `UseHybridLog()` | appsettings   | ❌ No              | ✅ Yes                 | DEBUG only |
+| `UseLog()`       | Hardcoded     | ? Yes (Dev/Prod)  | ? No                  | DEBUG only |
+| `UseHybridLog()` | appsettings   | ? No              | ? Yes                 | DEBUG only |
 
 ---
+
 

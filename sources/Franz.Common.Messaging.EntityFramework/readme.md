@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Messaging.EntityFramework**
+# **Franz.Common.Messaging.EntityFramework**
 
 A specialized library within the **Franz Framework** designed to integrate **Entity Framework Core** with messaging workflows. This package provides tools for managing database transactions seamlessly in messaging scenarios, ensuring consistency across distributed systems.
 
@@ -17,7 +17,7 @@ A specialized library within the **Franz Framework** designed to integrate **Ent
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

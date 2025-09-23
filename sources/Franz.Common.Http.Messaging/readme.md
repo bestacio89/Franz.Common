@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Http.Messaging**
+# **Franz.Common.Http.Messaging**
 
 A specialized library within the **Franz Framework**, designed to streamline the integration of messaging systems, health checks, and transaction management for HTTP-based services in **ASP.NET Core** applications. This package provides tools to ensure seamless messaging health monitoring and transactional consistency in distributed systems.
 
@@ -17,7 +17,7 @@ A specialized library within the **Franz Framework**, designed to streamline the
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -131,3 +131,4 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Upgrade version to .net 9.0.8
 - New features and improvements
 - Mediator concepts separated and compatible with both custom mediator and Mediatr
+

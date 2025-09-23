@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Http.Authentication**
+# **Franz.Common.Http.Authentication**
 
 A specialized library within the **Franz Framework** that provides streamlined configurations for **JWT Bearer Authentication** and Swagger integration in **ASP.NET Core** applications. This package simplifies secure API development by integrating authentication mechanisms and enhancing API documentation with authentication workflows.
 
@@ -17,7 +17,7 @@ A specialized library within the **Franz Framework** that provides streamlined c
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -160,4 +160,5 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
 

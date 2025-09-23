@@ -1,7 +1,7 @@
-﻿# Franz.Common.Mediator
+# Franz.Common.Mediator
 
 Franz.Common.Mediator is a **production-grade mediator library** for .NET that goes beyond MediatR.
-It’s **framework-agnostic, configurable, observable, resilient, and testable** — built for real enterprise systems.
+It�s **framework-agnostic, configurable, observable, resilient, and testable** � built for real enterprise systems.
 
 Unlike minimal mediators, Franz ships with:
 
@@ -18,7 +18,7 @@ Unlike minimal mediators, Franz ships with:
 
 ---
 
-## 📦 Installation
+## ?? Installation
 
 ```bash
 dotnet add package Franz.Common.Mediator
@@ -26,7 +26,7 @@ dotnet add package Franz.Common.Mediator
 
 ---
 
-## 🚀 Quick Start
+## ?? Quick Start
 
 ### 1. Define a Command and Handler
 
@@ -79,18 +79,18 @@ else
 
 ---
 
-## 🧩 Pipelines (Cross-Cutting Concerns)
+## ?? Pipelines (Cross-Cutting Concerns)
 
 Franz ships with many built-in pipelines, all **options-driven**:
 
-* **LoggingPipeline** → request/response logging.
-* **ValidationPipeline** → runs all `IValidator<TRequest>`.
-* **RetryPipeline** → retry transient errors.
-* **TimeoutPipeline** → cancel long-running requests.
-* **CircuitBreakerPipeline** → stop calling failing handlers.
-* **BulkheadPipeline** → limit concurrent requests.
-* **CachingPipeline** → cache query results.
-* **TransactionPipeline** → commit/rollback with `IUnitOfWork`.
+* **LoggingPipeline** ? request/response logging.
+* **ValidationPipeline** ? runs all `IValidator<TRequest>`.
+* **RetryPipeline** ? retry transient errors.
+* **TimeoutPipeline** ? cancel long-running requests.
+* **CircuitBreakerPipeline** ? stop calling failing handlers.
+* **BulkheadPipeline** ? limit concurrent requests.
+* **CachingPipeline** ? cache query results.
+* **TransactionPipeline** ? commit/rollback with `IUnitOfWork`.
 
 Example pipeline:
 
@@ -118,7 +118,7 @@ public class RetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 
 ---
 
-## 📋 Options Pattern
+## ?? Options Pattern
 
 All pipeline settings are configured centrally with `FranzMediatorOptions`:
 
@@ -142,7 +142,7 @@ namespace Franz.Common.Mediator.Options
 
 ---
 
-## ⚙️ Configuring Pipelines with Options
+## ?? Configuring Pipelines with Options
 
 In `Program.cs`:
 
@@ -201,7 +201,7 @@ flowchart TD
 
 ---
 
-## 🔍 Observability & Context
+## ?? Observability & Context
 
 Every request/notification/stream is observable via `IMediatorObserver`.
 
@@ -209,13 +209,13 @@ Every request/notification/stream is observable via `IMediatorObserver`.
 public class ConsoleMediatorObserver : IMediatorObserver
 {
     public Task OnRequestStarted(Type req, string correlationId) =>
-        Task.Run(() => Console.WriteLine($"➡ {req.Name} started [{correlationId}]"));
+        Task.Run(() => Console.WriteLine($"? {req.Name} started [{correlationId}]"));
 
     public Task OnRequestCompleted(Type req, string correlationId, TimeSpan duration) =>
-        Task.Run(() => Console.WriteLine($"✅ {req.Name} completed in {duration.TotalMilliseconds} ms"));
+        Task.Run(() => Console.WriteLine($"? {req.Name} completed in {duration.TotalMilliseconds} ms"));
 
     public Task OnRequestFailed(Type req, string correlationId, Exception ex) =>
-        Task.Run(() => Console.WriteLine($"❌ {req.Name} failed: {ex.Message}"));
+        Task.Run(() => Console.WriteLine($"? {req.Name} failed: {ex.Message}"));
 }
 ```
 
@@ -229,7 +229,7 @@ MediatorContext.Current.CorrelationId
 
 ---
 
-## ❗ Error & Result Handling
+## ? Error & Result Handling
 
 Every handler returns a `Result` or `Result<T>`.
 
@@ -243,7 +243,7 @@ if (!result.IsSuccess)
 
 ---
 
-## 🧪 Testing
+## ?? Testing
 
 Use `TestDispatcher` to run handlers without DI:
 
@@ -259,7 +259,7 @@ Assert.True(result.IsSuccess);
 
 ---
 
-## 🌐 ASP.NET Core Integration
+## ?? ASP.NET Core Integration
 
 ```csharp
 app.MapPost("/users", async (CreateUserCommand cmd, IDispatcher dispatcher) =>
@@ -271,7 +271,7 @@ app.MapPost("/users", async (CreateUserCommand cmd, IDispatcher dispatcher) =>
 
 ---
 
-## 📐 Design Principles
+## ?? Design Principles
 
 * **Framework-agnostic**
 * **Contracts only** (no infra hardcoding)
@@ -281,15 +281,15 @@ app.MapPost("/users", async (CreateUserCommand cmd, IDispatcher dispatcher) =>
 
 ---
 
-## 📜 License
+## ?? License
 
 MIT
 
 ---
 
-## 📝 Changelog
+## ?? Changelog
 
-### v1.3.4 – 2025-09-15
+### v1.3.4 � 2025-09-15
 
 * Introduced **Options pattern**.
 * Pipelines upgraded to be options-aware.
@@ -298,7 +298,7 @@ MIT
 
 ---
 
-### v1.3.5 – 2025-09-17
+### v1.3.5 � 2025-09-17
 
 * Fixed pipeline registration (open generics for DI).
 * Registered sub-options for DI.
@@ -306,31 +306,31 @@ MIT
 
 ---
 
-### v1.3.6 – 2025-09-15
+### v1.3.6 � 2025-09-15
 
-* Removed MediatR → now fully `Franz.Mediator`.
+* Removed MediatR ? now fully `Franz.Mediator`.
 * `IIntegrationEvent : INotification` for clean event flow.
 * `PublishAsync` powers event handling & pipelines.
 * Works standalone, no DI required.
 
 ---
 
-### v1.3.7 – 2025-09-17
+### v1.3.7 � 2025-09-17
 
 * Pipelines are now **opt-in**.
 
 ---
 
-### v1.3.12 – 2025-09-18
+### v1.3.12 � 2025-09-18
 
 * LoggingPreProcessor logs actual runtime request names.
-* LoggingPostProcessor adds prefixes → `[Post-Command]`, `[Post-Query]`, `[Post-Request]`.
+* LoggingPostProcessor adds prefixes ? `[Post-Command]`, `[Post-Query]`, `[Post-Request]`.
 * Pre/Post processors provide **business-level observability**.
 * Logs are lightweight, clean, and consistent.
 
 ---
 
-### v1.3.13 – 2025-09-18
+### v1.3.13 � 2025-09-18
 
 * Validation pipelines upgraded with environment-aware logging (Dev = verbose, Prod = lean).
 * Added `NotificationValidationPipeline<TNotification>` and `NotificationValidationException`.
@@ -348,25 +348,26 @@ MIT
 
 ---
 
-### v1.4.1 – 2025-09-20
+### v1.4.1 � 2025-09-20
 
 * **Opt-in pipeline registration** (`AddFranzRetryPipeline`, etc.).
 * Removed `AddFranzResiliencePipelines` (forced explicit registration).
-* **RetryPipeline** → transient errors only, custom backoff, cancellation support.
-* **BulkheadPipeline** → correct queue limiting, prevents “thundering herd”.
-* **CircuitBreakerPipeline** → lock-free, proper Half-Open, thread-safe state.
-* **Observability** → pipelines integrated with `IMediatorObserver`.
+* **RetryPipeline** ? transient errors only, custom backoff, cancellation support.
+* **BulkheadPipeline** ? correct queue limiting, prevents �thundering herd�.
+* **CircuitBreakerPipeline** ? lock-free, proper Half-Open, thread-safe state.
+* **Observability** ? pipelines integrated with `IMediatorObserver`.
 
 ---
 
-### v1.4.5 – 2025-09-21
+### v1.4.5 � 2025-09-21
 
 Patch release aligning **commands, queries, and events** with proper semantics:
 
-* **Commands/Queries** → `SendAsync` (single handler, request/response).
-* **Events (Domain + Integration)** → `PublishAsync` (fan-out, fire-and-forget).
+* **Commands/Queries** ? `SendAsync` (single handler, request/response).
+* **Events (Domain + Integration)** ? `PublishAsync` (fan-out, fire-and-forget).
 * Fixed bug where integration events were incorrectly dispatched via `Send`.
 * Updated `Franz.Common.Business`, `EntityFramework`, `Messaging.Hosting.Mediator`, and `Messaging.Kafka` to enforce correct notification semantics.
 * Standardized on **publish/notify** for integration events across all layers.
 
 ---
+

@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Serialization**
+# **Franz.Common.Serialization**
 
 A serialization utility library within the **Franz Framework** that simplifies JSON and byte array serialization. This package includes custom JSON converters, serializers, and extensions for seamless integration into .NET applications.
 
@@ -20,7 +20,7 @@ A serialization utility library within the **Franz Framework** that simplifies J
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

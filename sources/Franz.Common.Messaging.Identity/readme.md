@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Messaging.Identity**
+# **Franz.Common.Messaging.Identity**
 
 A library within the **Franz Framework** designed to integrate identity management with messaging workflows. This package provides tools for handling authorization contexts, building identity-based message structures, and ensuring seamless communication between identity and messaging services.
 
@@ -17,7 +17,7 @@ A library within the **Franz Framework** designed to integrate identity manageme
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

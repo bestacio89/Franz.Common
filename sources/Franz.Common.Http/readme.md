@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Http**
+# **Franz.Common.Http**
 
 A library within the **Franz Framework** designed to simplify HTTP-related operations, enhance exception handling, and streamline routing and serialization in **ASP.NET Core** applications. This package provides robust tools for managing errors, configuring application pipelines, and extending routing capabilities.
 
@@ -24,7 +24,7 @@ A library within the **Franz Framework** designed to simplify HTTP-related opera
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

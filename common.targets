@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <!-- Target Framework -->
@@ -6,26 +6,22 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-
     <!-- Versioning -->
-    <Version>1.5.3</Version>
-    <AssemblyVersion>1.5.3</AssemblyVersion>
-    <FileVersion>1.5.3</FileVersion>
-
+    <Version>1.5.4</Version>
+    <AssemblyVersion>1.5.4</AssemblyVersion>
+    <FileVersion>1.5.4</FileVersion>
     <!-- Author -->
     <Authors>Bernardo Estacio Abreu</Authors>
   </PropertyGroup>
-
   <PropertyGroup>
     <!-- Test Settings -->
     <RunSettingsFilePath>$(MSBuildProjectDirectory)\..\..\test.runsettings</RunSettingsFilePath>
   </PropertyGroup>
-
   <PropertyGroup>
     <!-- NuGet Metadata -->
     <PackageId>$(MSBuildProjectName)</PackageId>
     <Description>Shared utility library for the Franz Framework.</Description>
-    <Copyright>Copyright © 2025 Bernardo Estacio Abreu</Copyright>
+    <Copyright>Copyright Â© 2025 Bernardo Estacio Abreu</Copyright>
     <RepositoryUrl>https://dev.azure.com/AjnaTellus/Franz/_git/Franz.Common</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <RepositoryBranch>main</RepositoryBranch>
@@ -35,7 +31,6 @@
     <PackageReadmeFile>readme.md</PackageReadmeFile>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
-
   <!-- Include README File -->
   <ItemGroup>
     <None Include="$(MSBuildProjectDirectory)\readme.md" Pack="true" PackagePath="" />

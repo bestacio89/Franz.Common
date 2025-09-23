@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Bootstrap**
+# **Franz.Common.Bootstrap**
 
 A foundational library within the **Franz Framework**, designed to simplify the application startup process by centralizing dependency injection, resource management, and configuration. This package integrates seamlessly with other **Franz Framework** libraries to provide a streamlined and modular development experience.
 
@@ -22,7 +22,7 @@ A foundational library within the **Franz Framework**, designed to simplify the 
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

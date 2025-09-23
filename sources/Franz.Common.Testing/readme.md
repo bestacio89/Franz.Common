@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Testing**
+# **Franz.Common.Testing**
 
 A library within the **Franz Framework** designed to enhance unit testing in .NET applications. This package simplifies test development by integrating with popular testing frameworks and providing utilities for mock setups and fluent assertions.
 
@@ -20,7 +20,7 @@ A library within the **Franz Framework** designed to enhance unit testing in .NE
 
 ## **Version Information**
 
--- **Current Version**: 1.5.3
+-- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

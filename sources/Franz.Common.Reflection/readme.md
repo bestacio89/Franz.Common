@@ -1,4 +1,4 @@
-﻿# **Franz.Common.Reflection**
+# **Franz.Common.Reflection**
 
 A utility library within the **Franz Framework** that provides reflection-based tools to simplify and enhance application development. This package includes helper classes, extensions, and abstractions for working with assemblies, types, and dependency injection.
 
@@ -20,7 +20,7 @@ A utility library within the **Franz Framework** that provides reflection-based 
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

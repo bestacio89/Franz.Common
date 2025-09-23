@@ -1,4 +1,4 @@
-﻿# **Franz.Common.MongoDB**
+# **Franz.Common.MongoDB**
 
 A library within the **Franz Framework** designed to streamline the integration of MongoDB into .NET applications. This package provides utilities for configuring MongoDB services and registering them with dependency injection.
 
@@ -17,7 +17,7 @@ A library within the **Franz Framework** designed to streamline the integration 
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

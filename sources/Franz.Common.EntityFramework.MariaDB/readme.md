@@ -1,4 +1,4 @@
-﻿# **Franz.Common.EntityFramework.MariaDB**
+# **Franz.Common.EntityFramework.MariaDB**
 
 A library within the **Franz Framework** designed to extend **Entity Framework Core** support for **MariaDB** using the **Pomelo.EntityFrameworkCore.MySql** provider. This package simplifies the configuration and integration of MariaDB with EF Core in .NET applications.
 
@@ -17,7 +17,7 @@ A library within the **Franz Framework** designed to extend **Entity Framework C
 
 ## **Version Information**
 
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -130,3 +130,4 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+

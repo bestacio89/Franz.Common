@@ -1,32 +1,32 @@
-﻿````markdown
-# Franz.Common.Aras – v1.5.0 🎉
+````markdown
+# Franz.Common.Aras � v1.5.0 ??
 
 **Franz.Common.Aras** integrates **ARAS Innovator** into the **Franz Framework** with clean, DDD-driven abstractions.  
-It lets you treat ARAS as just another persistence provider — with **Entities**, **Aggregates**, **Unit of Work**, **Snapshots**, **Diagnostics**, and an **InMemory provider for testing**.
+It lets you treat ARAS as just another persistence provider � with **Entities**, **Aggregates**, **Unit of Work**, **Snapshots**, **Diagnostics**, and an **InMemory provider for testing**.
 
 ---
 
-## 🚀 What’s New in v1.5.0
+## ?? What�s New in v1.5.0
 
-- ✅ **Concrete ARAS Innovator provider** (REST API)  
-- ✅ **Fluent mapping layer** (field ↔ property, ignores, conversions)  
-- ✅ **Unit of Work** (commit entities + aggregates atomically)  
-- ✅ **Snapshotting** (optimize large aggregates, replay only post-snapshot events)  
-- ✅ **Diagnostics decorators** (logging + OpenTelemetry tracing)  
-- ✅ **InMemory provider** (unit testing without ARAS)  
-- ✅ **AddArasInnovator bootstrapper** (EF-style DI registration)  
-- ✅ **Full samples** for Entities, Aggregates, UoW, Testing, and Snapshots  
+- ? **Concrete ARAS Innovator provider** (REST API)  
+- ? **Fluent mapping layer** (field ? property, ignores, conversions)  
+- ? **Unit of Work** (commit entities + aggregates atomically)  
+- ? **Snapshotting** (optimize large aggregates, replay only post-snapshot events)  
+- ? **Diagnostics decorators** (logging + OpenTelemetry tracing)  
+- ? **InMemory provider** (unit testing without ARAS)  
+- ? **AddArasInnovator bootstrapper** (EF-style DI registration)  
+- ? **Full samples** for Entities, Aggregates, UoW, Testing, and Snapshots  
 ````
 ---
-- **Current Version**: 1.5.3
+- **Current Version**: 1.5.4
 --- 
-## ⚙️ Installation
+## ?? Installation
 
 ```bash
 dotnet add package Franz.Common.Aras
 ````
 
-If you’re in a class library (not ASP.NET Core), also add:
+If you�re in a class library (not ASP.NET Core), also add:
 
 ```bash
 dotnet add package Microsoft.Extensions.Http
@@ -34,7 +34,7 @@ dotnet add package Microsoft.Extensions.Http
 
 ---
 
-## 🏗 Setup
+## ?? Setup
 
 Register ARAS Innovator with dependency injection:
 
@@ -59,7 +59,7 @@ services.AddArasInnovator(options =>
 
 ---
 
-## 📦 Entities (CRUD)
+## ?? Entities (CRUD)
 
 Entities are simple `Entity<Guid>` models.
 
@@ -103,7 +103,7 @@ await repo.DeleteAsync(fetched.Id);
 
 ---
 
-## 🧩 Aggregates (DDD + Events)
+## ?? Aggregates (DDD + Events)
 
 Aggregates inherit from `AggregateRoot<TEvent>` and model behavior with domain events.
 
@@ -145,7 +145,7 @@ Console.WriteLine($"Loaded aggregate with PartNumber = {loaded.PartNumber}");
 
 ---
 
-## 🔄 Unit of Work
+## ?? Unit of Work
 
 Commit entities + aggregates in one go:
 
@@ -174,7 +174,7 @@ Console.WriteLine("UoW rolled back");
 
 ---
 
-## 🧪 InMemory Provider (Testing)
+## ?? InMemory Provider (Testing)
 
 Use the in-memory contexts without ARAS server:
 
@@ -206,7 +206,7 @@ Console.WriteLine($"Reloaded aggregate: {reloaded.PartNumber}");
 
 ---
 
-## 🛠 Snapshots (Performance)
+## ?? Snapshots (Performance)
 
 Aggregates are snapshotted automatically every *N* events (default 50):
 
@@ -223,7 +223,7 @@ options.SnapshotFrequency = 25;
 
 ---
 
-## 🛰 Diagnostics
+## ?? Diagnostics
 
 Enable structured logging + tracing with decorators:
 
@@ -235,7 +235,7 @@ services.Decorate<IArasEntityContext, DiagnosticEntityContextDecorator>();
 services.Decorate<IArasAggregateContext, DiagnosticAggregateContextDecorator>();
 ```
 
-You’ll get logs for:
+You�ll get logs for:
 
 * Entity queries, saves, deletes
 * Aggregate tracking, saving, committing
@@ -252,32 +252,33 @@ Sample log:
 
 ---
 
-## ✅ Summary
+## ? Summary
 
-* **Entities** → simple CRUD
-* **Aggregates** → DDD + event sourcing
-* **Unit of Work** → atomic batch commit
-* **InMemory** → testing without ARAS
-* **Snapshots** → scalable performance
-* **Diagnostics** → enterprise observability
-* **Bootstrapper** → one-liner service registration
+* **Entities** ? simple CRUD
+* **Aggregates** ? DDD + event sourcing
+* **Unit of Work** ? atomic batch commit
+* **InMemory** ? testing without ARAS
+* **Snapshots** ? scalable performance
+* **Diagnostics** ? enterprise observability
+* **Bootstrapper** ? one-liner service registration
 
 ---
 
-## 📂 Samples
+## ?? Samples
 
 This repo includes a `samples/` folder with ready-to-run console apps:
 
-* `Sample.Entities` → CRUD with PartEntity
-* `Sample.Aggregates` → Domain events with PartAggregate
-* `Sample.UoW` → Entities + aggregates in one transaction
-* `Sample.InMemory` → Tests without ARAS
-* `Sample.Diagnostics` → Logs + tracing
+* `Sample.Entities` ? CRUD with PartEntity
+* `Sample.Aggregates` ? Domain events with PartAggregate
+* `Sample.UoW` ? Entities + aggregates in one transaction
+* `Sample.InMemory` ? Tests without ARAS
+* `Sample.Diagnostics` ? Logs + tracing
 
 ---
 
-Franz.Common.Aras v1.5.0 — **bringing ARAS into the DDD world.**
+Franz.Common.Aras v1.5.0 � **bringing ARAS into the DDD world.**
 
 ```
 
 ---
+
