@@ -2,7 +2,7 @@ using Franz.Common.Annotations;
 using Franz.Common.Business.Domain;
 using Microsoft.AspNetCore.Mvc;
 using System.Reflection;
-
+namespace Franz.Common.Messaging.Kafka;
 public static class TopicNamer
 {
   private const string TopicSuffixName = "-in";

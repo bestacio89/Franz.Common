@@ -1,8 +1,10 @@
 ﻿// ✅ General CRUD repository for individual entities
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Repositories;
 using Franz.Common.Errors;
 using Microsoft.EntityFrameworkCore;
 
+namespace Franz.Common.EntityFramework.Repositories;
 public class EntityRepository<TDbContext, TEntity> : IEntityRepository<TEntity>
     where TDbContext : DbContext
     where TEntity : class, IEntity

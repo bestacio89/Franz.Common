@@ -7,28 +7,21 @@ using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Kafka.Modeling;
 using System.Text;
-using Franz.Common.Errors; // Assuming TechnicalException lives here
+using Franz.Common.Errors; // TechnicalException
 
 namespace Franz.Common.Messaging.Kafka;
 
-public class MessagingPublisher : IMessagingPublisher
+public class MessagingPublisher(
+    IProducer<string, byte[]> producer,
+    IMessagingInitializer messagingInitializer,
+    IMessageFactory messageFactory,
+    IDispatcher dispatcher)
+  : IMessagingPublisher
 {
-  private readonly IProducer<string, byte[]> _producer;
-  private readonly IMessagingInitializer _messagingInitializer;
-  private readonly IMessageFactory _messageFactory;
-  private readonly IDispatcher _dispatcher;
-
-  public MessagingPublisher(
-      IProducer<string, byte[]> producer,
-      IMessagingInitializer messagingInitializer,
-      IMessageFactory messageFactory,
-      IDispatcher dispatcher)
-  {
-    _producer = producer;
-    _messagingInitializer = messagingInitializer;
-    _messageFactory = messageFactory;
-    _dispatcher = dispatcher;
-  }
+  private readonly IProducer<string, byte[]> _producer = producer;
+  private readonly IMessagingInitializer _messagingInitializer = messagingInitializer;
+  private readonly IMessageFactory _messageFactory = messageFactory;
+  private readonly IDispatcher _dispatcher = dispatcher;
 
   public async Task Publish<TIntegrationEvent>(TIntegrationEvent integrationEvent)
       where TIntegrationEvent : BaseDomainEvent, IIntegrationEvent
@@ -47,13 +40,13 @@ public class MessagingPublisher : IMessagingPublisher
     var topic = TopicNamer.GetTopicName(integrationEventAssembly);
 
     // Build Kafka headers
-    var confluentheaders = new Confluent.Kafka.Headers();
+    var confluentHeaders = new Confluent.Kafka.Headers();
     foreach (var header in message.Headers)
     {
       var strValue = header.Value.ToString();
       if (!string.IsNullOrEmpty(strValue))
       {
-        confluentheaders.Add(header.Key, Encoding.UTF8.GetBytes(strValue));
+        confluentHeaders.Add(header.Key, Encoding.UTF8.GetBytes(strValue));
       }
     }
 
@@ -71,13 +64,13 @@ public class MessagingPublisher : IMessagingPublisher
           topic,
           new Message<string, byte[]>
           {
-            Headers = confluentheaders,
+            Headers = confluentHeaders,
             Value = Encoding.UTF8.GetBytes(message.Body)
           });
 
-      // Optional: log delivery
+      // Optional logging hook here
       // _logger.LogInformation("Delivered {EventType} to {TopicPartitionOffset}", 
-      //     typeof(TIntegrationEvent).Name, deliveryResult.TopicPartitionOffset);
+      //   typeof(TIntegrationEvent).Name, deliveryResult.TopicPartitionOffset);
     }
     catch (Exception ex)
     {

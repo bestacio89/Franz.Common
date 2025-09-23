@@ -34,8 +34,9 @@ public static class ServiceCollectionExtensions
 
     // 🔹 Log success (if logger is present in DI)
     using var provider = services.BuildServiceProvider();
-    var logger = provider.GetService<ILoggerFactory>()?.CreateLogger("Franz.BusinessBootstrap");
-    logger?.LogInformation("✅ Franz.Business bootstrapped with {AppAssembly}", applicationAssembly.FullName);
+    provider.GetService<ILoggerFactory>()?
+            .CreateLogger("Franz.BusinessBootstrap")
+            .LogInformation("✅ Franz.Business bootstrapped with {AppAssembly}", applicationAssembly.FullName);
 
     return services;
   }
@@ -55,8 +56,10 @@ public static class ServiceCollectionExtensions
     if (applicationAssembly == null)
     {
       using var provider = services.BuildServiceProvider();
-      var logger = provider.GetService<ILoggerFactory>()?.CreateLogger("Franz.BusinessBootstrap");
-      logger?.LogWarning("⚠️ No Application assembly found for {Name}, Business layer not registered.", applicationAssemblyName);
+      provider.GetService<ILoggerFactory>()?
+              .CreateLogger("Franz.BusinessBootstrap")
+              .LogWarning("⚠️ No Application assembly found for {Name}, Business layer not registered.", applicationAssemblyName);
+
       return services;
     }
 
@@ -86,16 +89,11 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  private static Assembly? SearchApplicationAssemblyInCurrentAppDomain(string applicationAssemblyName)
-  {
-    return AppDomain.CurrentDomain
-        .GetAssemblies()
-        .FirstOrDefault(assembly =>
-        {
-          var name = assembly.GetName().Name
-                     ?? throw new TechnicalException("Assembly without a name encountered.");
-          return name.Equals(applicationAssemblyName, StringComparison.InvariantCultureIgnoreCase);
-        });
-  }
-
+  private static Assembly? SearchApplicationAssemblyInCurrentAppDomain(string applicationAssemblyName) =>
+    AppDomain.CurrentDomain
+      .GetAssemblies()
+      .FirstOrDefault(assembly =>
+          (assembly.GetName().Name
+              ?? throw new TechnicalException("Assembly without a name encountered."))
+          .Equals(applicationAssemblyName, StringComparison.InvariantCultureIgnoreCase));
 }
