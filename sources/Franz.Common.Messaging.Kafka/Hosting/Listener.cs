@@ -29,46 +29,46 @@ namespace Franz.Common.Messaging.Kafka.Hosting
 
     public event EventHandler<MessageEventArgs>? Received;
 
-    public void Listen()
-    {
-      _consumer.Subscribe(_topicName);
+   public void Listen()
+{
+    _consumer.Subscribe(_topicName);
 
-      while (true)
-      {
+    while (true)
+    {
         try
         {
-          var consumeResult = _consumer.Consume();
+            var consumeResult = _consumer.Consume();
 
-          var message = new Message
-          {
-            Headers = TransfertHeaders(consumeResult),
-            Body = consumeResult.Message.Value ?? string.Empty, // ✅ Ensure non-null
-          };
+            var message = new Message
+            {
+                Headers = TransfertHeaders(consumeResult),
+                Body = consumeResult.Message.Value ?? string.Empty, // ✅ Ensure non-null
+            };
 
-          _logger.LogInformation(
-              "Consumed message from topic {Topic}, partition {Partition}, offset {Offset}, key {Key}",
-              consumeResult.Topic,
-              consumeResult.Partition,
-              consumeResult.Offset,
-              "<ignore>" // ✅ since key is Confluent.Kafka.Ignore
-          );
+            _logger.LogInformation(
+                "Consumed message from topic {Topic}, partition {Partition}, offset {Offset}, key {Key}",
+                consumeResult.Topic,
+                consumeResult.Partition,
+                consumeResult.Offset,
+                "<ignore>" // ✅ since key is Confluent.Kafka.Ignore
+            );
 
-          Received?.Invoke(this, new MessageEventArgs(message));
+            Received?.Invoke(this, new MessageEventArgs(message));
         }
         catch (ConsumeException e)
         {
-          _logger.LogError(e,
-              "Kafka consume error on topic {Topic}, partition {Partition}: {Reason}",
-              e.ConsumerRecord?.Topic ?? _topicName,
-              e.ConsumerRecord?.Partition.Value ?? -1,
-              e.Error.Reason);
+            _logger.LogError(e,
+                "Kafka consume error on topic {Topic}, partition {Partition}: {Reason}",
+                e.ConsumerRecord?.Topic ?? _topicName,
+                e.ConsumerRecord?.Partition.Value ?? -1,
+                e.Error.Reason);
         }
         catch (Exception ex)
         {
-          _logger.LogError(ex, "Unexpected error occurred in Kafka listener for topic {Topic}", _topicName);
+            _logger.LogError(ex, "Unexpected error occurred in Kafka listener for topic {Topic}", _topicName);
         }
-      }
     }
+}
 
 
 

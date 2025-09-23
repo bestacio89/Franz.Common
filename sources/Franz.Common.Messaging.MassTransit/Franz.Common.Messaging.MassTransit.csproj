@@ -7,4 +7,8 @@
     <PackageReference Include="MassTransit.Kafka" Version="8.5.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Errors\Franz.Common.Errors.csproj" />
+  </ItemGroup>
+
 </Project>

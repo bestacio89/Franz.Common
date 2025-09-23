@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using Franz.Common.Errors;
 using Franz.Common.Messaging.MassTransit.Contracts;
 using System.Text.Json;
 
@@ -24,8 +25,19 @@ public class KafkaConsumer : IKafkaConsumer
 
     while (!cancellationToken.IsCancellationRequested)
     {
-      var consumeResult = _consumer.Consume();
+      var consumeResult = _consumer.Consume(cancellationToken);
+
+      if (string.IsNullOrWhiteSpace(consumeResult.Message?.Value))
+      {
+        throw new TechnicalException($"Kafka message on topic '{topic}' had no payload.");
+      }
+
       var message = JsonSerializer.Deserialize<T>(consumeResult.Message.Value);
+      if (message is null)
+      {
+        throw new TechnicalException($"Failed to deserialize message on topic '{topic}' into type {typeof(T).Name}.");
+      }
+
       await handler(message);
     }
   }

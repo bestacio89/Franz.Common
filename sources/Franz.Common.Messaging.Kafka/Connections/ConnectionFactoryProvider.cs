@@ -4,22 +4,18 @@ using Franz.Common.Messaging.Configuration;
 
 namespace Franz.Common.Messaging.Kafka.Connections;
 
-public class ConnectionFactoryProvider : IConnectionFactoryProvider
+public class ConnectionFactoryProvider(IOptions<MessagingOptions> messagingOptions)
+  : IConnectionFactoryProvider
 {
-  private readonly IOptions<MessagingOptions> _messagingOptions;
+  private readonly IOptions<MessagingOptions> _messagingOptions = messagingOptions;
 
-  public ConnectionFactoryProvider(IOptions<MessagingOptions> messagingOptions)
-  {
-    _messagingOptions = messagingOptions;
-  }
-
-  ProducerConfig IConnectionFactoryProvider.Current => GetCurrent();
+  public ProducerConfig Current => GetCurrent();
 
   public ProducerConfig GetCurrent()
   {
     var options = _messagingOptions.Value;
 
-    var config = new ProducerConfig
+    return new ProducerConfig
     {
       BootstrapServers = options.HostName ?? "localhost",
       SslCaLocation = options.SslCaLocation,
@@ -29,7 +25,5 @@ public class ConnectionFactoryProvider : IConnectionFactoryProvider
           ? SecurityProtocol.Ssl
           : SecurityProtocol.Plaintext
     };
-
-    return config;
   }
 }
