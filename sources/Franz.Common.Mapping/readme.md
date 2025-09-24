@@ -2,7 +2,7 @@
 
 *A lightweight, fast, and extensible object mapping library for the Franz ecosystem.*
 
-**Current Version**: `1.5.7`
+**Current Version**: `1.5.9`
 
 ---
 
@@ -16,14 +16,14 @@ It provides:
 * 🔧 **Configurable via DI** with `AddFranzMapping`.
 * 🏎 **Expression-based mapping** (fast, cached, reflection-minimal).
 * 🧩 **Extendable** with custom converters and profiles.
-* 🛠 **Assembly scanning** for automatic profile registration (new in `1.5.7`).
+* 🛠 **Assembly scanning** for automatic profile registration (new in `1.5.9`).
 
 ---
 
 ## 📦 Installation
 
 ```bash
-dotnet add package Franz.Common.Mapping --version 1.5.7
+dotnet add package Franz.Common.Mapping --version 1.5.9
 ```
 
 ---
@@ -74,7 +74,7 @@ public class ApplicationProfile : FranzMapProfile
 
 ### 2. Register in DI
 
-#### Assembly scanning (recommended, new in `1.5.7`):
+#### Assembly scanning (recommended, new in `1.5.9`):
 
 ```csharp
 services.AddFranzMapping(Assembly.GetExecutingAssembly());

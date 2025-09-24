@@ -226,7 +226,7 @@ Perfect — here’s the **main README updated with v1.5.1** so it flows right a
 ---
 
 ## 📌 Changelog
-**Latest Version:** `1.5.7`
+**Latest Version:** `1.5.9`
 
 ### ✨ Highlights
 - ⚡ By-name fallback mapping (zero config).
@@ -236,7 +236,7 @@ Perfect — here’s the **main README updated with v1.5.1** so it flows right a
 - 🛠 **NEW in 1.5.6** → Assembly scanning for auto-registration of profiles.
 
 
-## Version 1.5.4 and 1.5.5 - Maintenance Nullability Cleanup
+## Version 1.5.4 - 1.5.8 - Maintenance Nullability Cleanup
 - Dependencies updated
 - Documentation Upgrade
 - Documentation Cleanup

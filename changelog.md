@@ -258,7 +258,7 @@ Framework is closer to being a self-contained, end-to-end enterprise stack.
 - Updated ApplyMapping to use reflection for property assignment.  
 - Ensured fallback to convention-based mapping when no explicit rule is defined.  
 
-## Version 1.5.4 & 1.5.6- Maintenance Nullability Cleanup
+## Version 1.5.4 - 1.5.8- Maintenance Nullability Cleanup
 - Dependencies updated
 - Documentation Upgrade
 - Documentation Cleanup
@@ -270,7 +270,7 @@ Framework is closer to being a self-contained, end-to-end enterprise stack.
 - Cleaned ServiceCollectionExtensions with fail-fast guards
 - Kafka consumer: fail-fast on invalid payloads, structured exception logging
 - Consistent DDD exception usage (NotFoundException, TechnicalException)
-## 1.5.7 - 2025-09-23
+## 1.5.9 - 2025-09-23
 ### Added
 
 - `AddFranzMapping` overload with **assembly scanning** for automatic profile registration.
