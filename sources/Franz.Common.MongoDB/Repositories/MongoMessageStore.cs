@@ -34,20 +34,15 @@ public class MongoMessageStore : IMessageStore
   }
 
 
-  public async Task<IReadOnlyList<Message>> GetPendingAsync(CancellationToken cancellationToken = default)
+  public async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(CancellationToken cancellationToken = default)
   {
     var pending = await _collection
         .Find(m => m.SentOn == null)
         .ToListAsync(cancellationToken);
 
-    return pending.Select(p => new Message(
-        p.Body,
-        p.Headers.Select(h => new KeyValuePair<string, string[]>(h.Key, h.Value))
-    )
-    {
-      Properties = p.Properties
-    }).ToList();
+    return pending;
   }
+
 
   public async Task MarkAsSentAsync(string messageId, CancellationToken cancellationToken = default)
   {

@@ -1,9 +1,8 @@
 #nullable enable
 using Confluent.Kafka;
-using Franz.Common.Mediator.Messages;
-using Franz.Common.Messaging.Delegating;
-using Franz.Common.Messaging.Factories;
 using Franz.Common.Errors;
+using Franz.Common.Messaging;
+using Franz.Common.Messaging.Delegating;
 using Microsoft.Extensions.Logging;
 using System.Text;
 
@@ -13,37 +12,37 @@ public class MessagingSender(
     IProducer<string, byte[]> producer,
     IMessageHandler messageHandler,
     IMessagingTransaction messagingTransaction,
-    IMessageFactory messageFactory,
     ILogger<MessagingSender> logger)
   : IMessagingSender
 {
   private readonly IProducer<string, byte[]> _producer = producer;
   private readonly IMessageHandler _messageHandler = messageHandler;
   private readonly IMessagingTransaction _messagingTransaction = messagingTransaction;
-  private readonly IMessageFactory _messageFactory = messageFactory;
   private readonly ILogger<MessagingSender> _logger = logger;
 
-  public async Task SendAsync<TCommandBaseRequest>(TCommandBaseRequest command, CancellationToken cancellationToken = default)
-      where TCommandBaseRequest : ICommand
+  public async Task SendAsync(Message message, CancellationToken cancellationToken = default)
   {
-    if (command is null)
-      throw new TechnicalException("Cannot send a null command.");
+    if (message is null)
+      throw new TechnicalException("Cannot send a null message.");
 
-    var message = _messageFactory.Build(command);
+    if (string.IsNullOrWhiteSpace(message.Body))
+      throw new TechnicalException($"Message body is null or empty for {message.MessageType ?? "<unknown>"}");
 
+    // process pre-send hooks (optional)
     _messageHandler.Process(message);
 
-    await SendInternalAsync(command, message, cancellationToken);
+    await SendInternalAsync(message, cancellationToken);
   }
 
-  private async Task SendInternalAsync(ICommand command, Message message, CancellationToken cancellationToken)
+  private async Task SendInternalAsync(Message message, CancellationToken cancellationToken)
   {
-    var topicName = TopicNamer.GetTopicName(command.GetType().Assembly);
-    var headers = BuildHeaders(message);
-    var body = BuildBody(message);
+    // Resolve topic
+    var topicName = !string.IsNullOrWhiteSpace(message.MessageType)
+        ? message.MessageType!
+        : TopicNamer.GetTopicName(typeof(Message).Assembly);
 
-    if (body.Length == 0)
-      throw new TechnicalException($"Message body for {command.GetType().Name} is empty.");
+    var headers = BuildHeaders(message);
+    var body = Encoding.UTF8.GetBytes(message.Body!);
 
     _messagingTransaction.Begin();
 
@@ -51,6 +50,7 @@ public class MessagingSender(
     {
       var kafkaMessage = new Confluent.Kafka.Message<string, byte[]>
       {
+        Key = message.CorrelationId, // good for partitioning
         Headers = headers,
         Value = body
       };
@@ -58,15 +58,16 @@ public class MessagingSender(
       var result = await _producer.ProduceAsync(topicName, kafkaMessage, cancellationToken);
 
       _logger.LogInformation(
-          "Message published to {Topic} [{Partition}] @ {Offset}",
+          "Message {MessageType} published to {Topic} [{Partition}] @ {Offset}",
+          message.MessageType ?? "<unknown>",
           result.Topic,
           result.Partition.Value,
           result.Offset.Value);
     }
     catch (ProduceException<string, byte[]> ex)
     {
-      _logger.LogError(ex, "Kafka publish failed for {Command}", command.GetType().Name);
-      throw new TechnicalException($"Failed to publish {command.GetType().Name}", ex);
+      _logger.LogError(ex, "Kafka publish failed for {MessageType}", message.MessageType ?? "<unknown>");
+      throw new TechnicalException($"Failed to publish {message.MessageType}", ex);
     }
   }
 
@@ -76,21 +77,13 @@ public class MessagingSender(
 
     foreach (var header in message.Headers)
     {
-      var strValue = header.Value.ToString();
-      if (!string.IsNullOrEmpty(strValue))
+      foreach (var v in header.Value)
       {
-        headers.Add(header.Key, Encoding.UTF8.GetBytes(strValue));
+        if (!string.IsNullOrEmpty(v))
+          headers.Add(header.Key, Encoding.UTF8.GetBytes(v));
       }
     }
 
     return headers;
-  }
-
-  private static byte[] BuildBody(Message message)
-  {
-    if (string.IsNullOrEmpty(message.Body))
-      throw new TechnicalException("Message body cannot be null or empty.");
-
-    return Encoding.UTF8.GetBytes(message.Body);
   }
 }

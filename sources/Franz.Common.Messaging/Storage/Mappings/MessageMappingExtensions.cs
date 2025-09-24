@@ -24,10 +24,9 @@ namespace Franz.Common.Messaging.Storage
       };
     }
 
-
-
-
-
+ 
+   
+    
     public static Message ToMessage(this StoredMessage stored)
     {
       var msg = new Message(

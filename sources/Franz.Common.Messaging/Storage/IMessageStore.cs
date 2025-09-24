@@ -11,6 +11,6 @@ namespace Franz.Common.Messaging.Storage;
 public interface IMessageStore
 {
   Task SaveAsync(Message message, CancellationToken cancellationToken = default);
-  Task<IReadOnlyList<Message>> GetPendingAsync(CancellationToken cancellationToken = default);
+  Task<IReadOnlyList<StoredMessage>> GetPendingAsync(CancellationToken cancellationToken = default);
   Task MarkAsSentAsync(string messageId, CancellationToken cancellationToken = default);
 }

@@ -1,12 +1,9 @@
-
-
-using Franz.Common.Mediator.Messages;
-
 namespace Franz.Common.Messaging;
 
 public interface IMessagingSender
 {
-   Task SendAsync<TCommandBaseRequest>(TCommandBaseRequest command, CancellationToken cancellationToken = default)
-        where TCommandBaseRequest : ICommand;
-  
+  /// <summary>
+  /// Sends a transport-level message to the configured broker (e.g., Kafka).
+  /// </summary>
+  Task SendAsync(Message message, CancellationToken cancellationToken = default);
 }

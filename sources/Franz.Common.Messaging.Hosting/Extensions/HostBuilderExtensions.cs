@@ -49,4 +49,30 @@ public static class HostBuilderExtensions
     var configureServicesMethod = typeof(TStartup).GetMethod("ConfigureServices") ?? throw new TechnicalException(Resources.HostBuilderExtensionsNoMethodFoundException);
     configureServicesMethod!.Invoke(startup, new object[] { services });
   }
+
+
+  /// <summary>
+  /// Registers messaging infrastructure into the host without requiring a Startup class.
+  /// </summary>
+  public static IHostBuilder UseMessaging(
+      this IHostBuilder hostBuilder,
+      Action<IServiceCollection, IConfiguration>? configure = null,
+      Assembly? assembly = null)
+  {
+    assembly ??= Assembly.GetCallingAssembly();
+
+    hostBuilder
+        .LoadAssemblyReferencedNotLoaded(assembly)
+        .UseLog()
+        .ConfigureServices((ctx, services) =>
+        {
+          // Always register the hosted service
+          services.AddHostedService<MessagingHostedService>();
+
+          // Let the caller configure additional services
+          configure?.Invoke(services, ctx.Configuration);
+        });
+
+    return hostBuilder;
+  }
 }
