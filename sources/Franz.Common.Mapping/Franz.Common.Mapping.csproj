@@ -6,6 +6,10 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.9" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Errors\Franz.Common.Errors.csproj" />
+  </ItemGroup>
+
  
 
 </Project>

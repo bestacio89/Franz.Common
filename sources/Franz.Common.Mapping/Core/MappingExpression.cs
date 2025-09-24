@@ -1,68 +1,57 @@
 ﻿using System.Linq.Expressions;
 
-namespace Franz.Common.Mapping.Core;
-
 public class MappingExpression<TSource, TDestination>
 {
-  private readonly Dictionary<string, string> _memberMap = new();
+  private readonly Dictionary<string, string> _memberBindings = new();
   private readonly HashSet<string> _ignored = new();
-  private Func<TSource, TDestination>? _construct;
 
-  // Lambda-based API
-  public MappingExpression<TSource, TDestination> ForMember<TMember>(
-      Expression<Func<TDestination, TMember>> destination,
-      Expression<Func<TSource, TMember>> source)
+  // source-aware constructor
+  internal Func<TSource, TDestination>? Constructor { get; private set; }
+
+  // reverse constructor (optional)
+  internal Func<TDestination, TSource>? ReverseConstructor { get; private set; }
+
+  // expose bindings + ignored members
+  public IReadOnlyDictionary<string, string> MemberBindings => _memberBindings;
+  public IReadOnlyCollection<string> IgnoredMembers => _ignored;
+
+  public MappingExpression<TSource, TDestination> ForMember(
+      Expression<Func<TDestination, object>> destMember,
+      Expression<Func<TSource, object>> srcMember)
   {
-    var destName = ((MemberExpression)destination.Body).Member.Name;
-    var sourceName = ((MemberExpression)source.Body).Member.Name;
+    var destName = GetMemberName(destMember);
+    var srcName = GetMemberName(srcMember);
 
-    _memberMap[destName] = sourceName;
+    _memberBindings[destName] = srcName;
     return this;
   }
 
-  // String-based API
-  public MappingExpression<TSource, TDestination> ForMember(string destinationName, string sourceName)
+  public MappingExpression<TSource, TDestination> Ignore(
+      Expression<Func<TDestination, object>> destMember)
   {
-    _memberMap[destinationName] = sourceName;
-    return this;
-  }
-
-  public MappingExpression<TSource, TDestination> Ignore(string destinationName)
-  {
-    _ignored.Add(destinationName);
-    return this;
-  }
-
-  public MappingExpression<TSource, TDestination> Ignore<TMember>(
-      Expression<Func<TDestination, TMember>> destination)
-  {
-    var destName = ((MemberExpression)destination.Body).Member.Name;
+    var destName = GetMemberName(destMember);
     _ignored.Add(destName);
     return this;
   }
 
-  // Reverse mapping support
-  public MappingExpression<TDestination, TSource> ReverseMap()
+  // Forward constructor
+  public MappingExpression<TSource, TDestination> ConstructUsing(Func<TSource, TDestination> ctor)
   {
-    var reverse = new MappingExpression<TDestination, TSource>();
-
-    foreach (var ignore in _ignored)
-      reverse.Ignore(ignore);
-
-    foreach (var kvp in _memberMap)
-      reverse.ForMember(kvp.Value, kvp.Key);
-
-    return reverse;
-  }
-
-  public MappingExpression<TSource, TDestination> ConstructUsing(
-      Func<TSource, TDestination> factory)
-  {
-    _construct = factory;
+    Constructor = ctor;
     return this;
   }
 
-  internal Dictionary<string, string> MemberMap => _memberMap;
-  internal HashSet<string> Ignored => _ignored;
-  internal Func<TSource, TDestination>? Constructor => _construct;
+  // Reverse constructor
+  public MappingExpression<TSource, TDestination> ReverseConstructUsing(Func<TDestination, TSource> ctor)
+  {
+    ReverseConstructor = ctor;
+    return this;
+  }
+
+  private string GetMemberName(LambdaExpression expr)
+  {
+    if (expr.Body is MemberExpression m) return m.Member.Name;
+    if (expr.Body is UnaryExpression u && u.Operand is MemberExpression um) return um.Member.Name;
+    throw new InvalidOperationException("Invalid member expression");
+  }
 }
