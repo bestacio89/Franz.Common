@@ -5,7 +5,7 @@ using Franz.Common.Errors; // TechnicalException
 namespace Franz.Common.Messaging.Kafka.Serialisation;
 
 public class JsonMessageDeserializer<TMessage>(JsonSerializerSettings? settings = null)
-  : IMessageDeserializer<TMessage> where TMessage : Message
+  : IMessageDeserializer<TMessage> where TMessage : StoredMessage
 {
   private readonly JsonSerializerSettings? _settings = settings;
 

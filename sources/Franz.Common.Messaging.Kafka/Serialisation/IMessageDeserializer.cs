@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-public interface IMessageDeserializer<TMessage> where TMessage : Message
+public interface IMessageDeserializer<TMessage> where TMessage : StoredMessage
 {
   TMessage Deserialize(string message); // Specify the return type as TMessage
 }
