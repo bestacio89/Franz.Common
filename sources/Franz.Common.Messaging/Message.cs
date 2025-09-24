@@ -8,10 +8,7 @@ public class Message : INotification
 {
   public Message() { }
 
-  public Message(string? body)
-  {
-    Body = body;
-  }
+  public Message(string? body) => Body = body;
 
   public Message(string? body, IEnumerable<KeyValuePair<string, StringValues>> headers)
   {
@@ -37,14 +34,41 @@ public class Message : INotification
   public virtual string? Body { get; set; }
 
   /// <summary>
-  /// Transport-level headers (Kafka, HTTP, etc.)
+  /// Transport-level headers (Kafka, HTTP, etc.).
   /// Always initialized to avoid null checks.
   /// </summary>
   public virtual MessageHeaders Headers { get; set; } = new();
 
   /// <summary>
   /// User-defined metadata for business-level properties that should not be mixed with transport headers.
-  /// Always initialized to a dictionary to avoid null checks.
   /// </summary>
-  public virtual IDictionary<string, object> Properties { get; set; } = new Dictionary<string, object>();
+  public virtual IDictionary<string, object> Properties { get; set; } =
+      new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+  /// <summary>
+  /// Correlation identifier for distributed tracing.
+  /// </summary>
+  public virtual string CorrelationId
+  {
+    get => Properties.TryGetValue(nameof(CorrelationId), out var v) ? v.ToString()! : string.Empty;
+    set => Properties[nameof(CorrelationId)] = value;
+  }
+
+  /// <summary>
+  /// Logical message type (used for deserialization).
+  /// </summary>
+  public virtual string? MessageType
+  {
+    get => Properties.TryGetValue(nameof(MessageType), out var v) ? v.ToString() : null;
+    set => Properties[nameof(MessageType)] = value!;
+  }
+
+  public T? GetProperty<T>(string key)
+  {
+    if (Properties.TryGetValue(key, out var value) && value is T castValue)
+      return castValue;
+    return default;
+  }
+
+  public void SetProperty<T>(string key, T value) => Properties[key] = value!;
 }
