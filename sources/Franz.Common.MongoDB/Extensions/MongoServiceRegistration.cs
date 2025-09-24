@@ -1,22 +1,54 @@
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Franz.Common.EntityFramework;
 using MongoDB.Driver;
 
 namespace Franz.Common.MongoDB.Extensions;
+
+/// <summary>
+/// Provides extension methods for registering MongoDB contexts in the DI container.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
-  public static IServiceCollection AddMongoDbContext<TContext>(this IServiceCollection services, IConfiguration configuration) where TContext : MongoDbContext
+  /// <summary>
+  /// Registers a MongoDB context of type <typeparamref name="TContext"/> in the service collection.
+  /// </summary>
+  /// <typeparam name="TContext">The MongoDB context type derived from <see cref="MongoDbContext"/>.</typeparam>
+  /// <param name="services">The service collection.</param>
+  /// <param name="configuration">The application configuration containing the "MongoDb" section.</param>
+  /// <returns>The modified service collection.</returns>
+  /// <exception cref="InvalidOperationException">
+  /// Thrown if required configuration values (ConnectionString or DatabaseName) are missing.
+  /// </exception>
+  public static IServiceCollection AddMongoDbContext<TContext>(
+      this IServiceCollection services,
+      IConfiguration configuration)
+      where TContext : MongoDbContext
   {
     var mongoDbSection = configuration.GetSection("MongoDb");
     var connectionString = mongoDbSection.GetValue<string>("ConnectionString");
     var databaseName = mongoDbSection.GetValue<string>("DatabaseName");
 
-    services.AddScoped<IMongoClient>(s => new MongoClient(connectionString));
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-    services.AddScoped<IMongoDatabase>(s => s.GetService<IMongoClient>().GetDatabase(databaseName));
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+      throw new InvalidOperationException("MongoDB connection string is not configured. Please set 'MongoDb:ConnectionString' in configuration.");
+    }
+
+    if (string.IsNullOrWhiteSpace(databaseName))
+    {
+      throw new InvalidOperationException("MongoDB database name is not configured. Please set 'MongoDb:DatabaseName' in configuration.");
+    }
+
+    // Register MongoClient as a singleton (thread-safe, recommended by MongoDB docs)
+    services.AddSingleton<IMongoClient>(_ => new MongoClient(connectionString));
+
+    // Register IMongoDatabase as scoped per request
+    services.AddScoped<IMongoDatabase>(sp =>
+    {
+      var client = sp.GetRequiredService<IMongoClient>();
+      return client.GetDatabase(databaseName);
+    });
+
+    // Register the custom context
     services.AddScoped<TContext>();
 
     return services;

@@ -7,13 +7,17 @@
 
 
   <ItemGroup>
+    <PackageReference Include="Franz.Common.Messaging" Version="1.5.9" />
     <PackageReference Include="MongoDB.Driver" Version="3.4.3" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Business\Franz.Common.Business.csproj" />
     <ProjectReference Include="..\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
     <ProjectReference Include="..\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
     <ProjectReference Include="..\Franz.Common.Http.MultiTenancy\Franz.Common.Http.MultiTenancy.csproj" />
+    <ProjectReference Include="..\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
+    <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
   </ItemGroup>
 
 </Project>
