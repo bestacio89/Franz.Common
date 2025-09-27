@@ -15,32 +15,54 @@ public class IdentityContextAccessor : IIdentityContextAccessor
     this.httpContextAccessor = httpContextAccessor;
   }
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
   public string? GetCurrentEmail()
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
   {
-    var result = httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.UserEmail, ClaimTypes.Email);
-
-    return result;
+    return httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.UserEmail, ClaimTypes.Email);
   }
 
   public Guid? GetCurrentId()
   {
     var userId = httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.UserId, ClaimTypes.NameIdentifier);
-
-    Guid? result = null;
-    if (Guid.TryParse(userId, out var guid))
-      result = guid;
-
-    return result;
+    return Guid.TryParse(userId, out var guid) ? guid : null;
   }
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
   public string? GetCurrentFullName()
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
   {
-    var result = httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.UserFullName, ClaimTypes.Name);
-
-    return result;
+    return httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.UserFullName, ClaimTypes.Name);
   }
+
+  public string[]? GetCurrentRoles()
+  {
+    var roles = httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.UserRoles, ClaimTypes.Role);
+    return string.IsNullOrWhiteSpace(roles)
+        ? null
+        : roles.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+  }
+
+  public Guid? GetCurrentTenantId()
+  {
+    var tenantId = httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.TenantId, "tenant_id");
+    return Guid.TryParse(tenantId, out var guid) ? guid : null;
+  }
+
+  public Guid? GetCurrentDomainId()
+  {
+    var domainId = httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.DomainId, "domain_id");
+    return Guid.TryParse(domainId, out var guid) ? guid : null;
+  }
+
+  public FranzIdentityContext GetCurrentIdentity()
+  {
+    return new FranzIdentityContext
+    {
+      UserId = GetCurrentId(),
+      Email = GetCurrentEmail(),
+      FullName = GetCurrentFullName(),
+      Roles = GetCurrentRoles(),
+      TenantId = GetCurrentTenantId(),
+      DomainId = GetCurrentDomainId()
+    };
+  }
+
+
 }

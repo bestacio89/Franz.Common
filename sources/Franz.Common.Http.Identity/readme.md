@@ -1,120 +1,155 @@
-# **Franz.Common.Http.Identity**
+﻿# **Franz.Common.Http.Identity**
 
-A utility library within the **Franz Framework** that enhances **ASP.NET Core** identity management for HTTP-based applications. This package provides tools for accessing and managing identity context in a consistent and efficient manner.
+A utility library within the **Franz Framework** that enhances **ASP.NET Core** identity management for HTTP-based applications.
+This package provides tools for **identity context access**, **dependency injection**, and **plug-and-play SSO providers** (WS-Fed, OIDC, SAML2, Keycloak).
 
 ---
-
+-** Current Version**: 1.5.10
+---
 ## **Features**
 
-- **Identity Context Access**:
-  - `IdentityContextAccessor` for simplified access to the current user's identity information in HTTP requests.
-- **Dependency Injection**:
-  - `ServiceCollectionExtensions` for seamless integration of identity-related services.
+* **Identity Context Access**
 
----
+  * `IdentityContextAccessor`: resolves identity consistently from `HttpContext` (headers & claims).
+  * Unified into `FranzIdentityContext` (UserId, Email, FullName, Roles, TenantId, DomainId).
 
-## **Version Information**
+* **Dependency Injection**
 
-- **Current Version**: 1.5.9
-- Part of the private **Franz Framework** ecosystem.
+  * `AddFranzHttpIdentity()`: registers identity accessor and supporting services.
 
----
+* **Authentication Providers** (config-driven via `appsettings.json`):
 
-## **Dependencies**
+  * `AddFranzWsFedIdentity()` – WS-Federation.
+  * `AddFranzOidcIdentity()` – OpenID Connect.
+  * `AddFranzSaml2Identity()` – SAML2 (via Sustainsys).
+  * `AddFranzKeycloakIdentity()` – Keycloak (OIDC + role normalization).
 
-This package relies on:
-- **Microsoft.AspNetCore.Mvc.Core** (2.2.5): Core MVC functionalities for identity and authentication.
-- **Franz.Common.Identity**: Core identity utilities and extensions.
-- **Franz.Common.Http**: HTTP utilities and middleware extensions.
-- **Franz.Common.Headers**: Header management utilities for HTTP applications.
+* **Claims Normalization**
+
+  * All providers map claims into the same `FranzIdentityContext`.
+  * Ensures consistent user & tenant resolution across IdPs.
 
 ---
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
-
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Http.Identity  
+dotnet add package Franz.Common.Http.Identity
 ```
 
 ---
 
 ## **Usage**
 
-### **1. Access Identity Context**
-
-Leverage `IdentityContextAccessor` to access the current user's identity information:
+### 1. Register Core Identity
 
 ```csharp
-using Franz.Common.Http.Identity;
+builder.Services.AddFranzHttpIdentity();
+```
 
-public class MyService
-{
-    private readonly IdentityContextAccessor _identityContextAccessor;
+---
 
-    public MyService(IdentityContextAccessor identityContextAccessor)
-    {
-        _identityContextAccessor = identityContextAccessor;
-    }
+### 2. Add a Provider
 
-    public string GetUserId()
-    {
-        return _identityContextAccessor.User?.FindFirst("sub")?.Value;
-    }
+Identity providers are registered via DI extensions and configured in **appsettings.json**.
+
+#### 🔹 WS-Federation
+
+```csharp
+builder.Services.AddFranzWsFedIdentity(builder.Configuration);
+```
+
+**appsettings.json**
+
+```json
+"FranzIdentity": {
+  "WsFed": {
+    "MetadataAddress": "https://login.microsoftonline.com/{tenant}/federationmetadata/2007-06/federationmetadata.xml",
+    "Wtrealm": "https://myapp.example.com/"
+  }
 }
 ```
 
-### **2. Register Identity Utilities**
+---
 
-Use `ServiceCollectionExtensions` to register identity-related services:
+#### 🔹 OpenID Connect (OIDC)
 
 ```csharp
-using Franz.Common.Http.Identity.Extensions;
+builder.Services.AddFranzOidcIdentity(builder.Configuration);
+```
 
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddIdentityContext(); // Registers identity context utilities
-    }
+**appsettings.json**
+
+```json
+"FranzIdentity": {
+  "Oidc": {
+    "Authority": "https://login.microsoftonline.com/{tenant}/v2.0",
+    "ClientId": "my-client-id",
+    "ClientSecret": "super-secret",
+    "CallbackPath": "/signin-oidc"
+  }
 }
 ```
 
-### **3. Use Identity Context in Controllers**
+---
 
-Access identity data directly in controllers:
+#### 🔹 SAML2
 
 ```csharp
-[ApiController]
-[Route("api/[controller]")]
-public class UserController : ControllerBase
-{
-    private readonly IdentityContextAccessor _identityContextAccessor;
+builder.Services.AddFranzSaml2Identity(builder.Configuration);
+```
 
-    public UserController(IdentityContextAccessor identityContextAccessor)
-    {
-        _identityContextAccessor = identityContextAccessor;
-    }
+**appsettings.json**
 
-    [HttpGet("me")]
-    public IActionResult GetCurrentUser()
-    {
-        var userId = _identityContextAccessor.User?.FindFirst("sub")?.Value;
-        return Ok(new { UserId = userId });
-    }
+```json
+"FranzIdentity": {
+  "Saml2": {
+    "EntityId": "https://myapp.example.com/",
+    "IdpMetadata": "https://idp.example.com/metadata",
+    "CallbackPath": "/signin-saml"
+  }
 }
+```
+
+---
+
+#### 🔹 Keycloak (via OIDC)
+
+```csharp
+builder.Services.AddFranzKeycloakIdentity(builder.Configuration);
+```
+
+**appsettings.json**
+
+```json
+"FranzIdentity": {
+  "Keycloak": {
+    "Authority": "https://keycloak.example.com/auth/realms/myrealm",
+    "ClientId": "franz-web",
+    "ClientSecret": "super-secret",
+    "CallbackPath": "/signin-keycloak"
+  }
+}
+```
+
+---
+
+### 3. Access Identity in Your App
+
+```csharp
+app.MapGet("/whoami", (IIdentityContextAccessor ctx) =>
+{
+    var identity = ctx.GetCurrentIdentity();
+    return Results.Ok(new
+    {
+        identity.UserId,
+        identity.Email,
+        identity.FullName,
+        identity.Roles,
+        identity.TenantId,
+        identity.DomainId
+    });
+});
 ```
 
 ---
@@ -122,18 +157,18 @@ public class UserController : ControllerBase
 ## **Integration with Franz Framework**
 
 The **Franz.Common.Http.Identity** package integrates seamlessly with:
-- **Franz.Common.Identity**: Provides foundational identity utilities.
-- **Franz.Common.Http**: Enhances HTTP functionality for identity-based applications.
-- **Franz.Common.Headers**: Simplifies header-based identity management.
 
-Ensure these dependencies are installed to fully leverage the library's capabilities.
+* **Franz.Common.Identity** → core identity contracts and models.
+* **Franz.Common.Http** → HTTP utilities and middleware.
+* **Franz.Common.Headers** → standardized header handling for identity propagation.
 
 ---
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
+This package is part of a private framework. Contributions are limited to the internal development team.
+
+1. Clone the repository @ [Franz.Common](https://github.com/bestacio89/Franz.Common/)
 2. Create a feature branch.
 3. Submit a pull request for review.
 
@@ -141,17 +176,37 @@ This package is part of a private framework. Contributions are limited to the in
 
 ## **License**
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
+Licensed under the MIT License. See the `LICENSE` file for details.
 
 ---
 
 ## **Changelog**
 
-### Version 1.2.65
-- Upgrade version to .net 9
+### Version 1.5.10
+
+* Added `IdentityContextAccessor` (HttpContext-based).
+* Introduced `AddFranzHttpIdentity()` DI extension.
+* Added provider extensions:
+
+  * WS-Federation (`AddFranzWsFedIdentity`).
+  * OpenID Connect (`AddFranzOidcIdentity`).
+  * SAML2 (`AddFranzSaml2Identity`).
+  * Keycloak (`AddFranzKeycloakIdentity`).
+* Config-driven setup via `appsettings.json`.
+* Unified claims mapping into `FranzIdentityContext`.
+
+
 
 ### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
+
+* Upgraded to **.NET 9.0.8**
+* Added **new features and improvements**
+* Separated **business concepts** from **mediator concepts**
+* Now compatible with both the **in-house mediator** and **MediatR**
+
+### Version 1.2.65
+
+* Upgrade version to .NET 9
+
+---
+

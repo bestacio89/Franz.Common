@@ -1,91 +1,55 @@
 # **Franz.Common.Identity**
 
-A foundational library within the **Franz Framework** that provides tools for managing identity context across **ASP.NET Core** applications. This package simplifies access to user identity information, supporting dependency injection for streamlined integration with other components.
+A foundational library within the **Franz Framework** that provides contracts and utilities for managing **identity context** across applications.
+This package defines the **core abstractions** for accessing user identity information in a consistent, provider-agnostic way.
 
 ---
-
+-** Current Version**: 1.5.10
+---
 ## **Features**
 
-- **Identity Context Management**:
-  - `IdentityContextAccessor` for accessing user identity data in a consistent manner across applications.
-- **Dependency Injection**:
-  - Seamless integration with dependency injection via the **Franz.Common.DependencyInjection** package.
+* **Identity Context Management**
 
----
+  * `FranzIdentityContext`: unified model (UserId, Email, FullName, Roles, TenantId, DomainId).
+  * `IIdentityContextAccessor`: contract for resolving identity across frameworks.
 
-## **Version Information**
+* **Testing Support**
 
-- **Current Version**: 1.5.9
-- Part of the private **Franz Framework** ecosystem.
+  * `FakeIdentityContextAccessor`: simple stub for unit/integration tests.
 
----
+* **Framework-Agnostic**
 
-## **Dependencies**
-
-This package relies on:
-- **Franz.Common.DependencyInjection**: Provides dependency injection utilities to simplify service registration.
+  * No dependency on ASP.NET Core or `HttpContext`.
+  * ASP.NET-specific implementation lives in [`Franz.Common.Http.Identity`](../Franz.Common.Http.Identity).
 
 ---
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
-
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Identity  
+dotnet add package Franz.Common.Identity
 ```
 
 ---
 
 ## **Usage**
 
-### **1. Access Identity Context**
-
-The `IdentityContextAccessor` simplifies access to the current user's identity data:
+### Access Identity Context
 
 ```csharp
 using Franz.Common.Identity;
 
 public class MyService
 {
-    private readonly IdentityContextAccessor _identityContextAccessor;
+    private readonly IIdentityContextAccessor _identityContext;
 
-    public MyService(IdentityContextAccessor identityContextAccessor)
+    public MyService(IIdentityContextAccessor identityContext)
     {
-        _identityContextAccessor = identityContextAccessor;
+        _identityContext = identityContext;
     }
 
-    public string GetUserId()
-    {
-        return _identityContextAccessor.User?.FindFirst("sub")?.Value;
-    }
-}
-```
-
-### **2. Register Identity Context**
-
-Integrate `IdentityContextAccessor` into your application:
-
-```csharp
-using Franz.Common.Identity;
-
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddSingleton<IdentityContextAccessor>(); // Register the accessor
-    }
+    public FranzIdentityContext GetIdentity()
+        => _identityContext.GetCurrentIdentity();
 }
 ```
 
@@ -94,16 +58,17 @@ public class Startup
 ## **Integration with Franz Framework**
 
 The **Franz.Common.Identity** package integrates seamlessly with:
-- **Franz.Common.DependencyInjection**: Simplifies registration of the identity context in ASP.NET Core applications.
 
-Ensure this dependency is installed to fully utilize the package's capabilities.
+* **Franz.Common.Http.Identity**: ASP.NET Core implementation + SSO providers.
+* **Franz.Common.Headers**: standardized HTTP header propagation.
 
 ---
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
+This package is part of a private framework. Contributions are limited to the internal development team.
+
+1. Clone the repository @ [Franz.Common](https://github.com/bestacio89/Franz.Common/)
 2. Create a feature branch.
 3. Submit a pull request for review.
 
@@ -111,17 +76,40 @@ This package is part of a private framework. Contributions are limited to the in
 
 ## **License**
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
+Licensed under the MIT License. See the `LICENSE` file for details.
 
 ---
 
 ## **Changelog**
 
-### Version 1.2.65
-- Upgrade version to .net 9
+### Version 1.5.10
+
+* Introduced **`FranzIdentityContext`** (UserId, Email, FullName, Roles, TenantId, DomainId).
+* Added **`IIdentityContextAccessor`** interface for framework-agnostic identity access.
+* Added **`FakeIdentityContextAccessor`** for testing.
+* Moved ASP.NET Core specifics into a new package: **Franz.Common.Http.Identity**, including:
+
+  * `IdentityContextAccessor` (HttpContext-based implementation).
+  * `AddFranzHttpIdentity()` DI extension.
+  * Provider extensions:
+
+    * `AddFranzWsFedIdentity()` (WS-Federation).
+    * `AddFranzOidcIdentity()` (OpenID Connect).
+    * `AddFranzSaml2Identity()` (SAML2 via Sustainsys).
+    * `AddFranzKeycloakIdentity()` (Keycloak OIDC with role normalization).
+* All providers normalize into **`FranzIdentityContext`**.
+* Config-driven setup via **appsettings.json** (no hardcoded values).
 
 ### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
+
+* Upgraded to **.NET 9.0.8**.
+* Added new features and improvements.
+* Separated business concepts from mediator concepts.
+* Now compatible with both in-house mediator and MediatR.
+
+### Version 1.2.65
+
+* Upgraded to **.NET 9**.
+
+---
+
