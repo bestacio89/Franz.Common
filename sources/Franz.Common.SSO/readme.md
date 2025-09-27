@@ -1,43 +1,54 @@
+﻿---
+
 # **Franz.Common.SSO**
 
-A library within the **Franz Framework** designed to provide streamlined support for Single Sign-On (SSO) using ASP.NET Core Identity and Entity Framework Core. This package includes interfaces and implementations for managing SSO providers and configuring SSO services.
+A library within the **Franz Framework** that provides streamlined support for **Single Sign-On (SSO)** in ASP.NET Core applications.
+This package unifies configuration and registration of multiple SSO providers into a single, consistent bootstrapping mechanism, while normalizing all claims into a unified **`FranzIdentityContext`**.
 
+---
+-** Current Version**: 1.5.10
 ---
 
 ## **Features**
 
-- **SSO Provider Management**:
-  - `ISsoProvider` interface for defining custom SSO providers.
-  - `GenericSSOProvider` and `GenericSSOManager` for generic implementations of SSO workflows.
-- **Service Registration**:
-  - `SsoServiceRegistration` to simplify the integration of SSO services into your application.
-- **ASP.NET Core Identity Integration**:
-  - Full support for ASP.NET Core Identity and Entity Framework Core for identity management.
+* **Centralized SSO Bootstrapping**
 
----
+  * One entry point: `AddFranzSsoIdentity(configuration)`
+  * Loads provider settings directly from `appsettings.json`
+  * Ensures only one interactive provider is active unless explicitly configured
 
-## **Version Information**
+* **Supported Providers**
 
-- **Current Version**: 1.5.9
-- Part of the private **Franz Framework** ecosystem.
+  * **WS-Federation** (Azure AD classic / ADFS)
+  * **SAML2** (via Sustainsys.Saml2)
+  * **OpenID Connect (OIDC)**
+  * **Keycloak** (via OIDC, with claims transformation)
+  * **JWT Bearer** (API token validation for microservices)
 
----
+* **Claims Normalization**
 
-## **Dependencies**
+  * Maps provider-specific claims (Azure AD, Keycloak, SAML attributes, etc.)
+  * Produces a unified `FranzIdentityContext` with:
 
-This package relies on the following dependencies:
-- **Microsoft.AspNetCore.Identity** (2.2.0): Provides core Identity functionality.
-- **Microsoft.AspNetCore.Identity.EntityFrameworkCore** (8.0.0): Adds Entity Framework Core integration for ASP.NET Identity.
+    * `UserId`, `Email`, `FullName`
+    * `Roles`
+    * `TenantId`, `DomainId`
 
-Additionally, it integrates with:
-- **Franz.Common.EntityFramework**: Provides foundational Entity Framework utilities.
+* **Structured Logging**
+
+  * Bootstrapping and provider activation logged via `ILogger<T>`
+  * Clean integration with **Franz.Common.Logging** / Serilog
+
+* **Configuration-Driven**
+
+  * All providers enabled/disabled via config
+  * No hard-coded values in code
 
 ---
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+From your private Azure feed:
 
 ```bash
 dotnet nuget add source "https://your-private-feed-url" \
@@ -45,111 +56,123 @@ dotnet nuget add source "https://your-private-feed-url" \
   --username "YourAzureUsername" \
   --password "YourAzurePassword" \
   --store-password-in-clear-text
-```
 
-Install the package:
-
-```bash
-dotnet add package Franz.Common.SSO  
+dotnet add package Franz.Common.SSO
 ```
 
 ---
 
 ## **Usage**
 
-### **1. Register SSO Services**
+### **1. Configure appsettings.json**
 
-Use `SsoServiceRegistration` to register SSO services in your application:
+```json
+{
+  "FranzIdentity": {
+    "AllowMultipleInteractiveProviders": false,
+    "WsFederation": {
+      "Enabled": false,
+      "MetadataAddress": "https://login.microsoftonline.com/...",
+      "Wtrealm": "https://your-app"
+    },
+    "Saml2": {
+      "Enabled": false,
+      "IdpMetadata": "https://idp.example.com/metadata",
+      "EntityId": "https://your-app"
+    },
+    "Oidc": {
+      "Enabled": true,
+      "Authority": "https://login.microsoftonline.com/{tenantId}/v2.0",
+      "ClientId": "your-client-id",
+      "ClientSecret": "your-client-secret"
+    },
+    "Keycloak": {
+      "Enabled": false,
+      "Authority": "https://keycloak.example.com/realms/yourrealm",
+      "ClientId": "your-client-id",
+      "ClientSecret": "your-client-secret"
+    },
+    "Jwt": {
+      "Enabled": true,
+      "Authority": "https://login.microsoftonline.com/{tenantId}/v2.0",
+      "Audience": "api://your-api"
+    }
+  }
+}
+```
+
+---
+
+### **2. Register SSO in Program.cs**
 
 ```csharp
 using Franz.Common.SSO.Extensions;
 
-public class Startup
+var builder = WebApplication.CreateBuilder(args);
+
+// Add Franz SSO Identity
+builder.Services.AddFranzSsoIdentity(builder.Configuration);
+
+var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapGet("/whoami", (IIdentityContextAccessor accessor) =>
 {
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddSsoServices(options =>
-        {
-            options.DefaultProvider = "YourSSOProvider";
-        });
-    }
-}
+    var identity = accessor.GetCurrentIdentity();
+    return Results.Json(identity);
+});
+
+app.Run();
 ```
 
-### **2. Implement a Custom SSO Provider**
+---
 
-Create a custom implementation of `ISsoProvider`:
-
-```csharp
-using Franz.Common.SSO.Interfaces;
-
-public class CustomSSOProvider : ISsoProvider
-{
-    public Task<string> AuthenticateAsync(string token)
-    {
-        // Custom authentication logic
-        return Task.FromResult("AuthenticatedUserId");
-    }
-}
-```
-
-### **3. Use the GenericSSOManager**
-
-Leverage the `GenericSSOManager` for managing SSO workflows:
+### **3. Normalized Identity Usage**
 
 ```csharp
-using Franz.Common.SSO;
-
-public class SsoService
-{
-    private readonly GenericSSOManager _ssoManager;
-
-    public SsoService(GenericSSOManager ssoManager)
-    {
-        _ssoManager = ssoManager;
-    }
-
-    public async Task<string> AuthenticateUserAsync(string token)
-    {
-        return await _ssoManager.AuthenticateAsync(token);
-    }
-}
+var identity = _accessor.GetCurrentIdentity();
+Console.WriteLine($"User: {identity.FullName}, Tenant: {identity.TenantId}, Roles: {string.Join(", ", identity.Roles)}");
 ```
 
 ---
 
 ## **Integration with Franz Framework**
 
-The **Franz.Common.SSO** package integrates seamlessly with the **Franz Framework**, enabling secure and efficient single sign-on functionality for distributed systems. Use it alongside other Franz packages for enhanced identity and access management.
-
----
-
-## **Contributing**
-
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
-
-## **License**
-
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
+* Works with **Franz.Common.Identity** for the core identity context.
+* Works with **Franz.Common.Http.Identity** for ASP.NET Core providers.
+* Centralizes all SSO wiring into one consistent package.
 
 ---
 
 ## **Changelog**
 
-### Version 1.2.65
-- Added `ISsoProvider` for custom SSO provider implementation.
-- Introduced `GenericSSOProvider` and `GenericSSOManager` for generic SSO workflows.
-- Integrated with ASP.NET Core Identity and Entity Framework Core.
-- Provided `SsoServiceRegistration` for streamlined service configuration.
+### Version 1.5.10
 
+* **Complete SSO overhaul**
+
+  * Removed legacy `GenericSSOManager`/`GenericSSOProvider`
+  * Introduced `FranzSsoSettings` for unified config binding
+  * Added `AddFranzSsoIdentity()` bootstrap extension
+  * Integrated **WS-Fed, SAML2, OIDC, Keycloak, JWT Bearer** providers
+  * Added claims normalization pipeline to `FranzIdentityContext`
+  * Added structured startup logging via `FranzSsoStartupFilter`
 
 ### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
+
+* Upgraded to **.NET 9.0.8**
+* Added new features and improvements
+* Separated **business concepts** from **mediator concepts**
+* Now compatible with both the in-house mediator and MediatR
+
+### Version 1.2.65
+
+* Added `ISsoProvider` for custom SSO provider implementation
+* Introduced `GenericSSOProvider` and `GenericSSOManager` for generic workflows
+* Integrated with ASP.NET Core Identity and EF Core
+* Provided `SsoServiceRegistration` for streamlined configuration
+
+---
+
+⚡ With v1.5.10, **Franz.Common.SSO** is now a unified, production-ready SSO abstraction for all supported protocols.

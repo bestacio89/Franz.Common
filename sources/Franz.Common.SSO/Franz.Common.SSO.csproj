@@ -12,6 +12,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
+    <ProjectReference Include="..\Franz.Common.Http.Identity\Franz.Common.Http.Identity.csproj" />
+    <ProjectReference Include="..\Franz.Common.Logging\Franz.Common.Logging.csproj" />
   </ItemGroup>
 
 </Project>

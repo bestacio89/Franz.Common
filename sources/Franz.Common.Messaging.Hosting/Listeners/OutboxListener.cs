@@ -7,7 +7,6 @@ using global::Franz.Common.Mediator.Messages;
 using global::Franz.Common.Messaging.Storage;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Franz.Common.Messaging.Storage;
 
 namespace Franz.Common.HostingMessaging.Listeners;
 

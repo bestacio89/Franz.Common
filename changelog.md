@@ -1,26 +1,13 @@
-Perfect 👍 — let’s unify the style across your changelog so it looks clean, professional, and consistent. I’ll make every entry follow the same format:
-
-```
-## Version X.Y.Z – Title 🎯
-### ✨ Added
-### 🔧 Changed
-### 🐛 Fixed
-### 📚 Docs
-```
-
-Here’s the cleaned-up **full changelog including 1.4.5 and 1.5.0**:
-
----
-
 # 📈 Changelog
 
 ---
 
 ## Version 1.2.65 – Foundation 🏗️
 
+### ✨ Added
+
 * 🌐 Kafka bootstrapping: producers, consumers, distributed messaging.
-* 🗄️ Multiple database bootstrapping.
-* 🧩 Multi-database support (SQL).
+* 🗄️ Multi-database bootstrapping (SQL).
 * 🗃️ NoSQL support.
 
 ---
@@ -29,26 +16,26 @@ Here’s the cleaned-up **full changelog including 1.4.5 and 1.5.0**:
 
 ### ✨ Added
 
-* **Multi-Tenancy Enhancements**
+* **Multi-Tenancy**
 
-  * Canonical `TenantResolutionResult` with `Succeeded`, `TenantInfo`, `Source`, `Message`.
-  * Added `TenantResolutionSource.Property` for message property–based resolution.
-  * Implemented **DefaultTenantResolutionPipeline** & **DefaultDomainResolutionPipeline** (HTTP + Messaging).
+  * Canonical `TenantResolutionResult` (`Succeeded`, `TenantInfo`, `Source`, `Message`).
+  * `TenantResolutionSource.Property` for property-based resolution.
+  * Default tenant/domain resolution pipelines (HTTP + Messaging).
   * Middleware for automatic tenant/domain resolution.
 
 * **Mediator (Initial Release)**
 
-  * Core Dispatcher, Commands, Queries, Notifications.
-  * Basic Pipelines (Logging, Validation).
-  * EF integration with `DbContextBase`.
+  * Core dispatcher for Commands, Queries, Notifications.
+  * Pipelines: Logging, Validation.
+  * EF integration via `DbContextBase`.
   * Observability hooks (`MediatorContext`, `IMediatorObserver`).
-  * Console observer for demo/testing.
+  * Console observer for testing.
 
 ### 🔧 Changed
 
 * Refactored HTTP & Messaging resolvers to canonical models.
 
-### 🔍 Diagnostics
+### 📚 Docs
 
 * Structured results for better logging & observability.
 
@@ -56,34 +43,50 @@ Here’s the cleaned-up **full changelog including 1.4.5 and 1.5.0**:
 
 ## Version 1.3.2 – Error Model ❌
 
-* Introduced **Error abstraction** with standard codes (`NotFound`, `Validation`, `Conflict`, `Unexpected`).
+### ✨ Added
+
+* `Error` abstraction with standard codes (`NotFound`, `Validation`, `Conflict`, `Unexpected`).
 * Extended `Result<T>` to integrate seamlessly with `Error`.
-* Added `ResultExtensions` for ergonomic conversions.
+* `ResultExtensions` for ergonomic conversions.
 
 ---
 
 ## Version 1.3.3 – Validation & Transactions ⚖️
 
-* Refined **Validation pipeline** with FluentValidation adapter.
-* Improved **Transaction pipeline** with rollback rules via options.
-* Fixed **streaming dispatcher yields** with observability.
+### ✨ Added
+
+* FluentValidation adapter for validation pipeline.
+* Transaction pipeline with rollback rules via options.
+
+### 🐛 Fixed
+
+* Streaming dispatcher yields with observability.
 
 ---
 
 ## Version 1.3.4 – Decoupling AutoMapper 🔌
 
-* Removed AutoMapper coupling → mapping responsibility pushed to Application layer.
-* Framework stays reflection-free & adapter-friendly.
+### 🔧 Changed
+
+* Removed AutoMapper coupling → mapping pushed to Application layer.
+* Framework remains reflection-free & adapter-friendly.
 
 ---
 
 ## Version 1.3.5 – Resilience Pipelines 🛡️
 
-* Fixed **open generic pipeline registration**.
-* Transaction & caching pipelines now DI-friendly.
-* Resilience pipelines (Retry, Timeout, CircuitBreaker, Bulkhead) fully configurable.
-* README updated with configuration examples.
-* Simplified onboarding with one-line `AddFranzMediator()`.
+### ✨ Added
+
+* Retry, Timeout, CircuitBreaker, Bulkhead resilience pipelines.
+* Configurable caching pipelines (Memory, Distributed, Redis).
+
+### 🐛 Fixed
+
+* Open generic pipeline registration errors.
+
+### 📚 Docs
+
+* Added configuration examples for pipelines.
 
 ---
 
@@ -95,23 +98,23 @@ Here’s the cleaned-up **full changelog including 1.4.5 and 1.5.0**:
 * `IIntegrationEvent : INotification` for clean event flow.
 * `IDispatcher.PublishAsync` powers events.
 
-### 📡 Messaging (Kafka)
+### 📡 Messaging
 
-* Publisher now uses `_dispatcher.PublishAsync()` → events flow through pipelines.
-* Async publish (`Task` return type).
-* Topic initialization streamlined.
+* Kafka publisher uses `_dispatcher.PublishAsync()` for event fan-out.
 
-### 🔧 DI
+### 🔧 Changed
 
-* Extensions isolated in `Franz.Common.DependencyInjection.Extensions`.
+* DI extensions isolated in `Franz.Common.DependencyInjection.Extensions`.
 * Core libs DI-free, adapters optional.
 
 ---
 
-## Version 1.3.9 – Database Stability Fixes 🐛
+## Version 1.3.9 – Database Stability 🐛
 
-* Fixed default port fallback (MariaDB 3306, Postgres 5432, SQL Server 1433, Oracle 1521).
-* Switched `localhost` → `127.0.0.1` for TCP consistency.
+### 🐛 Fixed
+
+* Default port fallback for MariaDB, Postgres, SQL Server, Oracle.
+* Replaced `localhost` → `127.0.0.1` for TCP consistency.
 * Default `SslMode=None`.
 * Masked passwords in logs.
 
@@ -119,32 +122,44 @@ Here’s the cleaned-up **full changelog including 1.4.5 and 1.5.0**:
 
 ## Version 1.3.10 – Scoped DbContext 🔄
 
+### 🔧 Changed
+
 * Enforced DbContext resolution via DI scope.
-* Corrected `EnsureCreated` vs `Migrate` lifecycle usage.
-* Options added for drop/create/migrate.
+* Corrected `EnsureCreated` vs `Migrate` usage.
 
 ---
 
 ## Version 1.3.11 – Seed Lifecycle Cleanup 🌱
 
-* Fixed duplicate seed issues.
+### 🐛 Fixed
+
+* Duplicate seed issues resolved.
+
+### 🔧 Changed
+
 * Environment-aware defaults for migrations.
 * Clarified seeding strategy.
 
 ---
 
-## Version 1.3.12 – Verbose Logging & Observability 📖
+## Version 1.3.12 – Observability 📖
 
-* Added `LoggingPreProcessor` & `LoggingPostProcessor`.
+### ✨ Added
+
+* `LoggingPreProcessor` & `LoggingPostProcessor`.
 * Prefixed logs with `[Command]`, `[Query]`, `[Request]`.
-* Unified request lifecycle logging.
 
 ---
 
 ## Version 1.3.14 – Correlation IDs 🔗
 
-* Unified correlation flow across requests, DB, pipelines.
-* Accepts external IDs via `X-Correlation-ID`.
+### ✨ Added
+
+* Correlation ID flow across requests, DB, pipelines.
+* Support for external IDs via `X-Correlation-ID`.
+
+### 🔧 Changed
+
 * Scoped logging with Serilog + ILogger.
 * Environment-aware logs (Dev = verbose, Prod = lean).
 
@@ -152,128 +167,174 @@ Here’s the cleaned-up **full changelog including 1.4.5 and 1.5.0**:
 
 ## Version 1.4.0 – Observability & Resilience 🚀
 
-### ✨ New Modules
+### ✨ Added
 
 * **Mediator.Polly** → Retry, CircuitBreaker, Timeout, Bulkhead.
 * **Caching** → Memory, Distributed, Redis.
-* **Mediator.OpenTelemetry** → automatic spans with Franz tags.
+* **Mediator.OpenTelemetry** → Automatic spans with Franz tags.
 * **Http.Refit** → Config-driven typed clients with Polly, correlation headers, Serilog, OTEL.
 
-### ⚙️ Improvements
+### 🔧 Changed
 
 * Unified logging model.
 * Reduced boilerplate with bootstrappers.
-* DX improvements for resilience/caching/tracing.
 
 ---
 
 ## Version 1.4.1 – Patch & Docs 📚
 
+### 📚 Docs
+
 * Documentation refinements.
+
+### 🐛 Fixed
+
 * Minor bootstrapper fixes.
-* Adjusted resilience config snippets.
-* Internal consistency updates.
 
 ---
 
 ## Version 1.4.2 – Cleanup & Consolidation 🧹
 
+### 🔧 Changed
+
 * Removed `SaveEntitiesAsync` → merged into `SaveChangesAsync`.
 * Removed obsolete `DbContextMultiDatabase`.
-* Aligned Business + EntityFramework packages.
-* Docs/README updated.
+* Business + EF packages aligned.
 
 ---
 
-## Version 1.4.4 – Stability Meets Firepower 🔥
+## Version 1.4.4 – Stability 🔥
 
-* Logging & hybrid config improvements.
+### 🔧 Changed
+
+* Improved logging + hybrid config.
 * Cleaner DI registration.
+
+### ✨ Added
+
 * Elastic APM opt-in.
-* Performance boosts in mediator pipelines.
 
 ---
 
-## Version 1.4.5 – Event Semantics Fix 🐛
+## Version 1.4.5 – Event Semantics 🐛
 
 ### 🐛 Fixed
 
-* **Business** → `AggregateRoot` enforces `INotification`; `GetUncommittedChanges()` returns `IReadOnlyCollection<BaseDomainEvent>`.
-* **EntityFramework** → Domain events dispatched via `PublishAsync` instead of `Send`.
+* **Business** → `AggregateRoot` enforces `INotification`.
+* **EntityFramework** → Events dispatched via `PublishAsync`.
 * **Mediator** → Split `SendAsync` (commands/queries) vs `PublishAsync` (events).
-* **Messaging.Hosting.Mediator** → Integration events published via `PublishAsync`.
-* **Messaging.Kafka** → Kafka dispatcher uses `PublishAsync`.
-
-### ✅ Outcome
-
-* Clear separation restored:
-
-  * Commands = intentions.
-  * Queries = retrieval.
-  * Events = notifications (fan-out, no return).
+* **Messaging.Kafka** → Dispatcher uses `PublishAsync`.
 
 ---
 
-## Version 1.5.0 – When Aras Becomes Simple ✨
+## Version 1.5.0 – Aras Integration ✨
 
 ### ✨ Added
 
 * Completed **Aras integration** with simplified abstractions.
-* Full alignment across Business, EF, Mediator, Messaging.
-* Integration events now **pure notifications** (fan-out).
-* Kafka + Hosting layers unified on `PublishAsync`.
+* Integration events → pure notifications (fan-out).
 
 ### 🔧 Changed
 
-* Clearer semantics between **Commands, Queries, Domain Events, Integration Events**.
-* Stronger enforcement of **publish/notify** for events across the stack.
+* Clearer semantics between Commands, Queries, Domain Events, Integration Events.
+* Kafka + Hosting unified on `PublishAsync`.
 
-### 🚀 Foundation
+---
 
-* Prepared for **polyglot messaging** in upcoming 1.5.x releases.
+## Version 1.5.1 – Mapping Arrives 🚀
 
-Version 1.5.1 – AutoMapper++ Arrives 🚀
-✨ Added
+### ✨ Added
 
-Introduced Franz.Common.Mapping as a lightweight, Franz-native alternative to AutoMapper.
+* `Franz.Common.Mapping` as a Franz-native AutoMapper alternative.
+* Profiles (`FranzMapProfile`) with `CreateMap`, `ForMember`, `Ignore`.
+* By-name default mapping.
+* DI support with `services.AddFranzMapping(...)`.
 
-Support for profiles (FranzMapProfile) with CreateMap, ForMember, and Ignore.
+### 🔧 Changed
 
-Default by-name mapping when no explicit profile exists.
+* Ecosystem consistency → mapping without external dependencies.
 
-Dependency injection support with services.AddFranzMapping(...).
+---
 
-Tested and validated in the Book API integration project to ensure real-world readiness.
+## Version 1.5.2 – Reverse Mapping 🔄
 
-🔧 Improved
+### 🐛 Fixed
 
-Ecosystem consistency — Franz now provides mapping without external dependencies.
+* Corrected `ReverseMap()` implementation.
+* Mapping storage simplified with string-based resolution.
 
-Framework is closer to being a self-contained, end-to-end enterprise stack.
-## Version 1.5.2 – Reverse Mapping Unlocked 🔄
+---
 
-### 🔧 Fixed
-- Corrected `ReverseMap()` to properly generate reverse mappings.  
-- Switched mapping storage to string-based property resolution for simplicity.  
-- Updated ApplyMapping to use reflection for property assignment.  
-- Ensured fallback to convention-based mapping when no explicit rule is defined.  
+## Version 1.5.4 – 1.5.8 – Maintenance 🔧
 
-## Version 1.5.4 - 1.5.8- Maintenance Nullability Cleanup
-- Dependencies updated
-- Documentation Upgrade
-- Documentation Cleanup
-- Upgraded core package dependencies
-- Removed redundant Business.HandlerCollector
-- Normalized nullability across bootstrap, messaging, Kafka layers
-- Refactored MessagingSender to async-safe implementation
-- Structured logging via ILogger (Serilog ready)
-- Cleaned ServiceCollectionExtensions with fail-fast guards
-- Kafka consumer: fail-fast on invalid payloads, structured exception logging
-- Consistent DDD exception usage (NotFoundException, TechnicalException)
-## 1.5.9 - 2025-09-23
-### Added
+### 🔧 Changed
 
-- `AddFranzMapping` overload with **assembly scanning** for automatic profile registration.
-- Cleaner DI integration — developers can now register mappings with:
-  ```csharp
-  services.AddFranzMapping(Assembly.GetExecutingAssembly());
+* Dependencies updated.
+* Normalized nullability across bootstrap, messaging, Kafka.
+* Async-safe `MessagingSender`.
+* Cleaner `ServiceCollectionExtensions` with fail-fast guards.
+* Consistent DDD exceptions (`NotFoundException`, `TechnicalException`).
+
+### 📚 Docs
+
+* README + docs cleanup.
+
+### 🐛 Fixed
+
+* Kafka consumer fail-fast on invalid payloads.
+* Structured exception logging.
+
+---
+
+## Version 1.5.9 – Mapping Improvements 🗺️
+
+### ✨ Added
+
+* `AddFranzMapping` overload with assembly scanning.
+
+### 🔧 Changed
+
+* Cleaner DI integration for mapping registration.
+
+---
+
+## Version 1.5.10 – Unified Identity & SSO 🔑
+
+### ✨ Added
+
+* **Franz.Common.Identity**
+
+  * `FranzIdentityContext` (UserId, Email, FullName, Roles, TenantId, DomainId).
+  * `IIdentityContextAccessor` + `FakeIdentityContextAccessor`.
+
+* **Franz.Common.Http.Identity**
+
+  * ASP.NET Core `IdentityContextAccessor`.
+  * `AddHttpIdentityContext()` DI extension.
+  * Config-driven providers: WS-Fed, SAML2, OIDC, Keycloak.
+
+* **Franz.Common.SSO**
+
+  * `FranzSsoSettings` for unified config.
+  * `AddFranzSsoIdentity()` bootstrapper.
+  * JWT bearer support for APIs.
+  * Claims normalization pipeline.
+  * Structured logging via `FranzSsoStartupFilter`.
+
+### 🔧 Changed
+
+* Removed legacy `GenericSSOManager`/`GenericSSOProvider`.
+* ASP.NET-specific code separated into `Franz.Common.Http.Identity`.
+* Provider enforcement: one interactive provider unless allowed.
+
+### 🐛 Fixed
+
+* Startup errors with multiple providers.
+* Normalized claims across WS-Fed/SAML2/OIDC/Keycloak.
+
+### 📚 Docs
+
+* Updated READMEs for Identity, Http.Identity, SSO.
+* Unified usage examples with `appsettings.json` + DI extensions.
+
+---
