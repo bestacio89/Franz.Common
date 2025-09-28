@@ -300,41 +300,150 @@
 
 ## Version 1.5.10 – Unified Identity & SSO 🔑
 
-### ✨ Added
+✨ Added
 
-* **Franz.Common.Identity**
+Introduced Outbox pattern with StoredMessage DTO and persistence mappings.
 
-  * `FranzIdentityContext` (UserId, Email, FullName, Roles, TenantId, DomainId).
-  * `IIdentityContextAccessor` + `FakeIdentityContextAccessor`.
+Implemented IMessageStore abstraction for persistence-agnostic outbox storage.
 
-* **Franz.Common.Http.Identity**
+Added Inbox pattern (IInboxStore) for idempotent message consumption.
 
-  * ASP.NET Core `IdentityContextAccessor`.
-  * `AddHttpIdentityContext()` DI extension.
-  * Config-driven providers: WS-Fed, SAML2, OIDC, Keycloak.
+Introduced IMessageSerializer abstraction with JSON default implementation.
 
-* **Franz.Common.SSO**
+Added correlation tracking via MessageContextAccessor.
 
-  * `FranzSsoSettings` for unified config.
-  * `AddFranzSsoIdentity()` bootstrapper.
-  * JWT bearer support for APIs.
-  * Claims normalization pipeline.
-  * Structured logging via `FranzSsoStartupFilter`.
+🔧 Changed
 
-### 🔧 Changed
+Refactored transport-level Message to decouple mediator from messaging.
 
-* Removed legacy `GenericSSOManager`/`GenericSSOProvider`.
-* ASP.NET-specific code separated into `Franz.Common.Http.Identity`.
-* Provider enforcement: one interactive provider unless allowed.
+Standardized serialization across Kafka and Mongo outbox.
 
-### 🐛 Fixed
+Improved structured logging with emoji conventions (✅ success, ⚠️ retry, 🔥 DLQ).
 
-* Startup errors with multiple providers.
-* Normalized claims across WS-Fed/SAML2/OIDC/Keycloak.
+🐛 Fixed
 
-### 📚 Docs
+Serialization mismatches between Kafka and Outbox replays.
 
-* Updated READMEs for Identity, Http.Identity, SSO.
-* Unified usage examples with `appsettings.json` + DI extensions.
+Missing correlation propagation in consumer pipelines.
+
+📚 Docs
+
+Updated README to document Outbox, Inbox, retry/DLQ, serializer abstraction, and monitoring hooks.
+
+📦 Franz.Common.MongoDB
+[Release] v1.5.10 – Outbox Persistence & Indexing 🍃
+
+✨ Added
+
+MongoMessageStore implementation of IMessageStore.
+
+MoveToDeadLetterAsync to handle exhausted retries.
+
+Automatic index creation on SentOn, RetryCount, and CreatedOn.
+
+DI extension: AddMongoMessageStore().
+
+🔧 Changed
+
+Clean separation of persistence DTOs (StoredMessage) from runtime transport (Message).
+
+📚 Docs
+
+Updated README to show Mongo outbox/inbox usage, retry/DLQ behavior, and DI setup.
+
+📦 Franz.Common.Messaging.Hosting
+[Release] v1.5.10 – Async Listeners & Context 🎧
+
+✨ Added
+
+Async IListener interface (Listen(CancellationToken)).
+
+MessageContextAccessor.Set/Clear for safe context management.
+
+Inbox checks in listeners for idempotent dispatch.
+
+🔧 Changed
+
+Refactored OutboxMessageListener & KafkaMessageListener to async pattern.
+
+Unified message deserialization pipeline.
+
+📚 Docs
+
+Updated README with v1.5.10 features and changelog.
+
+📦 Franz.Common.Messaging.Hosting.Kafka
+[Release] v1.5.10 – Kafka Hosting Bridge ☕
+
+✨ Added
+
+KafkaHostedService to run Kafka listeners as hosted services.
+
+OutboxHostedService to publish Mongo outbox messages into Kafka.
+
+DI extension: KafkaHostingServiceCollectionExtensions with AddKafkaHostedListener() & AddOutboxHostedListener().
+
+🔧 Changed
+
+Separated transport (Messaging.Kafka) from orchestration (Hosting.Kafka).
+
+📚 Docs
+
+Added new README with usage, DI setup, logging conventions, and changelog.
+
+📦 Franz.Common.Identity
+[Release] v1.5.10 – Unified Identity 🔑
+
+✨ Added
+
+FranzIdentityContext (UserId, Email, FullName, Roles, TenantId, DomainId).
+
+IIdentityContextAccessor & FakeIdentityContextAccessor for testing.
+
+📦 Franz.Common.Http.Identity
+[Release] v1.5.10 – HTTP Identity Accessor 🌐
+
+✨ Added
+
+HttpContextIdentityContextAccessor (ASP.NET Core).
+
+DI extension: AddHttpIdentityContext().
+
+Config-driven providers: WS-Fed, SAML2, OIDC, Keycloak.
+
+Automatic claims normalization into FranzIdentityContext.
+
+📦 Franz.Common.SSO
+[Release] v1.5.10 – Unified SSO 🚪
+
+✨ Added
+
+FranzSsoSettings for unified configuration in appsettings.json.
+
+One-line bootstrap: AddFranzSsoIdentity().
+
+JWT bearer token support.
+
+Unified claims normalization pipeline across providers.
+
+Startup logging via FranzSsoStartupFilter.
+
+🔧 Changed
+
+Removed legacy GenericSSOManager & EF Identity coupling.
+
+Extracted ASP.NET Core specifics into Franz.Common.Http.Identity.
+
+Enforced: only one interactive provider active unless explicitly allowed.
+
+🐛 Fixed
+
+Startup issues from multiple provider registrations.
+
+Claims normalization across WS-Fed, SAML2, OIDC, and Keycloak.
+
+📚 Docs
+
+Updated READMEs for Identity, Http.Identity, and SSO with provider setup examples.
 
 ---

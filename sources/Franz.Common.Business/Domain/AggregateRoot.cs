@@ -4,7 +4,7 @@ using Franz.Common.Mediator.Messages; // 🔹 For INotification
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
-namespace Franz.Common.Business
+namespace Franz.Common.Business.Domain
 {
   /// <summary>
   /// Base class for all aggregate roots in DDD.
