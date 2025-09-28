@@ -1,21 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <Import Project="..\..\common.targets" />
 
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.Kafka\Franz.Common.Messaging.Kafka.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="readme.md">
-      <PackagePath></PackagePath>
-      <Pack>true</Pack>
-    </None>
-  </ItemGroup>
+
 
 </Project>
