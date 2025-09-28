@@ -1,6 +1,5 @@
 using Franz.Common.Errors;
 using Franz.Common.Messaging.Contexting;
-using Franz.Common.Messaging.Hosting.Contexting;
 using Franz.Common.Messaging.Hosting.Executing;
 using Franz.Common.Messaging.Hosting.Properties;
 
@@ -35,7 +34,7 @@ public class MessagingHostedService : IHostedService
 
         using var serviceProviderScope = serviceProvider.CreateScope();
         var messageContextAccessor = serviceProviderScope.ServiceProvider.GetRequiredService<MessageContextAccessor>();
-        messageContextAccessor.Current = new MessageContext(message);
+        messageContextAccessor.Set(new MessageContext(message));
 
         var messagingStrategyExecuters = serviceProviderScope.ServiceProvider.GetServices<IMessagingStrategyExecuter>();
 

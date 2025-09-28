@@ -1,134 +1,188 @@
-# **Franz.Common.MongoDB**
+﻿Got it ✅ — let’s update the **README for Franz.Common.MongoDB v1.5.10** to reflect all the new changes we introduced (Inbox store, Outbox store, DLQ, indexes, DI extensions, etc.).
 
-A library within the **Franz Framework** designed to streamline the integration of MongoDB into .NET applications. This package provides utilities for configuring MongoDB services and registering them with dependency injection.
-
----
-
-## **Features**
-
-- **MongoDB Service Registration**:
-  - `MongoServiceRegistration` simplifies the configuration and registration of MongoDB clients and databases.
-- **Custom Configuration**:
-  - Easily integrate custom configurations for MongoDB connections.
-- **Dependency Injection Support**:
-  - Provides out-of-the-box DI integration for MongoDB services.
+Here’s the rewritten version:
 
 ---
 
-## **Version Information**
+```markdown
+# Franz.Common.MongoDB
 
-- **Current Version**: 1.5.9
-- Part of the private **Franz Framework** ecosystem.
-
----
-
-## **Dependencies**
-
-This package has no additional dependencies beyond the .NET runtime and MongoDB client libraries.
+A library within the **Franz Framework** designed to streamline the integration of MongoDB into .NET applications.  
+This package provides utilities for configuring MongoDB services, registering them with dependency injection, and enabling reliable **messaging persistence** patterns such as **Outbox** and **Inbox**.
 
 ---
 
-## **Installation**
+## ✨ Features
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+- **MongoDB Service Registration**
+  - `MongoServiceRegistration` for simplified client and database registration.
+  - Options-driven configuration via `MongoOptions`.
 
-```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+- **📦 Outbox Support**
+  - `MongoMessageStore` for storing pending messages.
+  - Automatic retry and **Dead Letter Queue (DLQ)** support.
+  - Auto-created indexes on:
+    - `SentOn` (pending lookups)
+    - `RetryCount` (retry cycles)
+    - `CreatedOn` (cleanup/archival)
+
+- **📥 Inbox Support**
+  - `MongoInboxStore` ensures **idempotent message consumption**.
+  - Unique index on processed message IDs prevents duplicates.
+
+- **⚙️ Dependency Injection**
+  - Extensions for clean setup:
+    - `AddMongoMessageStore`
+    - `AddMongoInboxStore`
+    - `AddMongoDB`
+
+- **🔒 Reliability**
+  - Atomic updates for retries (`UpdateRetryAsync`).
+  - Safe move to dead-letter collection (`MoveToDeadLetterAsync`).
+  - Mark-as-sent functionality for outbox messages.
+
+---
+
+## 📂 Project Structure
+
 ```
 
-Install the package:
+Franz.Common.MongoDB/
+├── Configuration/
+│    └── MongoOptions.cs
+├── Outbox/
+│    ├── MongoMessageStore.cs
+│    └── DeadLetterCollection.cs
+├── Inbox/
+│    └── MongoInboxStore.cs
+├── Extensions/
+│    └── ServiceCollectionExtensions.cs
+└── MongoServiceRegistration.cs
 
-```bash
-dotnet add package Franz.Common.MongoDB  
-```
+````
 
 ---
 
-## **Usage**
+## ⚙️ Configuration
 
-### **1. Register MongoDB Services**
+`appsettings.json`:
 
-Use `MongoServiceRegistration` to add MongoDB services to your dependency injection container:
+```json
+"Mongo": {
+  "ConnectionString": "mongodb://localhost:27017",
+  "DatabaseName": "MessagingDb",
+  "OutboxCollection": "OutboxMessages",
+  "DeadLetterCollection": "DeadLetterMessages",
+  "InboxCollection": "InboxMessages"
+}
+````
+
+---
+
+## 🚀 Dependency Injection Setup
 
 ```csharp
-using Franz.Common.MongoDB;
-
-public class Startup
+builder.Services.AddMongoDB(options =>
 {
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddMongoDB(options =>
-        {
-            options.ConnectionString = "mongodb://localhost:27017";
-            options.DatabaseName = "MyDatabase";
-        });
-    }
+    options.ConnectionString = "mongodb://localhost:27017";
+    options.DatabaseName = "MessagingDb";
+});
+
+builder.Services.AddMongoMessageStore(configuration);
+builder.Services.AddMongoInboxStore(configuration);
+```
+
+---
+
+## 🔄 Usage
+
+### Outbox Message Store
+
+```csharp
+var message = new StoredMessage
+{
+    Id = Guid.NewGuid().ToString(),
+    Body = "{ \"OrderId\": 123 }",
+    CreatedOn = DateTime.UtcNow
+};
+
+await _messageStore.SaveAsync(message);
+```
+
+### Inbox Message Store
+
+```csharp
+if (!await _inboxStore.HasProcessedAsync(message.Id))
+{
+    await _dispatcher.PublishAsync(orderCreatedEvent);
+    await _inboxStore.MarkProcessedAsync(message.Id);
 }
 ```
 
-### **2. Access MongoDB Services**
+---
 
-Inject the MongoDB client or database into your services:
+## 📊 Observability
 
-```csharp
-public class MyService
-{
-    private readonly IMongoDatabase _database;
-
-    public MyService(IMongoDatabase database)
-    {
-        _database = database;
-    }
-
-    public async Task InsertDocumentAsync<T>(T document, string collectionName)
-    {
-        var collection = _database.GetCollection<T>(collectionName);
-        await collection.InsertOneAsync(document);
-    }
-}
-```
-
-### **3. Customize Configurations**
-
-Store custom MongoDB configurations in the `config` folder and extend the registration process as needed.
+* Mongo collections come with indexes for performance.
+* Logs include retries ⚠️, DLQ moves 🔥, and successful sends ✅.
+* OpenTelemetry hooks enabled via higher-level messaging layer.
 
 ---
 
-## **Integration with Franz Framework**
+## 📌 Roadmap
 
-The **Franz.Common.MongoDB** package integrates seamlessly with the **Franz Framework**, enabling MongoDB-based storage and operations in distributed systems. Combine it with other Franz libraries for enhanced functionality.
-
----
-
-## **Contributing**
-
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
+* TTL indexes for automatic cleanup of old outbox/inbox entries.
+* Configurable sharding/replica set support for large-scale deployments.
+* RabbitMQ-backed inbox/outbox stores (parallel to Kafka).
 
 ---
 
-## **License**
+## 📝 Version Information
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
+* **Current Version**: 1.5.10
+* Part of the private **Franz Framework** ecosystem.
 
 ---
 
-## **Changelog**
+## 📜 License
+
+This library is licensed under the MIT License. See the `LICENSE` file for details.
+
+---
+
+## 📖 Changelog
 
 ### Version 1.2.65
-- Added `MongoServiceRegistration` for streamlined MongoDB service configuration and registration.
-- Introduced support for custom MongoDB configurations.
 
+* Added `MongoServiceRegistration` for streamlined MongoDB service configuration and registration.
+* Introduced support for custom MongoDB configurations.
 
 ### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
+
+* Upgraded to **.NET 9.0.8**.
+* Added **new features and improvements**.
+* Separated **business concepts** from **mediator concepts**.
+* Now compatible with both the **in-house mediator** and **MediatR**.
+
+### Version 1.5.10
+
+* Introduced **Mongo Outbox** (`MongoMessageStore`) with retries and Dead Letter Queue.
+* Added **Mongo Inbox** (`MongoInboxStore`) for idempotent consumption.
+* Auto-created indexes on `SentOn`, `RetryCount`, and `CreatedOn`.
+* Added dependency injection extensions:
+
+  * `AddMongoMessageStore`
+  * `AddMongoInboxStore`
+* Extended `IMessageStore` with:
+
+  * `UpdateRetryAsync`
+  * `MoveToDeadLetterAsync`
+  * `MarkAsSentAsync`
+* Improved observability with structured logging and OpenTelemetry hooks.
+
+---
+
+```
+
+---
+

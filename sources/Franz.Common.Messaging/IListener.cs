@@ -2,9 +2,15 @@ namespace Franz.Common.Messaging.Hosting;
 
 public interface IListener
 {
-    event EventHandler<MessageEventArgs> Received;
+  event EventHandler<MessageEventArgs> Received;
 
-    void Listen();
+  /// <summary>
+  /// Start listening asynchronously.
+  /// </summary>
+  Task Listen(CancellationToken stoppingToken = default);
 
-    void StopListen();
+  /// <summary>
+  /// Stop listening and clean up resources.
+  /// </summary>
+  void StopListen();
 }

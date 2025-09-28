@@ -1,164 +1,178 @@
-# **Franz.Common.Messaging**
+﻿
+# Franz.Common.Messaging
 
-A messaging abstraction library within the **Franz Framework** that simplifies the handling of messages, headers, and events for distributed systems. This package provides a comprehensive set of tools to build, send, and manage messages, with strong support for context propagation, delegation, and customizable strategies.
+A messaging abstraction library within the **Franz Framework** that provides a unified foundation for building reliable, resilient, and extensible distributed messaging systems.  
 
----
-
-## **Features**
-
-- **Messaging Context Management**:
-  - Interfaces like `IMessageContext` and `IMessageContextAccessor` for managing message-specific data.
-  - `MessageContext` for centralized context handling.
-- **Delegating Handlers**:
-  - `MessageBuilderDelegatingHandler` to extend messaging pipelines.
-- **Factories**:
-  - `MessageFactory` and builder strategies (`CommandMessageBuilderStrategy`, `IntegrationEventMessageBuilderStrategy`) for consistent message construction.
-- **Headers**:
-  - Tools like `HeaderContextAccessor`, `HeaderNamer`, and `MessageHeaders` to manage and propagate headers.
-- **Messaging Lifecycle**:
-  - Interfaces for key messaging operations, such as:
-    - `IMessagingInitializer`
-    - `IMessagingPublisher`
-    - `IMessagingSender`
-    - `IMessagingTransaction`
-- **Constants and Utilities**:
-  - Includes `MessagingConstants` and helper classes for common messaging patterns.
-- **Dependency Injection**:
-  - `ServiceCollectionExtensions` for streamlined registration of messaging-related services.
+It supports **outbox**, **inbox**, **retries**, **dead-letter queues**, and **multiple transports** (starting with **Kafka** and **MongoDB**).
 
 ---
 
-## **Version Information**
+## ✨ Features
 
-- **Current Version**: 1.5.9
-- Part of the private **Franz Framework** ecosystem.
+- **📦 Outbox Pattern**
+  - Reliable delivery with `OutboxPublisherService`.
+  - Retries with exponential backoff.
+  - Moves failed messages to a **Dead Letter Queue (DLQ)** after max retries.
+  - MongoDB-backed implementation (`MongoMessageStore`).
+
+- **📥 Inbox Pattern**
+  - Prevents duplicate processing with `IInboxStore`.
+  - MongoDB-backed implementation (`MongoInboxStore`).
+  - Guarantees **idempotency** under retries or replays.
+
+- **🧩 Serializer Abstraction**
+  - Unified `IMessageSerializer` contract.
+  - Default `JsonMessageSerializer` (camelCase, ignore nulls).
+  - Shared across Kafka, Mongo, and Outbox.
+
+- **📊 Observability & Monitoring**
+  - Structured logging (with emojis ✅⚠️🔥).
+  - OpenTelemetry-friendly hooks.
+  - Covers retries, DLQ moves, dispatch, and consumption.
+
+- **🎧 Listeners & Hosting**
+  - Transport-agnostic `IListener` interface.
+  - Dedicated listeners:
+    - `KafkaListener` (transport-only)
+    - `OutboxListener` (transport-only)
+  - Hosted service wrappers:
+    - `KafkaHostedService`
+    - `OutboxHostedService`
+  - Clean **separation of transport vs hosting concerns**.
+
+- **⚡ MongoDB Integration**
+  - `MongoMessageStore` with automatic index creation:
+    - `SentOn`
+    - `RetryCount`
+    - `CreatedOn`
+  - `MongoInboxStore` with unique index on message IDs.
+  - DI extensions: `AddMongoMessageStore`, `AddMongoInboxStore`.
 
 ---
 
-## **Dependencies**
+## 📂 Project Structure
 
-This package relies on:
-- **Microsoft.Extensions.Options** (8.0.0): Provides options pattern for configurations.
-- **Microsoft.Extensions.Options.ConfigurationExtensions** (8.0.0): Extends options for configuration binding.
-- **Microsoft.Extensions.Primitives** (8.0.0): Supports header and data propagation.
-- **Newtonsoft.Json** (13.0.3): For serialization of message payloads.
-- **Franz.Common.Business**: Provides core business utilities.
-- **Franz.Common.DependencyInjection**: Simplifies dependency injection.
-- **Franz.Common.Errors**: For error handling in messaging workflows.
-- **Franz.Common.Headers**: Enhances header handling.
-
----
-
-## **Installation**
-
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
-
-```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
 ```
 
-Install the package:
+Franz.Common.Messaging/
+├── Configuration/
+├── Contexting/
+├── Delegating/
+├── Extensions/
+├── Factories/
+├── Headers/
+├── Outboxes/
+│    ├── OutboxOptions.cs
+│    ├── OutboxPublisherService.cs
+│    └── ServiceCollectionExtensions.cs
+├── Serialization/
+│    ├── ISerializer.cs
+│    ├── JsonMessageSerializer.cs
+│    └── ServiceCollectionExtensions.cs
+├── Storage/
+│    ├── InboxStore.cs
+│    ├── IMessageStore.cs
+│    ├── StoredMessage.cs
+│    ├── Mappings/MessageMappingExtensions.cs
+│    └── …
+├── Message.cs
+├── IMessageSender.cs
+└── …
 
-```bash
-dotnet add package Franz.Common.Messaging  
-```
+````
+
+Hosting-specific projects:
+- **Franz.Common.Messaging.Hosting** → defines `IListener`, `MessageContext`, base services.
+- **Franz.Common.Messaging.Hosting.Kafka** → `KafkaHostedService`.
+- **Franz.Common.Messaging.Hosting.Mongo** → `OutboxHostedService`, `InboxHostedService`.
 
 ---
 
-## **Usage**
+## ⚙️ Configuration
 
-### **1. Configure Messaging Options**
+`MessagingOptions` in `appsettings.json`:
 
-Use `MessagingOptions` to configure messaging behavior:
-
-```csharp
-using Franz.Common.Messaging.Configuration;
-
-services.Configure<MessagingOptions>(options =>
-{
-    options.DefaultExchange = "my-default-exchange";
-});
-```
-
-### **2. Build and Send Messages**
-
-Leverage `MessageFactory` and `IMessagingSender` to build and send messages:
-
-```csharp
-using Franz.Common.Messaging.Factories;
-
-var messageFactory = new MessageFactory();
-var message = messageFactory.CreateMessage("my-event", new { Key = "Value" });
-
-await messagingSender.SendAsync(message);
-```
-
-### **3. Use Context Accessors**
-
-Access messaging context and headers using `MessageContext`:
-
-```csharp
-using Franz.Common.Messaging.Contexting;
-
-public class MyService
-{
-    private readonly IMessageContextAccessor _messageContextAccessor;
-
-    public MyService(IMessageContextAccessor messageContextAccessor)
-    {
-        _messageContextAccessor = messageContextAccessor;
-    }
-
-    public string GetHeaderValue(string headerKey)
-    {
-        return _messageContextAccessor.MessageContext.Headers[headerKey];
-    }
+```json
+"Messaging": {
+  "BootstrapServers": "localhost:9092",
+  "GroupId": "my-service",
+  "OutboxCollection": "OutboxMessages",
+  "DeadLetterCollection": "DeadLetterMessages",
+  "InboxCollection": "InboxMessages"
 }
-```
+````
 
-### **4. Propagate Headers**
+---
 
-Use `HeaderPropagationMessageBuilder` to ensure headers are propagated in distributed messaging:
+## ⚡ Dependency Injection Setup
 
 ```csharp
-using Franz.Common.Messaging.Headers;
-
-var headers = new MessageHeaders();
-headers.Add("CorrelationId", Guid.NewGuid().ToString());
-
-var messageBuilder = new HeaderPropagationMessageBuilder(headers);
+builder.Services.AddMessagingCore();
+builder.Services.AddMongoMessageStore(configuration);
+builder.Services.AddMongoInboxStore(configuration);
+builder.Services.AddKafkaHostedListener();
+builder.Services.AddOutboxHostedListener();
 ```
 
 ---
 
-## **Integration with Franz Framework**
+## 🔄 Typical Flow
 
-The **Franz.Common.Messaging** package integrates seamlessly with:
-- **Franz.Common.Business**: Provides foundational utilities for business logic.
-- **Franz.Common.Headers**: Simplifies header propagation.
-- **Franz.Common.DependencyInjection**: Enables streamlined dependency injection for messaging services.
-
----
-
-## **Contributing**
-
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
+1. **Send Command/Event** → via `IMessagingSender`.
+2. **Persist in Outbox** → `MongoMessageStore`.
+3. **Publisher Service** → retries + DLQ if needed.
+4. **Transport** → Kafka.
+5. **Listener** → consumes message.
+6. **Inbox Check** → skip if already processed.
+7. **Dispatcher** → `SendAsync` (command) / `PublishAsync` (event).
 
 ---
 
-## **License**
+## 🚀 Extensibility
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
+* Add new transports (RabbitMQ, Azure Service Bus, etc.):
+
+  * Implement `IListener` + HostedService in `Hosting.[Transport]`.
+  * Add DI registration extensions.
+* Swap Mongo for SQL by implementing `IMessageStore` and `IInboxStore`.
+* Replace JSON with custom serializers via `IMessageSerializer`.
 
 ---
+
+## 📊 Observability
+
+* Emoji-style structured logs for clarity:
+
+  * ✅ Success
+  * ⚠️ Retry
+  * 🔁 Skipped (Inbox)
+  * 🔥 Dead Letter
+* Compatible with OpenTelemetry for tracing message lifecycles.
+
+---
+
+## 📌 Roadmap
+
+* Batch consumption support.
+* Message expiration / cleanup.
+* RabbitMQ transport (`Franz.Common.Messaging.Hosting.RabbitMq`).
+
+---
+
+## 📝 Version Information
+
+* **Current Version**: 1.5.10
+* Part of the private **Franz Framework** ecosystem.
+
+---
+
+## 📜 License
+
+This library is licensed under the MIT License. See the `LICENSE` file for details.
+
+```
+
+
 
 ## **Changelog**
 

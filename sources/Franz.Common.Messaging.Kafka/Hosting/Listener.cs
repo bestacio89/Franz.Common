@@ -1,94 +1,69 @@
-﻿#nullable enable
-using Confluent.Kafka;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Primitives;
-using Franz.Common.Messaging.Headers;
+﻿using Confluent.Kafka;
 using Franz.Common.Messaging.Hosting;
-using Franz.Common.Messaging.Kafka.Modeling;
-using Franz.Common.Reflection;
-using System.Text;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
-namespace Franz.Common.Messaging.Kafka.Hosting
+namespace Franz.Common.Messaging.Kafka;
+
+public class KafkaListener : IListener
 {
-  public class KafkaListener : IListener
+  private readonly IConsumer<string, string> _consumer;
+  private readonly ILogger<KafkaListener> _logger;
+  private readonly string[] _topics;
+
+  public KafkaListener(
+      IConsumer<string, string> consumer,
+      IEnumerable<string> topics,
+      ILogger<KafkaListener> logger)
   {
-    private readonly IConsumer<Ignore, string> _consumer;
-    private readonly ILogger<KafkaListener> _logger;
-    private readonly string _topicName;
+    _consumer = consumer;
+    _topics = topics.ToArray();
+    _logger = logger;
+  }
 
-    public KafkaListener(
-        IConsumer<Ignore, string> consumer,
-        IAssemblyAccessor assemblyAccessor,
-        ILogger<KafkaListener> logger)
+  public event EventHandler<MessageEventArgs>? Received;
+
+  public Task Listen(CancellationToken stoppingToken = default)
+  {
+    _consumer.Subscribe(_topics);
+    _logger.LogInformation("🎧 Kafka listener subscribed to {Topics}", string.Join(",", _topics));
+
+    try
     {
-      _consumer = consumer;
-      _logger = logger;
-      var assembly = assemblyAccessor.GetEntryAssembly();
-      _topicName = TopicNamer.GetTopicName((System.Reflection.Assembly)assembly);
-    }
-
-    public event EventHandler<MessageEventArgs>? Received;
-
-   public void Listen()
-{
-    _consumer.Subscribe(_topicName);
-
-    while (true)
-    {
+      while (!stoppingToken.IsCancellationRequested)
+      {
+        ConsumeResult<string, string>? result;
         try
         {
-            var consumeResult = _consumer.Consume();
-
-            var message = new Message
-            {
-                Headers = TransfertHeaders(consumeResult),
-                Body = consumeResult.Message.Value ?? string.Empty, // ✅ Ensure non-null
-            };
-
-            _logger.LogInformation(
-                "Consumed message from topic {Topic}, partition {Partition}, offset {Offset}, key {Key}",
-                consumeResult.Topic,
-                consumeResult.Partition,
-                consumeResult.Offset,
-                "<ignore>" // ✅ since key is Confluent.Kafka.Ignore
-            );
-
-            Received?.Invoke(this, new MessageEventArgs(message));
+          result = _consumer.Consume(); // respect cancellation
         }
-        catch (ConsumeException e)
+        catch (ConsumeException ex)
         {
-            _logger.LogError(e,
-                "Kafka consume error on topic {Topic}, partition {Partition}: {Reason}",
-                e.ConsumerRecord?.Topic ?? _topicName,
-                e.ConsumerRecord?.Partition.Value ?? -1,
-                e.Error.Reason);
+          _logger.LogError(ex, "❌ Error consuming Kafka message");
+          continue;
         }
-        catch (Exception ex)
+
+        if (result?.Message?.Value is null)
+          continue;
+
+        var transport = JsonSerializer.Deserialize<Message>(result.Message.Value);
+        if (transport is null)
         {
-            _logger.LogError(ex, "Unexpected error occurred in Kafka listener for topic {Topic}", _topicName);
+          _logger.LogWarning("⚠️ Skipped message: cannot deserialize transport for {Topic}", result.Topic);
+          continue;
         }
+
+        Received?.Invoke(this, new MessageEventArgs(transport));
+      }
     }
-}
-
-
-
-
-    public void StopListen()
+    finally
     {
-      _consumer.Unsubscribe();
+      _consumer.Close();
     }
 
-    public static MessageHeaders TransfertHeaders(ConsumeResult<Ignore, string> consumeResult)
-    {
-      var dictionary = consumeResult.Message.Headers
-          .ToDictionary(
-              header => header.Key ?? string.Empty, // Ensure key is not null
-              header => new StringValues(
-                  Encoding.UTF8.GetString(header.GetValueBytes() ?? Array.Empty<byte>())
-              )
-          );
-
-      return new MessageHeaders(dictionary);
-    }
+    return Task.CompletedTask;
   }
+
+
+  public void StopListen() => _consumer.Unsubscribe();
 }

@@ -14,6 +14,7 @@
 	  <ProjectReference Include="..\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />
 	  <ProjectReference Include="..\Franz.Common.Logging\Franz.Common.Logging.csproj" />
 	  <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
+	  <ProjectReference Include="..\Franz.Common.Serialization\Franz.Common.Serialization.csproj" />
 	</ItemGroup>
 	
 	<ItemGroup>
@@ -29,5 +30,9 @@
 	    <Generator>PublicResXFileCodeGenerator</Generator>
 	    <LastGenOutput>Resources.Designer.cs</LastGenOutput>
 	  </EmbeddedResource>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Listeners\NewFolder\" />
 	</ItemGroup>
 </Project>

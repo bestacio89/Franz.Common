@@ -1,3 +1,5 @@
+using Franz.Common.Messaging.Storage;
+using Franz.Common.MongoDB.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
@@ -50,6 +52,21 @@ public static class ServiceCollectionExtensions
 
     // Register the custom context
     services.AddScoped<TContext>();
+
+    return services;
+  }
+
+  public static IServiceCollection AddMongoMessageStore(
+       this IServiceCollection services,
+       string connectionString,
+       string dbName,
+       string outboxCollectionName = "OutboxMessages",
+       string deadLetterCollectionName = "DeadLetterMessages")
+  {
+    var client = new MongoClient(connectionString);
+    var database = client.GetDatabase(dbName);
+
+    services.AddSingleton<IMessageStore>(new MongoMessageStore(database, outboxCollectionName, deadLetterCollectionName));
 
     return services;
   }
