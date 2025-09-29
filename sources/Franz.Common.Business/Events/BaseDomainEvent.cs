@@ -7,6 +7,13 @@ namespace Franz.Common.Business.Domain;
 [DebuggerDisplay("{EventType} (Aggregate={AggregateId}, Correlation={CorrelationId})")]
 public abstract class BaseDomainEvent : IDomainEvent, INotification
 {
+
+  protected BaseDomainEvent(Guid aggregateId, string aggregateType, string? correlationId = null)
+  {
+    AggregateId = aggregateId;
+    AggregateType = aggregateType;
+    CorrelationId = correlationId;
+  }
   /// <summary>
   /// Unique identifier for this event instance (useful for deduplication/outbox).
   /// </summary>
@@ -37,4 +44,6 @@ public abstract class BaseDomainEvent : IDomainEvent, INotification
   /// Useful for serialization/logging.
   /// </summary>
   public string EventType => GetType().Name;
+
+  
 }

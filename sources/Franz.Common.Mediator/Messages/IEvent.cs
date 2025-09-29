@@ -7,5 +7,5 @@ using System.Threading.Tasks;
 namespace Franz.Common.Mediator.Messages;
 public interface IEvent : INotification
 {
-  DateTime OccurredOn { get; }
+  DateTimeOffset OccurredOn { get; }
 }

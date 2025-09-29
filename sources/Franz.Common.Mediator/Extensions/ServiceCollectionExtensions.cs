@@ -5,6 +5,9 @@ using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Observers;
 using Franz.Common.Mediator.Options;
 using Franz.Common.Mediator.Pipelines.Core;
+using Franz.Common.Mediator.Pipelines.Events.Logging;
+using Franz.Common.Mediator.Pipelines.Events.PostProcessing;
+using Franz.Common.Mediator.Pipelines.Events.Preprocessing;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Mediator.Pipelines.Processors;
 using Franz.Common.Mediator.Pipelines.Processors.Logging;
@@ -13,7 +16,11 @@ using Franz.Common.Mediator.Pipelines.Resilience;
 using Franz.Common.Mediator.Pipelines.Transaction;
 using Franz.Common.Mediator.Pipelines.Validation;
 using Franz.Common.Mediator.Validation;
+using Franz.Common.Mediator.Validation.Events;
+using Franz.Common.Mediator.Validation.Events.Preprocessing;
+using Franz.Common.Mediator.Validation.Events.Validation;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Reflection;
 
 namespace Franz.Common.Mediator.Extensions
@@ -37,6 +44,7 @@ namespace Franz.Common.Mediator.Extensions
 
       // Dispatcher
       services.AddScoped<IDispatcher, FranzDispatcher>();
+      services.AddScoped<IEventDispatcher, EventDispatcher>();
 
       // -------------------- HANDLERS --------------------
       services.Scan(scan => scan
@@ -48,6 +56,8 @@ namespace Franz.Common.Mediator.Extensions
           .AddClasses(c => c.AssignableTo(typeof(INotificationHandler<>)))
               .AsImplementedInterfaces().WithScopedLifetime()
           .AddClasses(c => c.AssignableTo(typeof(IStreamQueryHandler<,>)))
+              .AsImplementedInterfaces().WithScopedLifetime()
+          .AddClasses(c => c.AssignableTo(typeof(IEventHandler<>)))
               .AsImplementedInterfaces().WithScopedLifetime()
       );
 
@@ -104,8 +114,26 @@ namespace Franz.Common.Mediator.Extensions
       return services;
     }
 
+    public static IServiceCollection AddFranzEventValidationPipeline(this IServiceCollection services)
+    {
+      services.AddScoped(typeof(IEventPipeline<>), typeof(EventValidationPipeline<>))
+                
+               //Eventpreprocessors
+              .AddScoped(typeof(IEventPreProcessor<>), typeof(EventAuditPreProcessor<>))
+              .AddScoped(typeof(IEventPreProcessor<>), typeof(SerilogEventAuditPreProcessor<>))
+              .AddScoped(typeof(IEventPreProcessor<>), typeof(SerilogEventLoggingPreProcessor<>))
+              
+              //MainLogginPipeline
+              .AddScoped(typeof(IEventPipeline<>), typeof(SerilogEventLoggingPipeline<>))
+              
+              //eventpostprocessors
+              .AddScoped(typeof(IEventPostProcessor<>), typeof(SerilogEventLoggingPostProcessor<>))
+              .AddScoped(typeof(IEventPostProcessor<>), typeof(SerilogEventAuditPostProcessor<>))
+              .AddScoped(typeof(IEventPostProcessor<>), typeof(EventAuditPostProcessor<>));
 
-  
+      return services;
+    }
+
     public static IServiceCollection AddFranzTransactionPipeline(this IServiceCollection services)
     {
       services.AddScoped(typeof(IPipeline<,>), typeof(TransactionPipeline<,>));
@@ -137,7 +165,35 @@ namespace Franz.Common.Mediator.Extensions
 
       return services;
     }
+        /// <summary>
+      /// Registers Franz Mediator with a sensible default setup:
+      /// - Scans the entry assembly for handlers
+      /// - Enables logging, validation, audit pipelines
+      /// - Adds default console observer if configured
+      /// </summary>
+      public static IServiceCollection AddFranzMediatorDefault(
+          this IServiceCollection services,
+          Action<FranzMediatorOptions>? configure = null)
+      {
+        var entryAssembly = Assembly.GetEntryAssembly()
+                            ?? Assembly.GetCallingAssembly();
+
+        // Core mediator (handlers + dispatcher)
+        services.AddFranzMediator(new[] { entryAssembly }, configure);
+
+        // Default pipelines: logging + validation + serilog audit
+        services.AddFranzLoggingPipeline();
+        services.AddFranzValidationPipeline();
+        services.AddFranzSerilogLoggingPipeline();
+        services.AddFranzSerilogAuditPipeline();
 
 
-  }
+        // Transaction support
+        services.AddFranzTransactionPipeline();
+
+        return services;
+      }
+    }
+
+    
 }

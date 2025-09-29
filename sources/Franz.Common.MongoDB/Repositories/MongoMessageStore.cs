@@ -52,6 +52,7 @@ public class MongoMessageStore : IMessageStore
     await _collection.UpdateOneAsync(m => m.Id == id, update, cancellationToken: cancellationToken);
   }
 
+
   public async Task UpdateRetryAsync(StoredMessage message, CancellationToken cancellationToken = default)
   {
     var update = Builders<StoredMessage>.Update

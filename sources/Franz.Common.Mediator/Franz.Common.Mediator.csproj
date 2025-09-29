@@ -12,6 +12,10 @@
     <PackageReference Include="Serilog" Version="4.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Franz.Common\Franz.Common.csproj" />
+  </ItemGroup>
+
   
 
 </Project>

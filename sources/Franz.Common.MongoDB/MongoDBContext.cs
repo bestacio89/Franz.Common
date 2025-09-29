@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
-using Franz.Common.MongoDB.config;
 using MongoDB.Driver;
+using Franz.Common.MongoDB.Configuration;
 
 namespace Franz.Common.MongoDB;
 
