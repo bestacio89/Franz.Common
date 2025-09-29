@@ -1,0 +1,52 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\..\common.targets" />
+  
+ 
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\sources\Franz.Common.Business\Franz.Common.Business.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Errors\Franz.Common.Errors.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Hosting.Messaging.Kafka\Franz.Common.Messaging.Hosting.Kafka.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Http.Bootstrap\Franz.Common.Http.Bootstrap.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Http.EntityFramework\Franz.Common.Http.EntityFramework.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Http.Headers\Franz.Common.Http.Headers.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Http.Identity\Franz.Common.Http.Identity.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Http.Messaging\Franz.Common.Http.Messaging.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Http.MultiTenancy\Franz.Common.Http.MultiTenancy.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Http\Franz.Common.Http.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Logging\Franz.Common.Logging.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Mapping\Franz.Common.Mapping.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Mediator.OpenTelemetry\Franz.Common.Mediator.OpenTelemetry.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Mediator.Polly\Franz.Common.Mediator.Polly.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.EntityFramework\Franz.Common.Messaging.EntityFramework.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.MediatR\Franz.Common.Messaging.Hosting.Mediator.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Identity\Franz.Common.Messaging.Identity.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Kafka\Franz.Common.Messaging.Kafka.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.MongoDB\Franz.Common.MongoDB.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Reflection\Franz.Common.Reflection.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Serialization\Franz.Common.Serialization.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="Ocelot" Version="24.0.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="6.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+
+</Project>
