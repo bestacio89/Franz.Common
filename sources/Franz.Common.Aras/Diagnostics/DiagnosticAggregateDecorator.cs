@@ -1,7 +1,7 @@
 ﻿using Franz.Common.Aras.Abstractions.Contexts.Contracts;
 using Franz.Common.Aras.Abstractions.Snapshots.Contracts;
-using Franz.Common.Business;
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 using Franz.Common.Mediator.Dispatchers;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -12,7 +12,7 @@ namespace Franz.Common.Aras.Diagnostics
   /// Diagnostic decorator for <see cref="IArasAggregateContext"/>.
   /// Adds structured logging and OpenTelemetry tracing around aggregate operations.
   /// </summary>
-  public class DiagnosticAggregateContextDecorator : IArasAggregateContext
+  public sealed class DiagnosticAggregateContextDecorator : IArasAggregateContext
   {
     private readonly IArasAggregateContext _inner;
     private readonly ILogger<DiagnosticAggregateContextDecorator> _logger;
@@ -28,16 +28,17 @@ namespace Franz.Common.Aras.Diagnostics
       _activitySource = activitySource;
     }
 
-    public IDispatcher Dispatcher => _inner.Dispatcher;
+   
 
-    public void TrackAggregate<TAggregate, TEvent>(TAggregate aggregate)
-        where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-        where TEvent : BaseDomainEvent
+    public void TrackAggregate<TAggregate, TDomainEvent>(TAggregate aggregate)
+        where TAggregate : AggregateRoot<TDomainEvent>, new()
+        where TDomainEvent : IDomainEvent
     {
-      _logger.LogInformation("Tracking aggregate {Aggregate} with Id {Id}",
+      _logger.LogInformation(
+          "Tracking aggregate {Aggregate} with Id {Id}",
           typeof(TAggregate).Name, aggregate.Id);
 
-      _inner.TrackAggregate<TAggregate, TEvent>(aggregate);
+      _inner.TrackAggregate<TAggregate, TDomainEvent>(aggregate);
     }
 
     public async Task<int> SaveAggregateChangesAsync(CancellationToken ct = default)
@@ -53,55 +54,59 @@ namespace Franz.Common.Aras.Diagnostics
       return count;
     }
 
-    public async Task<TAggregate?> GetAggregateAsync<TAggregate, TEvent>(
+    public async Task<TAggregate?> GetAggregateAsync<TAggregate, TDomainEvent>(
         Guid id, CancellationToken ct = default
     )
-        where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-        where TEvent : BaseDomainEvent
+        where TAggregate : AggregateRoot<TDomainEvent>, new()
+        where TDomainEvent : IDomainEvent
     {
       using var activity = _activitySource.StartActivity("Aras.GetAggregate");
       activity?.SetTag("aggregate", typeof(TAggregate).Name);
       activity?.SetTag("id", id);
 
-      _logger.LogInformation("Fetching ARAS aggregate {Aggregate} with Id {Id}",
+      _logger.LogInformation(
+          "Fetching ARAS aggregate {Aggregate} with Id {Id}",
           typeof(TAggregate).Name, id);
 
-      var result = await _inner.GetAggregateAsync<TAggregate, TEvent>(id, ct);
+      var result = await _inner.GetAggregateAsync<TAggregate, TDomainEvent>(id, ct);
 
-      _logger.LogInformation("Fetched ARAS aggregate {Aggregate} with Id {Id}: Found={Found}",
+      _logger.LogInformation(
+          "Fetched ARAS aggregate {Aggregate} with Id {Id}: Found={Found}",
           typeof(TAggregate).Name, id, result != null);
 
       return result;
     }
 
-    public async Task SaveAggregateAsync<TAggregate, TEvent>(
+    public async Task SaveAggregateAsync<TAggregate, TDomainEvent>(
         TAggregate aggregate,
         CancellationToken ct = default
     )
-        where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-        where TEvent : BaseDomainEvent
+        where TAggregate : AggregateRoot<TDomainEvent>, new()
+        where TDomainEvent : IDomainEvent
     {
       using var activity = _activitySource.StartActivity("Aras.SaveAggregate");
       activity?.SetTag("aggregate", typeof(TAggregate).Name);
       activity?.SetTag("id", aggregate.Id);
 
-      _logger.LogInformation("Saving ARAS aggregate {Aggregate} with Id {Id}",
+      _logger.LogInformation(
+          "Saving ARAS aggregate {Aggregate} with Id {Id}",
           typeof(TAggregate).Name, aggregate.Id);
 
-      await _inner.SaveAggregateAsync<TAggregate, TEvent>(aggregate, ct);
+      await _inner.SaveAggregateAsync<TAggregate, TDomainEvent>(aggregate, ct);
 
-      _logger.LogInformation("Saved ARAS aggregate {Aggregate} with Id {Id}",
+      _logger.LogInformation(
+          "Saved ARAS aggregate {Aggregate} with Id {Id}",
           typeof(TAggregate).Name, aggregate.Id);
     }
 
-    public IAggregateSnapshotStore<TAggregate, TEvent> SnapshotStore<TAggregate, TEvent>()
-        where TAggregate : AggregateRoot<TEvent>, new()
-        where TEvent : BaseDomainEvent
+    public IAggregateSnapshotStore<TAggregate, TDomainEvent> SnapshotStore<TAggregate, TDomainEvent>()
+        where TAggregate : AggregateRoot<TDomainEvent>, new()
+        where TDomainEvent : IDomainEvent
     {
       _logger.LogInformation("Resolving SnapshotStore for {Aggregate}", typeof(TAggregate).Name);
-      return _inner.SnapshotStore<TAggregate, TEvent>();
+      return _inner.SnapshotStore<TAggregate, TDomainEvent>();
     }
 
-    public void Dispose() => _inner.Dispose();
+  
   }
 }

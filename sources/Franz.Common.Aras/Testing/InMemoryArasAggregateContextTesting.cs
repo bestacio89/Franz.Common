@@ -1,7 +1,8 @@
 ﻿using Franz.Common.Aras.Abstractions.Contexts.Contracts;
 using Franz.Common.Aras.Abstractions.Snapshots.Contracts;
-using Franz.Common.Business;
+using Franz.Common.Aras.Testing.Snapshots;
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 using Franz.Common.Mediator.Dispatchers;
 using System.Collections.Concurrent;
 
@@ -10,14 +11,15 @@ namespace Franz.Common.Aras.Testing
   /// <summary>
   /// In-memory implementation of the ARAS aggregate context.
   /// Designed for testing without a live ARAS instance.
+  /// Persists events in memory and dispatches them through Franz pipelines.
   /// </summary>
-  public class InMemoryArasAggregateContext : IArasAggregateContext
+  public sealed class InMemoryArasAggregateContext : IArasAggregateContext, IDisposable
   {
     private readonly InMemoryEventStore _eventStore;
     private readonly IDispatcher _dispatcher;
-    private readonly List<IAggregateRoot> _tracked = new();
+    private readonly List<object> _tracked = new();
 
-    // Snapshot stores per aggregate/event type pair
+    // Snapshot stores keyed by (Aggregate, Event) type
     private readonly ConcurrentDictionary<(Type, Type), object> _snapshotStores = new();
 
     public InMemoryArasAggregateContext(InMemoryEventStore eventStore, IDispatcher dispatcher)
@@ -28,9 +30,9 @@ namespace Franz.Common.Aras.Testing
 
     public IDispatcher Dispatcher => _dispatcher;
 
-    public void TrackAggregate<TAggregate, TEvent>(TAggregate aggregate)
-        where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-        where TEvent : BaseDomainEvent
+    public void TrackAggregate<TAggregate, TDomainEvent>(TAggregate aggregate)
+        where TAggregate : AggregateRoot<TDomainEvent>, new()
+        where TDomainEvent : IDomainEvent
     {
       if (!_tracked.Contains(aggregate))
         _tracked.Add(aggregate);
@@ -40,18 +42,23 @@ namespace Franz.Common.Aras.Testing
     {
       int saved = 0;
 
-      foreach (var aggregate in _tracked.OfType<IAggregateRoot>())
+      foreach (var aggregateObj in _tracked)
       {
-        var changes = aggregate.GetUncommittedChanges().ToList();
-        if (changes.Any())
+        switch (aggregateObj)
         {
-          _eventStore.Append(aggregate.Id, changes);
+          case AggregateRoot<IDomainEvent> agg:
+            var changes = agg.GetUncommittedChanges().ToList();
+            if (changes.Any())
+            {
+              _eventStore.Append(agg.Id, changes);
 
-          foreach (var e in changes)
-            await _dispatcher.PublishAsync(e, ct);
+              foreach (var e in changes)
+                await _dispatcher.PublishEventAsync(e, ct);
 
-          aggregate.MarkChangesAsCommitted();
-          saved++;
+              agg.MarkChangesAsCommitted();
+              saved++;
+            }
+            break;
         }
       }
 
@@ -59,14 +66,14 @@ namespace Franz.Common.Aras.Testing
       return saved;
     }
 
-    public Task<TAggregate?> GetAggregateAsync<TAggregate, TEvent>(
+    public Task<TAggregate?> GetAggregateAsync<TAggregate, TDomainEvent>(
         Guid id, CancellationToken ct = default)
-        where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-        where TEvent : BaseDomainEvent
+        where TAggregate : AggregateRoot<TDomainEvent>, new()
+        where TDomainEvent : IDomainEvent
     {
       var aggregate = new TAggregate();
 
-      var history = _eventStore.Load(id).OfType<TEvent>().ToList();
+      var history = _eventStore.Load(id).OfType<TDomainEvent>().ToList();
       if (history.Any())
       {
         aggregate.ReplayEvents(history);
@@ -76,29 +83,37 @@ namespace Franz.Common.Aras.Testing
       return Task.FromResult<TAggregate?>(null);
     }
 
-    public async Task SaveAggregateAsync<TAggregate, TEvent>(
-        TAggregate aggregate, CancellationToken ct = default)
-        where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-        where TEvent : BaseDomainEvent
+    public async Task SaveAggregateAsync<TAggregate, TDomainEvent>(
+    TAggregate aggregate, CancellationToken ct = default)
+    where TAggregate : AggregateRoot<TDomainEvent>, new()
+    where TDomainEvent : IDomainEvent
     {
-      var lastEvent = aggregate.GetUncommittedChanges().LastOrDefault();
-      if (lastEvent is not null)
+      var changes = aggregate.GetUncommittedChanges().ToList();
+      if (changes.Any())
       {
-        _eventStore.Append(aggregate.Id, new[] { lastEvent });
-        await _dispatcher.PublishAsync(lastEvent, ct);
+        // ✅ Cast to IEnumerable<IDomainEvent> since List<TDomainEvent> is not covariant
+        _eventStore.Append(aggregate.Id, changes.Cast<IDomainEvent>());
+
+        foreach (var ev in changes)
+        {
+          // Publish with the correct concrete type via dispatcher
+          await _dispatcher.PublishEventAsync(ev, ct);
+        }
+
         aggregate.MarkChangesAsCommitted();
       }
     }
 
-    public IAggregateSnapshotStore<TAggregate, TEvent> SnapshotStore<TAggregate, TEvent>()
-        where TAggregate : AggregateRoot<TEvent>, new()
-        where TEvent : BaseDomainEvent
-    {
-      var key = (typeof(TAggregate), typeof(TEvent));
 
-      var store = (IAggregateSnapshotStore<TAggregate, TEvent>)_snapshotStores.GetOrAdd(
+    public IAggregateSnapshotStore<TAggregate, TDomainEvent> SnapshotStore<TAggregate, TDomainEvent>()
+        where TAggregate : AggregateRoot<TDomainEvent>, new()
+        where TDomainEvent : IDomainEvent
+    {
+      var key = (typeof(TAggregate), typeof(TDomainEvent));
+
+      var store = (IAggregateSnapshotStore<TAggregate, TDomainEvent>)_snapshotStores.GetOrAdd(
           key,
-          _ => new InMemorySnapshotStore<TAggregate, TEvent>()
+          _ => new InMemoryAggregateSnapshotStore<TAggregate, TDomainEvent>()
       );
 
       return store;
@@ -110,10 +125,4 @@ namespace Franz.Common.Aras.Testing
       _snapshotStores.Clear();
     }
   }
-
-  /// <summary>
-  /// In-memory snapshot store for a specific aggregate/event pair.
-  /// Used by InMemoryArasAggregateContext.
-  /// </summary>
-  
 }

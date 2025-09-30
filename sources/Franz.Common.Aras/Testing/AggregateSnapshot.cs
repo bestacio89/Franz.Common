@@ -1,13 +1,14 @@
 ﻿using Franz.Common.Aras.Abstractions.Snapshots.Contracts;
 using Franz.Common.Business;
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 using System;
 
 namespace Franz.Common.Aras.Testing
 {
   public class AggregateSnapshot<TAggregate, TEvent> : IAggregateSnapshot
       where TAggregate : AggregateRoot<TEvent>, new()
-      where TEvent : BaseDomainEvent
+      where TEvent : IDomainEvent
   {
     public Guid AggregateId { get; }
     public int Version { get; }

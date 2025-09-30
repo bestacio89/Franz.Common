@@ -1,12 +1,13 @@
 ﻿using Franz.Common.Aras.Abstractions.Snapshots.Contracts;
 using Franz.Common.Business;
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 
 namespace Franz.Common.Aras.Infrastructure.Snapshots
 {
   public class ArasInnovatorSnapshotStore<TAggregate, TEvent> : IAggregateSnapshotStore<TAggregate, TEvent>
       where TAggregate : AggregateRoot<TEvent>, new()
-      where TEvent : BaseDomainEvent
+      where TEvent : IDomainEvent
   {
     public Task SaveSnapshotAsync(TAggregate aggregate, CancellationToken ct = default)
     {

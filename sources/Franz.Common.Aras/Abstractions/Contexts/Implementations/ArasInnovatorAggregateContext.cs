@@ -1,15 +1,20 @@
 ﻿using Franz.Common.Aras.Abstractions.Contexts.Contracts;
 using Franz.Common.Aras.Abstractions.Snapshots.Contracts;
 using Franz.Common.Aras.Mappings.Contracts.Factories;
-using Franz.Common.Business;
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 using Franz.Common.Mediator.Dispatchers;
 using System.Net.Http.Json;
 using System.Reflection;
 
 namespace Franz.Common.Aras.Innovator.Contexts;
 
-public class ArasInnovatorAggregateContext : IArasAggregateContext
+/// <summary>
+/// ARAS-specific aggregate context implementation that
+/// persists aggregates over HTTP and dispatches domain events
+/// into Franz pipelines.
+/// </summary>
+public sealed class ArasInnovatorAggregateContext : IArasAggregateContext
 {
   private readonly HttpClient _client;
   private readonly IDispatcher _dispatcher;
@@ -30,28 +35,30 @@ public class ArasInnovatorAggregateContext : IArasAggregateContext
 
   public IDispatcher Dispatcher => _dispatcher;
 
-  public void TrackAggregate<TAggregate, TEvent>(TAggregate aggregate)
-      where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-      where TEvent : BaseDomainEvent
+  public void TrackAggregate<TAggregate, TDomainEvent>(TAggregate aggregate)
+      where TAggregate : AggregateRoot<TDomainEvent>, new()
+      where TDomainEvent : IDomainEvent
   {
-    _trackedAggregates.Add((aggregate, typeof(TAggregate), typeof(TEvent)));
+    _trackedAggregates.Add((aggregate, typeof(TAggregate), typeof(TDomainEvent)));
   }
 
   public async Task<int> SaveAggregateChangesAsync(CancellationToken ct = default)
   {
     foreach (var (aggregate, aggType, evtType) in _trackedAggregates)
     {
-      // Call PersistAggregateAsync<TAggregate,TEvent> dynamically
+      // Call PersistAggregateAsync<TAggregate,TDomainEvent> dynamically
       var method = typeof(ArasInnovatorAggregateContext)
           .GetMethod(nameof(PersistAggregateAsync), BindingFlags.NonPublic | BindingFlags.Instance)!
           .MakeGenericMethod(aggType, evtType);
 
       await (Task)method.Invoke(this, new object[] { aggregate, ct })!;
 
-      var root = (IAggregateRoot)aggregate;
+      // Dispatch all uncommitted domain events
+      var root = (AggregateRoot<IDomainEvent>)aggregate;
+      var changes = root.GetUncommittedChanges().ToList();
 
-      foreach (var ev in root.GetUncommittedChanges())
-        await _dispatcher.PublishAsync(ev, ct);
+      foreach (var ev in changes)
+        await _dispatcher.PublishEventAsync(ev, ct);
 
       root.MarkChangesAsCommitted();
     }
@@ -61,12 +68,12 @@ public class ArasInnovatorAggregateContext : IArasAggregateContext
     return count;
   }
 
-  public async Task<TAggregate?> GetAggregateAsync<TAggregate, TEvent>(
+  public async Task<TAggregate?> GetAggregateAsync<TAggregate, TDomainEvent>(
       Guid id,
       CancellationToken ct = default
   )
-      where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-      where TEvent : BaseDomainEvent
+      where TAggregate : AggregateRoot<TDomainEvent>, new()
+      where TDomainEvent : IDomainEvent
   {
     var response = await _client.GetAsync($"/api/v1/{typeof(TAggregate).Name}/{id}", ct);
     if (!response.IsSuccessStatusCode) return null;
@@ -74,35 +81,35 @@ public class ArasInnovatorAggregateContext : IArasAggregateContext
     var arasData = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>(cancellationToken: ct);
     if (arasData is null) return null;
 
-    var mapper = _mapperFactory.Resolve<TAggregate, TEvent>();
+    var mapper = _mapperFactory.Resolve<TAggregate, TDomainEvent>();
     return mapper.MapFromState(arasData);
   }
 
-  public async Task SaveAggregateAsync<TAggregate, TEvent>(
+  public async Task SaveAggregateAsync<TAggregate, TDomainEvent>(
       TAggregate aggregate,
       CancellationToken ct = default
   )
-      where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-      where TEvent : BaseDomainEvent
+      where TAggregate : AggregateRoot<TDomainEvent>, new()
+      where TDomainEvent : IDomainEvent
   {
-    await PersistAggregateAsync<TAggregate, TEvent>(aggregate, ct);
+    await PersistAggregateAsync<TAggregate, TDomainEvent>(aggregate, ct);
 
-    var lastEvent = aggregate.GetUncommittedChanges().LastOrDefault();
-    if (lastEvent != null)
-      await _dispatcher.PublishAsync(lastEvent, ct);
+    var changes = aggregate.GetUncommittedChanges().ToList();
+    foreach (var ev in changes)
+      await _dispatcher.PublishEventAsync(ev, ct);
 
     aggregate.MarkChangesAsCommitted();
   }
 
   // Strongly typed persistence logic
-  private async Task PersistAggregateAsync<TAggregate, TEvent>(
-    TAggregate aggregate,
-    CancellationToken ct
-)
-    where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-    where TEvent : BaseDomainEvent
+  private async Task PersistAggregateAsync<TAggregate, TDomainEvent>(
+      TAggregate aggregate,
+      CancellationToken ct
+  )
+      where TAggregate : AggregateRoot<TDomainEvent>, new()
+      where TDomainEvent : IDomainEvent
   {
-    var mapper = _mapperFactory.Resolve<TAggregate, TEvent>();
+    var mapper = _mapperFactory.Resolve<TAggregate, TDomainEvent>();
     var arasData = mapper.MapToAras(aggregate);
 
     HttpResponseMessage response;
@@ -114,9 +121,9 @@ public class ArasInnovatorAggregateContext : IArasAggregateContext
     response.EnsureSuccessStatusCode();
   }
 
-  public IAggregateSnapshotStore<TAggregate, TEvent> SnapshotStore<TAggregate, TEvent>()
-      where TAggregate : AggregateRoot<TEvent>, new()
-      where TEvent : BaseDomainEvent
+  public IAggregateSnapshotStore<TAggregate, TDomainEvent> SnapshotStore<TAggregate, TDomainEvent>()
+      where TAggregate : AggregateRoot<TDomainEvent>, new()
+      where TDomainEvent : IDomainEvent
   {
     // Plug your snapshot store here when ready
     throw new NotImplementedException();

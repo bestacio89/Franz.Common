@@ -1,6 +1,7 @@
 ﻿using Franz.Common.Aras.Abstractions.Snapshots.Contracts;
 using Franz.Common.Business;
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
@@ -10,8 +11,8 @@ namespace Franz.Common.Aras.Testing
 {
   public class InMemorySnapshotStore<TAggregate, TEvent> :
       IAggregateSnapshotStore<TAggregate, TEvent>
-      where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-      where TEvent : BaseDomainEvent
+      where TAggregate : AggregateRoot<TEvent>, IAggregateRoot<TEvent>, new()
+      where TEvent : IDomainEvent
   {
     private readonly ConcurrentDictionary<Guid, (TAggregate Aggregate, int Version)> _snapshots = new();
 

@@ -1,6 +1,7 @@
 ﻿using Franz.Common.Aras.Abstractions.Contexts.Contracts;
 using Franz.Common.Business;
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 using Franz.Common.Mediator.Dispatchers;
 using System;
 using System.Collections.Generic;
@@ -33,7 +34,7 @@ namespace Franz.Common.Aras.Persistence
     /// Exposes dispatcher from the aggregate context
     /// so domain events can flow into Franz pipelines.
     /// </summary>
-    public IDispatcher Dispatcher => _aggCtx.Dispatcher;
+   
 
     /// <summary>
     /// Developer-friendly entry point for CRUD-style operations on entities.
@@ -82,25 +83,24 @@ namespace Franz.Common.Aras.Persistence
       private readonly IArasAggregateContext _ctx;
       internal AggregateOps(IArasAggregateContext ctx) => _ctx = ctx;
 
-      public Task<TAggregate?> ById<TAggregate, TEvent>(
+      public Task<TAggregate?> ById<TAggregate, TDomainEvent>(
           Guid id,
           CancellationToken ct = default)
-        where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-        where TEvent : BaseDomainEvent
-        => _ctx.GetAggregateAsync<TAggregate, TEvent>(id, ct);
+        where TAggregate : AggregateRoot<TDomainEvent>, IAggregateRoot<TDomainEvent>, new()
+        where TDomainEvent : IDomainEvent
+        => _ctx.GetAggregateAsync<TAggregate, TDomainEvent>(id, ct);
 
-      public Task Save<TAggregate, TEvent>(
+      public Task Save<TAggregate, TDomainEvent>(
           TAggregate aggregate,
           CancellationToken ct = default)
-        where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-        where TEvent : BaseDomainEvent
-        => _ctx.SaveAggregateAsync<TAggregate, TEvent>(aggregate, ct);
+        where TAggregate : AggregateRoot<TDomainEvent>, IAggregateRoot<TDomainEvent>, new()
+        where TDomainEvent : IDomainEvent
+        => _ctx.SaveAggregateAsync<TAggregate, TDomainEvent>(aggregate, ct);
 
-      public void Track<TAggregate, TEvent>(
-          TAggregate aggregate)
-        where TAggregate : AggregateRoot<TEvent>, IAggregateRoot, new()
-        where TEvent : BaseDomainEvent
-        => _ctx.TrackAggregate<TAggregate, TEvent>(aggregate);
+      public void Track<TAggregate, TDomainEvent>(TAggregate aggregate)
+        where TAggregate : AggregateRoot<TDomainEvent>, IAggregateRoot<TDomainEvent>, new()
+        where TDomainEvent : IDomainEvent
+        => _ctx.TrackAggregate<TAggregate, TDomainEvent>(aggregate);
 
       public Task<int> Commit(CancellationToken ct = default)
         => _ctx.SaveAggregateChangesAsync(ct);

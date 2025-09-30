@@ -1,19 +1,18 @@
 ﻿using Franz.Common.Aras.Mappings.Contracts.Mappers;
-using Franz.Common.Business;
 using Franz.Common.Business.Domain;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Franz.Common.Business.Events;
 
-namespace Franz.Common.Aras.Mappings.Contracts.Factories;
-/// <summary>
-/// Factory to resolve aggregate mappers via DI.
-/// </summary>
-public interface IArasAggregateMapperFactory
+namespace Franz.Common.Aras.Mappings.Contracts.Factories
 {
-  IArasAggregateMapper<TAggregate, TEvent> Resolve<TAggregate, TEvent>()
-      where TAggregate : AggregateRoot<TEvent>
-      where TEvent : BaseDomainEvent;
+  /// <summary>
+  /// Factory to resolve aggregate mappers via dependency injection.
+  /// Provides the correct <see cref="IArasAggregateMapper{TAggregate,TDomainEvent}"/>
+  /// for the given aggregate and its domain event type.
+  /// </summary>
+  public interface IArasAggregateMapperFactory
+  {
+    IArasAggregateMapper<TAggregate, TDomainEvent> Resolve<TAggregate, TDomainEvent>()
+        where TAggregate : AggregateRoot<TDomainEvent>, new()
+        where TDomainEvent : IDomainEvent;
+  }
 }

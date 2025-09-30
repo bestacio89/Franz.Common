@@ -1,5 +1,6 @@
 ﻿using Franz.Common.Business;
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +10,7 @@ using System.Threading.Tasks;
 namespace Franz.Common.Aras.Mappings.Contracts.Mappers;
 public interface IArasAggregateMapper<TAggregate, TEvent>
         where TAggregate : AggregateRoot<TEvent>
-        where TEvent : BaseDomainEvent
+        where TEvent : IDomainEvent
 {
   /// <summary>
   /// Build an aggregate from ARAS persisted state.
