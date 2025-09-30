@@ -1,7 +1,7 @@
 ﻿using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Messages;
 
-namespace Franz.Common.IntegrationTesting.Commands;
+namespace Franz.Common.Integration.Tests.Commands;
 
 public sealed class PlaceOrderCommand : ICommand<Unit>
 {

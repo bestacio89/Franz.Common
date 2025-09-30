@@ -1,5 +1,6 @@
 ﻿using Castle.Core.Resource;
-using Franz.Common.IntegrationTesting.Commands;
+using Franz.Common.Integration.Tests.Commands;
+
 using Franz.Common.IntegrationTesting.Domain;
 using Franz.Common.IntegrationTesting.Domain.Events;
 using Franz.Common.Mediator.Dispatchers;
@@ -9,9 +10,9 @@ using Moq;
 
 public sealed class PlaceOrderHandler : ICommandHandler<PlaceOrderCommand, Unit>
 {
-  private readonly IEventDispatcher _dispatcher;
+  private readonly IDispatcher _dispatcher;
 
-  public PlaceOrderHandler(IEventDispatcher dispatcher)
+  public PlaceOrderHandler(IDispatcher dispatcher)
   {
     _dispatcher = dispatcher;
   }
@@ -22,15 +23,16 @@ public sealed class PlaceOrderHandler : ICommandHandler<PlaceOrderCommand, Unit>
         command.OrderId,
         command.CustomerId,
         command.Lines.Select(l => new OrderLine(l.sku, l.qty, unitPrice: l.price))
-    ); 
+    );
 
-    
+
     // 🚀 Publish all raised events
-    foreach (var ev in order.GetUncommittedChanges())
+    foreach (var ev in order.GetUncommittedChanges().Cast<OrderPlacedEvent>())
     {
-      await _dispatcher.PublishAsync(ev, cancellationToken);
+      await _dispatcher.PublishEventAsync(ev, cancellationToken);
     }
-    
+
+
     order.MarkChangesAsCommitted();
 
     return Unit.Value;

@@ -1,24 +1,34 @@
 ﻿using Franz.Common.Business.Domain;
 using Franz.Common.IntegrationTesting.Domain.Events;
+using Franz.Common.Mediator.Messages;
 
 namespace Franz.Common.IntegrationTesting.Domain;
 
-public sealed class OrderAggregate : AggregateRoot<BaseDomainEvent>
+public sealed class OrderAggregate : AggregateRoot<IEvent>
 {
   public Guid OrderId { get; private set; }
   public Guid CustomerId { get; private set; }
   public bool IsCancelled { get; private set; }
-  private readonly List<OrderLine> _lines = new();
 
+  private readonly List<OrderLine> _lines = new();
   public IReadOnlyCollection<OrderLine> Lines => _lines.AsReadOnly();
   public decimal Total => _lines.Sum(l => l.LineTotal);
 
-  private OrderAggregate() { }
+  // Default constructor ensures handlers are always registered
+  public OrderAggregate()
+  {
+    RegisterHandlers();
+  }
+
+  // Constructor for rehydration, also ensures handlers registered
+  private OrderAggregate(Guid id) : base(id)
+  {
+    RegisterHandlers();
+  }
 
   public static OrderAggregate CreateNew(Guid orderId, Guid customerId, IEnumerable<OrderLine> lines)
   {
     var agg = new OrderAggregate();
-    agg.RegisterHandlers();
 
     agg.RaiseEvent(new OrderPlacedEvent(
         orderId,
@@ -50,8 +60,12 @@ public sealed class OrderAggregate : AggregateRoot<BaseDomainEvent>
   {
     OrderId = e.AggregateId ?? Guid.Empty;
     CustomerId = e.CustomerId;
+
     _lines.Clear();
-    _lines.AddRange(e.Lines.Select(l => new OrderLine(l.Sku, l.Quantity, l.UnitPrice)));
+    _lines.AddRange(e.Lines.Select(l =>
+        new OrderLine(l.Sku, l.Quantity, l.UnitPrice)
+    ));
+    IsCancelled = false;
   }
 
   private void Apply(OrderCancelledEvent _)
@@ -59,14 +73,10 @@ public sealed class OrderAggregate : AggregateRoot<BaseDomainEvent>
     IsCancelled = true;
   }
 
-  public static OrderAggregate Rehydrate(Guid orderId, Guid customerId)
+  public static OrderAggregate Rehydrate(Guid id, IEnumerable<IEvent> history)
   {
-    var agg = new OrderAggregate();
-    agg.RegisterHandlers();
-    agg.OrderId = orderId;
-    agg.CustomerId = customerId;
+    var agg = new OrderAggregate(id);
+    agg.ReplayEvents(history); // inherited from AggregateRoot
     return agg;
-
   }
-
 }

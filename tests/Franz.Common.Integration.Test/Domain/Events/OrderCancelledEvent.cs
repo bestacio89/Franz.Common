@@ -1,20 +1,27 @@
-﻿using Franz.Common.Business.Domain;
-using Franz.Common.Mediator.Messages;
+﻿using Franz.Common.Business.Events;
+using Franz.Common.IntegrationTesting.Domain;
+
 using System.Diagnostics;
 
-namespace Franz.Common.IntegrationTesting.Domain.Events;
-
-[DebuggerDisplay("OrderCancelled (Aggregate={AggregateId})")]
-public sealed class OrderCancelledEvent : BaseDomainEvent, INotification
+[DebuggerDisplay("OrderCancelled (Aggregate={AggregateId}, Reason={Reason})")]
+public sealed class OrderCancelledEvent : IDomainEvent
 {
-  /// <summary>
-  /// Reason for cancellation (optional).
-  /// </summary>
-  public string? Reason { get; }
-
   public OrderCancelledEvent(Guid aggregateId, string? reason = null, string? correlationId = null)
-      : base(aggregateId, nameof(OrderAggregate), correlationId)
   {
+    EventId = Guid.NewGuid();
+    OccurredOn = DateTimeOffset.UtcNow;
+    CorrelationId = correlationId ?? Guid.NewGuid().ToString();
+    AggregateId = aggregateId;
+    AggregateType = nameof(OrderAggregate);
     Reason = reason;
   }
+
+  public Guid EventId { get; }
+  public DateTimeOffset OccurredOn { get; }
+  public string? CorrelationId { get; }
+  public Guid? AggregateId { get; }
+  public string AggregateType { get; }
+  public string EventType => GetType().Name;
+
+  public string? Reason { get; }
 }

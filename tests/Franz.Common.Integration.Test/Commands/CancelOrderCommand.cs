@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Franz.Common.IntegrationTesting.Commands;
+namespace Franz.Common.Integration.Tests.Commands;
 public sealed class CancelOrderCommand : ICommand<Unit>
 {
   public Guid OrderId { get; init; }

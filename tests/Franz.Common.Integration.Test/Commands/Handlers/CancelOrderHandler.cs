@@ -1,31 +1,25 @@
-﻿using Franz.Common.IntegrationTesting.Domain;
+﻿using Franz.Common.Integration.Tests.Commands;
+using Franz.Common.IntegrationTesting.Domain;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Handlers;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Franz.Common.Mediator.Messages;
 
-namespace Franz.Common.IntegrationTesting.Commands.Handlers;
 public sealed class CancelOrderHandler : ICommandHandler<CancelOrderCommand, Unit>
 {
-  private readonly IEventDispatcher _dispatcher;
+  private readonly IAggregateRootRepository<OrderAggregate, IEvent> _repository;
 
-  public CancelOrderHandler(IEventDispatcher dispatcher) => _dispatcher = dispatcher;
+  public CancelOrderHandler(IAggregateRootRepository<OrderAggregate, IEvent> repository)
+      => _repository = repository;
 
-
-
-  // For the test we create a minimal agg instance and raise cancel
   public async Task<Unit> Handle(CancelOrderCommand command, CancellationToken ct = default)
   {
-    var agg = OrderAggregate.Rehydrate(command.OrderId, Guid.Empty); // no customer in this test
+    // no need to expose generics here anymore
+    var agg = OrderAggregate.Rehydrate(command.OrderId, Array.Empty<IEvent>());
+
     agg.Cancel();
 
-    foreach (var ev in agg.GetUncommittedChanges())
-      await _dispatcher.PublishAsync(ev, ct);
+    await _repository.SaveAsync(agg, ct);
 
-    agg.MarkChangesAsCommitted();
     return Unit.Value;
   }
 

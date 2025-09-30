@@ -9,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Franz.Common.IntegrationTesting.Commands.Handlers.Events;
+namespace Franz.Common.Integration.Tests.Commands.Handlers;
 public sealed class OrderCancelledEventHandler : IEventHandler<OrderCancelledEvent>
 {
   private readonly IProcessedEventSink _sink;
