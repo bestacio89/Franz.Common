@@ -30,7 +30,6 @@ public abstract class DbContextBase : DbContext
 
     var result = await base.SaveChangesAsync(cancellationToken);
 
-    await DispatchDomainEventsAsync();
 
     return result;
   }
@@ -56,25 +55,6 @@ public abstract class DbContextBase : DbContext
           // Ensure soft delete is persisted
           entry.State = EntityState.Modified;
           break;
-      }
-    }
-  }
-
-  private async Task DispatchDomainEventsAsync()
-  {
-    var domainEntities = ChangeTracker.Entries<Entity>()
-        .Where(x => x.Entity.Events.Any())
-        .Select(x => x.Entity)
-        .ToList();
-
-    foreach (var entity in domainEntities)
-    {
-      var events = entity.Events.ToList();
-      entity.ClearEvents();
-
-      foreach (var domainEvent in events)
-      {
-        await _dispatcher.PublishAsync(domainEvent);
       }
     }
   }

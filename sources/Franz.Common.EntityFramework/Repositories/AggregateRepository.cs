@@ -1,49 +1,56 @@
 using Franz.Common.Business.Domain;
-using Franz.Common.EntityFramework.Extensions;
 using Franz.Common.Errors;
+using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.Mediator.Messages;
 using Microsoft.EntityFrameworkCore;
 
-public abstract class AggregateRepository<TDbContext, TAggregateRoot> : IAggregateRepository<TAggregateRoot>
+public abstract class AggregateRepository<TDbContext, TAggregateRoot, TEvent>
+    : IAggregateRootRepository<TAggregateRoot, TEvent>
     where TDbContext : DbContext
-    where TAggregateRoot : class,IAggregateRoot
+    where TAggregateRoot : class, IAggregateRoot<TEvent>, new()
+    where TEvent : class, IDomainEvent
 {
   protected readonly TDbContext DbContext;
+  private readonly IDispatcher _dispatcher;
 
-  public AggregateRepository(TDbContext dbContext)
+  protected AggregateRepository(TDbContext dbContext, IDispatcher dispatcher)
   {
     DbContext = dbContext;
+    _dispatcher = dispatcher;
   }
 
   public async Task<TAggregateRoot> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
   {
-    var entity = await DbContext.Set<TAggregateRoot>()
-        .IncludeAllRelationships(DbContext)
-        .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+    // load historical events from persistence
+    var history = await DbContext.Set<TEvent>()
+        .Where(e => e.AggregateId == id)
+        .OrderBy(e => e.OccurredOn)
+        .ToListAsync(cancellationToken);
 
-    return entity ?? throw new NotFoundException($"Entity {typeof(TAggregateRoot).Name} with ID {id} not found.");
+    if (!history.Any())
+      throw new NotFoundException($"{typeof(TAggregateRoot).Name} with ID {id} not found.");
+
+    // rebuild aggregate from events
+    var aggregate = new TAggregateRoot();
+    aggregate.Rehydrate(id, history);
+    return aggregate;
   }
 
-
-  public async Task AddAsync(TAggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
+  public async Task SaveAsync(TAggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
   {
-    await DbContext.Set<TAggregateRoot>().AddAsync(aggregateRoot, cancellationToken);
+    var changes = aggregateRoot.GetUncommittedChanges().ToList();
+
+    if (!changes.Any())
+      return;
+
+    // persist new events
+    await DbContext.Set<TEvent>().AddRangeAsync(changes, cancellationToken);
     await DbContext.SaveChangesAsync(cancellationToken);
-  }
 
-  public async Task UpdateAsync(TAggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
-  {
-    var existingAggregate = await GetByIdAsync(aggregateRoot.Id, cancellationToken);
+    // dispatch them
+    foreach (var ev in changes)
+      await _dispatcher.PublishEventAsync(ev, cancellationToken);
 
-    if (existingAggregate == null)
-      throw new InvalidOperationException($"Aggregate {typeof(TAggregateRoot).Name} not found.");
-
-    DbContext.Entry(existingAggregate).CurrentValues.SetValues(aggregateRoot);
-    await DbContext.SaveChangesAsync(cancellationToken);
-  }
-
-  public async Task DeleteAsync(TAggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
-  {
-    DbContext.Set<TAggregateRoot>().Remove(aggregateRoot);
-    await DbContext.SaveChangesAsync(cancellationToken);
+    aggregateRoot.MarkChangesAsCommitted();
   }
 }

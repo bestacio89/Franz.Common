@@ -1,5 +1,5 @@
 using Franz.Common.Business.Domain;
-using Franz.Common.Business.Events;
+
 using Franz.Common.Business.Repositories;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.EntityFramework.Behaviors;
@@ -72,7 +72,7 @@ public static class ServiceCollectionExtensions
 
     var typeDbContext = typeof(TDbContext);
     var entityTypes = GetEntityTypesFromDbContext(typeDbContext)
-        .Where(type => typeof(IEntity).IsAssignableFrom(type) && !typeof(IAggregateRoot).IsAssignableFrom(type));
+        .Where(type => typeof(IEntity).IsAssignableFrom(type) && !typeof(IAggregateRoot<>).IsAssignableFrom(type));
 
     foreach (var entityType in entityTypes)
     {
@@ -90,18 +90,18 @@ public static class ServiceCollectionExtensions
 
   public static IServiceCollection AddAggregateRepositories<TDbContext, TEvent>(this IServiceCollection services)
     where TDbContext : DbContext
-    where TEvent : BaseDomainEvent
+    where TEvent : IDomainEvent
   {
     services = services.AddScoped<DbContext>(sp => sp.GetRequiredService<TDbContext>());
 
     var typeDbContext = typeof(TDbContext);
     var aggregateTypes = GetEntityTypesFromDbContext(typeDbContext)
-        .Where(type => typeof(IAggregateRoot).IsAssignableFrom(type));
+        .Where(type => typeof(IAggregateRoot<>).IsAssignableFrom(type));
 
     foreach (var aggregateType in aggregateTypes)
     {
-      var repositoryInterface = typeof(IAggregateRepository<>).MakeGenericType(aggregateType);
-      var repositoryImplementation = typeof(AggregateRepository<,>).MakeGenericType(typeDbContext, aggregateType, typeof(TEvent));
+      var repositoryInterface = typeof(IAggregateRootRepository<,>).MakeGenericType(aggregateType);
+      var repositoryImplementation = typeof(AggregateRepository<, ,>).MakeGenericType(typeDbContext, aggregateType, typeof(TEvent));
 
       if (!services.Any(x => x.ServiceType == repositoryInterface))
       {
