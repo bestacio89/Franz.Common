@@ -18,7 +18,7 @@ namespace Franz.Common.MongoDB.Repositories.Implementations
   public class MongoAggregateRepository<TAggregate, TEvent>
       : IAggregateRepository<TAggregate, TEvent>
       where TAggregate : AggregateRoot<TEvent>
-      where TEvent : BaseDomainEvent, INotification
+      where TEvent : IDomainEvent
   {
     private readonly IMongoCollection<StoredEvent> _eventCollection;
     private readonly IDispatcher _mediator;
@@ -77,7 +77,7 @@ namespace Franz.Common.MongoDB.Repositories.Implementations
       aggregate.MarkChangesAsCommitted();
 
       foreach (var ev in uncommitted)
-        await _mediator.PublishAsync(ev);
+        await _mediator.PublishEventAsync(ev);
     }
 
     /// <summary>

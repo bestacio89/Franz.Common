@@ -1,46 +1,44 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
-
-namespace Franz.Common.MongoDB.Events;
 using Franz.Common.Business.Domain;
 using Franz.Common.Mediator.Messages;
-using Franz.Common.MongoDB.Events;
-using global::MongoDB.Driver;
-using System.Text.Json;
+using MongoDB.Driver;
 
-public class EventMigration
+namespace Franz.Common.MongoDB.Events
 {
-  private readonly IMongoCollection<BaseDomainEvent> _oldCollection;
-  private readonly IMongoCollection<StoredEvent> _newCollection;
-
-  public EventMigration(IMongoDatabase database)
+  public class EventMigration
   {
-    _oldCollection = database.GetCollection<BaseDomainEvent>("Events");
-    _newCollection = database.GetCollection<StoredEvent>("Events_New");
-  }
+    private readonly IMongoCollection<IDomainEvent> _oldCollection;
+    private readonly IMongoCollection<StoredEvent> _newCollection;
 
-  public async Task MigrateAsync()
-  {
-    var oldEvents = await _oldCollection.Find(FilterDefinition<BaseDomainEvent>.Empty).ToListAsync();
-
-    var storedEvents = oldEvents.Select(ev => new StoredEvent
+    public EventMigration(IMongoDatabase database)
     {
-      EventId = ev.EventId,
-      AggregateId = (Guid)ev.AggregateId,
-      AggregateType = ev.AggregateType,
-      EventType = ev.GetType().AssemblyQualifiedName!,
-      OccurredOn = ev.OccurredOn,
-      CorrelationId = ev.CorrelationId,
-      Payload = JsonSerializer.Serialize(ev)
-    }).ToList();
+      _oldCollection = database.GetCollection<IDomainEvent>("Events");
+      _newCollection = database.GetCollection<StoredEvent>("Events_New");
+    }
 
-    if (storedEvents.Any())
-      await _newCollection.InsertManyAsync(storedEvents);
+    public async Task MigrateAsync()
+    {
+      var oldEvents = await _oldCollection.Find(FilterDefinition<IDomainEvent>.Empty).ToListAsync();
 
-    Console.WriteLine($"Migrated {storedEvents.Count} events.");
+      var storedEvents = oldEvents.Select(ev => new StoredEvent
+      {
+        EventId = ev.EventId,
+        AggregateId = (Guid)ev.AggregateId,
+        AggregateType = ev.AggregateType,
+        EventType = ev.GetType().AssemblyQualifiedName!,
+        OccurredOn = ev.OccurredOn,
+        CorrelationId = ev.CorrelationId,
+        Payload = JsonSerializer.Serialize(ev)
+      }).ToList();
+
+      if (storedEvents.Any())
+        await _newCollection.InsertManyAsync(storedEvents);
+
+      Console.WriteLine($"Migrated {storedEvents.Count} events.");
+    }
   }
 }
-
