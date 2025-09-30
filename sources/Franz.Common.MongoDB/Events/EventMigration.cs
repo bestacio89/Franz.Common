@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 using Franz.Common.Mediator.Messages;
 using MongoDB.Driver;
 

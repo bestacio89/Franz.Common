@@ -120,11 +120,11 @@ Licensed under the **MIT License**.
 
 ## 📌 Changelog
 
-**Latest Version:** `1.5.10`
+**Latest Version:** `1.6.0`
 
 ---
 
-### 🚀 Version 1.5.10 – Identity, Messaging & Hosting Unification
+### 🚀 Version 1.6.0– Identity, Messaging & Hosting Unification
 
 ✨ Added
 

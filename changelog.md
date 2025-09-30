@@ -246,7 +246,7 @@
 ### ✨ Added
 
 * `Franz.Common.Mapping` as a Franz-native AutoMapper alternative.
-* Profiles (`FranzMapProfile`) with `CreateMap`, `ForMember`, `Ignore`.
+* Profiles (`FranzMapProfile`) with `CreateMap`, `ForMember`, `Ignore`).
 * By-name default mapping.
 * DI support with `services.AddFranzMapping(...)`.
 
@@ -298,152 +298,98 @@
 
 ---
 
-## Version 1.5.10 – Unified Identity & SSO 🔑
+## Version 1.6.0 – The Consolidation Release 🏗️🔑📦
 
-✨ Added
+Identity, Messaging, and Domain Events finally under one clean architecture.
 
-Introduced Outbox pattern with StoredMessage DTO and persistence mappings.
+### ✨ Added
 
-Implemented IMessageStore abstraction for persistence-agnostic outbox storage.
+* **Outbox & Inbox Patterns**
 
-Added Inbox pattern (IInboxStore) for idempotent message consumption.
+  * `IMessageStore` abstraction with `StoredMessage` DTO for persistence-agnostic outbox storage.
+  * `IInboxStore` for idempotent message consumption.
+  * MongoDB implementation (`MongoMessageStore`) with automatic index creation.
+  * Retry/DLQ handling via `MoveToDeadLetterAsync`.
 
-Introduced IMessageSerializer abstraction with JSON default implementation.
+* **Dispatcher Enhancements**
 
-Added correlation tracking via MessageContextAccessor.
+  * Unified dispatcher for Commands, Queries, Domain Events, and Integration Events.
+  * Overloads for `PublishEventAsync(IEvent)` with runtime type dispatch.
+  * End-to-end correlation tracking flows through dispatcher + pipelines.
+  * Logging & Validation pipelines flow seamlessly for all event types.
 
-🔧 Changed
+* **Domain Event Contracts**
 
-Refactored transport-level Message to decouple mediator from messaging.
+  * Introduced `IDomainEvent` as a first-class contract inheriting from `IEvent`.
+  * Aggregates now strictly raise `IDomainEvent`s.
+  * Entities no longer dispatch events.
+  * Clear split: **Domain Events** (inside aggregates) vs **Integration Events** (messaging/db boundary).
 
-Standardized serialization across Kafka and Mongo outbox.
+* **Identity & SSO**
 
-Improved structured logging with emoji conventions (✅ success, ⚠️ retry, 🔥 DLQ).
+  * `FranzIdentityContext` (UserId, Email, FullName, Roles, TenantId, DomainId).
+  * `IIdentityContextAccessor` & `FakeIdentityContextAccessor` for testing.
+  * `HttpContextIdentityContextAccessor` (ASP.NET Core).
+  * Unified claims normalization across WS-Fed, SAML2, OIDC, and Keycloak.
+  * One-line bootstrap: `AddFranzSsoIdentity()`.
 
-🐛 Fixed
+* **Testing Infrastructure**
 
-Serialization mismatches between Kafka and Outbox replays.
+  * In-memory aggregate repository for fast integration tests.
+  * In-memory processed event sink with correlation-aware matching.
+  * Out-of-the-box sanity checks to validate handler resolution.
 
-Missing correlation propagation in consumer pipelines.
+* **Messaging Hosting**
 
-📚 Docs
+  * Async `IListener` interface for Kafka & Outbox listeners.
+  * `KafkaHostedService` to run Kafka listeners as hosted services.
+  * `OutboxHostedService` to publish Mongo outbox messages into Kafka.
+  * Inbox checks in listeners for idempotent dispatch.
 
-Updated README to document Outbox, Inbox, retry/DLQ, serializer abstraction, and monitoring hooks.
+### 🔧 Changed
 
-📦 Franz.Common.MongoDB
-[Release] v1.5.10 – Outbox Persistence & Indexing 🍃
+* **Repositories**
 
-✨ Added
+  * Aggregate repositories now persist + replay domain events consistently.
+  * Entities no longer raise/persist events.
+  * Fixed DI registration for `AggregateRepository` with domain events.
 
-MongoMessageStore implementation of IMessageStore.
+* **Pipelines**
 
-MoveToDeadLetterAsync to handle exhausted retries.
+  * Clean separation between **Notifications** and **Events**.
+  * Logging & validation pipelines fully organized and applied consistently.
 
-Automatic index creation on SentOn, RetryCount, and CreatedOn.
+* **Messaging**
 
-DI extension: AddMongoMessageStore().
+  * Transport-level `Message` decoupled from persistence-level `StoredMessage`.
+  * Standardized serialization across Kafka and Outbox.
+  * Unified deserialization pipeline for listeners.
 
-🔧 Changed
+* **Mediator Concepts**
 
-Clean separation of persistence DTOs (StoredMessage) from runtime transport (Message).
+  * Clarified event semantics:
 
-📚 Docs
+    * Domain = `IDomainEvent` (facts inside aggregates).
+    * Integration = `IIntegrationEvent` (messaging, db, external).
+  * Aggregates must always register `Apply` handlers for their domain events.
 
-Updated README to show Mongo outbox/inbox usage, retry/DLQ behavior, and DI setup.
+### 🐛 Fixed
 
-📦 Franz.Common.Messaging.Hosting
-[Release] v1.5.10 – Async Listeners & Context 🎧
+* DI mismatches causing event handlers not to resolve in tests.
+* Repository save loops failing to publish uncommitted domain events.
+* Serialization mismatches between Kafka and Outbox replays.
+* Missing correlation propagation in consumer pipelines.
+* Startup issues from multiple identity provider registrations.
+* Claims normalization inconsistencies across SSO providers.
+* Multiple handler registrations (duplicate scans) cleaned up.
 
-✨ Added
+### 📚 Docs
 
-Async IListener interface (Listen(CancellationToken)).
+* Updated README to cover:
 
-MessageContextAccessor.Set/Clear for safe context management.
-
-Inbox checks in listeners for idempotent dispatch.
-
-🔧 Changed
-
-Refactored OutboxMessageListener & KafkaMessageListener to async pattern.
-
-Unified message deserialization pipeline.
-
-📚 Docs
-
-Updated README with v1.5.10 features and changelog.
-
-📦 Franz.Common.Messaging.Hosting.Kafka
-[Release] v1.5.10 – Kafka Hosting Bridge ☕
-
-✨ Added
-
-KafkaHostedService to run Kafka listeners as hosted services.
-
-OutboxHostedService to publish Mongo outbox messages into Kafka.
-
-DI extension: KafkaHostingServiceCollectionExtensions with AddKafkaHostedListener() & AddOutboxHostedListener().
-
-🔧 Changed
-
-Separated transport (Messaging.Kafka) from orchestration (Hosting.Kafka).
-
-📚 Docs
-
-Added new README with usage, DI setup, logging conventions, and changelog.
-
-📦 Franz.Common.Identity
-[Release] v1.5.10 – Unified Identity 🔑
-
-✨ Added
-
-FranzIdentityContext (UserId, Email, FullName, Roles, TenantId, DomainId).
-
-IIdentityContextAccessor & FakeIdentityContextAccessor for testing.
-
-📦 Franz.Common.Http.Identity
-[Release] v1.5.10 – HTTP Identity Accessor 🌐
-
-✨ Added
-
-HttpContextIdentityContextAccessor (ASP.NET Core).
-
-DI extension: AddHttpIdentityContext().
-
-Config-driven providers: WS-Fed, SAML2, OIDC, Keycloak.
-
-Automatic claims normalization into FranzIdentityContext.
-
-📦 Franz.Common.SSO
-[Release] v1.5.10 – Unified SSO 🚪
-
-✨ Added
-
-FranzSsoSettings for unified configuration in appsettings.json.
-
-One-line bootstrap: AddFranzSsoIdentity().
-
-JWT bearer token support.
-
-Unified claims normalization pipeline across providers.
-
-Startup logging via FranzSsoStartupFilter.
-
-🔧 Changed
-
-Removed legacy GenericSSOManager & EF Identity coupling.
-
-Extracted ASP.NET Core specifics into Franz.Common.Http.Identity.
-
-Enforced: only one interactive provider active unless explicitly allowed.
-
-🐛 Fixed
-
-Startup issues from multiple provider registrations.
-
-Claims normalization across WS-Fed, SAML2, OIDC, and Keycloak.
-
-📚 Docs
-
-Updated READMEs for Identity, Http.Identity, and SSO with provider setup examples.
+  * Outbox/Inbox usage and retry/DLQ behavior.
+  * DI setup for Mongo Outbox, Kafka listeners, and SSO identity providers.
+  * Event semantics (Domain vs Integration).
+  * Monitoring hooks and structured logging conventions (✅ success, ⚠️ retry, 🔥 DLQ).
 
 ---

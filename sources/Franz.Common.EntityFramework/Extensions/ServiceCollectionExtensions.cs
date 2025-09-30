@@ -1,5 +1,5 @@
 using Franz.Common.Business.Domain;
-
+using Franz.Common.Business.Events;
 using Franz.Common.Business.Repositories;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.EntityFramework.Behaviors;

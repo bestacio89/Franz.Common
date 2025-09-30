@@ -1,4 +1,5 @@
 using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 using Franz.Common.Errors;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Messages;

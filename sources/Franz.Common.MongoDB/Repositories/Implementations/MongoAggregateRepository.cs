@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Franz.Common.MongoDB.Events;
+using Franz.Common.Business.Events;
 
 namespace Franz.Common.MongoDB.Repositories.Implementations
 {

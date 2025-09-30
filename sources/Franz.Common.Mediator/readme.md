@@ -14,7 +14,7 @@ Unlike minimal mediators, Franz ships with:
 
 ---
 
-* ** Current Version**: 1.5.10
+* ** Current Version**: 1.6.0
 
 ---
 
