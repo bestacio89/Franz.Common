@@ -1,11 +1,11 @@
-using Franz.Common.Business.Events;
+
 
 namespace Franz.Common.Business.Domain;
 
 public abstract class Entity<TId> : IEntity
 {
   private int? _requestedHashCode;
-  private readonly List<IDomainEvent> _events = new();
+
 
   public TId Id { get; protected set; } = default!;
   public Guid PersistentId { get; private set; } = Guid.NewGuid();
@@ -21,21 +21,11 @@ public abstract class Entity<TId> : IEntity
   public DateTime? DateDeleted { get; private set; }
   public string? DeletedBy { get; private set; }
 
-  public IReadOnlyCollection<IDomainEvent> Events => _events.AsReadOnly();
+
 
   protected Entity() { }
 
-  #region Domain Events
-  public void AddEvent(IDomainEvent eventItem)
-  {
-    if (!_events.Contains(eventItem))
-      _events.Add(eventItem);
-  }
 
-  public void RemoveEvent(IDomainEvent eventItem) => _events.Remove(eventItem);
-
-  public void ClearEvents() => _events.Clear();
-  #endregion
 
   #region Audit Methods
   public void MarkCreated(string createdBy)

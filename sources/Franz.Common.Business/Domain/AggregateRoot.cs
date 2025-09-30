@@ -1,5 +1,4 @@
 ﻿using Franz.Common.Business.Domain;
-using Franz.Common.Business.Events;
 using Franz.Common.Mediator.Messages; // 🔹 For INotification
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -11,8 +10,8 @@ namespace Franz.Common.Business.Domain
   /// Supports event sourcing by tracking uncommitted domain events,
   /// applying events through registered handlers, and replaying history.
   /// </summary>
-  public abstract class AggregateRoot<TEvent> : Entity<Guid>, IAggregateRoot
-      where TEvent : BaseDomainEvent, INotification // 🔹 enforce publishable events
+  public abstract class AggregateRoot<TEvent> : Entity<Guid>, IAggregateRoot<TEvent>
+      where TEvent : IEvent // 🔹 enforce publishable events
   {
     private readonly List<TEvent> _changes = new();
     private readonly Dictionary<Type, Action<TEvent>> _handlers = new();
@@ -32,7 +31,7 @@ namespace Franz.Common.Business.Domain
     /// <summary>
     /// Get uncommitted changes (events raised since last commit).
     /// </summary>
-    public IReadOnlyCollection<BaseDomainEvent> GetUncommittedChanges() => _changes.AsReadOnly();
+    public IReadOnlyCollection<TEvent> GetUncommittedChanges() => _changes.AsReadOnly();
 
     /// <summary>
     /// Clear tracked changes after persistence.
@@ -69,6 +68,13 @@ namespace Franz.Common.Business.Domain
       {
         ApplyChange(@event, false);
       }
+    }
+
+    public void Rehydrate(Guid id, IEnumerable<TEvent> events)
+    {
+      Id = id;
+      ReplayEvents(events);
+      MarkChangesAsCommitted(); // after replay, no new changes
     }
 
     private void ApplyChange(TEvent @event, bool isNew)
