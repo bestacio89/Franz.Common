@@ -1,5 +1,4 @@
 using Franz.Common.Business.Domain;
-using Franz.Common.Business.Events;
 using Franz.Common.Mediator;
 
 namespace Franz.Common.Messaging;
@@ -11,5 +10,5 @@ public interface IMessagingPublisher
   /// and then forwards it to the external messaging system (e.g., Kafka).
   /// </summary>
   Task Publish<TIntegrationEvent>(TIntegrationEvent integrationEvent)
-      where TIntegrationEvent : BaseDomainEvent, IIntegrationEvent;
+      where TIntegrationEvent :IIntegrationEvent;
 }

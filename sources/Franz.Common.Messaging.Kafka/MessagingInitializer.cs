@@ -1,14 +1,10 @@
-using Franz.Common.Business.Events;
-using Franz.Common.Mediator.Handlers; // <- Franz handler contracts
+using Confluent.Kafka;
+using Confluent.Kafka.Admin;
+using Franz.Common.Mediator;
 using Franz.Common.Mediator.Messages; // <- Franz INotification marker
 using Franz.Common.Messaging.Configuration;
-using Franz.Common.Messaging.Kafka.Modeling;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
-using Confluent.Kafka.Admin;
-using System.Reflection;
-using Confluent.Kafka;
-using Franz.Common.Mediator;
 
 namespace Franz.Common.Messaging.Kafka
 {

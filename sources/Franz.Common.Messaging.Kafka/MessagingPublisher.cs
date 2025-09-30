@@ -1,13 +1,10 @@
 using Confluent.Kafka;
 using Franz.Common.Business.Domain;
-using Franz.Common.Business.Events;
+using Franz.Common.Errors; // TechnicalException
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Dispatchers;
-using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Factories;
-using Franz.Common.Messaging.Kafka.Modeling;
 using System.Text;
-using Franz.Common.Errors; // TechnicalException
 
 namespace Franz.Common.Messaging.Kafka;
 
@@ -24,7 +21,7 @@ public class MessagingPublisher(
   private readonly IDispatcher _dispatcher = dispatcher;
 
   public async Task Publish<TIntegrationEvent>(TIntegrationEvent integrationEvent)
-      where TIntegrationEvent : BaseDomainEvent, IIntegrationEvent
+      where TIntegrationEvent : IIntegrationEvent
   {
     // Ensure messaging infra is ready
     _messagingInitializer.Initialize();

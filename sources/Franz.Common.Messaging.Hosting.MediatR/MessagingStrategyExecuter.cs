@@ -1,4 +1,3 @@
-using Franz.Common.Business.Events;
 using Franz.Common.Errors;
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Dispatchers;

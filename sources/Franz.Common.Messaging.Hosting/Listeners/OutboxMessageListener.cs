@@ -62,7 +62,7 @@ public class OutboxMessageListener : IListener
           if (domainObject is IEvent evt)
           {
             _logger.LogInformation("📢 Dispatching event {EventType} from Outbox", evt.GetType().Name);
-            await _dispatcher.PublishAsync(evt, stoppingToken);
+            await _dispatcher.PublishEventAsync(evt, stoppingToken);
           }
           else if (domainObject is ICommand cmd)
           {
