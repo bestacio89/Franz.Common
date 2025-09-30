@@ -28,4 +28,10 @@ public interface IDispatcher
     PublishStrategy strategy = PublishStrategy.Sequential,
     NotificationErrorHandling errorHandling = NotificationErrorHandling.StopOnFirstFailure)
     where TNotification : INotification;
+
+  // NEW: Generic event publishing
+  Task PublishEventAsync<TEvent>(
+      TEvent @event,
+      CancellationToken cancellationToken = default)
+      where TEvent : IEvent;
 }

@@ -195,5 +195,10 @@ namespace Franz.Common.Mediator.Testing
     {
       throw new NotImplementedException();
     }
+
+    public Task PublishEventAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) where TEvent : IEvent
+    {
+      throw new NotImplementedException();
+    }
   }
 }

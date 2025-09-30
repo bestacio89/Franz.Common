@@ -44,7 +44,7 @@ namespace Franz.Common.Mediator.Extensions
 
       // Dispatcher
       services.AddScoped<IDispatcher, FranzDispatcher>();
-      services.AddScoped<IEventDispatcher, EventDispatcher>();
+
 
       // -------------------- HANDLERS --------------------
       services.Scan(scan => scan
@@ -116,20 +116,27 @@ namespace Franz.Common.Mediator.Extensions
 
     public static IServiceCollection AddFranzEventValidationPipeline(this IServiceCollection services)
     {
-      services.AddScoped(typeof(IEventPipeline<>), typeof(EventValidationPipeline<>))
-                
-               //Eventpreprocessors
-              .AddScoped(typeof(IEventPreProcessor<>), typeof(EventAuditPreProcessor<>))
-              .AddScoped(typeof(IEventPreProcessor<>), typeof(SerilogEventAuditPreProcessor<>))
-              .AddScoped(typeof(IEventPreProcessor<>), typeof(SerilogEventLoggingPreProcessor<>))
-              
-              //MainLogginPipeline
-              .AddScoped(typeof(IEventPipeline<>), typeof(SerilogEventLoggingPipeline<>))
-              
-              //eventpostprocessors
-              .AddScoped(typeof(IEventPostProcessor<>), typeof(SerilogEventLoggingPostProcessor<>))
-              .AddScoped(typeof(IEventPostProcessor<>), typeof(SerilogEventAuditPostProcessor<>))
-              .AddScoped(typeof(IEventPostProcessor<>), typeof(EventAuditPostProcessor<>));
+      // Event Pipelines (main chain)
+      services.TryAddEnumerable(ServiceDescriptor.Scoped(
+          typeof(IEventPipeline<>), typeof(EventValidationPipeline<>)));
+      services.TryAddEnumerable(ServiceDescriptor.Scoped(
+          typeof(IEventPipeline<>), typeof(SerilogEventLoggingPipeline<>)));
+
+      // Pre-processors
+      services.TryAddEnumerable(ServiceDescriptor.Scoped(
+          typeof(IEventPreProcessor<>), typeof(EventAuditPreProcessor<>)));
+      services.TryAddEnumerable(ServiceDescriptor.Scoped(
+          typeof(IEventPreProcessor<>), typeof(SerilogEventAuditPreProcessor<>)));
+      services.TryAddEnumerable(ServiceDescriptor.Scoped(
+          typeof(IEventPreProcessor<>), typeof(SerilogEventLoggingPreProcessor<>)));
+
+      // Post-processors
+      services.TryAddEnumerable(ServiceDescriptor.Scoped(
+          typeof(IEventPostProcessor<>), typeof(SerilogEventLoggingPostProcessor<>)));
+      services.TryAddEnumerable(ServiceDescriptor.Scoped(
+          typeof(IEventPostProcessor<>), typeof(SerilogEventAuditPostProcessor<>)));
+      services.TryAddEnumerable(ServiceDescriptor.Scoped(
+          typeof(IEventPostProcessor<>), typeof(EventAuditPostProcessor<>)));
 
       return services;
     }

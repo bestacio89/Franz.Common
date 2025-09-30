@@ -1,9 +1,10 @@
-﻿using Franz.Common.Mediator.Diagnostics;
-using Franz.Common.Mediator.Context;
+﻿using Franz.Common.Mediator.Context;
+using Franz.Common.Mediator.Diagnostics;
 using Franz.Common.Mediator.Handlers;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Processors;
+using Franz.Common.Mediator.Validation.Events;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -145,7 +146,6 @@ namespace Franz.Common.Mediator.Dispatchers
         var pipelines = _serviceProvider.GetServices<INotificationPipeline<TNotification>>().ToList();
         var observers = _serviceProvider.GetServices<IMediatorObserver>().ToList();
 
-        // Build the per-handler pipeline chain
         Func<INotificationHandler<TNotification>, Task> buildHandlerChain =
           handler =>
           {
@@ -186,7 +186,6 @@ namespace Franz.Common.Mediator.Dispatchers
 
                 if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
                   throw;
-                // else ContinueOnError: swallow and move to next handler
               }
             }
             break;
@@ -212,8 +211,7 @@ namespace Franz.Common.Mediator.Dispatchers
                 await NotifyNotificationHandlerFailed(notification!, handlerType, correlationId, ex, duration, observers, cancellationToken);
 
                 if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
-                  throw; // let Task.WhenAll surface the aggregate
-                // ContinueOnError: swallow
+                  throw;
               }
             });
 
@@ -221,18 +219,60 @@ namespace Franz.Common.Mediator.Dispatchers
             break;
         }
 
-        return (object?)null; // no response for Publish
+        return (object?)null;
       }, cancellationToken);
     }
 
-    // -------------------- STREAMING --------------------
+    // -------------------- EVENTS --------------------
 
+    // Generic version
+    public Task PublishEventAsync<TEvent>(
+        TEvent @event,
+        CancellationToken cancellationToken = default)
+        where TEvent : IEvent
+    {
+      return ExecuteWithObservability(@event, async () =>
+      {
+        var handlers = _serviceProvider.GetServices<IEventHandler<TEvent>>().ToList();
+        var pipelines = _serviceProvider.GetServices<IEventPipeline<TEvent>>().ToList();
+
+        Func<Task> handlerChain = () => Task.WhenAll(
+            handlers.Select(h => h.HandleAsync(@event, cancellationToken)));
+
+        foreach (var pipeline in pipelines.AsEnumerable().Reverse())
+        {
+          var next = handlerChain;
+          handlerChain = () => pipeline.HandleAsync(@event, next, cancellationToken);
+        }
+
+        await handlerChain();
+        return (object?)null;
+      }, cancellationToken);
+    }
+
+    // Non-generic bridge version
+    public Task PublishEventAsync(IEvent @event, CancellationToken ct = default)
+    {
+      var concreteType = @event.GetType(); // e.g. OrderCancelledEvent
+      var method = typeof(FranzDispatcher)
+          .GetMethod(nameof(PublishEventAsync), new[] { typeof(IEvent), typeof(CancellationToken) });
+
+      // find the generic PublishEventAsync<TEvent>
+      var generic = typeof(FranzDispatcher)
+          .GetMethods()
+          .First(m => m.Name == nameof(PublishEventAsync) && m.IsGenericMethod);
+
+      var constructed = generic.MakeGenericMethod(concreteType);
+      return (Task)constructed.Invoke(this, new object?[] { @event, ct })!;
+    }
+
+
+    // -------------------- STREAMING --------------------
     public async IAsyncEnumerable<TResponse> Stream<TQuery, TResponse>(
       TQuery query,
       [EnumeratorCancellation] CancellationToken cancellationToken = default)
       where TQuery : IStreamQuery<TResponse>
     {
-      // FIX: use static Reset
       MediatorContext.Reset();
 
       var correlationId = MediatorContext.Current.CorrelationId;
@@ -248,22 +288,8 @@ namespace Franz.Common.Mediator.Dispatchers
         var stream = handler.Handle(query, cancellationToken);
         enumerator = stream.GetAsyncEnumerator(cancellationToken);
 
-        while (true)
+        while (await enumerator.MoveNextAsync())
         {
-          bool hasNext;
-          try
-          {
-            hasNext = await enumerator.MoveNextAsync();
-          }
-          catch (Exception ex)
-          {
-            capturedException = ex;
-            throw;
-          }
-
-          if (!hasNext)
-            break;
-
           yield return enumerator.Current;
         }
       }
@@ -275,43 +301,31 @@ namespace Franz.Common.Mediator.Dispatchers
         var duration = DateTime.UtcNow - start;
 
         if (capturedException is null)
-        {
           await NotifyRequestCompleted(query, null, correlationId, duration, cancellationToken);
-        }
         else
-        {
           await NotifyRequestFailed(query, capturedException, correlationId, duration, cancellationToken);
-        }
       }
     }
 
-    // -------------------- OBSERVER NOTIFICATIONS (REQUESTS) --------------------
+    // -------------------- OBSERVER NOTIFICATIONS --------------------
 
     private async Task NotifyRequestStarted(object request, string correlationId, CancellationToken cancellationToken)
     {
       foreach (var observer in _serviceProvider.GetServices<IMediatorObserver>())
-      {
         await observer.OnRequestStarted(request, correlationId, cancellationToken);
-      }
     }
 
     private async Task NotifyRequestCompleted(object request, object? response, string correlationId, TimeSpan duration, CancellationToken cancellationToken)
     {
       foreach (var observer in _serviceProvider.GetServices<IMediatorObserver>())
-      {
         await observer.OnRequestCompleted(request, response, correlationId, duration, cancellationToken);
-      }
     }
 
     private async Task NotifyRequestFailed(object request, Exception exception, string correlationId, TimeSpan duration, CancellationToken cancellationToken)
     {
       foreach (var observer in _serviceProvider.GetServices<IMediatorObserver>())
-      {
         await observer.OnRequestFailed(request, exception, correlationId, duration, cancellationToken);
-      }
     }
-
-    // -------------------- OBSERVER NOTIFICATIONS (PER-HANDLER) --------------------
 
     private static async Task NotifyNotificationHandlerStarted(
       object notification,
@@ -321,9 +335,7 @@ namespace Franz.Common.Mediator.Dispatchers
       CancellationToken cancellationToken)
     {
       foreach (var o in observers)
-      {
         await o.OnNotificationHandlerStarted(notification, handlerType, correlationId, cancellationToken);
-      }
     }
 
     private static async Task NotifyNotificationHandlerCompleted(
@@ -335,9 +347,7 @@ namespace Franz.Common.Mediator.Dispatchers
       CancellationToken cancellationToken)
     {
       foreach (var o in observers)
-      {
         await o.OnNotificationHandlerCompleted(notification, handlerType, correlationId, duration, cancellationToken);
-      }
     }
 
     private static async Task NotifyNotificationHandlerFailed(
@@ -350,12 +360,8 @@ namespace Franz.Common.Mediator.Dispatchers
       CancellationToken cancellationToken)
     {
       foreach (var o in observers)
-      {
         await o.OnNotificationHandlerFailed(notification, handlerType, correlationId, exception, duration, cancellationToken);
-      }
     }
-
-   
 
     // -------------------- EXECUTION WRAPPER --------------------
 
@@ -364,7 +370,6 @@ namespace Franz.Common.Mediator.Dispatchers
         Func<Task<TResult>> execute,
         CancellationToken cancellationToken)
     {
-      // FIX: use static Reset
       MediatorContext.Reset();
 
       var correlationId = MediatorContext.Current.CorrelationId;
