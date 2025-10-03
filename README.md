@@ -109,7 +109,7 @@ Contributions are welcome (internal team preferred).
 3. Submit PR.
 4. Add tests + docs.
 
-See [controbuting.md](contributing.md).
+See [contributing.md](contributing.md).
 
 ---
 
