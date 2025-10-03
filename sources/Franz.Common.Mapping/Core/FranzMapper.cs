@@ -25,9 +25,13 @@ public class FranzMapper : IFranzMapper
     // Handle explicitly configured mappings
     if (_config.TryGetMapping<TSource, TDestination>(out var expression))
     {
-      TDestination? destination = expression.Constructor != null
-          ? expression.Constructor(source)
-          : Activator.CreateInstance<TDestination>();
+      TDestination? destination;
+      if (expression.Constructor != null)
+        destination = expression.Constructor(source);
+      else
+      {
+        destination = Activator.CreateInstance<TDestination>();
+      }
 
       if (destination is null)
       {

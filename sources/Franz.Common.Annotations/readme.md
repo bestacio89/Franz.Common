@@ -13,7 +13,7 @@ A lightweight library within the **Franz Framework** designed to provide custom 
 
 ## **Version Information**
 
-- ** Current Version**: 1.6.0
+- ** Current Version**: 1.6.1
 - Part of the private **Franz Framework** ecosystem.
 
 ---

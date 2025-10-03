@@ -5,7 +5,7 @@ It provides abstractions, utilities, and patterns for building **scalable, audit
 
 ---
 
-* **Current Version**: 1.6.0
+* **Current Version**: 1.6.1
 
 ---
 
@@ -166,7 +166,7 @@ public interface IAggregateRootRepository<TAggregateRoot, TEvent>
 
 ---
 
-## **What’s New in 1.6.0**
+## **What’s New in 1.6.1**
 
 * Added **auditing + soft delete** in `Entity<TId>`.
 * Introduced **`IDomainEvent`** with correlation & audit metadata.

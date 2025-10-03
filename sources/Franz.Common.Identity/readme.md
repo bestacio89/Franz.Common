@@ -4,7 +4,7 @@ A foundational library within the **Franz Framework** that provides contracts an
 This package defines the **core abstractions** for accessing user identity information in a consistent, provider-agnostic way.
 
 ---
--** Current Version**: 1.6.0
+-** Current Version**: 1.6.1
 ---
 ## **Features**
 
@@ -82,7 +82,7 @@ Licensed under the MIT License. See the `LICENSE` file for details.
 
 ## **Changelog**
 
-### Version 1.6.0
+### Version 1.6.1
 
 * Introduced **`FranzIdentityContext`** (UserId, Email, FullName, Roles, TenantId, DomainId).
 * Added **`IIdentityContextAccessor`** interface for framework-agnostic identity access.

@@ -1,4 +1,4 @@
-﻿Got it ✅ — let’s update the **README for Franz.Common.MongoDB v1.6.0** to reflect all the new changes we introduced (Inbox store, Outbox store, DLQ, indexes, DI extensions, etc.).
+﻿Got it ✅ — let’s update the **README for Franz.Common.MongoDB v1.6.1** to reflect all the new changes we introduced (Inbox store, Outbox store, DLQ, indexes, DI extensions, etc.).
 
 Here’s the rewritten version:
 
@@ -139,7 +139,7 @@ if (!await _inboxStore.HasProcessedAsync(message.Id))
 
 ## 📝 Version Information
 
-* **Current Version**: 1.6.0
+* **Current Version**: 1.6.1
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -164,7 +164,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 * Separated **business concepts** from **mediator concepts**.
 * Now compatible with both the **in-house mediator** and **MediatR**.
 
-### Version 1.6.0
+### Version 1.6.1
 
 * Introduced **Mongo Outbox** (`MongoMessageStore`) with retries and Dead Letter Queue.
 * Added **Mongo Inbox** (`MongoInboxStore`) for idempotent consumption.
