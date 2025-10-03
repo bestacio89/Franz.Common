@@ -1,10 +1,4 @@
-﻿Perfect 👍 — let’s extend your README so that **v1.6.1** highlights the new **NoSQL support** (MongoDB + Cosmos) in addition to the relational providers.
-
-Here’s the refined version with the new changelog entry:
-
----
-
-# **Franz.Common.Http.EntityFramework**
+﻿# **Franz.Common.Http.EntityFramework**
 
 A specialized library within the **Franz Framework** that integrates **Entity Framework Core** with **ASP.NET Core** applications.
 This package simplifies transactional handling, dependency injection, and middleware configurations, enhancing database operations in HTTP-based services.
@@ -179,6 +173,3 @@ The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
 
 * Upgraded version to **.NET 9**
 
----
-
-👉 Do you want me to also generate a **Mermaid diagram** showing the persistence bootstrapper (`AddDatabase`) branching into Relational vs NoSQL providers, so the README visualizes the polyglot architecture?
