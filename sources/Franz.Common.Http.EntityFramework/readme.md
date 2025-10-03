@@ -19,10 +19,10 @@ This package simplifies transactional handling, dependency injection, and middle
 
   * Built-in support for relational database operations.
 
-* **Multi-Database Provider Support** *(since 1.3.4, extended in 1.6.1)*:
+* **Multi-Database Provider Support** *(since 1.3.4, extended in 1.6.2)*:
 
   * Configure **MariaDB**, **Postgres**, **Oracle**, or **SQL Server** via `appsettings.json`.
-  * **New in 1.6.1** → Polyglot persistence: support for **MongoDB** and **Azure Cosmos DB** as first-class NoSQL providers.
+  * **New in 1.6.2** → Polyglot persistence: support for **MongoDB** and **Azure Cosmos DB** as first-class NoSQL providers.
 
 * **Modular Design**:
 
@@ -39,7 +39,7 @@ This package simplifies transactional handling, dependency injection, and middle
 
 ## **Version Information**
 
-* **Current Version**: 1.6.1
+* **Current Version**: 1.6.2
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -56,8 +56,8 @@ This package relies on:
 * **Franz.Common.EntityFramework.Postgres**
 * **Franz.Common.EntityFramework.Oracle**
 * **Franz.Common.EntityFramework.SQLServer**
-* **Franz.Common.MongoDB** (new in 1.6.1)
-* **Franz.Common.AzureCosmosDB** (new in 1.6.1)
+* **Franz.Common.MongoDB** (new in 1.6.2)
+* **Franz.Common.AzureCosmosDB** (new in 1.6.2)
 
 ---
 
@@ -146,7 +146,7 @@ The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
 
 ## **Changelog**
 
-### Version 1.6.1
+### Version 1.6.2
 
 * Extended **multi-database provider support** to include **NoSQL** providers:
 

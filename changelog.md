@@ -371,3 +371,14 @@ Identity, Messaging, and Domain Events finally under one clean architecture.
   - *“Surf the architecture microservice setup with Franz.Template — clean, done right, and properly strapped on. But one thing: we don’t like boonies.”*  
 
 ---
+## Franz.Framework v1.6.2
+
+* ✨ Added AddFranzResilience(IConfiguration) — single entrypoint to configure Retry, Timeout, Bulkhead, CircuitBreaker policies from appsettings.json.
+
+* ♻️ Internal cleanup: unified PollyPolicyRegistryOptions + Mediator pipelines under one bootstrapper.
+
+* 🛡️ Config-driven resilience now out-of-the-box: no more manual policy registration.
+
+* ✅ Requires Microsoft.Extensions.Configuration.Binder (for GetValue<T>() binding).
+
+* 📦 Backward-compatible: existing AddFranzPollyRetry, AddFranzPollyTimeout, etc. still available if you need fine-grained control.

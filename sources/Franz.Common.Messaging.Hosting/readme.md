@@ -140,7 +140,7 @@ public class CustomMessagingStrategyExecuter : IMessagingStrategyExecuter
 
 ## 📝 Version Information
 
-* **Current Version**: 1.6.1
+* **Current Version**: 1.6.2
 * Part of the private **Franz Framework** ecosystem.
 ---
 
@@ -163,7 +163,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 * Separated business concepts from mediator concepts.
 * Compatibility with both the in-house mediator and **MediatR**.
 
-### Version 1.6.1
+### Version 1.6.2
 
 * Introduced **KafkaHostedService** and **OutboxHostedService** for clean separation of concerns.
 * Added **Inbox pattern** integration (`IInboxStore`) with hosted listener support.

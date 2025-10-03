@@ -114,7 +114,7 @@ public class OutboxHostedService : BackgroundService
 
 ## 📝 Version Information
 
-* **Current Version**: 1.6.1
+* **Current Version**: 1.6.2
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -127,7 +127,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 
 ## 📖 Changelog
 
-### Version 1.6.1
+### Version 1.6.2
 
 * Introduced `KafkaHostedService` to run Kafka listeners inside .NET host.
 * Added `OutboxHostedService` to bridge Mongo outbox with Kafka publishing.

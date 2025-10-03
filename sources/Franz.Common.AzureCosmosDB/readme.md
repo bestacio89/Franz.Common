@@ -29,9 +29,9 @@ This package extends the polyglot persistence philosophy of the framework by ena
 
 ## **Version Information**
 
-* **Current Version**: 1.6.1
+* **Current Version**: 1.6.2
 * Part of the private **Franz Framework** ecosystem.
-* Extended capacities: Cosmos DB support introduced in 1.6.1.
+* Extended capacities: Cosmos DB support introduced in 1.6.2.
 
 ---
 
@@ -137,7 +137,7 @@ Licensed under the MIT License. See the `LICENSE` file for more details.
 
 ## **Changelog**
 
-### Version 1.6.1
+### Version 1.6.2
 
 * Introduced **Azure Cosmos DB integration**.
 * Added `CosmosDBMessageStore` implementing `IMessageStore`.

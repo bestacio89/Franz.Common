@@ -17,7 +17,7 @@ A library within the **Franz Framework** designed to integrate identity manageme
 
 ## **Version Information**
 
-- ** Current Version**: 1.6.1
+- ** Current Version**: 1.6.2
 - Part of the private **Franz Framework** ecosystem.
 
 ---

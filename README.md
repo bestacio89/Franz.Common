@@ -109,7 +109,7 @@ Contributions are welcome (internal team preferred).
 3. Submit PR.
 4. Add tests + docs.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [controbuting.md](contributing.md).
 
 ---
 
@@ -127,9 +127,20 @@ Licensed under the **MIT License**.
 
 ## 📌 Changelog
 
-**Latest Version:** `1.6.1`
+**Latest Version:** `1.6.2`
 
 ---
+## Franz.Framework v1.6.2
+
+* ✨ Added AddFranzResilience(IConfiguration) — single entrypoint to configure Retry, Timeout, Bulkhead, CircuitBreaker policies from appsettings.json.
+
+* ♻️ Internal cleanup: unified PollyPolicyRegistryOptions + Mediator pipelines under one bootstrapper.
+
+* 🛡️ Config-driven resilience now out-of-the-box: no more manual policy registration.
+
+* ✅ Requires Microsoft.Extensions.Configuration.Binder (for GetValue<T>() binding).
+
+* 📦 Backward-compatible: existing AddFranzPollyRetry, AddFranzPollyTimeout, etc. still available if you need fine-grained control.
 
 ### 🚀 Version 1.6.1 – Polyglot Database & Messaging Bootstrap 🌍
 
@@ -246,7 +257,7 @@ Licensed under the **MIT License**.
 * **1.4.2** – Removed `SaveEntitiesAsync`; cleaned multi-db DbContext.
 * **1.4.0** – Migrated to C# 12, resilience pipelines, observability.
 
-➡️ Full history available in [CHANGELOG.md](CHANGELOG.md).
+➡️ Full history available in [changelog.md](changelog.md).
 
 ---
 

@@ -19,7 +19,7 @@ This package ensures **transactional consistency** for outbox patterns in relati
 
   * Native support for relational outbox patterns when using **EF Core** (MariaDB, Postgres, Oracle, SQL Server).
 
-* **Polyglot Messaging Support** *(new in 1.6.1)*
+* **Polyglot Messaging Support** *(new in 1.6.2)*
 
   * Messaging outbox/dead-letter can also be stored in **MongoDB** or **Azure Cosmos DB** via unified configuration.
   * Clean abstraction with `IMessageStore`, so your messaging workflow does not change regardless of provider.
@@ -28,7 +28,7 @@ This package ensures **transactional consistency** for outbox patterns in relati
 
 ## **Version Information**
 
-* **Current Version**: 1.6.1
+* **Current Version**: 1.6.2
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -41,8 +41,8 @@ This package relies on:
 * **Microsoft.EntityFrameworkCore.Relational** (8.0.0) – Relational database support
 * **Franz.Common.EntityFramework.MariaDB** – MariaDB provider bootstrap
 * **Franz.Common.Messaging.Hosting** – Hosting + transaction coordination
-* **Franz.Common.MongoDB** *(new in 1.6.1)* – MongoDB messaging provider
-* **Franz.Common.AzureCosmosDB** *(new in 1.6.1)* – Cosmos DB messaging provider
+* **Franz.Common.MongoDB** *(new in 1.6.2)* – MongoDB messaging provider
+* **Franz.Common.AzureCosmosDB** *(new in 1.6.2)* – Cosmos DB messaging provider
 
 ---
 
@@ -160,7 +160,7 @@ The **Franz.Common.Messaging.EntityFramework** package integrates seamlessly wit
 
 ## **Changelog**
 
-### Version 1.6.1
+### Version 1.6.2
 
 * Extended **messaging persistence** beyond EF: added support for **MongoDB** and **Azure Cosmos DB**.
 * Unified **config-driven provider selection** for messaging outbox/dead-letter (`Messaging:Provider`).
