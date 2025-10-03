@@ -23,4 +23,19 @@ public static class HostBuilderExtensions
 
     return result;
   }
+
+  /// <summary>
+  /// Configures the host for modern .NET applications without Startup.cs,
+  /// bootstrapping logging and loading referenced assemblies.
+  /// </summary>
+  public static IHostBuilder UseHttpBootstrap(this IHostBuilder hostBuilder, Assembly? assembly = null)
+  {
+    assembly ??= Assembly.GetCallingAssembly();
+
+    var result = hostBuilder
+        .LoadAssemblyReferencedNotLoaded(assembly)
+        .UseLog();
+
+    return result;
+  }
 }

@@ -34,7 +34,7 @@ public static class MessageDeserializerExtensions
     var type = ResolveType(message.MessageType, typeof(IEvent));
     if (type is null) return null;
 
-    var @event = (IEvent?)JsonSerializer.Deserialize(message.Body, type, _jsonOptions);
+    var @event = (IEvent?)JsonSerializer.Deserialize(message.Body is not null, type, _jsonOptions);
 
     if (@event != null)
     {

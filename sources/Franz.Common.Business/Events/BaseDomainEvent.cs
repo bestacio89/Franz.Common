@@ -3,7 +3,7 @@ namespace Franz.Common.Business.Events;
 public interface IDomainEvent : IEvent
 {
   Guid EventId { get; }
-  DateTimeOffset OccurredOn { get; }
+  new DateTimeOffset OccurredOn { get; }
   string? CorrelationId { get; }
   Guid? AggregateId { get; }
   string AggregateType { get; }
