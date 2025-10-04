@@ -122,6 +122,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Integration.Te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.AzureCosmosDB", "sources\Franz.Common.AzureCosmosDB\Franz.Common.AzureCosmosDB.csproj", "{150D8AA9-9D3E-4F1B-B1A6-79E0B6DDCE4E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.RabbitMQ", "sources\Franz.Common.Messaging.RabbitMQ\Franz.Common.Messaging.RabbitMQ.csproj", "{B2CA2B2E-8990-CB2E-606A-8BF5FA2D02C2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -340,6 +342,10 @@ Global
 		{150D8AA9-9D3E-4F1B-B1A6-79E0B6DDCE4E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{150D8AA9-9D3E-4F1B-B1A6-79E0B6DDCE4E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{150D8AA9-9D3E-4F1B-B1A6-79E0B6DDCE4E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B2CA2B2E-8990-CB2E-606A-8BF5FA2D02C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2CA2B2E-8990-CB2E-606A-8BF5FA2D02C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2CA2B2E-8990-CB2E-606A-8BF5FA2D02C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2CA2B2E-8990-CB2E-606A-8BF5FA2D02C2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -399,6 +405,7 @@ Global
 		{8D6715F9-1D12-42BB-B206-2CFAC06FDF8A} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 		{910C30EB-196B-605A-EC2B-1CD3623F54FC} = {99C4C621-B376-4D7A-BB9B-C56DEB0AA0CB}
 		{150D8AA9-9D3E-4F1B-B1A6-79E0B6DDCE4E} = {2A34967E-2D10-4703-BFB0-D4883859D440}
+		{B2CA2B2E-8990-CB2E-606A-8BF5FA2D02C2} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {069A32C7-587A-42C8-B9D2-9CF7EE93E2BD}
