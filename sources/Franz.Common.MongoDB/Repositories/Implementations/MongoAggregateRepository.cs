@@ -34,7 +34,7 @@ namespace Franz.Common.MongoDB.Repositories.Implementations
     /// Loads an aggregate by replaying its domain events.
     /// Throws <see cref="NotFoundException"/> if no events are found.
     /// </summary>
-    public async Task<TAggregate> GetByIdAsync(Guid id)
+    public async Task<TAggregate?> GetByIdAsync(Guid id)
     {
       var storedEvents = await _eventCollection
           .Find(Builders<StoredEvent>.Filter.Eq(e => e.AggregateId, id))
@@ -66,11 +66,11 @@ namespace Franz.Common.MongoDB.Repositories.Implementations
       var storedEvents = uncommitted.Select(ev => new StoredEvent
       {
         EventId = ev.EventId,
-        AggregateId = (Guid)ev.AggregateId,
+        AggregateId = (Guid)ev.AggregateId!,
         AggregateType = ev.AggregateType,
         EventType = ev.GetType().AssemblyQualifiedName!,
         OccurredOn = ev.OccurredOn,
-        CorrelationId = ev.CorrelationId,
+        CorrelationId = ev.CorrelationId!,
         Payload = JsonSerializer.Serialize(ev)
       }).ToList();
 

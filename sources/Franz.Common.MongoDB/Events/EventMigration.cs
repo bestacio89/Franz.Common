@@ -28,12 +28,13 @@ namespace Franz.Common.MongoDB.Events
       var storedEvents = oldEvents.Select(ev => new StoredEvent
       {
         EventId = ev.EventId,
-        AggregateId = (Guid)ev.AggregateId,
+        AggregateId = ev.AggregateId ?? throw new InvalidOperationException(
+              $"Event {ev.EventId} of type {ev.GetType().Name} has no AggregateId."),
         AggregateType = ev.AggregateType,
         EventType = ev.GetType().AssemblyQualifiedName!,
         OccurredOn = ev.OccurredOn,
-        CorrelationId = ev.CorrelationId,
-        Payload = JsonSerializer.Serialize(ev)
+        CorrelationId = ev.CorrelationId!,
+        Payload = JsonSerializer.Serialize(ev)!
       }).ToList();
 
       if (storedEvents.Any())

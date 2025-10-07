@@ -8,7 +8,7 @@
 
     public IDictionary<string, string[]> Headers { get; set; } = new Dictionary<string, string[]>();
 
-    public IDictionary<string, object?> Properties { get; set; } = new Dictionary<string, object?>();
+    public IDictionary<string, object> Properties { get; set; } = new Dictionary<string, object>();
 
     public string? CorrelationId { get; set; }
 

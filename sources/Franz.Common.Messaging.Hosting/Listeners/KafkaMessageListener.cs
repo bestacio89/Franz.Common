@@ -53,7 +53,11 @@ public class KafkaMessageListener : IListener
           continue;
         }
 
-        Received?.Invoke(this, new MessageEventArgs(transport));
+        if (Received != null)
+        {
+          var handlers = Received.GetInvocationList().Cast<Func<object, MessageEventArgs, Task>>();
+          await Task.WhenAll(handlers.Select(h => h(this, new MessageEventArgs(transport))));
+        }
       }
     }
     finally

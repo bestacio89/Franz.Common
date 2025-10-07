@@ -1,10 +1,11 @@
 ﻿using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
 using Franz.Common.IntegrationTesting.Domain.Events;
 using Franz.Common.Mediator.Messages;
 
 namespace Franz.Common.IntegrationTesting.Domain;
 
-public sealed class OrderAggregate : AggregateRoot<IEvent>
+public sealed class OrderAggregate : AggregateRoot<IDomainEvent>
 {
   public Guid OrderId { get; private set; }
   public Guid CustomerId { get; private set; }
@@ -76,7 +77,7 @@ public sealed class OrderAggregate : AggregateRoot<IEvent>
   public static OrderAggregate Rehydrate(Guid id, IEnumerable<IEvent> history)
   {
     var agg = new OrderAggregate(id);
-    agg.ReplayEvents(history); // inherited from AggregateRoot
+    agg.ReplayEvents((IEnumerable<IDomainEvent>)history); // inherited from AggregateRoot
     return agg;
   }
 }

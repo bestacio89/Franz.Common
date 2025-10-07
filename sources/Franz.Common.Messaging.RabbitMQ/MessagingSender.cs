@@ -25,6 +25,8 @@ public class MessagingSender : IMessagingSender
 
   public Task SendAsync(Message message, CancellationToken cancellationToken = default)
   {
+    if (message.Body == null)
+      throw new ArgumentNullException(nameof(message.Body), "Message body cannot be null");
     // Let the message handler run any enrichment/middleware
     messageHandler.Process(message);
 

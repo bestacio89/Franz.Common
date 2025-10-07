@@ -1,4 +1,5 @@
-﻿using Franz.Common.Integration.Tests.Commands;
+﻿using Franz.Common.Business.Events;
+using Franz.Common.Integration.Tests.Commands;
 using Franz.Common.IntegrationTesting.Domain;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Handlers;
@@ -6,9 +7,9 @@ using Franz.Common.Mediator.Messages;
 
 public sealed class CancelOrderHandler : ICommandHandler<CancelOrderCommand, Unit>
 {
-  private readonly IAggregateRootRepository<OrderAggregate, IEvent> _repository;
+  private readonly IAggregateRootRepository<OrderAggregate, IDomainEvent> _repository;
 
-  public CancelOrderHandler(IAggregateRootRepository<OrderAggregate, IEvent> repository)
+  public CancelOrderHandler(IAggregateRootRepository<OrderAggregate, IDomainEvent> repository)
       => _repository = repository;
 
   public async Task<Unit> Handle(CancelOrderCommand command, CancellationToken ct = default)

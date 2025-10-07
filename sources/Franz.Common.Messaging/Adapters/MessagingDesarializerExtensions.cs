@@ -18,7 +18,7 @@ public static class MessageDeserializerExtensions
     var type = ResolveType(message.MessageType, typeof(ICommand));
     if (type is null) return null;
 
-    var command = (ICommand?)JsonSerializer.Deserialize(message.Body, type, _jsonOptions);
+    var command = (ICommand?)JsonSerializer.Deserialize(message.Body is not null, type, _jsonOptions);
 
     if (command != null)
     {

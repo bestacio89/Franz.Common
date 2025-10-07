@@ -1,4 +1,5 @@
-﻿using Franz.Common.Integration.Tests.Commands;
+﻿using Franz.Common.Business.Events;
+using Franz.Common.Integration.Tests.Commands;
 using Franz.Common.Integration.Tests.Commands.Handlers;
 using Franz.Common.Integration.Tests.Commands.Handlers.Events;
 using Franz.Common.IntegrationTesting.Domain;
@@ -29,7 +30,7 @@ public class DispatcherTests
 
           // ✅ register repo + sink
           services.AddScoped<
-              IAggregateRootRepository<OrderAggregate, IEvent>,
+              IAggregateRootRepository<OrderAggregate, IDomainEvent>,
               InMemoryOrderRepository>();
 
           services.AddScoped<InMemoryProcessedEventSink>();

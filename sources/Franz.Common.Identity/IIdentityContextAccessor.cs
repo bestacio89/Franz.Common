@@ -1,15 +1,13 @@
-namespace Franz.Common.Identity
+﻿using Franz.Common.Identity;
+
+public interface IIdentityContextAccessor
 {
-  public interface IIdentityContextAccessor
-  {
-    Guid? GetCurrentId();
-    string? GetCurrentFullName();
-    string? GetCurrentEmail();
-    string[]? GetCurrentRoles();
+  string? GetCurrentEmail();
+  Guid? GetCurrentId();
+  string? GetCurrentFullName();
+  Guid? GetCurrentTenantId();
+  Guid? GetCurrentDomainId();
+  string[]? GetCurrentRoles();
 
-    Guid? GetCurrentTenantId();
-    Guid? GetCurrentDomainId();
-
-    FranzIdentityContext GetCurrentIdentity();
-  }
+  FranzIdentityContext? GetCurrentIdentity(); // ✅ make nullable
 }

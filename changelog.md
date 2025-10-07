@@ -382,3 +382,50 @@ Identity, Messaging, and Domain Events finally under one clean architecture.
 * ✅ Requires Microsoft.Extensions.Configuration.Binder (for GetValue<T>() binding).
 
 * 📦 Backward-compatible: existing AddFranzPollyRetry, AddFranzPollyTimeout, etc. still available if you need fine-grained control.
+✅ Full Nullability Compliance
+
+Refactored all core components (FranzMapper, AggregateRepository, EventMigration, IdentityContextAccessor, etc.) to be 100 % analyzer-clean under <Nullable>enable + <TreatWarningsAsErrors>true>.
+
+Explicit null checks and domain-safe TechnicalException handling added across all mapping and repository layers.
+
+🧩 Generic Constraint Realignment
+
+IAggregateRootRepository<TAggregateRoot, TEvent> now enforces correct IDomainEvent typing.
+
+All in-memory and persistence repositories updated for stricter type safety.
+
+Domain aggregates explicitly implement IAggregateRoot<IDomainEvent>.
+
+⚙️ Messaging & Serialization Improvements
+
+Hardened JSON serialization (safe deserialization guards + explicit null handling).
+
+Corrected StoredMessage ↔ Message mappings to respect object? semantics.
+
+Added async-safe event dispatch for Kafka listeners (Func<object, MessageEventArgs, Task>).
+
+🐇 RabbitMQ Integration Enhancements
+
+Introduced unified listener/producer pipeline compatible with 1.6.x mediator stack.
+
+Improved connection resilience and TLS-enforced channel setup.
+
+Added structured logging and correlation propagation through message headers.
+
+🔐 TLS & Security Hardening
+
+Default transport policy upgraded to TLS 1.3 only.
+
+Disabled legacy protocol negotiation and enforced certificate validation via SslOptions.
+
+Added optional runtime enforcement:
+
+AppContext.SetSwitch("System.Net.Security.AllowLegacyTLSVersions", false);
+System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls13;
+
+
+🧪 Integration Tests
+
+All event sourcing and mediator integration tests pass successfully.
+
+Verified repository rehydration, dispatch, and mapping under full null-safe conditions.

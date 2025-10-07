@@ -31,8 +31,4 @@
 	    <LastGenOutput>Resources.Designer.cs</LastGenOutput>
 	  </EmbeddedResource>
 	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Listeners\NewFolder\" />
-	</ItemGroup>
 </Project>
