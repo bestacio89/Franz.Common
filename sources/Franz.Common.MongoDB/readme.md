@@ -1,8 +1,4 @@
-﻿Got it ✅ — let’s update the **README for Franz.Common.MongoDB v1.6.2** to reflect all the new changes we introduced (Inbox store, Outbox store, DLQ, indexes, DI extensions, etc.).
-
-Here’s the rewritten version:
-
----
+﻿---
 
 ```markdown
 # Franz.Common.MongoDB
@@ -139,7 +135,7 @@ if (!await _inboxStore.HasProcessedAsync(message.Id))
 
 ## 📝 Version Information
 
-* **Current Version**: 1.6.2
+* **Current Version**: 1.6.3
 * Part of the private **Franz Framework** ecosystem.
 
 ---

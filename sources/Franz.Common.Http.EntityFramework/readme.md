@@ -19,10 +19,11 @@ This package simplifies transactional handling, dependency injection, and middle
 
   * Built-in support for relational database operations.
 
-* **Multi-Database Provider Support** *(since 1.3.4, extended in 1.6.2)*:
+* **Multi-Database Provider Support** *(since 1.3.4, extended in 1.6.2 & 1.6.3)*:
 
   * Configure **MariaDB**, **Postgres**, **Oracle**, or **SQL Server** via `appsettings.json`.
-  * **New in 1.6.2** → Polyglot persistence: support for **MongoDB** and **Azure Cosmos DB** as first-class NoSQL providers.
+  * **Since 1.6.2** → Polyglot persistence: support for **MongoDB** and **Azure Cosmos DB** as first-class NoSQL providers.
+  * **New in 1.6.3** → Environment-aware multi-database registration with provider validation, preventing silent misconfigurations.
 
 * **Modular Design**:
 
@@ -39,7 +40,8 @@ This package simplifies transactional handling, dependency injection, and middle
 
 ## **Version Information**
 
-* **Current Version**: 1.6.2
+* **Current Version**: 1.6.3
+  → Adds **environment-aware validation**, stronger governance for multi-database setups, and provider-context alignment.
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -56,8 +58,8 @@ This package relies on:
 * **Franz.Common.EntityFramework.Postgres**
 * **Franz.Common.EntityFramework.Oracle**
 * **Franz.Common.EntityFramework.SQLServer**
-* **Franz.Common.MongoDB** (new in 1.6.2)
-* **Franz.Common.AzureCosmosDB** (new in 1.6.2)
+* **Franz.Common.MongoDB** (since 1.6.2)
+* **Franz.Common.AzureCosmosDB** (since 1.6.2)
 
 ---
 
@@ -92,10 +94,12 @@ dotnet add package Franz.Common.Http.EntityFramework
     "ConnectionString": "Host=localhost;Database=mydb;Username=myuser;Password=mypass"
   },
   "MongoDb": {
+    "Provider": "Mongo",
     "ConnectionString": "mongodb://localhost:27017",
     "DatabaseName": "FranzMongoDb"
   },
   "CosmosDb": {
+    "Provider": "Cosmos",
     "ConnectionString": "AccountEndpoint=https://your-account.documents.azure.com:443/;AccountKey=your-key;",
     "DatabaseName": "FranzCosmosDb"
   }
@@ -110,6 +114,14 @@ Supported providers: `MariaDb`, `Postgres`, `Oracle`, `SqlServer`, `Mongo`, `Cos
 
 ```csharp
 builder.Services.AddDatabase<MyDbContext>(builder.Environment, builder.Configuration);
+```
+
+For **multiple contexts** (polyglot persistence):
+
+```csharp
+builder.Services.RegisterDatabaseForContext<MyRelationalDbContext>(builder.Configuration.GetSection("Database"));
+builder.Services.RegisterDatabaseForContext<MyMongoDbContext>(builder.Configuration.GetSection("MongoDb"));
+builder.Services.RegisterDatabaseForContext<MyCosmosStore>(builder.Configuration.GetSection("CosmosDb"));
 ```
 
 ---
@@ -146,6 +158,21 @@ The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
 
 ## **Changelog**
 
+### Version 1.6.3
+
+* **Environment-aware validation** added to `AddDatabase<TDbContext>` and `RegisterDatabaseForContext<TContext>`:
+
+  * Enforces correct provider/context alignment for **relational (EF)**, **MongoDB**, and **CosmosDB** contexts.
+  * Prevents silent misconfigurations (wrong provider/context combinations now throw explicit exceptions).
+  * Guards against hardcoded connection strings — all values must come from `appsettings.{Environment}.json`.
+* **Governance baked in for relational DBs**:
+
+  * Automatic registration of **transactions per HTTP call**, **generic repositories**, and **behaviors**.
+* Extended **multi-database orchestration**:
+
+  * Support for mixing multiple contexts (`MariaDB`, `Postgres`, `Oracle`, `SQLServer`, `MongoDB`, `CosmosDB`) within the same app.
+  * Polyglot persistence scenarios are now governed by clear, opinionated rules.
+
 ### Version 1.6.2
 
 * Extended **multi-database provider support** to include **NoSQL** providers:
@@ -173,3 +200,4 @@ The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
 
 * Upgraded version to **.NET 9**
 
+---

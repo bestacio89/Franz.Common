@@ -125,142 +125,86 @@ Licensed under the **MIT License**.
 
 ---
 
-## 📌 Changelog
+📌 Changelog
 
-**Latest Version:** `1.6.2`
+Latest Version: 1.6.3
 
----
-## Franz.Framework v1.6.2
+🚀 Version 1.6.3 – Multi-Environment & Cosmos Governance 🌐🗄️
 
-* ✨ Added AddFranzResilience(IConfiguration) — single entrypoint to configure Retry, Timeout, Bulkhead, CircuitBreaker policies from appsettings.json.
+✨ Added
 
-* ♻️ Internal cleanup: unified PollyPolicyRegistryOptions + Mediator pipelines under one bootstrapper.
+* Environment-Aware Bootstrapper → auto-detects appsettings.{Environment}.json, validates configuration per environment (Dev/Test/Prod).
 
-* 🛡️ Config-driven resilience now out-of-the-box: no more manual policy registration.
+* AzureCosmosStore base → generic Cosmos DB persistence context, mirrors EF + Mongo.
 
-* ✅ Requires Microsoft.Extensions.Configuration.Binder (for GetValue<T>() binding).
+* AddCosmosDatabase<TStore> DI bootstrapper for clean Cosmos integration.
 
-* 📦 Backward-compatible: existing AddFranzPollyRetry, AddFranzPollyTimeout, etc. still available if you need fine-grained control.
+* Governance Enforcement → no hardcoded connection strings, fail-fast provider/context validation.
 
-### 🚀 Version 1.6.1 – Polyglot Database & Messaging Bootstrap 🌍
+* Multi-Database Validation → unified checks for EF, Mongo, Cosmos.
 
-✨ **Added**
+🔧 Changed
 
-* **Polyglot Persistence**
+* Cleaner orchestration for relational vs NoSQL contexts.
 
-  * Extended `AddDatabase<TDbContext>` to support **MongoDB** and **Azure Cosmos DB** in addition to relational providers.
-  * New `AddDatabases<TDbContext>` method enables **polyglot mode** → configure both Relational + Document stores in the same microservice.
-  * Unified configuration style (`Databases:Relational` + `Databases:Document`) for clean, multi-db bootstrapping.
+* More explicit runtime errors for invalid/missing configs.
 
-* **Messaging**
+🚀 Version 1.6.2 – Resilience & Null Safety 🛡️
 
-  * `AddMessageStore` bootstrapper now supports **MongoDB** and **Azure Cosmos DB** outbox/dead-letter stores.
-  * EF-based relational stores simplified to use **generic repositories** directly (no extra boilerplate).
-  * Consistent abstraction via `IMessageStore` for Mongo + Cosmos backends.
+✨ Added
 
-* **Cosmos Integration**
+* AddFranzResilience(IConfiguration) → one-line bootstrapper for Retry, Timeout, Bulkhead, CircuitBreaker policies.
 
-  * Added `CosmosDBMessageStore` implementation.
-  * Used `PatchItemAsync` for atomic updates (`SentOn` field), aligning with Mongo `Builders.Update.Set`.
-  * Added bootstrapper for Cosmos message persistence.
+🔧 Changed
 
-🔧 **Changed**
+* Unified PollyPolicyRegistryOptions + Mediator pipelines.
 
-* Clean separation between **base projects** (low-level infra) and **bootstrappers** (developer-facing DI).
-* APIs now rely on **bootstrappers only** (`Franz.Common.Http.EntityFramework`, `Franz.Common.MongoDB`, `Franz.Common.AzureCosmosDB`, etc.), enforcing clean architecture from the start.
-* Documentation/tagline updates to reflect Franz philosophy:
+* Config-driven resilience baked in by default.
 
-  * *“Your architecture, your way — under Franz conventions (we still make the rules).”*
+* Full nullability compliance (<Nullable>enable + <TreatWarningsAsErrors>true>).
 
-📚 **Docs**
+* Strict generic constraints (IAggregateRootRepository<T, TEvent> → enforces IDomainEvent).
 
-* Updated **Franz.Common.Http.EntityFramework** README with NoSQL support (Mongo, Cosmos).
-* Updated **Franz.Common.Messaging.EntityFramework** README with polyglot config examples.
-* Polished **Franz.Template** intro with developer-friendly tagline:
+* Hardened serialization and async-safe Kafka dispatch.
 
-  * *“Surf the architecture microservice setup with Franz.Template — clean, done right, and properly strapped on. But one thing: we don’t like boonies.”*
+* RabbitMQ pipeline upgraded with TLS 1.3 enforcement and structured logging.
 
----
+🧪 Tests
 
-### 🚀 Version 1.6.0 – Identity, Messaging & Hosting Unification
+* Full mediator + repository integration tests validated.
 
-✨ **Added**
+🚀 Version 1.6.1 – Polyglot Database & Messaging Bootstrap 🌍
 
-* **Identity & SSO**
-  • FranzIdentityContext with unified user/tenant/domain model.
-  • HttpContextIdentityContextAccessor & DI bootstrap.
-  • FranzSsoSettings with WS-Fed, SAML2, OIDC, Keycloak support.
-  • JWT bearer token integration.
-  • Claims normalization pipeline.
+✨ Added
 
-* **Messaging**
-  • Outbox pattern with retries + dead-letter queue.
-  • Inbox pattern for idempotent consumers.
-  • IMessageSerializer abstraction with JSON default implementation.
-  • KafkaHostedService & OutboxHostedService for hosted consumption/dispatch.
-  • DI extensions for Mongo outbox and Kafka hosting.
-  • Async IListener interface with cancellation support.
-  • Structured emoji logging and OpenTelemetry hooks.
+* Polyglot Persistence → AddDatabase<TDbContext> supports Relational + MongoDB + Cosmos DB.
 
-🔧 **Changed**
+* AddDatabases<TDbContext> for multi-provider mode.
 
-* Removed legacy GenericSSOManager/EF Identity coupling.
-* Refactored message DTOs to decouple mediator from transports.
-* Extracted ASP.NET Core specifics into `Franz.Common.Http.Identity`.
-* Enforced: only one interactive SSO provider active at a time.
+* Config-driven DB bootstrapping (Databases:Relational, Databases:Document).
 
-🐛 **Fixed**
+* Messaging → outbox/dead-letter stores in MongoDB + CosmosDB with IMessageStore.
 
-* Startup issues with multiple SSO providers.
-* Serialization mismatches between Kafka & Outbox.
-* Claims normalization consistency across all SSO providers.
+* Cosmos → CosmosDBMessageStore with atomic updates (PatchItemAsync).
 
-📚 **Docs**
+🔧 Changed
 
-* Updated READMEs for **Messaging**, **MongoDB**, **Hosting**, **Hosting.Kafka**, **Identity**, **Http.Identity**, **SSO**.
-* Added usage guides for provider configuration & DI extensions.
+* Bootstrappers philosophy → devs reference only bootstrappers, not base infra libs.
 
----
+Unified architecture tagline:
 
-### Version 1.5.9 – Mapping Improvements ⚡
+* “Your architecture, your way — under Franz conventions (we still make the rules).”
 
-* By-name fallback mapping (zero config).
-* Profiles with `CreateMap`, `ForMember`, `Ignore`, `ReverseMap`, `ConstructUsing`.
-* Expression-based mapping with caching.
-* DI integration with `AddFranzMapping`.
-* NEW in 1.5.6 → Assembly scanning for auto-registration of profiles.
+📚 Docs
 
-### Version 1.5.4 - 1.5.8 – Maintenance Nullability Cleanup 🧹
+* NoSQL bootstrapping examples added.
 
-* Updated dependencies.
-* Documentation cleanup & upgrades.
-* Removed redundant `Business.HandlerCollector`.
-* Normalized nullability across bootstrap, messaging, Kafka.
-* Refactored `MessagingSender` to async-safe.
-* Structured logging improvements.
-* Fail-fast guards in DI.
-* Kafka consumer → strict payload validation.
-* Consistent DDD exception usage.
+Template tagline refined:
 
-### Version 1.5.2 – Reverse Mapping Unlocked 🔄
-
-* Fixed `ReverseMap()` to correctly generate reverse mappings.
-* Replaced expression storage with string-based property resolution.
-* Convention-based mapping fallback.
-
-### Older Versions
-
-* **1.5.1** – Native Mapping Arrives
-* **1.5.0** – When Aras Becomes Simple
-* **1.4.5** – Patch Release: Event Semantics
-* **1.4.4** – Logging improvements, hybrid config, Elastic APM opt-in, perf boosts.
-* **1.4.2** – Removed `SaveEntitiesAsync`; cleaned multi-db DbContext.
-* **1.4.0** – Migrated to C# 12, resilience pipelines, observability.
+* “Surf the architecture microservice setup with Franz.Template — clean, done right, properly strapped on. One thing: we don’t like boonies.”
 
 ➡️ Full history available in [changelog.md](changelog.md).
 
 ---
 
 🔥 With `Franz.Common`, you can bootstrap a Kafka-ready, resilient, **polyglot microservice** with **one line of code**.
-
-```

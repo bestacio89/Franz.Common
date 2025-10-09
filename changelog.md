@@ -1,3 +1,5 @@
+   
+
 # 📈 Changelog
 
 ---
@@ -5,427 +7,371 @@
 ## Version 1.2.65 – Foundation 🏗️
 
 ### ✨ Added
-* 🌐 Kafka bootstrapping: producers, consumers, distributed messaging.  
-* 🗄️ Multi-database bootstrapping (SQL).  
-* 🗃️ NoSQL support.  
+
+* 🌐 Kafka bootstrapping: producers, consumers, distributed messaging.
+* 🗄️ Multi-database bootstrapping (SQL).
+* 🗃️ NoSQL support.
 
 ---
 
 ## Version 1.3.1 – Multi-Tenancy & Mediator 🚦
 
 ### ✨ Added
-* **Multi-Tenancy**  
-  * Canonical `TenantResolutionResult` (`Succeeded`, `TenantInfo`, `Source`, `Message`).  
-  * `TenantResolutionSource.Property` for property-based resolution.  
-  * Default tenant/domain resolution pipelines (HTTP + Messaging).  
-  * Middleware for automatic tenant/domain resolution.  
 
-* **Mediator (Initial Release)**  
-  * Core dispatcher for Commands, Queries, Notifications.  
-  * Pipelines: Logging, Validation.  
-  * EF integration via `DbContextBase`.  
-  * Observability hooks (`MediatorContext`, `IMediatorObserver`).  
-  * Console observer for testing.  
+* **Multi-Tenancy**
+
+  * Canonical `TenantResolutionResult` (`Succeeded`, `TenantInfo`, `Source`, `Message`).
+  * `TenantResolutionSource.Property` for property-based resolution.
+  * Default tenant/domain resolution pipelines (HTTP + Messaging).
+  * Middleware for automatic tenant/domain resolution.
+* **Mediator (Initial Release)**
+
+  * Core dispatcher for Commands, Queries, Notifications.
+  * Pipelines: Logging, Validation.
+  * EF integration via `DbContextBase`.
+  * Observability hooks (`MediatorContext`, `IMediatorObserver`).
+  * Console observer for testing.
 
 ### 🔧 Changed
-* Refactored HTTP & Messaging resolvers to canonical models.  
+
+* Refactored HTTP & Messaging resolvers to canonical models.
 
 ### 📚 Docs
-* Structured results for better logging & observability.  
+
+* Structured results for better logging & observability.
 
 ---
 
 ## Version 1.3.2 – Error Model ❌
 
 ### ✨ Added
-* `Error` abstraction with standard codes (`NotFound`, `Validation`, `Conflict`, `Unexpected`).  
-* Extended `Result<T>` to integrate seamlessly with `Error`.  
-* `ResultExtensions` for ergonomic conversions.  
+
+* `Error` abstraction with standard codes (`NotFound`, `Validation`, `Conflict`, `Unexpected`).
+* Extended `Result<T>` to integrate seamlessly with `Error`.
+* `ResultExtensions` for ergonomic conversions.
 
 ---
 
 ## Version 1.3.3 – Validation & Transactions ⚖️
 
 ### ✨ Added
-* FluentValidation adapter for validation pipeline.  
-* Transaction pipeline with rollback rules via options.  
+
+* FluentValidation adapter for validation pipeline.
+* Transaction pipeline with rollback rules via options.
 
 ### 🐛 Fixed
-* Streaming dispatcher yields with observability.  
+
+* Streaming dispatcher yields with observability.
 
 ---
 
 ## Version 1.3.4 – Decoupling AutoMapper 🔌
 
 ### 🔧 Changed
-* Removed AutoMapper coupling → mapping pushed to Application layer.  
-* Framework remains reflection-free & adapter-friendly.  
+
+* Removed AutoMapper coupling → mapping pushed to Application layer.
+* Framework remains reflection-free & adapter-friendly.
 
 ---
 
 ## Version 1.3.5 – Resilience Pipelines 🛡️
 
 ### ✨ Added
-* Retry, Timeout, CircuitBreaker, Bulkhead resilience pipelines.  
-* Configurable caching pipelines (Memory, Distributed, Redis).  
+
+* Retry, Timeout, CircuitBreaker, Bulkhead resilience pipelines.
+* Configurable caching pipelines (Memory, Distributed, Redis).
 
 ### 🐛 Fixed
-* Open generic pipeline registration errors.  
+
+* Open generic pipeline registration errors.
 
 ### 📚 Docs
-* Added configuration examples for pipelines.  
+
+* Added configuration examples for pipelines.
 
 ---
 
 ## Version 1.3.6 – Mediator Independence 🧵
 
 ### ✨ Added
-* Removed MediatR dependency → now fully `Franz.Mediator`.  
-* `IIntegrationEvent : INotification` for clean event flow.  
-* `IDispatcher.PublishAsync` powers events.  
+
+* Removed MediatR dependency → now fully `Franz.Mediator`.
+* `IIntegrationEvent : INotification` for clean event flow.
+* `IDispatcher.PublishAsync` powers events.
 
 ### 📡 Messaging
-* Kafka publisher uses `_dispatcher.PublishAsync()` for event fan-out.  
+
+* Kafka publisher uses `_dispatcher.PublishAsync()` for event fan-out.
 
 ### 🔧 Changed
-* DI extensions isolated in `Franz.Common.DependencyInjection.Extensions`.  
-* Core libs DI-free, adapters optional.  
+
+* DI extensions isolated in `Franz.Common.DependencyInjection.Extensions`.
+* Core libs DI-free, adapters optional.
 
 ---
 
 ## Version 1.3.9 – Database Stability 🐛
 
 ### 🐛 Fixed
-* Default port fallback for MariaDB, Postgres, SQL Server, Oracle.  
-* Replaced `localhost` → `127.0.0.1` for TCP consistency.  
-* Default `SslMode=None`.  
-* Masked passwords in logs.  
+
+* Default port fallback for MariaDB, Postgres, SQL Server, Oracle.
+* Replaced `localhost` → `127.0.0.1` for TCP consistency.
+* Default `SslMode=None`.
+* Masked passwords in logs.
 
 ---
 
 ## Version 1.3.10 – Scoped DbContext 🔄
 
 ### 🔧 Changed
-* Enforced DbContext resolution via DI scope.  
-* Corrected `EnsureCreated` vs `Migrate` usage.  
+
+* Enforced DbContext resolution via DI scope.
+* Corrected `EnsureCreated` vs `Migrate` usage.
 
 ---
 
 ## Version 1.3.11 – Seed Lifecycle Cleanup 🌱
 
 ### 🐛 Fixed
-* Duplicate seed issues resolved.  
+
+* Duplicate seed issues resolved.
 
 ### 🔧 Changed
-* Environment-aware defaults for migrations.  
-* Clarified seeding strategy.  
+
+* Environment-aware defaults for migrations.
+* Clarified seeding strategy.
 
 ---
 
 ## Version 1.3.12 – Observability 📖
 
 ### ✨ Added
-* `LoggingPreProcessor` & `LoggingPostProcessor`.  
-* Prefixed logs with `[Command]`, `[Query]`, `[Request]`.  
+
+* `LoggingPreProcessor` & `LoggingPostProcessor`.
+* Prefixed logs with `[Command]`, `[Query]`, `[Request]`.
 
 ---
 
 ## Version 1.3.14 – Correlation IDs 🔗
 
 ### ✨ Added
-* Correlation ID flow across requests, DB, pipelines.  
-* Support for external IDs via `X-Correlation-ID`.  
+
+* Correlation ID flow across requests, DB, pipelines.
+* Support for external IDs via `X-Correlation-ID`.
 
 ### 🔧 Changed
-* Scoped logging with Serilog + ILogger.  
-* Environment-aware logs (Dev = verbose, Prod = lean).  
+
+* Scoped logging with Serilog + ILogger.
+* Environment-aware logs (Dev = verbose, Prod = lean).
 
 ---
 
 ## Version 1.4.0 – Observability & Resilience 🚀
 
 ### ✨ Added
-* **Mediator.Polly** → Retry, CircuitBreaker, Timeout, Bulkhead.  
-* **Caching** → Memory, Distributed, Redis.  
-* **Mediator.OpenTelemetry** → Automatic spans with Franz tags.  
-* **Http.Refit** → Config-driven typed clients with Polly, correlation headers, Serilog, OTEL.  
+
+* **Mediator.Polly** → Retry, CircuitBreaker, Timeout, Bulkhead.
+* **Caching** → Memory, Distributed, Redis.
+* **Mediator.OpenTelemetry** → Automatic spans with Franz tags.
+* **Http.Refit** → Config-driven typed clients with Polly, correlation headers, Serilog, OTEL.
 
 ### 🔧 Changed
-* Unified logging model.  
-* Reduced boilerplate with bootstrappers.  
+
+* Unified logging model.
+* Reduced boilerplate with bootstrappers.
 
 ---
 
 ## Version 1.4.1 – Patch & Docs 📚
 
 ### 📚 Docs
-* Documentation refinements.  
+
+* Documentation refinements.
 
 ### 🐛 Fixed
-* Minor bootstrapper fixes.  
+
+* Minor bootstrapper fixes.
 
 ---
 
 ## Version 1.4.2 – Cleanup & Consolidation 🧹
 
 ### 🔧 Changed
-* Removed `SaveEntitiesAsync` → merged into `SaveChangesAsync`.  
-* Removed obsolete `DbContextMultiDatabase`.  
-* Business + EF packages aligned.  
+
+* Removed `SaveEntitiesAsync` → merged into `SaveChangesAsync`.
+* Removed obsolete `DbContextMultiDatabase`.
+* Business + EF packages aligned.
 
 ---
 
 ## Version 1.4.4 – Stability 🔥
 
 ### 🔧 Changed
-* Improved logging + hybrid config.  
-* Cleaner DI registration.  
+
+* Improved logging + hybrid config.
+* Cleaner DI registration.
 
 ### ✨ Added
-* Elastic APM opt-in.  
+
+* Elastic APM opt-in.
 
 ---
 
 ## Version 1.4.5 – Event Semantics 🐛
 
 ### 🐛 Fixed
-* **Business** → `AggregateRoot` enforces `INotification`.  
-* **EntityFramework** → Events dispatched via `PublishAsync`.  
-* **Mediator** → Split `SendAsync` (commands/queries) vs `PublishAsync` (events).  
-* **Messaging.Kafka** → Dispatcher uses `PublishAsync`.  
+
+* **Business** → `AggregateRoot` enforces `INotification`.
+* **EntityFramework** → Events dispatched via `PublishAsync`.
+* **Mediator** → Split `SendAsync` (commands/queries) vs `PublishAsync` (events).
+* **Messaging.Kafka** → Dispatcher uses `PublishAsync`.
 
 ---
 
 ## Version 1.5.0 – Aras Integration ✨
 
 ### ✨ Added
-* Completed **Aras integration** with simplified abstractions.  
-* Integration events → pure notifications (fan-out).  
+
+* Completed **Aras integration** with simplified abstractions.
+* Integration events → pure notifications (fan-out).
 
 ### 🔧 Changed
-* Clearer semantics between Commands, Queries, Domain Events, Integration Events.  
-* Kafka + Hosting unified on `PublishAsync`.  
+
+* Clearer semantics between Commands, Queries, Domain Events, Integration Events.
+* Kafka + Hosting unified on `PublishAsync`.
 
 ---
 
 ## Version 1.5.1 – Mapping Arrives 🚀
 
 ### ✨ Added
-* `Franz.Common.Mapping` as a Franz-native AutoMapper alternative.  
-* Profiles (`FranzMapProfile`) with `CreateMap`, `ForMember`, `Ignore`).  
-* By-name default mapping.  
-* DI support with `services.AddFranzMapping(...)`.  
 
-### 🔧 Changed
-* Ecosystem consistency → mapping without external dependencies.  
+* `Franz.Common.Mapping` as a Franz-native AutoMapper alternative.
+* Profiles (`FranzMapProfile`) with `CreateMap`, `ForMember`, `Ignore`).
+* By-name default mapping.
+* DI support with `services.AddFranzMapping(...)`.
 
 ---
 
 ## Version 1.5.2 – Reverse Mapping 🔄
 
 ### 🐛 Fixed
-* Corrected `ReverseMap()` implementation.  
-* Mapping storage simplified with string-based resolution.  
+
+* Corrected `ReverseMap()` implementation.
+* Mapping storage simplified with string-based resolution.
 
 ---
 
 ## Version 1.5.4 – 1.5.8 – Maintenance 🔧
 
 ### 🔧 Changed
-* Dependencies updated.  
-* Normalized nullability across bootstrap, messaging, Kafka.  
-* Async-safe `MessagingSender`.  
-* Cleaner `ServiceCollectionExtensions` with fail-fast guards.  
-* Consistent DDD exceptions (`NotFoundException`, `TechnicalException`).  
+
+* Dependencies updated.
+* Normalized nullability across bootstrap, messaging, Kafka.
+* Async-safe `MessagingSender`.
+* Cleaner `ServiceCollectionExtensions` with fail-fast guards.
+* Consistent DDD exceptions (`NotFoundException`, `TechnicalException`).
 
 ### 📚 Docs
-* README + docs cleanup.  
+
+* README + docs cleanup.
 
 ### 🐛 Fixed
-* Kafka consumer fail-fast on invalid payloads.  
-* Structured exception logging.  
+
+* Kafka consumer fail-fast on invalid payloads.
+* Structured exception logging.
 
 ---
 
 ## Version 1.5.9 – Mapping Improvements 🗺️
 
 ### ✨ Added
-* `AddFranzMapping` overload with assembly scanning.  
+
+* `AddFranzMapping` overload with assembly scanning.
 
 ### 🔧 Changed
-* Cleaner DI integration for mapping registration.  
+
+* Cleaner DI integration for mapping registration.
 
 ---
 
 ## Version 1.6.0 – The Consolidation Release 🏗️🔑📦
 
-Identity, Messaging, and Domain Events finally under one clean architecture.
-
-### ✨ Added
-* **Outbox & Inbox Patterns**  
-  * `IMessageStore` abstraction with `StoredMessage` DTO for persistence-agnostic outbox storage.  
-  * `IInboxStore` for idempotent message consumption.  
-  * MongoDB implementation (`MongoMessageStore`) with automatic index creation.  
-  * Retry/DLQ handling via `MoveToDeadLetterAsync`.  
-
-* **Dispatcher Enhancements**  
-  * Unified dispatcher for Commands, Queries, Domain Events, and Integration Events.  
-  * Overloads for `PublishEventAsync(IEvent)` with runtime type dispatch.  
-  * End-to-end correlation tracking flows through dispatcher + pipelines.  
-  * Logging & Validation pipelines flow seamlessly for all event types.  
-
-* **Domain Event Contracts**  
-  * Introduced `IDomainEvent` as a first-class contract inheriting from `IEvent`.  
-  * Aggregates now strictly raise `IDomainEvent`s.  
-  * Entities no longer dispatch events.  
-  * Clear split: **Domain Events** (inside aggregates) vs **Integration Events** (messaging/db boundary).  
-
-* **Identity & SSO**  
-  * `FranzIdentityContext` (UserId, Email, FullName, Roles, TenantId, DomainId).  
-  * `IIdentityContextAccessor` & `FakeIdentityContextAccessor` for testing.  
-  * `HttpContextIdentityContextAccessor` (ASP.NET Core).  
-  * Unified claims normalization across WS-Fed, SAML2, OIDC, and Keycloak.  
-  * One-line bootstrap: `AddFranzSsoIdentity()`.  
-
-* **Testing Infrastructure**  
-  * In-memory aggregate repository for fast integration tests.  
-  * In-memory processed event sink with correlation-aware matching.  
-  * Out-of-the-box sanity checks to validate handler resolution.  
-
-* **Messaging Hosting**  
-  * Async `IListener` interface for Kafka & Outbox listeners.  
-  * `KafkaHostedService` to run Kafka listeners as hosted services.  
-  * `OutboxHostedService` to publish Mongo outbox messages into Kafka.  
-  * Inbox checks in listeners for idempotent dispatch.  
-
-### 🔧 Changed
-* **Repositories**  
-  * Aggregate repositories now persist + replay domain events consistently.  
-  * Entities no longer raise/persist events.  
-  * Fixed DI registration for `AggregateRepository` with domain events.  
-
-* **Pipelines**  
-  * Clean separation between **Notifications** and **Events**.  
-  * Logging & validation pipelines fully organized and applied consistently.  
-
-* **Messaging**  
-  * Transport-level `Message` decoupled from persistence-level `StoredMessage`.  
-  * Standardized serialization across Kafka and Outbox.  
-  * Unified deserialization pipeline for listeners.  
-
-* **Mediator Concepts**  
-  * Clarified event semantics:  
-    * Domain = `IDomainEvent` (facts inside aggregates).  
-    * Integration = `IIntegrationEvent` (messaging, db, external).  
-  * Aggregates must always register `Apply` handlers for their domain events.  
-
-### 🐛 Fixed
-* DI mismatches causing event handlers not to resolve in tests.  
-* Repository save loops failing to publish uncommitted domain events.  
-* Serialization mismatches between Kafka and Outbox replays.  
-* Missing correlation propagation in consumer pipelines.  
-* Startup issues from multiple identity provider registrations.  
-* Claims normalization inconsistencies across SSO providers.  
-* Multiple handler registrations (duplicate scans) cleaned up.  
-
-### 📚 Docs
-* Updated README to cover:  
-  * Outbox/Inbox usage and retry/DLQ behavior.  
-  * DI setup for Mongo Outbox, Kafka listeners, and SSO identity providers.  
-  * Event semantics (Domain vs Integration).  
-  * Monitoring hooks and structured logging conventions (✅ success, ⚠️ retry, 🔥 DLQ).  
+*(see previous full details — Outbox/Inbox, Identity, Domain Events, etc.)*
 
 ---
 
 ## Version 1.6.1 – Polyglot Persistence & Messaging 🌍
 
 ### ✨ Added
-* **Polyglot Persistence**  
-  * Extended `AddDatabase<TDbContext>` to support **MongoDB** and **Azure Cosmos DB** alongside relational providers.  
-  * New `AddDatabases<TDbContext>` for **multi-provider mode** → configure both Relational + Document stores in the same service.  
-  * Config-driven selection via `Databases:Relational` + `Databases:Document` sections.  
 
-* **Messaging**  
-  * `AddMessageStore` bootstrapper extended to support **MongoDB** and **CosmosDB** outbox/dead-letter persistence.  
-  * EF stores simplified to just use **generic repositories** (no extra plumbing).  
-  * Unified abstraction with `IMessageStore` for Mongo + Cosmos.  
-
-* **Cosmos Integration**  
-  * Added `CosmosDBMessageStore` implementation with atomic updates using `PatchItemAsync`.  
-  * Outbox and DeadLetter containers auto-created at startup.  
+* Extended `AddDatabase<TDbContext>` → supports **MongoDB** and **Azure Cosmos DB**.
+* New `AddDatabases<TDbContext>` for **multi-provider mode** (Relational + Document).
+* Config-driven selection via `Databases:Relational` + `Databases:Document`.
+* `AddMessageStore` → supports **MongoDB** and **CosmosDB** outbox/dead-letter.
+* Added `CosmosDBMessageStore` implementation with atomic updates.
 
 ### 🔧 Changed
-* **Bootstrappers Philosophy**  
-  * APIs should depend on **bootstrappers only** (not base projects).  
-  * Clear separation: base projects = low-level infra, bootstrappers = developer entrypoints.  
-  * Example: `AddDatabase`, `AddMessageStore`, `BootstrapCommonServices` → the only things referenced in services.  
 
-* **Taglines & Conventions**  
-  * Adopted Franz philosophy for docs and templates:  
-    - *“Your architecture, your way — under Franz conventions (we still make the rules).”*  
+* Bootstrappers philosophy → APIs depend only on bootstrappers, not base projects.
+* Clear split: base projects = infra, bootstrappers = developer entrypoints.
 
 ### 📚 Docs
-* Updated `Franz.Common.Http.EntityFramework` README → added NoSQL support examples.  
-* Updated `Franz.Common.Messaging.EntityFramework` README → clarified EF vs NoSQL messaging stores.  
-* Refined `Franz.Template` with tagline:  
-  - *“Surf the architecture microservice setup with Franz.Template — clean, done right, and properly strapped on. But one thing: we don’t like boonies.”*  
+
+* Updated `Franz.Common.Http.EntityFramework` and `Franz.Common.Messaging.EntityFramework` with NoSQL examples.
+* Refined `Franz.Template` with new tagline.
 
 ---
-## Franz.Framework v1.6.2
 
-* ✨ Added AddFranzResilience(IConfiguration) — single entrypoint to configure Retry, Timeout, Bulkhead, CircuitBreaker policies from appsettings.json.
+## Version 1.6.2 – Resilience & Null Safety 🛡️
 
-* ♻️ Internal cleanup: unified PollyPolicyRegistryOptions + Mediator pipelines under one bootstrapper.
+### ✨ Added
 
-* 🛡️ Config-driven resilience now out-of-the-box: no more manual policy registration.
+* `AddFranzResilience(IConfiguration)` → single entrypoint for Retry, Timeout, Bulkhead, CircuitBreaker.
 
-* ✅ Requires Microsoft.Extensions.Configuration.Binder (for GetValue<T>() binding).
+### 🔧 Changed
 
-* 📦 Backward-compatible: existing AddFranzPollyRetry, AddFranzPollyTimeout, etc. still available if you need fine-grained control.
-✅ Full Nullability Compliance
+* Unified `PollyPolicyRegistryOptions` + Mediator pipelines.
+* Config-driven resilience now fully bootstrapped.
+* Full nullability compliance (`<Nullable>enable + <TreatWarningsAsErrors>true>`).
+* Generic constraints realigned (`IAggregateRootRepository<T, TEvent>` enforces `IDomainEvent`).
+* Messaging & serialization hardened (safe deserialization, async-safe dispatch).
 
-Refactored all core components (FranzMapper, AggregateRepository, EventMigration, IdentityContextAccessor, etc.) to be 100 % analyzer-clean under <Nullable>enable + <TreatWarningsAsErrors>true>.
+### ✨ Messaging
 
-Explicit null checks and domain-safe TechnicalException handling added across all mapping and repository layers.
+* Improved Kafka listeners (async-safe).
+* RabbitMQ integration enhanced (TLS 1.3 only, structured logging, correlation propagation).
 
-🧩 Generic Constraint Realignment
+### 🧪 Tests
 
-IAggregateRootRepository<TAggregateRoot, TEvent> now enforces correct IDomainEvent typing.
+* Full integration tests validated under null-safety.
 
-All in-memory and persistence repositories updated for stricter type safety.
+---
 
-Domain aggregates explicitly implement IAggregateRoot<IDomainEvent>.
+## Version 1.6.3 – Multi-Environment & Cosmos Governance 🌐🗄️
 
-⚙️ Messaging & Serialization Improvements
+### ✨ Added
 
-Hardened JSON serialization (safe deserialization guards + explicit null handling).
+* **Environment-Aware Bootstrapper**
 
-Corrected StoredMessage ↔ Message mappings to respect object? semantics.
+  * Detects and validates `appsettings.{Environment}.json`.
+  * Enforces correct configuration per environment (Dev, Test, Prod).
+* **AzureCosmosStore**
 
-Added async-safe event dispatch for Kafka listeners (Func<object, MessageEventArgs, Task>).
+  * Introduced as a generic base for Cosmos DB persistence.
+  * `AddCosmosDatabase<TStore>` extension for clean DI registration.
+* **Governance Enforcement**
 
-🐇 RabbitMQ Integration Enhancements
+  * No hardcoded connection strings accepted.
+  * Fail-fast validation for provider/context mismatches.
+* **Multi-Database Validation**
 
-Introduced unified listener/producer pipeline compatible with 1.6.x mediator stack.
+  * Unified checks across EF, Mongo, Cosmos.
+  * Clear runtime exceptions for invalid setups.
 
-Improved connection resilience and TLS-enforced channel setup.
+### 🔧 Changed
 
-Added structured logging and correlation propagation through message headers.
+* Improved multi-database orchestration → cleaner separation of relational vs NoSQL contexts.
+* More explicit runtime errors for invalid or missing configs.
 
-🔐 TLS & Security Hardening
-
-Default transport policy upgraded to TLS 1.3 only.
-
-Disabled legacy protocol negotiation and enforced certificate validation via SslOptions.
-
-Added optional runtime enforcement:
-
-AppContext.SetSwitch("System.Net.Security.AllowLegacyTLSVersions", false);
-System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls13;
-
-
-🧪 Integration Tests
-
-All event sourcing and mediator integration tests pass successfully.
-
-Verified repository rehydration, dispatch, and mapping under full null-safe conditions.
+ 

@@ -27,7 +27,7 @@
     <RepositoryBranch>main</RepositoryBranch>
     <RepositoryCommit>$(SourceRevisionId)</RepositoryCommit>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>Franz;Common;Utilities;Mediator;Kafka;Microservices</PackageTags>
+    <PackageTags>Franz;Common;Utilities;Mediator;Kafka;RabbitMQ;Eventful;Microservices</PackageTags>
     <PackageReadmeFile>readme.md</PackageReadmeFile>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
