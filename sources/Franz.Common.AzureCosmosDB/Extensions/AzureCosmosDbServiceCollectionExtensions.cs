@@ -46,6 +46,43 @@ public static class AzureCosmosDbServiceCollectionExtensions
 
     return services;
   }
+  /// <summary>
+  /// Registers a typed Cosmos Store derived from AzureCosmosStore.
+  /// </summary>
+  public static IServiceCollection AddCosmosStore<TCosmosStore>(
+      this IServiceCollection services,
+      IConfiguration configuration)
+      where TCosmosStore : AzureCosmosStore
+  {
+    var section = configuration.GetSection("CosmosDb");
+    var connectionString = section.GetValue<string>("ConnectionString");
+    var databaseName = section.GetValue<string>("DatabaseName");
+
+    if (string.IsNullOrWhiteSpace(connectionString))
+      throw new InvalidOperationException("Missing 'CosmosDb:ConnectionString'.");
+    if (string.IsNullOrWhiteSpace(databaseName))
+      throw new InvalidOperationException("Missing 'CosmosDb:DatabaseName'.");
+
+    // CosmosClient is already singleton
+    services.AddSingleton<CosmosClient>(_ => new CosmosClient(connectionString));
+
+    // Database is scoped
+    services.AddScoped<Database>(sp =>
+    {
+      var client = sp.GetRequiredService<CosmosClient>();
+      return client.GetDatabase(databaseName);
+    });
+
+    // Register the concrete store
+    services.AddScoped<TCosmosStore>(sp =>
+    {
+      var client = sp.GetRequiredService<CosmosClient>();
+      var database = sp.GetRequiredService<Database>();
+      return (TCosmosStore)Activator.CreateInstance(typeof(TCosmosStore), client, database)!;
+    });
+
+    return services;
+  }
 
   /// <summary>
   /// Registers Cosmos-based message store (Outbox & DeadLetter).

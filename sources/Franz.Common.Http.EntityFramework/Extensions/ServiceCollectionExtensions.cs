@@ -11,51 +11,36 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Franz.Common.AzureCosmosDB.Extensions;
+using Franz.Common.AzureCosmosDB;
 
 namespace Franz.Common.Http.EntityFramework.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-  public static IServiceCollection AddDatabase<TDbContext>(
-      this IServiceCollection services,
-      IHostEnvironment hostEnvironment,
-      IConfiguration configuration)
-      where TDbContext : DbContextBase
+  public static IServiceCollection AddRelationalDatabase<TDbContext>(
+     this IServiceCollection services,
+     IHostEnvironment env,
+     IConfiguration config)
+     where TDbContext : DbContextBase
   {
-    // Always wire the transaction filter by default
-    services.AddDatabaseTransactionPerHttpCall();
-
-    // Pick database provider
-    var provider = configuration["Database:Provider"]?.ToLowerInvariant();
+    var provider = config["Database:Provider"]?.ToLowerInvariant()
+        ?? throw new InvalidOperationException("Missing relational provider.");
 
     services = provider switch
     {
-      // Relational EF providers
-      "mariadb" => services.AddMariaDatabase<TDbContext>(configuration),
-      "oracle" => services.AddOracleDatabase<TDbContext>(configuration),
-      "postgres" => services.AddPostgresDatabase<TDbContext>(configuration),
-      "sqlserver" => services.AddSqlServerDatabase<TDbContext>(configuration),
-
-      // NoSQL providers
-      "mongo" => services.AddMongoDbContext<MongoDbContext>(configuration),
-      "cosmos" => services.AddCosmosDatabase(configuration),
-
-      _ => throw new InvalidOperationException(
-              $"Unsupported DB provider '{provider}'. " +
-              "Valid: MariaDb, Oracle, Postgres, SqlServer, Mongo, Cosmos.")
+      "mariadb" => services.AddMariaDatabase<TDbContext>(config),
+      "oracle" => services.AddOracleDatabase<TDbContext>(config),
+      "postgres" => services.AddPostgresDatabase<TDbContext>(config),
+      "sqlserver" => services.AddSqlServerDatabase<TDbContext>(config),
+      _ => throw new InvalidOperationException($"Unsupported relational provider '{provider}'.")
     };
 
-    // Only EF-based providers support DbContext behaviors
-    if (IsRelational(provider))
-    {
-      services
-          .AddDatabaseTransactionPerHttpCall()
-          .AddGenericRepositories<TDbContext>()
-          .AddBehaviors();
-    }
-
-    return services;
+    return services
+        .AddDatabaseTransactionPerHttpCall()
+        .AddGenericRepositories<TDbContext>()
+        .AddBehaviors();
   }
+
 
   public static IServiceCollection AddDatabaseTransactionPerHttpCall(this IServiceCollection services)
   {
@@ -70,53 +55,33 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  private static bool IsRelational(string? provider)
-  {
-    return provider is "mariadb" or "oracle" or "postgres" or "sqlserver";
-  }
-
-  public static IServiceCollection AddDatabases<TDbContext>(
+  public static IServiceCollection AddMongoDatabase<TMongoContext>(
     this IServiceCollection services,
-    IHostEnvironment env,
     IConfiguration config)
-    where TDbContext : DbContextBase
+    where TMongoContext : MongoDbContext
   {
-    // Relational
-    var relationalSection = config.GetSection("Databases:Relational");
-    var relationalProvider = relationalSection.GetValue<string>("Provider")?.ToLowerInvariant();
+    var provider = config["Database:Provider"]?.ToLowerInvariant();
+    if (provider != "mongo")
+      throw new InvalidOperationException("MongoDbContext requires provider 'mongo'.");
 
-    if (!string.IsNullOrWhiteSpace(relationalProvider))
-    {
-      services = relationalProvider switch
-      {
-        "mariadb" => services.AddMariaDatabase<TDbContext>(config),
-        "oracle" => services.AddOracleDatabase<TDbContext>(config),
-        "postgres" => services.AddPostgresDatabase<TDbContext>(config),
-        "sqlserver" => services.AddSqlServerDatabase<TDbContext>(config),
-        _ => throw new InvalidOperationException($"Unsupported relational provider '{relationalProvider}'")
-      };
-
-      services
-          .AddDatabaseTransactionPerHttpCall()
-          .AddGenericRepositories<TDbContext>()
-          .AddBehaviors();
-    }
-
-    // Document (NoSQL)
-    var documentSection = config.GetSection("Databases:Document");
-    var documentProvider = documentSection.GetValue<string>("Provider")?.ToLowerInvariant();
-
-    if (!string.IsNullOrWhiteSpace(documentProvider))
-    {
-      services = documentProvider switch
-      {
-        "mongo" => services.AddMongoDbContext<MongoDbContext>(config),
-        "cosmos" => services.AddCosmosDatabase(config),
-        _ => throw new InvalidOperationException($"Unsupported document provider '{documentProvider}'")
-      };
-    }
-
-    return services;
+    return services.AddMongoDbContext<TMongoContext>(config);
   }
+
+  public static IServiceCollection AddCosmosDatabase<TCosmosContext>(
+    this IServiceCollection services,
+    IConfiguration config)
+    where TCosmosContext : AzureCosmosStore
+  {
+    var provider = config["Database:Provider"]?.ToLowerInvariant();
+    if (provider != "cosmos")
+      throw new InvalidOperationException("AzureCosmosStore requires provider 'cosmos'.");
+
+    return services.AddCosmosDatabase(config);
+  }
+
+
+
+
+  
 
 }

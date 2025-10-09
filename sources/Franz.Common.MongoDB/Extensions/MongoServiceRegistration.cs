@@ -9,7 +9,7 @@ namespace Franz.Common.MongoDB.Extensions;
 /// <summary>
 /// Provides extension methods for registering MongoDB contexts in the DI container.
 /// </summary>
-public static class ServiceCollectionExtensions
+public static class MongoServiceCollectionExtensions
 {
   /// <summary>
   /// Registers a MongoDB context of type <typeparamref name="TContext"/> in the service collection.
