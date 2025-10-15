@@ -1,180 +1,182 @@
 ﻿using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Polly.Options;
 using Franz.Common.Mediator.Polly.Pipelines;
+using Franz.Common.Mediator.Results;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Polly;
 using Polly.Registry;
+using Polly.Timeout;
+using System;
+using System.Net.Http;
 
 namespace Franz.Common.Mediator.Polly
 {
+  /// <summary>
+  /// Unified Franz Polly integration.
+  /// Provides Mediator + HTTP resilience policies with a single registry and pipeline registration.
+  /// </summary>
   public static class FranzPollyServiceCollectionExtensions
   {
-    // ------------------------
-    // Core Policy Registry
-    // ------------------------
-    public static IServiceCollection AddFranzPollyPolicies(
-        this IServiceCollection services,
-        Action<PollyPolicyRegistryOptions> configure)
+    public static IServiceCollection AddFranzResilience(this IServiceCollection services, IConfiguration configuration)
     {
-      var options = new PollyPolicyRegistryOptions();
-      configure(options);
+      var resilience = configuration.GetSection("Resilience");
+      if (!resilience.Exists())
+        return services;
 
-      services.AddSingleton<IReadOnlyPolicyRegistry<string>>(sp =>
+      var registry = new PolicyRegistry();
+
+      AddMediatorPolicies(services, registry, resilience);
+      AddHttpPolicies(registry, resilience);
+
+      services.AddSingleton<IReadOnlyPolicyRegistry<string>>(registry);
+
+      Console.WriteLine("🧭 Franz.PolicyRegistry initialized with:");
+      foreach (var kvp in registry)
+        Console.WriteLine($"   {kvp.Key}");
+
+      return services;
+    }
+
+    // ==========================================================
+    // MEDIATOR POLICIES (Untyped IAsyncPolicy)
+    // ==========================================================
+    private static void AddMediatorPolicies(IServiceCollection services, PolicyRegistry registry, IConfigurationSection section)
+    {
+      // --- Retry ---
+      var retry = section.GetSection("RetryPolicy");
+      if (retry.Exists() && retry.GetValue<bool>("Enabled"))
       {
-        var registry = new PolicyRegistry();
-        foreach (var policy in options.Policies)
-        {
-          registry.Add(policy.Key, policy.Value);
-        }
-        return registry;
-      });
+        var count = retry.GetValue<int>("RetryCount", 3);
+        var intervalMs = retry.GetValue<int>("RetryIntervalMilliseconds", 200);
 
-      return services;
-    }
+        IAsyncPolicy mediatorRetry = Policy
+          .Handle<Exception>()
+          .WaitAndRetryAsync(count, _ => TimeSpan.FromMilliseconds(intervalMs));
 
-    // ------------------------
-    // Mediator Pipelines
-    // ------------------------
-    public static IServiceCollection AddFranzPollyRetry(
-        this IServiceCollection services,
-        string policyName)
-    {
-      services.Configure<PollyPipelineOptions<PollyRetryPipelineOptions>>(o => o.PolicyName = policyName);
-      services.AddTransient(typeof(IPipeline<,>), typeof(PollyRetryPipeline<,>));
-      return services;
-    }
+        registry.Add("mediator:RetryPolicy", mediatorRetry);
 
-    public static IServiceCollection AddFranzPollyCircuitBreaker(
-        this IServiceCollection services,
-        string policyName)
-    {
-      services.Configure<PollyPipelineOptions<PollyCircuitBreakerPipelineOptions>>(o => o.PolicyName = policyName);
-      services.AddTransient(typeof(IPipeline<,>), typeof(PollyCircuitBreakerPipeline<,>));
-      return services;
-    }
+        services.Configure<PollyRetryPipelineOptions>(o => o.PolicyName = "mediator:RetryPolicy");
+        services.AddTransient(typeof(IPipeline<,>), typeof(PollyRetryPipeline<,>));
+      }
 
-    public static IServiceCollection AddFranzPollyTimeout(
-        this IServiceCollection services,
-        string policyName)
-    {
-      services.Configure<PollyPipelineOptions<PollyTimeoutPipelineOptions>>(o => o.PolicyName = policyName);
-      services.AddTransient(typeof(IPipeline<,>), typeof(PollyTimeoutPipeline<,>));
-      return services;
-    }
-
-    public static IServiceCollection AddFranzPollyAdvancedCircuitBreaker(
-        this IServiceCollection services,
-        string policyName)
-    {
-      services.Configure<PollyPipelineOptions<PollyAdvancedCircuitBreakerOptions>>(o => o.PolicyName = policyName);
-      services.AddTransient(typeof(IPipeline<,>), typeof(PollyAdvancedCircuitBreakerPipeline<,>));
-      return services;
-    }
-
-    public static IServiceCollection AddFranzPollyBulkhead(
-        this IServiceCollection services,
-        string policyName)
-    {
-      services.Configure<PollyPipelineOptions<PollyBulkheadPipelineOptions>>(o => o.PolicyName = policyName);
-      services.AddTransient(typeof(IPipeline<,>), typeof(PollyBulkheadPipeline<,>));
-      return services;
-    }
-
-    // ------------------------
-    // Unified Config-Driven Entry Point
-    // ------------------------
-    public static IServiceCollection AddFranzResilience(
-        this IServiceCollection services,
-        IConfiguration configuration)
-    {
-      var section = configuration.GetSection("Resilience");
-
-      services.AddFranzPollyPolicies(options =>
+      // --- Circuit Breaker ---
+      var breaker = section.GetSection("CircuitBreaker");
+      if (breaker.Exists() && breaker.GetValue<bool>("Enabled"))
       {
-        if (section.GetSection("RetryPolicy").GetValue<bool>("Enabled"))
-        {
-          var count = section.GetSection("RetryPolicy").GetValue<int>("RetryCount");
-          var interval = section.GetSection("RetryPolicy").GetValue<int>("RetryIntervalMilliseconds");
+        var threshold = breaker.GetValue<double>("FailureThreshold", 0.5);
+        var minThroughput = breaker.GetValue<int>("MinimumThroughput", 10);
+        var duration = breaker.GetValue<int>("DurationOfBreakSeconds", 30);
 
-          options.AddRetry("RetryPolicy", count, interval);
-          services.AddFranzPollyRetry("RetryPolicy");
-        }
+        IAsyncPolicy mediatorBreaker = Policy
+          .Handle<Exception>()
+          .AdvancedCircuitBreakerAsync(
+              failureThreshold: threshold,
+              samplingDuration: TimeSpan.FromSeconds(30),
+              minimumThroughput: minThroughput,
+              durationOfBreak: TimeSpan.FromSeconds(duration));
 
-        if (section.GetSection("CircuitBreaker").GetValue<bool>("Enabled"))
-        {
-          var threshold = section.GetSection("CircuitBreaker").GetValue<double>("FailureThreshold");
-          var throughput = section.GetSection("CircuitBreaker").GetValue<int>("MinimumThroughput");
-          var duration = section.GetSection("CircuitBreaker").GetValue<int>("DurationOfBreakSeconds");
+        registry.Add("mediator:CircuitBreaker", mediatorBreaker);
 
-          options.AddCircuitBreaker("CircuitBreaker", threshold, throughput, duration);
-          services.AddFranzPollyCircuitBreaker("CircuitBreaker");
-        }
+        services.Configure<PollyCircuitBreakerPipelineOptions>(o => o.PolicyName = "mediator:CircuitBreaker");
+        services.AddTransient(typeof(IPipeline<,>), typeof(PollyCircuitBreakerPipeline<,>));
+      }
 
-        if (section.GetSection("TimeoutPolicy").GetValue<bool>("Enabled"))
-        {
-          var timeout = section.GetSection("TimeoutPolicy").GetValue<int>("TimeoutSeconds");
+      // --- Timeout ---
+      var timeout = section.GetSection("TimeoutPolicy");
+      if (timeout.Exists() && timeout.GetValue<bool>("Enabled"))
+      {
+        var seconds = timeout.GetValue<int>("TimeoutSeconds", 5);
 
-          options.AddTimeout("TimeoutPolicy", timeout);
-          services.AddFranzPollyTimeout("TimeoutPolicy");
-        }
+        IAsyncPolicy mediatorTimeout = Policy
+          .TimeoutAsync(TimeSpan.FromSeconds(seconds), TimeoutStrategy.Optimistic);
 
-        if (section.GetSection("BulkheadPolicy").GetValue<bool>("Enabled"))
-        {
-          var maxParallel = section.GetSection("BulkheadPolicy").GetValue<int>("MaxParallelization");
-          var maxQueue = section.GetSection("BulkheadPolicy").GetValue<int>("MaxQueueSize");
+        registry.Add("mediator:TimeoutPolicy", mediatorTimeout);
 
-          options.AddBulkhead("BulkheadPolicy", maxParallel, maxQueue);
-          services.AddFranzPollyBulkhead("BulkheadPolicy");
-        }
-      });
+        services.Configure<PollyTimeoutPipelineOptions>(o => o.PolicyName = "mediator:TimeoutPolicy");
+        services.AddTransient(typeof(IPipeline<,>), typeof(PollyTimeoutPipeline<,>));
+      }
 
-      return services;
-    }
-  }
+      // --- Bulkhead ---
+      var bulkhead = section.GetSection("BulkheadPolicy");
+      if (bulkhead.Exists() && bulkhead.GetValue<bool>("Enabled"))
+      {
+        var maxParallel = bulkhead.GetValue<int>("MaxParallelization", 10);
+        var maxQueue = bulkhead.GetValue<int>("MaxQueueSize", 20);
 
-  // ------------------------
-  // Options Wrappers
-  // ------------------------
-  public class PollyPipelineOptions<TOptions>
-  {
-    public string PolicyName { get; set; } = string.Empty;
-  }
+        IAsyncPolicy mediatorBulkhead = Policy
+          .BulkheadAsync(maxParallel, maxQueue);
 
-  // ------------------------
-  // Policy Registry Builder
-  // ------------------------
-  public static class PollyPolicyRegistryOptionsExtensions
-  {
-    public static void AddRetry(this PollyPolicyRegistryOptions options, string name, int retryCount, int intervalMs)
-    {
-      var policy = Policy<HttpResponseMessage>.Handle<Exception>()
-        .WaitAndRetryAsync(retryCount, _ => TimeSpan.FromMilliseconds(intervalMs));
-      options.Policies.Add(name, policy);
+        registry.Add("mediator:BulkheadPolicy", mediatorBulkhead);
+
+        services.Configure<PollyBulkheadPipelineOptions>(o => o.PolicyName = "mediator:BulkheadPolicy");
+        services.AddTransient(typeof(IPipeline<,>), typeof(PollyBulkheadPipeline<,>));
+      }
     }
 
-    public static void AddCircuitBreaker(this PollyPolicyRegistryOptions options, string name,
-      double failureThreshold, int minimumThroughput, int durationSeconds)
+    // ==========================================================
+    // HTTP POLICIES (Typed for HttpResponseMessage)
+    // ==========================================================
+    private static void AddHttpPolicies(PolicyRegistry registry, IConfigurationSection section)
     {
-      var policy = Policy<HttpResponseMessage>.Handle<Exception>()
-        .AdvancedCircuitBreakerAsync(
-          failureThreshold: failureThreshold,
-          samplingDuration: TimeSpan.FromSeconds(30),
-          minimumThroughput: minimumThroughput,
-          durationOfBreak: TimeSpan.FromSeconds(durationSeconds));
-      options.Policies.Add(name, policy);
-    }
+      // --- Retry ---
+      var retry = section.GetSection("RetryPolicy");
+      if (retry.Exists() && retry.GetValue<bool>("Enabled"))
+      {
+        var count = retry.GetValue<int>("RetryCount", 3);
+        var intervalMs = retry.GetValue<int>("RetryIntervalMilliseconds", 200);
 
-    public static void AddTimeout(this PollyPolicyRegistryOptions options, string name, int timeoutSeconds)
-    {
-      var policy = Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(timeoutSeconds));
-      options.Policies.Add(name, policy);
-    }
+        var policy = Policy<HttpResponseMessage>
+          .Handle<HttpRequestException>()
+          .OrResult(r => !r.IsSuccessStatusCode)
+          .WaitAndRetryAsync(count, _ => TimeSpan.FromMilliseconds(intervalMs));
 
-    public static void AddBulkhead(this PollyPolicyRegistryOptions options, string name, int maxParallelization, int maxQueueSize)
-    {
-      var policy = Policy.BulkheadAsync<HttpResponseMessage>(maxParallelization, maxQueueSize);
-      options.Policies.Add(name, policy);
+        registry.Add("http:RetryPolicy", policy);
+      }
+
+      // --- Circuit Breaker ---
+      var breaker = section.GetSection("CircuitBreaker");
+      if (breaker.Exists() && breaker.GetValue<bool>("Enabled"))
+      {
+        var threshold = breaker.GetValue<double>("FailureThreshold", 0.5);
+        var minThroughput = breaker.GetValue<int>("MinimumThroughput", 10);
+        var duration = breaker.GetValue<int>("DurationOfBreakSeconds", 30);
+
+        var policy = Policy<HttpResponseMessage>
+          .Handle<HttpRequestException>()
+          .OrResult(r => !r.IsSuccessStatusCode)
+          .AdvancedCircuitBreakerAsync(
+            threshold,
+            TimeSpan.FromSeconds(30),
+            minThroughput,
+            TimeSpan.FromSeconds(duration));
+
+        registry.Add("http:CircuitBreaker", policy);
+      }
+
+      // --- Timeout ---
+      var timeout = section.GetSection("TimeoutPolicy");
+      if (timeout.Exists() && timeout.GetValue<bool>("Enabled"))
+      {
+        var seconds = timeout.GetValue<int>("TimeoutSeconds", 5);
+
+        var policy = Policy.TimeoutAsync<HttpResponseMessage>(
+          TimeSpan.FromSeconds(seconds),
+          TimeoutStrategy.Optimistic);
+
+        registry.Add("http:TimeoutPolicy", policy);
+      }
+
+      // --- Bulkhead ---
+      var bulkhead = section.GetSection("BulkheadPolicy");
+      if (bulkhead.Exists() && bulkhead.GetValue<bool>("Enabled"))
+      {
+        var maxParallel = bulkhead.GetValue<int>("MaxParallelization", 10);
+        var maxQueue = bulkhead.GetValue<int>("MaxQueueSize", 20);
+
+        var policy = Policy.BulkheadAsync<HttpResponseMessage>(maxParallel, maxQueue);
+        registry.Add("http:BulkheadPolicy", policy);
+      }
     }
   }
 }
