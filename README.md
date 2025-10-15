@@ -125,86 +125,96 @@ Licensed under the **MIT License**.
 
 ---
 
-📌 Changelog
 
-Latest Version: 1.6.3
+## 📌 **Changelog**
 
-🚀 Version 1.6.3 – Multi-Environment & Cosmos Governance 🌐🗄️
+**Latest Version:** 1.6.14
 
-✨ Added
+---
 
-* Environment-Aware Bootstrapper → auto-detects appsettings.{Environment}.json, validates configuration per environment (Dev/Test/Prod).
+🚀 **Version 1.6.4 – 1.6.14 Chaos Benchmark Release 🌀🔥**
 
-* AzureCosmosStore base → generic Cosmos DB persistence context, mirrors EF + Mongo.
+### ✨ Added
 
-* AddCosmosDatabase<TStore> DI bootstrapper for clean Cosmos integration.
+* **Unified Franz Polly Resilience Integration**
 
-* Governance Enforcement → no hardcoded connection strings, fail-fast provider/context validation.
+  * `AddFranzResilience()` → single entrypoint to register Retry, CircuitBreaker, Timeout, and Bulkhead policies.
+  * Shared `PolicyRegistry` for both Mediator and HTTP pipelines.
+  * Full observability via correlation ID and resilience observers.
 
-* Multi-Database Validation → unified checks for EF, Mongo, Cosmos.
+* **Chaos Simulation Mode (Development Only)**
 
-🔧 Changed
+  * JSON-driven chaos testing for resilience validation.
+  * Simulated failures:
 
-* Cleaner orchestration for relational vs NoSQL contexts.
+    * `🍌 Banana Republic Exception: simulated DB meltdown!`
+    * `☕ Just a friendly reminder to take a break!`
+  * Ensures recovery logic and retry mechanisms function under controlled failure.
 
-* More explicit runtime errors for invalid/missing configs.
+* **Advanced Structured Logging**
 
-🚀 Version 1.6.2 – Resilience & Null Safety 🛡️
+  * Injects `FranzRequest`, `FranzCorrelationId`, `FranzPolicy`, and `FranzPipeline` into every log event.
+  * Fully compatible with Elastic, Seq, and Application Insights.
+  * Uniform telemetry across all pipelines.
 
-✨ Added
+---
 
-* AddFranzResilience(IConfiguration) → one-line bootstrapper for Retry, Timeout, Bulkhead, CircuitBreaker policies.
+### 🧩 Fixed
 
-🔧 Changed
+* Resolved `InvalidCastException` for `IAsyncPolicy<TResponse>` by standardizing typed policy registration.
+* Stabilized sequential policy chaining (Retry → CircuitBreaker → Timeout → Bulkhead).
+* Ensured observer notifications always propagate duration, circuit, and timeout data.
 
-* Unified PollyPolicyRegistryOptions + Mediator pipelines.
+---
 
-* Config-driven resilience baked in by default.
+### 🧠 Improved
 
-* Full nullability compliance (<Nullable>enable + <TreatWarningsAsErrors>true>).
+* Registry logging now enumerates every active policy at startup.
+* Cleaner error context for CircuitBreaker and Timeout events.
+* Chaos simulation and retry tests fully driven by `appsettings.{Environment}.json`.
 
-* Strict generic constraints (IAggregateRootRepository<T, TEvent> → enforces IDomainEvent).
+---
 
-* Hardened serialization and async-safe Kafka dispatch.
+### 🧭 Configuration Example
 
-* RabbitMQ pipeline upgraded with TLS 1.3 enforcement and structured logging.
+```json
+"Resilience": {
+  "RetryPolicy": { "Enabled": true, "RetryCount": 3, "RetryIntervalMilliseconds": 200 },
+  "CircuitBreaker": { "Enabled": true, "FailureThreshold": 0.5, "DurationOfBreakSeconds": 30 },
+  "TimeoutPolicy": { "Enabled": true, "TimeoutSeconds": 5 },
+  "BulkheadPolicy": { "Enabled": true, "MaxParallelization": 10, "MaxQueueSize": 20 },
+  "ChaosMode": { "Enabled": true, "FriendlyBreaks": true, "BananaFailures": true }
+}
+```
 
-🧪 Tests
+---
 
-* Full mediator + repository integration tests validated.
+> 🧭 Franz 1.6.14 marks the full mastery of resilience orchestration —
+> deterministic, chaos-tested, and operationally self-aware.
+> Every failure is intentional, observable, and recorded with beauty.
 
-🚀 Version 1.6.1 – Polyglot Database & Messaging Bootstrap 🌍
+---
 
-✨ Added
+🚀 **Version 1.6.3 – Multi-Environment & Cosmos Governance 🌐🗄️**
 
-* Polyglot Persistence → AddDatabase<TDbContext> supports Relational + MongoDB + Cosmos DB.
+### ✨ Added
 
-* AddDatabases<TDbContext> for multi-provider mode.
+* **Environment-Aware Bootstrapper** → auto-detects `appsettings.{Environment}.json`, validates per-environment configuration.
+* **AzureCosmosStore Base** → generic Cosmos DB persistence context mirroring EF + Mongo.
+* `AddCosmosDatabase<TStore>` → clean Cosmos DI bootstrapper.
+* **Governance Enforcement** → no hardcoded connection strings, fail-fast provider/context validation.
+* **Multi-Database Validation** → unified checks for EF, Mongo, Cosmos.
 
-* Config-driven DB bootstrapping (Databases:Relational, Databases:Document).
+### 🔧 Changed
 
-* Messaging → outbox/dead-letter stores in MongoDB + CosmosDB with IMessageStore.
+* Cleaner separation between relational and NoSQL contexts.
+* More explicit runtime errors for invalid or missing configurations.
 
-* Cosmos → CosmosDBMessageStore with atomic updates (PatchItemAsync).
-
-🔧 Changed
-
-* Bootstrappers philosophy → devs reference only bootstrappers, not base infra libs.
-
-Unified architecture tagline:
-
-* “Your architecture, your way — under Franz conventions (we still make the rules).”
-
-📚 Docs
-
-* NoSQL bootstrapping examples added.
-
-Template tagline refined:
-
-* “Surf the architecture microservice setup with Franz.Template — clean, done right, properly strapped on. One thing: we don’t like boonies.”
+---
 
 ➡️ Full history available in [changelog.md](changelog.md).
 
 ---
+
 
 🔥 With `Franz.Common`, you can bootstrap a Kafka-ready, resilient, **polyglot microservice** with **one line of code**.

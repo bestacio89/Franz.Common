@@ -374,4 +374,76 @@
 * Improved multi-database orchestration → cleaner separation of relational vs NoSQL contexts.
 * More explicit runtime errors for invalid or missing configs.
 
+---
+
+## **Version 1.6.4 - 1.6.14 – Chaos Benchmark Release 🌀🔥**
+
+### ✨ **Added**
+
+* **Unified Franz Polly Resilience Integration**
+
+  * Single-entry `AddFranzResilience()` extension for all Mediator and HTTP policies.
+  * Automatic registration of Retry, CircuitBreaker, Timeout, and Bulkhead pipelines.
+  * Global `PolicyRegistry` shared across Mediator + HTTP for consistent policy handling.
+  * Observers and correlation ID tracking added for full resilience telemetry.
+
+* **Chaos Simulation Mode (Development Only)**
+
+  * Controlled failure simulation for stress testing and resilience verification.
+  * Ensures recovery, retry, and logging integrity under chaotic scenarios.
+
+* **Advanced Structured Logging**
+
+  * Automatic injection of `FranzRequest`, `FranzCorrelationId`, and `FranzPolicy` context.
+  * Correlated logs across all policies and Mediator pipelines.
+  * Clean, uniform log lines ready for ingestion by Elastic, Seq, or Application Insights.
+
+---
+
+### 🧩 **Fixed**
+
+* **Typed Policy Resolution**
+
+  * Resolved `InvalidCastException` for `IAsyncPolicy<TResponse>` in Mediator pipelines.
+  * Normalized all policy registrations to typed variants to support generic pipelines.
+  * Enforced consistent naming convention:
+    `mediator:RetryPolicy`, `mediator:CircuitBreaker`, `mediator:TimeoutPolicy`, etc.
+
+* **Pipeline Composition Stability**
+
+  * Verified sequential resilience chaining: Retry → CircuitBreaker → Timeout → Bulkhead.
+  * Corrected observer propagation ensuring duration and state tracking on all outcomes.
+
+---
+
+### 🧠 **Improved**
+
+* Enhanced debugging output during policy registration with live registry enumeration.
+* Simplified chaos test orchestration driven entirely by JSON configuration.
+* Clearer resilience policy structure in `appsettings.Development.json`.
+
+---
+
+### 🧭 **Example Configuration**
+
+```json
+"Resilience": {
+  "RetryPolicy": { "Enabled": true, "RetryCount": 3, "RetryIntervalMilliseconds": 200 },
+  "CircuitBreaker": { "Enabled": true, "FailureThreshold": 0.5, "DurationOfBreakSeconds": 30 },
+  "TimeoutPolicy": { "Enabled": true, "TimeoutSeconds": 5 },
+  "BulkheadPolicy": { "Enabled": true, "MaxParallelization": 10, "MaxQueueSize": 20 },
+  "ChaosMode": { "Enabled": true, "FriendlyBreaks": true, "BananaFailures": true }
+}
+```
+
+---
+
+### 🏁 **Summary**
+
+> Franz now reaches **full deterministic resilience orchestration** — chaos tested, fully correlated, and operationally beautiful.
+> All failures are intentional, observable, and instructive.
+
+---
+
+
  

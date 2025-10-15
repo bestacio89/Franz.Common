@@ -2,7 +2,7 @@
 
 *A lightweight, fast, and extensible object mapping library for the Franz ecosystem.*
 
-**Current Version**: `1.5.9`
+**Current Version**: `1.6.14`
 
 ---
 
@@ -23,7 +23,7 @@ It provides:
 ## 📦 Installation
 
 ```bash
-dotnet add package Franz.Common.Mapping --version 1.5.9
+dotnet add package Franz.Common.Mapping --version 1.6.14
 ```
 
 ---
