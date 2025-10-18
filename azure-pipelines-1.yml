@@ -86,3 +86,28 @@ steps:
       git push gitlab HEAD:refs/heads/$CURRENT_BRANCH
       echo "##[endgroup]"
     displayName: 'Mirror branch to GitLab'
+
+  # 🏷️ Propagate Git tags to GitHub and GitLab (only on main)
+  - script: |
+      echo "##[group]Tag propagation setup"
+      git fetch --tags
+      echo "##[endgroup]"
+
+      echo "##[group]Find latest tag"
+      LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+      echo "Detected tag: $LATEST_TAG"
+      echo "##[endgroup]"
+
+      if [ -n "$LATEST_TAG" ]; then
+        echo "##[group]Propagating tag to GitHub"
+        git push github $LATEST_TAG
+        echo "##[endgroup]"
+
+        echo "##[group]Propagating tag to GitLab"
+        git push gitlab $LATEST_TAG
+        echo "##[endgroup]"
+      else
+        echo "⚠️ No tags found to propagate."
+      fi
+    condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+    displayName: 'Propagate tags to GitHub & GitLab'
