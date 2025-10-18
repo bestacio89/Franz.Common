@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.Business\Franz.Common.Business.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Caching\Franz.Common.Caching.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Errors\Franz.Common.Errors.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Hosting.Messaging.Kafka\Franz.Common.Messaging.Hosting.Kafka.csproj" />
@@ -34,6 +35,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="8.7.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="Ocelot" Version="24.0.1" />
@@ -46,6 +49,15 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="EntityFramework\Auditing\" />
+    <Folder Include="EntityFramework\Behaviors\" />
+    <Folder Include="EntityFramework\Configurations\" />
+    <Folder Include="EntityFramework\Conversions\" />
+    <Folder Include="EntityFramework\Extensions\" />
+    <Folder Include="EntityFramework\Repositories\" />
   </ItemGroup>
 
 
