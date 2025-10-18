@@ -2,17 +2,58 @@ trigger:
   branches:
     include:
       - main
-      - develop
+      
 
 pool:
   vmImage: 'ubuntu-latest'
 
+variables:
+- group: 'Secrets and variables'
+- name: buildConfiguration
+  value: 'Release'
+- name: projectName
+  value: 'Franz.Common'
+
 steps:
-  # Checkout your Azure DevOps repo
+  # 🧾 Checkout code
   - checkout: self
     persistCredentials: true
 
-  # Configure Git and push to GitHub
+  # ⚙️ .NET setup
+  - task: UseDotNet@2
+    displayName: 'Use .NET SDK (latest)'
+    inputs:
+      packageType: 'sdk'
+      version: '9.x'
+      installationPath: $(Agent.ToolsDirectory)/dotnet
+
+  # 🔧 Restore dependencies
+  - script: dotnet restore
+    displayName: 'Restore dependencies'
+
+  # 🏗️ Build
+  - script: dotnet build --configuration $(buildConfiguration) --no-restore
+    displayName: 'Build solution'
+
+  # 🧪 Tests
+  - script: dotnet test --configuration $(buildConfiguration) --no-build --logger trx
+    displayName: 'Run unit tests'
+
+  # 📦 Pack
+  - script: dotnet pack --configuration $(buildConfiguration) --no-build --output $(outputDir)
+    displayName: 'Pack NuGet packages'
+
+  # 🚀 Publish to FranzPlatform (only on main)
+  - task: NuGetCommand@2
+    displayName: 'Publish packages to FranzPlatform feed'
+    condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+    inputs:
+      command: 'push'
+      publishVstsFeed: '$(feedName)'
+      packagesToPush: '$(outputDir)/*.nupkg'
+      allowPackageConflicts: true
+
+  # 🔁 Mirror to GitHub
   - script: |
       echo "##[group]Configure Git"
       git config user.name "Azure DevOps"
@@ -22,12 +63,22 @@ steps:
       echo "##[group]Setup GitHub remote"
       git remote remove github || true
       git remote add github https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git
-      git remote -v
       echo "##[endgroup]"
 
-      echo "##[group]Push current branch to GitHub"
       CURRENT_BRANCH=$(Build.SourceBranchName)
       echo "Pushing branch $CURRENT_BRANCH to GitHub..."
       git push github HEAD:$CURRENT_BRANCH
-      echo "##[endgroup]"
     displayName: 'Mirror branch to GitHub'
+
+  # 🦊 Mirror to GitLab
+  - script: |
+      echo "##[group]Setup GitLab remote"
+      git remote remove gitlab || true
+      git remote add gitlab https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git
+      echo "##[endgroup]"
+
+      CURRENT_BRANCH=$(Build.SourceBranchName)
+      echo "Pushing branch $CURRENT_BRANCH to GitLab..."
+      git push gitlab HEAD:$CURRENT_BRANCH
+      echo "##[endgroup]"
+    displayName: 'Mirror branch to GitLab'
