@@ -2,7 +2,6 @@ trigger:
   branches:
     include:
       - main
-      
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -43,7 +42,7 @@ steps:
   - script: dotnet pack --configuration $(buildConfiguration) --no-build --output $(outputDir)
     displayName: 'Pack NuGet packages'
 
-  # 🚀 Publish to FranzPlatform (only on main)
+  # 🚀 Publish to FranzPlatform feed (only on main)
   - task: NuGetCommand@2
     displayName: 'Publish packages to FranzPlatform feed'
     condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
@@ -62,23 +61,28 @@ steps:
 
       echo "##[group]Setup GitHub remote"
       git remote remove github || true
-      git remote add github https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git
+      git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
+      git remote -v
       echo "##[endgroup]"
 
-      CURRENT_BRANCH=$(Build.SourceBranchName)
-      echo "Pushing branch $CURRENT_BRANCH to GitHub..."
-      git push github HEAD:$CURRENT_BRANCH
+      CURRENT_BRANCH=$(echo "$(Build.SourceBranchName)" | tr '[:upper:]' '[:lower:]')
+      echo "Normalized branch: $CURRENT_BRANCH"
+      echo "##[group]Push branch to GitHub"
+      git push github HEAD:refs/heads/$CURRENT_BRANCH
+      echo "##[endgroup]"
     displayName: 'Mirror branch to GitHub'
 
   # 🦊 Mirror to GitLab
   - script: |
       echo "##[group]Setup GitLab remote"
       git remote remove gitlab || true
-      git remote add gitlab https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git
+      git remote add gitlab "https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git"
+      git remote -v
       echo "##[endgroup]"
 
-      CURRENT_BRANCH=$(Build.SourceBranchName)
-      echo "Pushing branch $CURRENT_BRANCH to GitLab..."
-      git push gitlab HEAD:$CURRENT_BRANCH
+      CURRENT_BRANCH=$(echo "$(Build.SourceBranchName)" | tr '[:upper:]' '[:lower:]')
+      echo "Normalized branch: $CURRENT_BRANCH"
+      echo "##[group]Push branch to GitLab"
+      git push gitlab HEAD:refs/heads/$CURRENT_BRANCH
       echo "##[endgroup]"
     displayName: 'Mirror branch to GitLab'
