@@ -40,7 +40,7 @@ It provides clean abstractions, auditing, soft deletes, repositories, and seamle
 
 ## **Version Information**
 
-* **Current Version**: 1.6.14
+* **Current Version**: 1.6.15
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -190,6 +190,10 @@ Licensed under the **MIT License**.
 ---
 
 ## **Changelog**
+
+### **1.6.15**
+* Patch bump (package cleanup & docs).
+* Fixed Compiletime Error in ReadRepository and IReadrepository (because of stupid c# generic constraints).
 
 ### **1.4.2**
 

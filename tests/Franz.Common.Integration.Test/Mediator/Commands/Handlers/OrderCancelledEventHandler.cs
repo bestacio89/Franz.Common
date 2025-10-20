@@ -1,5 +1,4 @@
 ﻿using Franz.Common.Integration.Tests.Mediator.Commands.Handlers.Events;
-using Franz.Common.IntegrationTesting.Domain.Events;
 using Franz.Common.Mediator.Handlers;
 using Franz.Common.Mediator.Messages;
 using Microsoft.Extensions.Logging;

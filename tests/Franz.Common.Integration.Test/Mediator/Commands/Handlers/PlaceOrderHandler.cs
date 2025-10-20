@@ -2,7 +2,6 @@
 using Franz.Common.Integration.Tests.Mediator.Commands;
 using Franz.Common.Integration.Tests.Mediator.Domain;
 using Franz.Common.Integration.Tests.Mediator.Domain.Events;
-using Franz.Common.IntegrationTesting.Domain;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Handlers;
 using Franz.Common.Mediator.Messages;
