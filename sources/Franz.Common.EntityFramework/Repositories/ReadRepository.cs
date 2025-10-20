@@ -8,14 +8,12 @@ public class ReadRepository<TEntity>(DbContext dbContext) : IReadRepository<TEnt
 {
   public readonly DbContext dbContext = dbContext;
 
-  public virtual async Task<IQueryable<TEntity>> GetAll(CancellationToken cancellation)
+  public virtual async Task<IReadOnlyList<TEntity>> GetAll(CancellationToken cancellation)
   {
-    var result = await dbContext
+     
+       return await dbContext
       .Set<TEntity>()
-      .AsNoTracking()
-      .ToListAsync(cancellationToken: cancellation);
-
-    return (IQueryable<TEntity>) result;
+      .AsNoTracking().ToListAsync(cancellation);
   }
 
   public async Task<TEntity> GetEntity(int id)
