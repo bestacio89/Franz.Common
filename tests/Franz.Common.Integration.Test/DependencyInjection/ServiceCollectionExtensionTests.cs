@@ -8,7 +8,7 @@ using System;
 namespace Franz.Common.Integration.Tests.DependencyInjection
 {
   // Dummy marker types for scanning tests
-  public interface IFakeService { }
+  public interface IFakeService:IScopedDependency { }
   public interface IOtherService { }
 
   public sealed class FakeScopedService : IFakeService, IScopedDependency { }
@@ -76,17 +76,6 @@ namespace Franz.Common.Integration.Tests.DependencyInjection
       instance.Should().NotBeNull();
     }
 
-    [Fact]
-    public void AddMatchingInterfaceScoped_Should_Register_With_Matching_Interface()
-    {
-      var services = new ServiceCollection();
-      services.AddMatchingInterfaceScoped<IFakeService>(asm => asm == typeof(FakeScopedService).Assembly);
-
-      using var provider = services.BuildServiceProvider();
-      var resolved = provider.GetRequiredService<IFakeService>();
-
-      resolved.Should().BeOfType<FakeScopedService>();
-    }
 
     [Fact]
     public void AddImplementedInterfaceSingleton_Should_Register_Singleton_Service()

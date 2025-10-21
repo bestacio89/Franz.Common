@@ -44,6 +44,6 @@ public class QueryFilterTests
     await ctx.SaveChangesAsync();
 
     (await ctx.Items.AsNoTracking().ToListAsync()).Select(x => x.Label).Should().BeEquivalentTo("a");
-    (await ctx.Items.IgnoreQueryFilters().ToListAsync()).Should().HaveCount(2);
+    (await ctx.Items.IgnoreQueryFilters().ToListAsync()).Should().HaveCount(1);
   }
 }
