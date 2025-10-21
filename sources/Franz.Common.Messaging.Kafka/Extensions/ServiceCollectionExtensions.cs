@@ -16,17 +16,17 @@ namespace Franz.Common.Messaging.Kafka.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-  public static IServiceCollection AddMessaging(this IServiceCollection services, IConfiguration configuration)
+  public static IServiceCollection AddKafkaMessaging(this IServiceCollection services, IConfiguration configuration)
   {
     services
-      .AddMessagingPublisher(configuration)
-      .AddMessagingSender(configuration)
-      .AddMessagingConsumer(configuration);
+      .AddKafkaMessagingPublisher(configuration)
+      .AddKafkaMessagingSender(configuration)
+      .AddKafkaMessagingConsumer(configuration);
 
     return services;
   }
 
-  public static IServiceCollection AddMessagingSender(this IServiceCollection services, IConfiguration? configuration = null)
+  public static IServiceCollection AddKafkaMessagingSender(this IServiceCollection services, IConfiguration? configuration = null)
   {
     services
       .AddNoDuplicateScoped<IMessagingSender, MessagingSender>()
@@ -35,7 +35,7 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  public static IServiceCollection AddMessagingPublisher(this IServiceCollection services, IConfiguration configuration)
+  public static IServiceCollection AddKafkaMessagingPublisher(this IServiceCollection services, IConfiguration configuration)
   {
     services
       .AddNoDuplicateScoped<IMessagingPublisher, MessagingPublisher>()
@@ -47,7 +47,7 @@ public static class ServiceCollectionExtensions
   private static IServiceCollection AddCommonMessagingProducer(this IServiceCollection services, IConfiguration? configuration)
   {
     services
-          .AddMessagingConfiguration(configuration)
+          .AddKafkaMessagingConfiguration(configuration)
           .AddNoDuplicateScoped<IMessagingTransaction, MessagingTransaction>()
           .AddNoDuplicateScoped<IMessageFactory, MessageFactory>()
           .AddNoDuplicateScoped<IMessageHandler, MessageBuilderDelegatingHandler>();
@@ -55,7 +55,7 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  public static IServiceCollection AddMessagingConfiguration(this IServiceCollection services, IConfiguration? configuration)
+  public static IServiceCollection AddKafkaMessagingConfiguration(this IServiceCollection services, IConfiguration? configuration)
   {
     services
       .AddMessagingOptions(configuration)
@@ -90,11 +90,11 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  public static IServiceCollection AddMessagingConsumer(this IServiceCollection services, IConfiguration configuration)
+  public static IServiceCollection AddKafkaMessagingConsumer(this IServiceCollection services, IConfiguration configuration)
   {
     services
       .AddOnlyHighLifetimeModelProvider(ServiceLifetime.Singleton)
-      .AddMessagingConfiguration(configuration)
+      .AddKafkaMessagingConfiguration(configuration)
       .AddNoDuplicateScoped<MessageContextAccessor>()
       .AddNoDuplicateScoped<IMessageContextAccessor>(sp => sp.GetRequiredService<MessageContextAccessor>())
       .AddNoDuplicateSingleton<IListener, KafkaListener>()
