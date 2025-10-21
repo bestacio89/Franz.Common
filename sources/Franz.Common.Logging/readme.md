@@ -1,10 +1,10 @@
-# **Franz.Common.Logging**
+ï»¿# **Franz.Common.Logging**
 
 A comprehensive logging library within the **Franz Framework**, designed to enhance application monitoring and diagnostics using **Serilog** and **Elastic APM**.
 This package provides tools for centralized logging, tracing, and seamless integration with ASP.NET Core applications.
 
 ---
-- **Current Version**: 1.6.15
+- **Current Version**: 1.6.16
 
 ---
 
@@ -36,11 +36,11 @@ This package provides tools for centralized logging, tracing, and seamless integ
 
 ## **Dependencies**
 
-* **Elastic.Apm.NetCoreAll** (1.25.1) – APM agent integration.
-* **Elastic.Apm.SerilogEnricher** (8.6.1) – Correlates APM traces with logs.
-* **Serilog.AspNetCore** (8.0.0) – ASP.NET Core logging provider.
-* **Serilog.Enrichers.Demystifier** (1.0.2) – Clean stack traces in logs.
-* **Serilog.Enrichers.Environment** (2.3.0) – Environment metadata enrichment.
+* **Elastic.Apm.NetCoreAll** (1.25.1) â€“ APM agent integration.
+* **Elastic.Apm.SerilogEnricher** (8.6.1) â€“ Correlates APM traces with logs.
+* **Serilog.AspNetCore** (8.0.0) â€“ ASP.NET Core logging provider.
+* **Serilog.Enrichers.Demystifier** (1.0.2) â€“ Clean stack traces in logs.
+* **Serilog.Enrichers.Environment** (2.3.0) â€“ Environment metadata enrichment.
 
 ---
 
@@ -196,6 +196,34 @@ This library is licensed under the **MIT License**. See the `LICENSE` file for m
 
 ## **Changelog**
 
+Franz 1.6.16 â€” Logging Overhaul & Platform Stability
+ðŸ”¹ Highlights
+
+Unified Logging Core:
+Consolidated all environment-aware logging into UseLog() and UseHybridLog() inside Franz.Common.Logging.Extensions.
+
+Industrial-Grade Noise Filtering:
+Built-in suppression for noisy sources:
+Microsoft.EntityFrameworkCore, System.Net.Http.HttpClient, Microsoft.AspNetCore.*, HealthChecks, and Hosting.Lifetime.
+
+UTF-8 Enforcement Everywhere:
+Console and file outputs now use strict UTF-8 (no BOM) for full cross-platform consistency.
+
+Contextual Enrichment:
+Every log entry now includes Application, MachineName, and EnvironmentName properties for better traceability across distributed deployments.
+
+Environment-Aware Policy:
+
+Development: verbose console + debug + rolling log files.
+
+Production: structured JSON logs + compact console output + retention policy.
+
+Elastic APM Integration (Debug only):
+Seamless hook for Elastic.Apm.NetCoreAll via #if DEBUG.
+
+Version Synchronization:
+All 54 projects now aligned under v1.6.16, ensuring consistent metadata and package versioning across the Franz ecosystem.
+
 ### **1.4.4**
 
 * Added `UseHybridLog()` for appsettings-driven configuration.
@@ -229,7 +257,7 @@ This library is licensed under the **MIT License**. See the `LICENSE` file for m
 
 * Use `UseLog()` for **strict, environment-aware logging** in most applications (APIs, background services).
 * Use `UseHybridLog()` when you need **flexible, configuration-driven logging**, usually in enterprise apps with strong DevOps pipelines.
-* Elastic APM in **production** is always **opt-in** — wire it yourself if your infra requires it. Franz only enables APM automatically in **DEBUG** to help with local testing.
+* Elastic APM in **production** is always **opt-in** â€” wire it yourself if your infra requires it. Franz only enables APM automatically in **DEBUG** to help with local testing.
 
 ---
 
