@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Http.Refit.Contracts;
 using Franz.Common.Http.Refit.Handlers;
 using Franz.Common.Http.Refit.Options;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,13 @@ namespace Franz.Common.Http.Refit.Extensions
 {
   public static class FranzRefitServiceCollectionExtensions
   {
+    /// <summary>
+    /// Registers a typed Refit client with Franz conventions:
+    /// - Adds standard headers via <see cref="FranzRefitHeadersHandler"/>
+    /// - Adds authentication via <see cref="FranzRefitAuthHandler"/> (auto-disabled if no provider or options)
+    /// - Optionally attaches a Polly policy from the registry
+    /// - Supports OpenTelemetry-friendly RefitSettings
+    /// </summary>
     public static IServiceCollection AddFranzRefit<TClient>(
         this IServiceCollection services,
         string name,
@@ -22,16 +30,17 @@ namespace Franz.Common.Http.Refit.Extensions
         Action<RefitClientOptions>? configureOptions = null)
         where TClient : class
     {
-      // Register handlers (singleton is fine for handlers with DI)
+      // Register handlers as singletons (stateless, safe)
       services.TryAddSingleton<FranzRefitHeadersHandler>();
       services.TryAddSingleton<FranzRefitAuthHandler>();
 
+      // Register options if provided
       if (configureOptions != null)
         services.Configure(configureOptions);
 
-      // Choose correct AddRefitClient overload (factory returning RefitSettings to avoid ambiguity)
+      // Configure Refit client
       IHttpClientBuilder refitBuilder;
-      if (configureRefitSettings != null)
+      if (configureRefitSettings is not null)
       {
         refitBuilder = services.AddRefitClient<TClient>(sp =>
         {
@@ -45,24 +54,27 @@ namespace Franz.Common.Http.Refit.Extensions
         refitBuilder = services.AddRefitClient<TClient>();
       }
 
-      // Configure base address
-      refitBuilder.ConfigureHttpClient((sp, client) => client.BaseAddress = new Uri(baseUrl));
+      // Apply base address
+      refitBuilder.ConfigureHttpClient((_, client) => client.BaseAddress = new Uri(baseUrl));
 
-      // Add header handler
+      // Add headers handler
       refitBuilder.AddHttpMessageHandler<FranzRefitHeadersHandler>();
 
-      // Add auth handler: if an ITokenProvider is registered use it, otherwise use a NoOp implementation
+      // Add authentication handler
       refitBuilder.AddHttpMessageHandler(sp =>
       {
-        var tokenProvider = sp.GetService<ITokenProvider>();
+        var tokenProvider = sp.GetService<ITokenProvider>(); // optional
+        var options = sp.GetService<RefitClientOptions>();   // optional
         var logger = sp.GetRequiredService<ILogger<FranzRefitAuthHandler>>();
 
-        return tokenProvider is null
-          ? new FranzRefitAuthHandler(new NoOpTokenProvider(), logger) as DelegatingHandler
-          : new FranzRefitAuthHandler(tokenProvider, logger) as DelegatingHandler;
+        // 🧠 If no token provider, return a no-op handler that disables itself
+        return new FranzRefitAuthHandler(
+          tokenProvider ?? new NoOpTokenProvider(),
+          options,
+          logger);
       });
 
-      // Optional: attach named Polly policy from registry (host app must register the policy)
+      // Attach named Polly policy if specified
       if (!string.IsNullOrWhiteSpace(policyName))
       {
         refitBuilder.AddPolicyHandlerFromRegistry(policyName);
@@ -71,11 +83,14 @@ namespace Franz.Common.Http.Refit.Extensions
       return services;
     }
 
-    // Minimal no-op token provider used if DI doesn't provide a real one
+    /// <summary>
+    /// Minimal no-op token provider that always returns null.
+    /// Used to gracefully disable auth handling when no provider is registered.
+    /// </summary>
     private sealed class NoOpTokenProvider : ITokenProvider
     {
-      public Task<string?> GetTokenAsync(CancellationToken ct = default) =>
-          Task.FromResult<string?>(null);
+      public Task<string?> GetTokenAsync(CancellationToken ct = default)
+          => Task.FromResult<string?>(null);
     }
   }
 }
