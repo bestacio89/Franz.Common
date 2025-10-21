@@ -4,7 +4,7 @@ A foundational library within the **Franz Framework** that provides contracts an
 This package defines the **core abstractions** for accessing user identity information in a consistent, provider-agnostic way.
 
 ---
--**Current Version**: 1.6.16
+-**Current Version**: 1.6.17
 ---
 ## **Features**
 

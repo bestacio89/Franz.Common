@@ -1,4 +1,4 @@
-# **Franz.Common.Messaging.Kafka**
+﻿# **Franz.Common.Messaging.Kafka**
 
 A Kafka integration library within the **Franz Framework** designed to simplify interaction with Kafka topics, producers, and consumers. This package provides tools for creating and managing Kafka connections, handling serialization, and integrating Kafka workflows into distributed systems.
 
@@ -27,7 +27,7 @@ A Kafka integration library within the **Franz Framework** designed to simplify 
 
 ## **Version Information**
 
-- **Current Version**: 1.6.16
+- **Current Version**: 1.6.17
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -193,3 +193,24 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - MessagingPublisher.Publish is now async Task.
 - MessagingInitializer scans INotificationHandler<> for events.
 - Kafka topics auto-created for all integration events.
+
+
+### **Version 1.6.17**
+
+* ✅ **Extension Method Rebrand for Uniformity & Intent Clarity**
+  All Kafka registration extensions were renamed to follow the **explicit `AddKafka*` convention**, ensuring every API call clearly indicates its messaging backend.
+  This improves **discoverability**, **autocompletion support**, and **parity** with RabbitMQ and upcoming AzureEventBus modules.
+
+  Updated method list:
+
+  * `AddKafkaMessaging()`
+  * `AddKafkaMessagingPublisher()`
+  * `AddKafkaMessagingSender()`
+  * `AddKafkaMessagingConsumer()`
+  * `AddKafkaMessagingConfiguration()`
+
+* 🧩 **Purpose**: To standardize naming across all Franz messaging providers and make intent instantly recognizable in dependency registration blocks.
+
+---
+
+Would you like me to reformat your full `Franz.Common.Messaging.Kafka` README (with this new section inserted cleanly into the existing changelog)? I can integrate it seamlessly below your **v1.3.6** entry.
