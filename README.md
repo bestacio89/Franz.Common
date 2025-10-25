@@ -1,6 +1,6 @@
 # **Franz.Common**
 
-**Franz.Common** is the heart of the **Franz Framework** — a lightweight, modular framework that streamlines the development of **event-driven microservices**.  
+**Franz.Common** is the heart of the **Franz Framework** — a lightweight, modular framework that streamlines the development of **event-driven microservices**.
 It was born to reduce boilerplate and architectural complexity in modern .NET systems, with a **Kafka-first** design, but extensible to **RabbitMQ, Azure Service Bus, Redis, and HTTP APIs**.
 
 Franz provides **DDD + CQRS building blocks**, **resilience pipelines**, **auditing**, and **multi-tenancy** support across HTTP and messaging layers — batteries included, but modular.
@@ -21,7 +21,9 @@ Franz is modular: install only what you need.
 * **Franz.Common.Errors** → Unified error handling models.
 * **Franz.Common.Messaging** → Messaging abstractions with outbox, inbox, retry/DLQ, serializer.
 * **Franz.Common.Messaging.Hosting** → Async listener orchestration & context management.
-* **Franz.Common.Messaging.Hosting.Kafka** → Kafka hosted services & DI bootstrap.
+* **Franz.Common.Messaging.Kafka** → Kafka hosted services & DI bootstrap.
+* **Franz.Common.Messaging.RabbitMQ** → RabbitMQ producer, consumer, and transaction orchestration.
+* **Franz.Common.Http.Messaging** → Messaging + transaction filters & health checks for ASP.NET Core.
 * **Franz.Common.MongoDB** → Mongo-based outbox/inbox stores with retries and dead letter.
 * **Franz.Common.AzureCosmosDB** → CosmosDB outbox/inbox stores with retries and dead letter.
 * **Franz.Common.Identity** → Unified identity context.
@@ -52,7 +54,7 @@ Add the core library:
 
 ```bash
 dotnet add package Franz.Common --version 1.6.1
-````
+```
 
 Or install subpackages (e.g., `Business` + `EntityFramework`):
 
@@ -125,90 +127,53 @@ Licensed under the **MIT License**.
 
 ---
 
-
 ## 📌 **Changelog**
 
-**Latest Version:** 1.6.14
+**Latest Version:** 1.6.17
 
 ---
 
-🚀 **Version 1.6.4 – 1.6.14 Chaos Benchmark Release 🌀🔥**
+### **1.6.17 — Messaging Orchestration & Consistency Update**
 
-### ✨ Added
+A unified release focused on **naming standardization**, **protocol-specific clarity**, and **cross-package consistency** across **Kafka**, **RabbitMQ**, and **HTTP Messaging**.
 
-* **Unified Franz Polly Resilience Integration**
+#### 🧩 Unified Messaging API
 
-  * `AddFranzResilience()` → single entrypoint to register Retry, CircuitBreaker, Timeout, and Bulkhead policies.
-  * Shared `PolicyRegistry` for both Mediator and HTTP pipelines.
-  * Full observability via correlation ID and resilience observers.
+* All messaging extensions now use **explicit naming**:
 
-* **Chaos Simulation Mode (Development Only)**
+  * `AddKafka*` for Kafka
+  * `AddRabbitMQ*` for RabbitMQ
+  * `AddMessagingInHttpContext()` for unified HTTP integration
+* Improves readability, autocompletion, and architectural intent.
 
-  * JSON-driven chaos testing for resilience validation.
-  * Simulated failures:
+#### 🐇 RabbitMQ Integration
 
-    * `🍌 Banana Republic Exception: simulated DB meltdown!`
-    * `☕ Just a friendly reminder to take a break!`
-  * Ensures recovery logic and retry mechanisms function under controlled failure.
+* Added **RabbitMQ support** inside `Franz.Common.Http.Messaging`.
+* Introduced **`MessagingTransactionFilter`** for scoped commit/rollback logic.
+* Added **RabbitMQ health checks** and intelligent duplicate prevention.
+* Unified service registration and DI conventions with Kafka.
 
-* **Advanced Structured Logging**
+#### ☕ Kafka API Refactor
 
-  * Injects `FranzRequest`, `FranzCorrelationId`, `FranzPolicy`, and `FranzPipeline` into every log event.
-  * Fully compatible with Elastic, Seq, and Application Insights.
-  * Uniform telemetry across all pipelines.
+* Renamed all extension methods to the `AddKafka*` family for clarity.
+* Aligned dependency registration with RabbitMQ for full parity.
 
----
+#### 🌐 Ecosystem Synchronization
 
-### 🧩 Fixed
-
-* Resolved `InvalidCastException` for `IAsyncPolicy<TResponse>` by standardizing typed policy registration.
-* Stabilized sequential policy chaining (Retry → CircuitBreaker → Timeout → Bulkhead).
-* Ensured observer notifications always propagate duration, circuit, and timeout data.
+* Version alignment across **Kafka**, **RabbitMQ**, and **Http.Messaging**.
+* Foundation laid for **AzureEventBus** support in 1.7.x.
 
 ---
 
-### 🧠 Improved
+### **1.6.16 — Goodbye Chattering**
 
-* Registry logging now enumerates every active policy at startup.
-* Cleaner error context for CircuitBreaker and Timeout events.
-* Chaos simulation and retry tests fully driven by `appsettings.{Environment}.json`.
+Introduced an industrial-grade logging system with structured Serilog + Elastic APM integration.
+Franz now produces clean, contextual, UTF-8 logs across environments.
 
----
+### **1.6.15**
 
-### 🧭 Configuration Example
-
-```json
-"Resilience": {
-  "RetryPolicy": { "Enabled": true, "RetryCount": 3, "RetryIntervalMilliseconds": 200 },
-  "CircuitBreaker": { "Enabled": true, "FailureThreshold": 0.5, "DurationOfBreakSeconds": 30 },
-  "TimeoutPolicy": { "Enabled": true, "TimeoutSeconds": 5 },
-  "BulkheadPolicy": { "Enabled": true, "MaxParallelization": 10, "MaxQueueSize": 20 },
-  "ChaosMode": { "Enabled": true, "FriendlyBreaks": true, "BananaFailures": true }
-}
-```
-
----
-
-> 🧭 Franz 1.6.14 marks the full mastery of resilience orchestration —
-> deterministic, chaos-tested, and operationally self-aware.
-> Every failure is intentional, observable, and recorded with beauty.
-
----
-
-🚀 **Version 1.6.3 – Multi-Environment & Cosmos Governance 🌐🗄️**
-
-### ✨ Added
-
-* **Environment-Aware Bootstrapper** → auto-detects `appsettings.{Environment}.json`, validates per-environment configuration.
-* **AzureCosmosStore Base** → generic Cosmos DB persistence context mirroring EF + Mongo.
-* `AddCosmosDatabase<TStore>` → clean Cosmos DI bootstrapper.
-* **Governance Enforcement** → no hardcoded connection strings, fail-fast provider/context validation.
-* **Multi-Database Validation** → unified checks for EF, Mongo, Cosmos.
-
-### 🔧 Changed
-
-* Cleaner separation between relational and NoSQL contexts.
-* More explicit runtime errors for invalid or missing configurations.
+* Fixed casting issue in `ReadRepository`.
+* Replaced `IQueryable<T>` with `IReadOnlyCollection<T>` for safer semantics.
 
 ---
 
@@ -216,5 +181,7 @@ Licensed under the **MIT License**.
 
 ---
 
-
 🔥 With `Franz.Common`, you can bootstrap a Kafka-ready, resilient, **polyglot microservice** with **one line of code**.
+
+---
+
