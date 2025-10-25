@@ -5,7 +5,7 @@ It provides abstractions, utilities, and patterns for building **scalable, audit
 
 ---
 
-* **Current Version**: 1.6.18
+* **Current Version**: 1.6.19
 
 ---
 

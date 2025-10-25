@@ -505,7 +505,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## Version 1.6.18 - Mapping Refinements
+## Version 1.6.18 - 1.6.19 - Mapping Refinements
 
 ### 🧠 **Constructor-Aware Mapping Engine**
 

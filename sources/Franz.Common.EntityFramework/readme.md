@@ -40,7 +40,7 @@ It provides clean abstractions, auditing, soft deletes, repositories, and seamle
 
 ## **Version Information**
 
-* **Current Version**: 1.6.18
+* **Current Version**: 1.6.19
 * Part of the private **Franz Framework** ecosystem.
 
 ---

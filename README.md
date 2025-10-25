@@ -129,11 +129,11 @@ Licensed under the **MIT License**.
 
 ## 📌 **Changelog**
 
-**Latest Version:** 1.6.18
+**Latest Version:** 1.6.19
 
 ---
 
-## Version 1.6.18 - Mapping Refinements
+## Version 1.6.18- 1.6.19 - Mapping Refinements
 
 ### 🧠 **Constructor-Aware Mapping Engine**
 

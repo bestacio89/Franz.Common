@@ -3,7 +3,7 @@
 A library for handling and standardizing errors and exceptions in .NET applications. This library simplifies error management, making it easier to implement structured and meaningful error responses.
 
 ---
-- **Current Version**: 1.6.18
+- **Current Version**: 1.6.19
 
 ---
 

@@ -1,4 +1,4 @@
-﻿Perfect — this README is already clean, but with your new **constructor-aware, record-friendly mapper**, we can evolve it for **Franz.Common.Mapping 1.6.18** and showcase the architectural jump you just built.
+﻿Perfect — this README is already clean, but with your new **constructor-aware, record-friendly mapper**, we can evolve it for **Franz.Common.Mapping 1.6.19** and showcase the architectural jump you just built.
 
 Here’s the **updated README draft** (in your project’s tone and formatting):
 
@@ -8,7 +8,7 @@ Here’s the **updated README draft** (in your project’s tone and formatting):
 
 *A lightweight, fast, and extensible object mapping library for the Franz ecosystem.*
 
-**Current Version:** 1.6.18
+**Current Version:** 1.6.19
 **Codename:** *Constructor-Aware Evolution*
 
 ---
@@ -33,7 +33,7 @@ It provides:
 ## 📦 Installation
 
 ```bash
-dotnet add package Franz.Common.Mapping --version 1.6.18
+dotnet add package Franz.Common.Mapping --version 1.6.19
 ```
 
 ---
@@ -108,7 +108,7 @@ Console.WriteLine(dto.Email);    // john@acme.com
 
 ---
 
-## ✨ New in 1.6.18
+## ✨ New in 1.6.19
 
 ### 🧠 **Constructor-Aware Mapping Engine**
 
@@ -155,4 +155,4 @@ MIT — free to use, modify, and distribute.
 
 ---
 
-Would you like me to also generate the matching `CHANGELOG.md` entry for `1.6.18` in your Franz release format (with version header, bullet evolution notes, and commit tag)?
+Would you like me to also generate the matching `CHANGELOG.md` entry for `1.6.19` in your Franz release format (with version header, bullet evolution notes, and commit tag)?
