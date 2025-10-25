@@ -505,3 +505,18 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
+## Version 1.6.18 - Mapping Refinements
+
+### 🧠 **Constructor-Aware Mapping Engine**
+
+* Detects and invokes **record positional constructors** automatically.
+* Eliminates the need for `public MemberDto() { }`.
+* Allows **immutable DTOs and record structs** out-of-the-box.
+* Falls back to `Activator.CreateInstance()` only when no usable constructor exists.
+* 100 % backward-compatible with `ConstructUsing()` and legacy mappings.
+
+### 🧩 **Architectural Impact**
+
+* Strengthens immutability and contract integrity in the Franz ecosystem.
+* Enables the “DTOs must be immutable” Tribunal rule to pass naturally.
+* Outperforms AutoMapper in instantiation efficiency and architectural compliance.

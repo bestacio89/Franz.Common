@@ -129,9 +129,25 @@ Licensed under the **MIT License**.
 
 ## 📌 **Changelog**
 
-**Latest Version:** 1.6.17
+**Latest Version:** 1.6.18
 
 ---
+
+## Version 1.6.18 - Mapping Refinements
+
+### 🧠 **Constructor-Aware Mapping Engine**
+
+* Detects and invokes **record positional constructors** automatically.
+* Eliminates the need for `public MemberDto() { }`.
+* Allows **immutable DTOs and record structs** out-of-the-box.
+* Falls back to `Activator.CreateInstance()` only when no usable constructor exists.
+* 100 % backward-compatible with `ConstructUsing()` and legacy mappings.
+
+### 🧩 **Architectural Impact**
+
+* Strengthens immutability and contract integrity in the Franz ecosystem.
+* Enables the “DTOs must be immutable” Tribunal rule to pass naturally.
+* Outperforms AutoMapper in instantiation efficiency and architectural compliance.
 
 ### **1.6.17 — Messaging Orchestration & Consistency Update**
 
@@ -162,18 +178,6 @@ A unified release focused on **naming standardization**, **protocol-specific cla
 
 * Version alignment across **Kafka**, **RabbitMQ**, and **Http.Messaging**.
 * Foundation laid for **AzureEventBus** support in 1.7.x.
-
----
-
-### **1.6.16 — Goodbye Chattering**
-
-Introduced an industrial-grade logging system with structured Serilog + Elastic APM integration.
-Franz now produces clean, contextual, UTF-8 logs across environments.
-
-### **1.6.15**
-
-* Fixed casting issue in `ReadRepository`.
-* Replaced `IQueryable<T>` with `IReadOnlyCollection<T>` for safer semantics.
 
 ---
 
