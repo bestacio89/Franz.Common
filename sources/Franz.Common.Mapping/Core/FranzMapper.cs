@@ -1,8 +1,8 @@
 ﻿using Franz.Common.Errors;
 using Franz.Common.Mapping.Abstractions;
 using System.Collections;
-using System.Reflection;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 
 namespace Franz.Common.Mapping.Core;
 
@@ -21,7 +21,7 @@ public class FranzMapper : IFranzMapper
     if (source == null)
       throw new ArgumentNullException(nameof(source));
 
-    // Handle collection interface mappings dynamically
+    // 🧩 Handle collection interface mappings dynamically
     if (IsCollectionInterface(typeof(TDestination)))
     {
       var mapped = MapCollection(typeof(TSource), typeof(TDestination), source);
@@ -34,35 +34,34 @@ public class FranzMapper : IFranzMapper
       return (TDestination)mapped;
     }
 
-    // Handle explicitly configured mappings
+    // 🧱 Handle explicitly configured mappings
     if (_config.TryGetMapping<TSource, TDestination>(out var expression))
     {
       if (expression == null)
       {
         throw new TechnicalException(
-            $"Mapping expression for {typeof(TSource).Name} to {typeof(TDestination).Name} is null.");
+            $"Mapping expression for {typeof(TSource).Name} → {typeof(TDestination).Name} is null.");
       }
 
       TDestination destination;
       if (expression.Constructor != null)
       {
+        // 🧩 Explicit constructor delegate provided
         var constructed = expression.Constructor(source);
         destination = constructed ?? throw new TechnicalException(
             $"The constructor delegate for {typeof(TDestination).Name} returned null.");
       }
       else
       {
-        destination = Activator.CreateInstance<TDestination>()
-            ?? throw new TechnicalException(
-                $"Could not create instance of {typeof(TDestination).Name}. " +
-                "Make sure it has a parameterless constructor or use ConstructUsing().");
+        // 🧠 NEW LOGIC: record-aware instantiation (constructor-matching)
+        destination = (TDestination)CreateInstanceSmart(typeof(TSource), typeof(TDestination), source);
       }
 
       ApplyMapping(source, destination, expression);
       return destination;
     }
 
-    // Fallback default mapping
+    // 🧱 Fallback default mapping (also record-aware now)
     var fallback = DefaultMap<TSource, TDestination>(source);
     if (fallback == null)
     {
@@ -74,6 +73,44 @@ public class FranzMapper : IFranzMapper
     return fallback;
   }
 
+  // 🔧 Centralized smart constructor logic
+  private static object CreateInstanceSmart(Type sourceType, Type destType, object source)
+  {
+    // Prefer the "richest" constructor (record positional or full-parameterized)
+    var ctor = destType
+        .GetConstructors()
+        .OrderByDescending(c => c.GetParameters().Length)
+        .FirstOrDefault();
+
+    if (ctor != null && ctor.GetParameters().Length > 0)
+    {
+      var parameters = ctor.GetParameters()
+          .Select(p =>
+          {
+            var srcProp = sourceType
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)
+                .FirstOrDefault(prop => prop.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase));
+
+            return srcProp?.GetValue(source);
+          })
+          .ToArray();
+
+      try
+      {
+        return ctor.Invoke(parameters);
+      }
+      catch (Exception ex)
+      {
+        throw new TechnicalException(
+            $"⚠️ Failed to invoke {destType.Name} constructor. Parameter mismatch possible. Details: {ex.Message}", ex);
+      }
+    }
+
+    // 🪃 Fallback: Activator for legacy mutable types
+    return Activator.CreateInstance(destType)
+        ?? throw new TechnicalException(
+            $"Could not create instance of {destType.Name}. Ensure it has a suitable constructor.");
+  }
 
   private void ApplyMapping<TSource, TDestination>(
     [DisallowNull] TSource source,
@@ -90,7 +127,6 @@ public class FranzMapper : IFranzMapper
       if (expression.IgnoredMembers.Contains(destProp.Name))
         continue;
 
-      // Figure out which source name to use
       var srcName = expression.MemberBindings.TryGetValue(destProp.Name, out var boundName)
           ? boundName
           : destProp.Name;
@@ -110,7 +146,7 @@ public class FranzMapper : IFranzMapper
         continue;
       }
 
-      // Value object unwrapping (ex: ISBN.Value → string)
+      // 🔍 Value object unwrapping (e.g. ISBN.Value → string)
       var valueProp = srcValue.GetType().GetProperty("Value", BindingFlags.Instance | BindingFlags.Public);
       if (valueProp != null && destProp.PropertyType.IsAssignableFrom(valueProp.PropertyType))
       {
@@ -119,7 +155,7 @@ public class FranzMapper : IFranzMapper
         continue;
       }
 
-      // Handle collections
+      // 🔁 Handle collections recursively
       if (typeof(IEnumerable).IsAssignableFrom(destProp.PropertyType) && destProp.PropertyType != typeof(string))
       {
         var mappedCollection = MapCollection(srcProp.PropertyType, destProp.PropertyType, srcValue);
@@ -127,7 +163,7 @@ public class FranzMapper : IFranzMapper
         continue;
       }
 
-      // Handle nested objects recursively
+      // 🧩 Handle nested complex objects recursively
       if (!destProp.PropertyType.IsAssignableFrom(srcProp.PropertyType))
       {
         var mapMethod = typeof(FranzMapper)
@@ -147,14 +183,13 @@ public class FranzMapper : IFranzMapper
     }
   }
 
-
   private static TDestination DefaultMap<TSource, TDestination>([DisallowNull] TSource source)
   {
     if (source == null)
       throw new ArgumentNullException(nameof(source));
 
-    var dest = Activator.CreateInstance<TDestination>()
-        ?? throw new TechnicalException($"Failed to instantiate {typeof(TDestination).Name}.");
+    // 🔧 Use smart constructor for fallback as well
+    var dest = (TDestination)CreateInstanceSmart(typeof(TSource), typeof(TDestination), source);
 
     foreach (var prop in typeof(TDestination).GetProperties().Where(p => p.CanWrite))
     {
@@ -166,7 +201,6 @@ public class FranzMapper : IFranzMapper
     return dest;
   }
 
-
   private static bool IsCollectionInterface(Type type)
   {
     if (!type.IsGenericType) return false;
@@ -177,7 +211,6 @@ public class FranzMapper : IFranzMapper
            def == typeof(IReadOnlyCollection<>) ||
            def == typeof(IList<>);
   }
-
 
   private object MapCollection(Type sourceType, Type destType, object source)
   {
@@ -223,7 +256,6 @@ public class FranzMapper : IFranzMapper
 
     return result;
   }
-
 
   private static Type GetElementType(Type seqType)
       => seqType.IsArray ? seqType.GetElementType()! :
