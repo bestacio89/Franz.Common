@@ -2,7 +2,7 @@
 using Franz.Common.Mapping.Core;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
-
+namespace Franz.Common.Mapping.Extensions;
 public static class MappingServiceCollectionExtensions
 {
   public static IServiceCollection AddFranzMapping(
