@@ -1,234 +1,288 @@
-# **Franz.Common**
 
-**Deterministic Architecture for Event-Driven .NET Microservices**
+<p align="center">
+  <img width="180" src="Docs/assets/FranzLogo.png" alt="Franz Logo"/>
+</p>
 
-**Franz.Common** is the core of the **Franz Framework** — a lightweight, modular, correctness-first toolkit designed to eliminate boilerplate, unify architectural patterns, and accelerate the creation of **cloud-ready, event-driven microservices**.
+<h1 align="center">Franz.Common</h1>
+<p align="center"><b>Deterministic Architecture for Event-Driven .NET Microservices</b></p>
 
-With a **Kafka-first design** (extensible to RabbitMQ, Azure Service Bus, Redis Streams, and HTTP transports), Franz provides:
-
-* **DDD & CQRS abstractions**
-* **Mediator pipelines with behaviors**
-* **Outbox/inbox + retries + DLQ**
-* **Resilience policies (Polly)**
-* **Structured logging & correlation**
-* **Identity, SSO & tenant propagation**
-* **Unified HTTP & Messaging contracts**
-
-Franz is *batteries-included*, but *fully modular*.
-
----
-
-# **📚 Architecture Documentation**
-
-Franz includes complete, enterprise-grade documentation for institutions and multi-team environments:
-
-### 🧱 **Architecture (C4)**
-
-* [System Architecture](docs/architecture/system-architecture.md)
-* [Messaging Flow](docs/architecture/messaging-flow.md)
-* [Runtime Lifecycle](docs/architecture/runtime-lifecycle.md)
-* (Optional diagrams can be added later)
-
-### 🧭 **Governance**
-
-* [Versioning Policy](docs/governance/versioning-policy.md)
-* [Lifecycle & Release Policy](docs/governance/lifecycle-policy.md)
-* [Contribution Guidelines](docs/governance/contribution-guidelines.md)
-
-### 🔐 **Security & Compliance**
-
-* [Authentication Model (OIDC/SAML/WS-Fed)](docs/security/authentication-model.md)
-* [Audit Logging](docs/security/audit-logging.md)
-* [Data Protection & GDPR](docs/security/data-protection.md)
-
-### ⚙️ **Performance & Resilience**
-
-* [Load Testing Results](docs/performance/load-testing-results.md)
-* [Resilience Behaviors](docs/performance/resilience-behavior.md)
-
-### 🔌 **Integration & Standards**
-
-* [Integration Architecture](docs/integration/architecture-integration.md)
-* [API Error Contract](docs/compliance/api-error-contract.md)
-* [Logging Standards](docs/compliance/logging-standards.md)
-* [Naming Standards](docs/compliance/naming-standards.md)
-
-A full roadmap is available here:
-👉 **[ROADMAP.md](ROADMAP.md)**
+<p align="center">
+  <img src="https://img.shields.io/badge/.NET-9%2B-blueviolet" />
+  <img src="https://img.shields.io/badge/Architecture-Clean%20%7C%20DDD%20%7C%20CQRS-brightgreen" />
+  <img src="https://img.shields.io/badge/Messaging-Kafka%20%7C%20RabbitMQ-orange" />
+  <img src="https://img.shields.io/badge/Resilience-Polly-blue" />
+  <img src="https://img.shields.io/badge/Observability-OpenTelemetry-yellow" />
+  <img src="https://img.shields.io/badge/Multi--Tenancy-Built--In-9cf" />
+  <img src="https://img.shields.io/badge/License-MIT-lightgrey" />
+  <img src="https://img.shields.io/badge/NuGet-250k%2B%20downloads-success" />
+</p>
 
 ---
 
-# **📦 Subpackages**
+# 📘 Overview
 
-Franz is designed as a set of small, composable libraries:
+**Franz.Common** is the foundation of the **Franz Framework**, a modular, deterministic architecture layer for **building event-driven microservices in .NET 9+**.
 
-### 🧩 **Core & Business**
+It eliminates boilerplate, enforces architectural correctness, and provides **DDD, CQRS, messaging, multi-tenancy, resilience, observability, and identity** capabilities—designed for **scalable, long-lived enterprise systems**.
 
-* `Franz.Common.Business`
-* `Franz.Common.Errors`
-* `Franz.Common.Identity`
+Franz is **Kafka-first**, but also supports **RabbitMQ, Azure Service Bus, MongoDB, CosmosDB, SQL**, and more.
 
-### 🧩 **HTTP**
-
-* `Franz.Common.Http.Bootstrap`
-* `Franz.Common.Http.Identity`
-* `Franz.Common.Http.Messaging`
-* `Franz.Common.Http.Refit`
-
-### 🧩 **Mediator & Pipelines**
-
-* `Franz.Common.Mediator`
-* Logging
-* Validation
-* Caching
-* Resilience behaviors
-
-### 🧩 **Messaging**
-
-* `Franz.Common.Messaging`
-* `Franz.Common.Messaging.Hosting`
-* `Franz.Common.Messaging.Kafka`
-* `Franz.Common.Messaging.RabbitMQ`
-
-### 🧩 **Persistence**
-
-* `Franz.Common.EntityFramework`
-* `Franz.Common.MongoDB`
-* `Franz.Common.AzureCosmosDB`
-
-### 🧩 **Multi-Tenancy & Observability**
-
-* `Franz.Common.MultiTenancy`
-* `Franz.Common.Logging`
+> **Spring Boot for .NET — but deterministic, clean, and transparent.**
 
 ---
 
-# **🧱 Architecture Philosophy**
+# 🎯 Why Franz?
 
-Franz follows three core principles:
+Franz was created to bring **predictability, maintainability, and governance** to distributed .NET systems:
 
-### **1️⃣ Correctness First**
-
-Architecture is not diagrams — it is *deterministic behavior*.
-Franz enforces consistency across:
-
-* HTTP → standardized error contracts
-* Messaging → retries, DLQ, correlation
-* Persistence → transactional consistency
-* Logging → structured, correlated, compliant logs
-
-### **2️⃣ Predictability Over Cleverness**
-
-No hidden magic. Everything is explicit. Everything is testable.
-
-### **3️⃣ Enterprise-Ready Modules**
-
-* multi-tenancy
-* polyglot persistence
-* distributed tracing
-* compliance & governance
-* identity across boundaries
-
-Franz is used to bootstrap *multi-year, multi-team* modernization programs.
+- Reduces **80%+** of architectural boilerplate.
+- Enforces **structural correctness** at build time.
+- Provides **consistent architecture** across microservices.
+- Offers **first-class resilience**, **observability**, and **messaging** patterns.
+- Minimizes cognitive load through **unified abstractions**.
+- Designed for **enterprise requirements** (multi-tenancy, identity, auditability).
 
 ---
 
-# **🚀 Getting Started**
+# 📦 Subpackages
 
-Add the core:
+Franz follows a **"batteries-included but modular"** philosophy.
 
-```bash
-dotnet add package Franz.Common --version 1.6.1
+### **Core**
+- `Franz.Common` → Core primitives, serialization, DI, functional utilities.
+
+### **Domain & Application**
+- `Franz.Common.Business` → DDD aggregates, domain events, pipelines.
+- `Franz.Common.Mediator` → Lightweight CQRS mediator with pipelines.
+
+### **Infrastructure**
+- `Franz.Common.EntityFramework` → Auditing, soft deletes, domain event dispatching.
+- `Franz.Common.MongoDB` → Mongo outbox/inbox.
+- `Franz.Common.AzureCosmosDB` → Cosmos outbox/inbox.
+
+### **Messaging**
+- `Franz.Common.Messaging` → Messaging contracts, envelopes, options.
+- `Franz.Common.Messaging.Hosting` → Hosted async listeners.
+- `Franz.Common.Messaging.Kafka`
+- `Franz.Common.Messaging.RabbitMQ`
+
+### **HTTP**
+- `Franz.Common.Http.Bootstrap`
+- `Franz.Common.Http.Refit`
+- `Franz.Common.Http.Identity`
+- `Franz.Common.Http.Messaging`
+
+### **Identity**
+- `Franz.Common.Identity`
+- `Franz.Common.SSO` → Keycloak, OIDC, SAML2, WS-Fed integrations.
+
+---
+
+# 🔐 Security Principles
+
+Franz enforces strict, deterministic security patterns:
+
+- Mandatory **CorrelationId**, **TraceId**, and **TenantId** propagation.
+- Deterministic error filters (no sensitive data leakage).
+- Centralized **authentication & claims enrichment pipelines**.
+- Optional strict mode:
+  - no unregistered controllers  
+  - no unregistered message handlers  
+  - validation-first execution  
+- Standardized identity flows across **OIDC, SAML2, Keycloak, WS-Fed**.
+
+These principles make Franz suitable for **regulated environments**, including public institutions and financial sectors.
+
+---
+
+# 🌐 Architecture Overview
+
+```mermaid
+flowchart TD
+
+subgraph API Layer
+    A[HTTP Request] --> B[Franz.Http Pipeline]
+    B --> C[Correlation + Validation + Error Handling]
+    C --> D[Controller / Minimal API]
+end
+
+subgraph Application Layer
+    D --> E[Franz.Mediator]
+    E --> F[Command / Query Handlers]
+    F --> G[Domain Logic]
+end
+
+subgraph Infrastructure Layer
+    G --> H[(Database)]
+    G --> I[[Kafka Producer]]
+    G --> J[[RabbitMQ Producer]]
+end
+
+subgraph Messaging Layer
+    I --> K[[Kafka Broker]]
+    J --> L[[RabbitMQ Broker]]
+
+    K --> M[[Kafka Consumer]]
+    L --> N[[Rabbit Consumer]]
+
+    M --> E
+    N --> E
+end
+````
+
+---
+
+# 🔄 Runtime Request Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as Franz.Http
+    participant Mediator as Franz.Mediator
+    participant Handler
+    participant Infra as DB / Messaging
+
+    Client->>API: HTTP Request
+    API->>API: Correlation + Validation + Error Filter
+    API->>Mediator: Dispatch(Request)
+    Mediator->>Handler: Execute Handler
+    Handler->>Infra: Query DB / Publish Event
+    Infra-->>Handler: Response / Ack
+    Handler-->>Mediator: Result
+    Mediator-->>API: Standardized Response
+    API-->>Client: HTTP 200 / 400 / 500
 ```
 
-Use only the modules you need — Franz is fully modular.
+---
 
-Examples:
+# 📨 Messaging Flow (Kafka + Outbox)
+
+```mermaid
+flowchart LR
+
+subgraph Application
+    A[Command Handler] --> B[Domain Event]
+    B --> C[(Outbox Store)]
+    C --> D[Outbox Dispatcher]
+end
+
+D -->|Publish| E[(Kafka Broker)]
+E --> F[Consumer Service]
+F --> G[Message Handler]
+G --> H[(Database)]
+```
+
+---
+
+# 🗺️ Franz Ecosystem Map
+
+```mermaid
+flowchart LR
+
+Core[Franz.Common]
+Business[Business Layer]
+Mediator[Mediator]
+HttpBoot[Http Bootstrap]
+Refit[Refit Integration]
+Identity[Identity + SSO]
+
+subgraph Messaging
+  MsgCore[Messaging Core]
+  MsgHost[Messaging Hosting]
+  Kafka[Kafka Integration]
+  Rabbit[RabbitMQ Integration]
+end
+
+subgraph Persistence
+  EF[EF Core Extensions]
+  Mongo[MongoDB Outbox]
+  Cosmos[CosmosDB Outbox]
+end
+
+Core --> Business
+Core --> Mediator
+Core --> HttpBoot
+Core --> MsgCore
+Core --> Identity
+
+Business --> EF
+Mediator --> HttpBoot
+HttpBoot --> Refit
+
+MsgCore --> MsgHost
+MsgHost --> Kafka
+MsgHost --> Rabbit
+
+Core --> Mongo
+Core --> Cosmos
+```
+
+---
+
+# 🏛️ Architecture Enforcement (Franz Tribunal)
+
+Franz includes an optional **architecture test suite** based on ArchUnitNET:
+
+* Enforces **layer boundaries** (Domain → Application → Infrastructure).
+* Forbids **circular dependencies**.
+* Enforces **immutable DTOs**.
+* Validates naming conventions:
+
+  * Commands, Queries, Events
+  * Handlers
+  * Controllers
+* Ensures no domain leakage into infrastructure and vice-versa.
+* Ensures messaging boundaries are respected.
+
+This makes Franz suitable for **large organizations**, where maintaining architectural discipline is critical.
+
+---
+
+# 🚀 Getting Started
+
+### Install the core package:
 
 ```bash
-dotnet add package Franz.Common.Business
-dotnet add package Franz.Common.EntityFramework
-dotnet add package Franz.Common.Mediator
+dotnet add package Franz.Common --version 1.6.19
+```
+
+Messaging example:
+
+```bash
 dotnet add package Franz.Common.Messaging.Kafka
 ```
 
-Full guide:
-📘 **[docs/getting-started.md](docs/getting-started.md)**
-
 ---
 
-# **🏗 Reference Implementations**
+# 💡 Key Features
 
-Franz.Common does NOT embed sample microservices directly.
-Instead, the official templates live in separate repos:
+### ✔ DDD/CQRS First-Class
 
-### ⭐ **Franz.Template.WebApi**
+Entities, value objects, aggregates, events.
 
-A production-ready microservice template using:
+### ✔ Mediator with Pipelines
 
-* Franz.Mediator
-* Franz.Http
-* Kafka messaging
-* Validation + logging
-* Docker + CI/CD
+Logging, validation, telemetry, resilience, transactions.
 
-👉 [https://github.com/bestacio89/Franz](https://github.com/bestacio89/Franz)
+### ✔ Messaging First
 
-### ⭐ More templates coming soon:
-
-* Kafka Worker Template
-* RabbitMQ Template
-* Event-Sourcing Template
-
-Refer to `/samples/README.md` for integration details.
-
----
-
-# **🛠 Core Features**
-
-### ✔ CQRS & Mediator Pipelines
-
-* Logging
-* Validation
-* Caching
-* Resilience (Polly)
-* Metrics & tracing
-
-### ✔ Messaging & Distributed Processing
-
-* Kafka, RabbitMQ
-* Inbox / Outbox pattern
-* Retry & DLQ
-* Idempotency
-* Hosted consumers
-
-### ✔ HTTP Modeling
-
-* Unified error contract
-* Correlation ID propagation
-* API versioning (optional)
-* Refit + Polly integration
-
-### ✔ Multi-Tenancy Support
-
-* Tenant resolution
-* Propagation across HTTP and Messaging
-
-### ✔ Domain Model Foundation
-
-* Entities & aggregates
-* Domain events
-* Event dispatching
+Outbox/inbox, retries, DLQ, correlation propagation.
 
 ### ✔ Observability
 
-* Serilog structured logs
-* Automatic correlation
-* OpenTelemetry hooks
+Serilog, OpenTelemetry, structured logs.
+
+### ✔ Multi-tenancy
+
+Tenant resolution across HTTP, messaging, pipelines.
+
+### ✔ Polyglot Persistence
+
+SQL, MongoDB, CosmosDB with unified abstractions.
 
 ---
 
-# **🧪 Build & Test**
+# 🛠️ Build & Test
 
 ```bash
 git clone https://github.com/bestacio89/Franz.Common.git
@@ -237,7 +291,7 @@ dotnet build
 dotnet test
 ```
 
-For integration tests (Kafka):
+Kafka integration tests:
 
 ```bash
 docker-compose up -d
@@ -246,51 +300,56 @@ dotnet test --filter Category=Integration
 
 ---
 
-# **📈 Changelog**
+# 📜 Changelog Summary (1.4 → 1.6)
 
-Full changelog: [changelog.md](changelog.md)
+### 🧠 Constructor-aware Mapping Engine
 
-Highlights:
+Immutability-first DTO mapping.
 
-### **1.6.18–1.6.19 – Mapping Refinements**
+### 🐇 Unified Messaging Naming
 
-* Full constructor-aware mapping engine
-* Immutable DTO support
-* Faster instantiation
-* 100% backward compatible
+Consistent `AddKafka*` and `AddRabbit*` conventions.
 
-### **1.6.17 – Messaging Orchestration**
+### 🔄 Resilience Pipelines
 
-* Unified extension naming (`AddKafka*`, `AddRabbitMQ*`)
-* Consistent DI patterns across transports
-* Improved RabbitMQ integration
-* Cross-package synchronization
+Retry, fallback, timeout, circuit breakers.
 
----
+### 🧰 Identity & SSO
 
-# **🤝 Contributing**
+Keycloak / SAML2 / OIDC / WS-Fed unified flow.
 
-See the governance docs:
-
-* [Contribution Guidelines](docs/governance/contribution-guidelines.md)
-* [Versioning Policy](docs/governance/versioning-policy.md)
-* [Naming Standards](docs/compliance/naming-standards.md)
+Full changelog in `changelog.md`.
 
 ---
 
-# **📜 License**
+# 🛣️ Roadmap
+
+* `Franz.Common.Grpc` (fully deterministic gRPC pipelines)
+* Microsoft Azure Event Bus integration
+* Extended Cosmos/Mongo projection & TTL helpers
+* AWS/GCP multi-cloud samples
+* Distributed cache providers (Redis, Memcached)
+* Advanced Saga orchestration helpers (optional package)
+
+---
+
+# 🏢 Enterprise Adoption & Support
+
+Franz is maintained with enterprise environments in mind.
+
+For support, consulting, integration guidance, or architectural reviews,
+please contact the maintainer.
+
+---
+
+# 🤝 Contributing
+
+Pull requests welcome — internal contributors preferred.
+All PRs must include **tests**, **documentation**, and comply with the **Franz Tribunal** architecture rules.
+
+---
+
+# 📜 License
 
 MIT License.
-
----
-
-# **🦉 Franz Philosophy**
-
-> *“I don’t chase novelty — I chase correctness.”*
-> *“Architecture is not complexity — it is clarity under load.”*
-> *“Your system must behave the same in January as it does in June.”*
-
-Franz is built for professionals who value stability, predictability, and long-term thinking.
-
----
 
