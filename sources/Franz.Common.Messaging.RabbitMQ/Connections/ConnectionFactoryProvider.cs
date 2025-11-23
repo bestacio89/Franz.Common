@@ -3,51 +3,70 @@ using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using System.Net.Security;
 using System.Reflection;
+using System.Security.Authentication;
 
 namespace Franz.Common.Messaging.RabbitMQ.Connections;
 
-public class ConnectionFactoryProvider : IConnectionFactoryProvider
+public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
 {
-  private readonly IOptions<MessagingOptions> messagingOptions;
+  private readonly IOptions<MessagingOptions> _messagingOptions;
 
   public ConnectionFactoryProvider(IOptions<MessagingOptions> messagingOptions)
   {
-    this.messagingOptions = messagingOptions;
+    _messagingOptions = messagingOptions;
   }
 
-  public IConnectionFactory Current => GetCurrent();
+  public IConnectionFactory Current => CreateFactory();
 
-  private IConnectionFactory GetCurrent()
+  private IConnectionFactory CreateFactory()
   {
-    var result = new ConnectionFactory()
+    var options = _messagingOptions.Value;
+
+    var factory = new ConnectionFactory
     {
-      HostName = messagingOptions.Value.HostName ?? "localhost",
-      UserName = messagingOptions.Value.UserName ?? "guest",
-      Password = messagingOptions.Value.Password ?? "guest",
-      Port = messagingOptions.Value.Port ?? 9092,
-      VirtualHost = messagingOptions.Value.VirtualHost ?? "/",
+      HostName = options.HostName ?? "localhost",
+      UserName = options.UserName ?? "guest",
+      Password = options.Password ?? "guest",
+
+      Port = options.Port ?? AmqpTcpEndpoint.UseDefaultPort,
+      VirtualHost = options.VirtualHost ?? "/",
+
       ClientProvidedName = GetClientProvidedName(),
+
+      // Still valid in RabbitMQ 7.x:
+      AutomaticRecoveryEnabled = true,
+      TopologyRecoveryEnabled = true,
+      RequestedHeartbeat = TimeSpan.FromSeconds(30),
+
+      // NOTE: DispatchConsumersAsync REMOVED IN RABBITMQ 7.x
     };
 
-    if (messagingOptions.Value.SslEnabled != false)
+    if (options.SslEnabled == true)
     {
-      result.Ssl = new SslOption
+      factory.Ssl = new SslOption
       {
         Enabled = true,
-        AcceptablePolicyErrors = SslPolicyErrors.RemoteCertificateNotAvailable | SslPolicyErrors.RemoteCertificateNameMismatch | SslPolicyErrors.RemoteCertificateChainErrors,
-        Version = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls12
+        ServerName = options.HostName,
+        AcceptablePolicyErrors =
+              SslPolicyErrors.RemoteCertificateNotAvailable |
+              SslPolicyErrors.RemoteCertificateNameMismatch |
+              SslPolicyErrors.RemoteCertificateChainErrors,
+        Version = SslProtocols.Tls12 | SslProtocols.Tls13
       };
+
+      if (options.Port is null)
+        factory.Port = 5671;
     }
 
-    return result;
+    return factory;
   }
 
-  private string? GetClientProvidedName()
+  private static string? GetClientProvidedName()
   {
     var name = Assembly.GetEntryAssembly()?.GetName().Name;
 
     if (!string.IsNullOrEmpty(Environment.MachineName))
-      name = string.Concat(name, " (", Environment.MachineName, ")");
+      name = $"{name} ({Environment.MachineName})";
 
     return name;
   }

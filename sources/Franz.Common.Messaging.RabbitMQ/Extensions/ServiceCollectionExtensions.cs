@@ -7,7 +7,6 @@ using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Hosting;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Messaging.RabbitMQ.Replay;
-using Franz.Common.Messaging.RabbitMQ.Transactions;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Messaging.Extensions;
 using Microsoft.Extensions.Configuration;
@@ -50,7 +49,7 @@ public static class ServiceCollectionExtensions
   {
     services
           .AddRabbitMQMessagingConfiguration(configuration)
-          .AddNoDuplicateScoped<IMessagingTransaction, MessagingTransaction>()
+          
           .AddNoDuplicateScoped<IMessageFactory, MessageFactory>()
           .AddNoDuplicateScoped<IMessageHandler, MessageBuilderDelegatingHandler>();
 

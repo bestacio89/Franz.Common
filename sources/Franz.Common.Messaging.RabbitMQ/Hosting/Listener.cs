@@ -11,136 +11,137 @@ using System.Text;
 
 namespace Franz.Common.Messaging.RabbitMQ.Hosting;
 
-public class Listener : IListener
+public sealed class Listener : IListener, IAsyncDisposable
 {
-  private readonly IModelProvider modelProvider;
-  private readonly IBasicConsumerFactory basicConsumerFactory;
-  private readonly IReplayStrategy? replayStrategy;
-  private readonly ILogger<Listener> logger;
-  private readonly string queueName;
+  private readonly IModelProvider _modelProvider;
+  private readonly IBasicConsumerFactory _consumerFactory;
+  private readonly IReplayStrategy? _replayStrategy;
+  private readonly ILogger<Listener> _logger;
+  private readonly string _queueName;
 
-  private EventingBasicConsumer? consumer;
+  private AsyncEventingBasicConsumer? _consumer;
+  private string? _tag;
+
+  public event EventHandler<MessageEventArgs>? Received;
 
   public Listener(
       IModelProvider modelProvider,
       IAssemblyAccessor assemblyAccessor,
-      IBasicConsumerFactory basicConsumerFactory,
+      IBasicConsumerFactory consumerFactory,
       ILogger<Listener> logger,
       IReplayStrategy? replayStrategy = null)
   {
-    this.modelProvider = modelProvider;
-    this.basicConsumerFactory = basicConsumerFactory;
-    this.logger = logger;
-    this.replayStrategy = replayStrategy;
+    _modelProvider = modelProvider;
+    _consumerFactory = consumerFactory;
+    _logger = logger;
+    _replayStrategy = replayStrategy;
 
     var assembly = assemblyAccessor.GetEntryAssembly();
-    queueName = QueueNamer.GetQueueName(assembly);
+    _queueName = QueueNamer.GetQueueName(assembly);
   }
-
-  public string? Tag { get; private set; }
-
-  public event EventHandler<MessageEventArgs>? Received;
 
   public async Task Listen(CancellationToken stoppingToken = default)
   {
-    consumer = basicConsumerFactory.Build(modelProvider.Current);
+    var channel = _modelProvider.Current;
 
-    consumer.Received += ReceiveMessage;
+    _consumer = _consumerFactory.BuildAsync(channel);
+    _consumer.ReceivedAsync += ReceiveMessageAsync;
 
-    Tag = modelProvider.Current.BasicConsume(
-        queue: queueName,
+    _tag = await channel.BasicConsumeAsync(
+        queue: _queueName,
         autoAck: false,
-        consumerTag: string.Empty,
-        noLocal: false,
-        exclusive: false,
-        arguments: null,
-        consumer: consumer);
+        consumer: _consumer,
+        cancellationToken: stoppingToken);
 
-    // Keep the listener alive until cancellation is requested
+    _logger.LogInformation("RabbitMQ Listener started on queue {Queue}", _queueName);
+
     try
     {
-      while (!stoppingToken.IsCancellationRequested)
-      {
-        await Task.Delay(500, stoppingToken); // small delay to yield back to scheduler
-      }
+      await Task.Delay(Timeout.Infinite, stoppingToken);
     }
     catch (TaskCanceledException)
     {
-      // expected when stoppingToken is triggered
+      // normal shutdown
     }
   }
 
-  private void ReceiveMessage(object? sender, BasicDeliverEventArgs e)
+  private async Task ReceiveMessageAsync(object? sender, BasicDeliverEventArgs e)
   {
     try
     {
       var message = new Message
       {
-        Headers = TransfertHeaders(e),
-        Body = Encoding.UTF8.GetString(e.Body.ToArray(), 0, e.Body.Length),
+        Headers = ExtractHeaders(e),
+        Body = Encoding.UTF8.GetString(e.Body.ToArray())
       };
 
       Received?.Invoke(this, new MessageEventArgs(message));
 
-      modelProvider.Current.BasicAck(e.DeliveryTag, false);
+      await _modelProvider.Current.BasicAckAsync(e.DeliveryTag, false);
     }
     catch (Exception ex)
     {
-      logger.LogError(ex.GetBaseException(), "Error while processing message");
+      _logger.LogError(ex, "Error while processing message");
 
-      if (replayStrategy != null)
+      if (_replayStrategy != null)
       {
         try
         {
-          replayStrategy.Replay(e, ex);
+          await _replayStrategy.ReplayAsync(e, ex);
         }
-        catch (Exception replayException)
+        catch (Exception replayEx)
         {
-          logger.LogError(replayException, "Error while replaying message");
-
-          modelProvider.Current.BasicNack(e.DeliveryTag, false, false);
-          throw new AggregateException(ex, replayException);
+          _logger.LogError(replayEx, "Replay failed");
+          await _modelProvider.Current.BasicNackAsync(e.DeliveryTag, false, false);
+          throw new AggregateException(ex, replayEx);
         }
       }
       else
       {
-        modelProvider.Current.BasicNack(e.DeliveryTag, false, false);
+        await _modelProvider.Current.BasicNackAsync(e.DeliveryTag, false, false);
       }
 
       throw;
     }
-    finally
-    {
-      if (modelProvider.Current.HasTransaction())
-        modelProvider.Current.TxCommit();
-    }
   }
 
-  private static MessageHeaders TransfertHeaders(BasicDeliverEventArgs e)
+  private static MessageHeaders ExtractHeaders(BasicDeliverEventArgs e)
   {
-    var dictionary = e.BasicProperties.Headers?
-        .Where(header => !header.Key.StartsWith("x-"))
+    var headers = e.BasicProperties.Headers?
+        .Where(h => !h.Key.StartsWith("x-"))
         .ToDictionary(
-            x => x.Key,
-            x => new StringValues(Encoding.UTF8.GetString((byte[])x.Value)))
+            h => h.Key,
+            h => new StringValues(Encoding.UTF8.GetString((byte[])h.Value)))
         ?? new Dictionary<string, StringValues>();
 
-    return new MessageHeaders(dictionary);
+    return new MessageHeaders(headers);
   }
 
+  // REQUIRED by IListener
   public void StopListen()
   {
-    if (!string.IsNullOrEmpty(Tag))
+    // fire and forget — force sync wrapper around async
+    StopListenAsync().Wait();
+  }
+
+  public async Task StopListenAsync()
+  {
+    if (_tag != null)
     {
-      modelProvider.Current.BasicCancel(Tag);
+      await _modelProvider.Current.BasicCancelAsync(_tag);
+      _tag = null;
     }
 
-    Tag = null;
-
-    if (consumer != null)
+    if (_consumer != null)
     {
-      consumer.Received -= ReceiveMessage;
-      consumer = null;
+      _consumer.ReceivedAsync -= ReceiveMessageAsync;
+      _consumer = null;
     }
+  }
+
+  // REQUIRED by IAsyncDisposable
+  public async ValueTask DisposeAsync()
+  {
+    await StopListenAsync();
   }
 }

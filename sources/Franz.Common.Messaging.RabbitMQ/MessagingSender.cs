@@ -7,59 +7,39 @@ using System.Text;
 
 namespace Franz.Common.Messaging.RabbitMQ;
 
-public class MessagingSender : IMessagingSender
+public sealed class MessagingSender : IMessagingSender
 {
   private readonly IModelProvider modelProvider;
-  private readonly IMessageHandler messageHandler;
-  private readonly IMessagingTransaction? messagingTransaction;
+  private readonly IMessageHandler handler;
+  private readonly IMessagingTransaction? transaction;
 
   public MessagingSender(
       IModelProvider modelProvider,
-      IMessageHandler messageHandler,
-      IMessagingTransaction? messagingTransaction = null)
+      IMessageHandler handler,
+      IMessagingTransaction? transaction = null)
   {
     this.modelProvider = modelProvider;
-    this.messageHandler = messageHandler;
-    this.messagingTransaction = messagingTransaction;
+    this.handler = handler;
+    this.transaction = transaction;
   }
 
-  public Task SendAsync(Message message, CancellationToken cancellationToken = default)
+  public async Task SendAsync(Message message, CancellationToken cancellationToken = default)
   {
     if (message.Body == null)
-      throw new ArgumentNullException(nameof(message.Body), "Message body cannot be null");
-    // Let the message handler run any enrichment/middleware
-    messageHandler.Process(message);
+      throw new ArgumentNullException(nameof(message.Body));
 
-    // Derive target queue from the message type
-    var queueName = QueueNamer.GetQueueName(message.Body.GetType().Assembly);
+    handler.Process(message);
 
-    var properties = BuildProperties(message);
-    var body = BuildBody(message);
+    var queue = QueueNamer.GetQueueName(message.Body.GetType().Assembly);
 
-    messagingTransaction?.Begin();
+    var bytes = Encoding.UTF8.GetBytes(message.Body);
 
-    modelProvider.Current.BasicPublish(
-        exchange: string.Empty,
-        routingKey: queueName,
-        mandatory: true,
-        basicProperties: properties,
-        body: body);
+    transaction?.Begin();
 
-    return Task.CompletedTask;
-  }
-
-  private IBasicProperties BuildProperties(Message message)
-  {
-    var props = modelProvider.Current.CreateBasicProperties();
-    props.Persistent = true;
-    props.Headers = message.Headers.ToDictionary(
-        x => x.Key,
-        x => (object)x.Value.ToString() ?? string.Empty);
-    return props;
-  }
-
-  private static byte[]? BuildBody(Message message)
-  {
-    return message.Body != null ? Encoding.UTF8.GetBytes(message.Body) : null;
+    await modelProvider.Current.BasicPublishAsync(
+        exchange: "",
+        routingKey: queue,
+        bytes,
+        cancellationToken);
   }
 }

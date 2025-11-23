@@ -3,12 +3,10 @@ using RabbitMQ.Client.Events;
 
 namespace Franz.Common.Messaging.RabbitMQ;
 
-public class BasicConsumerFactory : IBasicConsumerFactory
+public sealed class BasicConsumerFactory : IBasicConsumerFactory
 {
-    public EventingBasicConsumer Build(IModel model)
-    {
-        EventingBasicConsumer? result = new(model);
-
-        return result;
-    }
+  public AsyncEventingBasicConsumer BuildAsync(IChannel channel)
+  {
+    return new AsyncEventingBasicConsumer(channel);
+  }
 }

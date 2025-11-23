@@ -1,20 +1,27 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
+  
   <Import Project="..\..\common.targets" />
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
     <PackageReference Include="RabbitMQ.Client" Version="7.2.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
     <ProjectReference Include="..\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
+    <ProjectReference Include="..\Franz.Common.Messaging.RabbitMQ\Franz.Common.Messaging.RabbitMQ.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
-    <ProjectReference Include="..\Franz.Common.Reflection\Franz.Common.Reflection.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="readme.md">
+      <PackagePath></PackagePath>
+      <Pack>true</Pack>
+    </None>
   </ItemGroup>
 
 </Project>

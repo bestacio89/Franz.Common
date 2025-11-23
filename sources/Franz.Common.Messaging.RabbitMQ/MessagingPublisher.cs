@@ -1,74 +1,61 @@
 using Franz.Common.Business.Events;
+using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.RabbitMQ.Modeling;
+using Franz.Common.Reflection;
 using Franz.Common.Mediator;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Factories;
-using Franz.Common.Messaging.RabbitMQ.Modeling;
 using System.Text;
+using RabbitMQ.Client;
 
 namespace Franz.Common.Messaging.RabbitMQ;
 
-public class MessagingPublisher : IMessagingPublisher
+public sealed class MessagingPublisher : IMessagingPublisher
 {
   private readonly IModelProvider modelProvider;
-  private readonly IMessagingInitializer messagingInitializer;
+  private readonly IMessagingInitializer initializer;
   private readonly IMessageFactory messageFactory;
-  private readonly IMessageHandler messageHandler;
-  private readonly IMessagingTransaction? messagingTransaction;
+  private readonly IMessageHandler handler;
+  private readonly IMessagingTransaction? transaction;
 
   public MessagingPublisher(
       IModelProvider modelProvider,
-      IMessagingInitializer messagingInitializer,
+      IMessagingInitializer initializer,
       IMessageFactory messageFactory,
-      IMessageHandler messageHandler,
-      IMessagingTransaction? messagingTransaction = null)
+      IMessageHandler handler,
+      IMessagingTransaction? transaction = null)
   {
     this.modelProvider = modelProvider;
-    this.messagingInitializer = messagingInitializer;
+    this.initializer = initializer;
     this.messageFactory = messageFactory;
-    this.messageHandler = messageHandler;
-    this.messagingTransaction = messagingTransaction;
+    this.handler = handler;
+    this.transaction = transaction;
   }
 
-  public Task Publish<TIntegrationEvent>(TIntegrationEvent integrationEvent)
+  public Task Publish<TIntegrationEvent>(TIntegrationEvent evt)
       where TIntegrationEvent : IIntegrationEvent
   {
-    // Ensure RabbitMQ topology (exchanges/queues) exists
-    messagingInitializer.Initialize();
+    initializer.Initialize();
 
-    // Build the raw message from the integration event
-    var message = messageFactory.Build(integrationEvent);
+    var message = messageFactory.Build(evt);
+    handler.Process(message);
 
-    // Apply any message pipeline handlers (headers, enrichment, etc.)
-    messageHandler.Process(message);
+    var exchange = ExchangeNamer.GetEventExchangeName(evt.GetType().Assembly);
 
-    // Figure out which exchange to target based on the event’s assembly
-    var integrationEventAssembly = integrationEvent.GetType().Assembly;
-    var exchangeName = ExchangeNamer.GetEventExchangeName(integrationEventAssembly);
-
-    // Actually publish to RabbitMQ
-    PublishInternal(message, exchangeName);
-
-    // Return completed task to respect async contract
-    return Task.CompletedTask;
+    return PublishInternalAsync(message, exchange);
   }
 
-  private void PublishInternal(Message message, string exchangeName)
+  private async Task PublishInternalAsync(Message message, string exchange)
   {
-    var properties = modelProvider.Current.CreateBasicProperties();
-    properties.Persistent = true;
-    properties.Headers = message.Headers.ToDictionary(
-        x => x.Key,
-        x => (object)x.Value.ToString());
+    var body = Encoding.UTF8.GetBytes(message.Body ?? string.Empty);
 
-    var body = message.Body != null ? Encoding.UTF8.GetBytes(message.Body) : null;
+    transaction?.Begin();
 
-    messagingTransaction?.Begin();
-
-    modelProvider.Current.BasicPublish(
-        exchange: exchangeName,
-        routingKey: string.Empty,
-        mandatory: false,
-        basicProperties: properties,
-        body: body);
+    // 7.x publishing:
+    await modelProvider.Current.BasicPublishAsync(
+        exchange,
+        routingKey: "",
+        body);
   }
 }

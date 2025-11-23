@@ -1,57 +1,53 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
-using System.IdentityModel.Tokens.Jwt;
+using Microsoft.OpenApi;
+using System.Text;
 
 namespace Franz.Common.Http.Authentication.Extensions;
+
 public static class ServiceCollectionExtensions
 {
-  public static IServiceCollection AddFranzAuthentication(this IServiceCollection services)
+  public static IServiceCollection AddFranzAuthentication(
+      this IServiceCollection services,
+      string? issuerSigningKey = null)
   {
-    services
-      .AddSwaggerGen(options =>
+    services.AddSwaggerGen(options =>
+    {
+      options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
       {
-        options.AddSecurityDefinition(name: "Bearer", securityScheme: new OpenApiSecurityScheme
+        Name = "Authorization",
+        Description = "Insert JWT as: Bearer {token}",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+      });
+
+    });
+
+    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
         {
-          Name = "Authorization",
-          Description = "Enter JWT",
-          In = ParameterLocation.Header,
-          Type = SecuritySchemeType.Http,
-          BearerFormat = "JWT",
-          Scheme = "Bearer"
-        });
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
-        {
+          options.RequireHttpsMetadata = true;
+          options.SaveToken = false;
+
+          options.TokenValidationParameters = new TokenValidationParameters
           {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            new string[]{}
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = issuerSigningKey != null,
+            NameClaimType = "name",
+            RoleClaimType = "role"
+          };
+
+          if (issuerSigningKey != null)
+          {
+            options.TokenValidationParameters.IssuerSigningKey =
+                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(issuerSigningKey));
           }
         });
-      })
-      .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-      .AddJwtBearer(options =>
-      {
-        options.SaveToken = false;
-        options.TokenValidationParameters = new TokenValidationParameters()
-        {
-          ValidateIssuer = false,
-          ValidateAudience = false,
-          ValidateLifetime = false,
-          ValidateIssuerSigningKey = false,
-          RequireSignedTokens = false,
-          NameClaimType = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
-          RoleClaimType = "role",
-          SignatureValidator = (token, parameters) => new JwtSecurityToken(token),
-        };
-      });
 
     return services;
   }

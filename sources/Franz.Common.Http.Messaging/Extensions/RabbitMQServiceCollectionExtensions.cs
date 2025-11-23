@@ -1,16 +1,10 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Franz.Common.Messaging.RabbitMQ.Extensions;
-using Franz.Common.DependencyInjection.Extensions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Franz.Common.Messaging.Hosting.Transactions;
+﻿using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Http.Messaging.Transactions;
-using Microsoft.Extensions.Configuration;
-using HealthChecks.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Connections;
+using Franz.Common.Messaging.RabbitMQ.Extensions;
+using HealthChecks.RabbitMQ;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 
 namespace Franz.Common.Http.Messaging.Extensions;

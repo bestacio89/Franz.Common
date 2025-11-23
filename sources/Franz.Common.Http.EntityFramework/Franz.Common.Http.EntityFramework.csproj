@@ -8,15 +8,14 @@
 
 	<ItemGroup>
 	  <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.3.0" />
-	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.8" />
-	  <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.8" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>
 	  <ProjectReference Include="..\Franz.Common.AzureCosmosDB\Franz.Common.AzureCosmosDB.csproj" />
 	  <ProjectReference Include="..\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
 	  <ProjectReference Include="..\Franz.Common.EntityFramework.MariaDB\Franz.Common.EntityFramework.MariaDB.csproj" />
-	  <ProjectReference Include="..\Franz.Common.EntityFramework.Oracle\Franz.Common.EntityFramework.Oracle.csproj" />
 	  <ProjectReference Include="..\Franz.Common.EntityFramework.PostGres\Franz.Common.EntityFramework.PostGres.csproj" />
 	  <ProjectReference Include="..\Franz.Common.EntityFramework.SQLServer\Franz.Common.EntityFramework.SQLServer.csproj" />
 	  <ProjectReference Include="..\Franz.Common.MongoDB\Franz.Common.MongoDB.csproj" />

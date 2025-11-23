@@ -1,7 +1,6 @@
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.MariaDB.Extensions;
-using Franz.Common.EntityFramework.Oracle.Extensions;
 using Franz.Common.EntityFramework.Postgres.Extensions;
 using Franz.Common.EntityFramework.SQLServer.Extensions;
 using Franz.Common.Http.EntityFramework.Transactions;
@@ -29,7 +28,6 @@ public static class ServiceCollectionExtensions
     services = provider switch
     {
       "mariadb" => services.AddMariaDatabase<TDbContext>(config),
-      "oracle" => services.AddOracleDatabase<TDbContext>(config),
       "postgres" => services.AddPostgresDatabase<TDbContext>(config),
       "sqlserver" => services.AddSqlServerDatabase<TDbContext>(config),
       _ => throw new InvalidOperationException($"Unsupported relational provider '{provider}'.")

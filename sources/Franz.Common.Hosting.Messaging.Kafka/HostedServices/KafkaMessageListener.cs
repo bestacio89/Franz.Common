@@ -3,7 +3,7 @@ using Franz.Common.Messaging.Serialization;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
-namespace Franz.Common.Messaging.Hosting.Listeners;
+namespace Franz.Common.Messaging.Hosting.Kafka.HostedServices;
 
 public class KafkaMessageListener : IListener
 {

@@ -1,33 +1,76 @@
+﻿using System.Threading;
 using RabbitMQ.Client;
 
 namespace Franz.Common.Messaging.RabbitMQ.Connections;
 
 public sealed class ConnectionProvider : IConnectionProvider, IDisposable
 {
-  private readonly IConnectionFactoryProvider connectionFactoryProvider;
-  private IConnection? connection;
+  private readonly IConnectionFactoryProvider _factoryProvider;
+  private readonly SemaphoreSlim _sync = new(1, 1);
 
-  public ConnectionProvider(IConnectionFactoryProvider connectionFactoryProvider)
+  private IConnection? _connection;
+  private bool _disposed;
+
+  public ConnectionProvider(IConnectionFactoryProvider factoryProvider)
   {
-    this.connectionFactoryProvider = connectionFactoryProvider;
+    _factoryProvider = factoryProvider;
   }
 
-  public IConnection Current => GetCurrent();
-
-  private IConnection GetCurrent()
+  public IConnection Current
   {
-    if (connection == null)
+    get
     {
-      var connectionFactory = connectionFactoryProvider.Current;
-      connection = connectionFactory.CreateConnection();
+      ThrowIfDisposed();
+      return GetOrCreateConnection();
     }
+  }
 
-    return connection;
+  private IConnection GetOrCreateConnection()
+  {
+    if (_connection is { IsOpen: true })
+      return _connection;
+
+    // Fast path failed → secure creation via lock
+    _sync.Wait();
+    try
+    {
+      if (_connection is { IsOpen: true })
+        return _connection;
+
+      var factory = _factoryProvider.Current;
+      _connection = (IConnection?)factory.CreateConnectionAsync();
+
+      return _connection;
+    }
+    finally
+    {
+      _sync.Release();
+    }
+  }
+
+  private void ThrowIfDisposed()
+  {
+    if (_disposed)
+      throw new ObjectDisposedException(nameof(ConnectionProvider));
   }
 
   public void Dispose()
   {
-    if (connection != null)
-      connection.Dispose();
+    if (_disposed)
+      return;
+
+    _disposed = true;
+
+    try
+    {
+      _connection?.Dispose();
+    }
+    catch
+    {
+      // swallow — closing a dead connection may throw
+    }
+
+    _connection?.Dispose();
+    _sync.Dispose();
   }
 }

@@ -5,7 +5,6 @@ using Microsoft.Extensions.Hosting;
 using Franz.Common.EntityFramework.MariaDB.Extensions;
 using Franz.Common.EntityFramework.SQLServer.Extensions;
 using Franz.Common.EntityFramework.Postgres.Extensions;
-using Franz.Common.EntityFramework.Oracle.Extensions;
 using Franz.Common.MongoDB.Extensions;
 using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.MongoDB;
@@ -31,7 +30,7 @@ public static class ServiceCollectionExtensions
     {
       // EF providers (relational)
       "mariadb" => services.AddMariaDatabase<TDbContext>(configuration),
-      "oracle" => services.AddOracleDatabase<TDbContext>(configuration),
+
       "postgres" => services.AddPostgresDatabase<TDbContext>(configuration),
       "sqlserver" => services.AddSqlServerDatabase<TDbContext>(configuration),
 

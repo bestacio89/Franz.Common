@@ -9,9 +9,9 @@ using Franz.Common.Mediator.Messages;
 
 namespace Franz.Common.Messaging.RabbitMQ;
 
-public class MessagingInitializer : IMessagingInitializer
+public sealed class MessagingInitializer : IMessagingInitializer
 {
-  private static bool IsInitialized { get; set; }
+  private static bool IsInitialized = false;
 
   private readonly IModelProvider modelProvider;
   private readonly IAssemblyAccessor assemblyAccessor;
@@ -20,11 +20,16 @@ public class MessagingInitializer : IMessagingInitializer
   private readonly string deadLetterQueueName;
   private readonly string deadLetterExchangeName;
 
-  public MessagingInitializer(IModelProvider modelProvider, IAssemblyAccessor assemblyAccessor, IOptions<MessagingOptions> messagingOptions)
+  public MessagingInitializer(
+      IModelProvider modelProvider,
+      IAssemblyAccessor assemblyAccessor,
+      IOptions<MessagingOptions> options)
   {
     this.modelProvider = modelProvider;
     this.assemblyAccessor = assemblyAccessor;
+
     var assembly = assemblyAccessor.GetEntryAssembly();
+
     exchangeName = ExchangeNamer.GetEventExchangeName(assembly);
     queueName = QueueNamer.GetQueueName(assembly);
     deadLetterQueueName = QueueNamer.GetDeadLetterQueueName(assembly);
@@ -33,37 +38,59 @@ public class MessagingInitializer : IMessagingInitializer
 
   public void Initialize()
   {
-    if (!IsInitialized)
-    {
-      InitializeExchange();
-      InitializeQueue();
-      InitializeDeadLetterQueue();
-      InitializeExchangesForSubscriptions();
+    if (IsInitialized)
+      return;
 
-      IsInitialized = true;
-    }
+    InitializeExchange();
+    InitializeQueue();
+    InitializeDeadLetterQueue();
+    InitializeExchangesForSubscriptions();
+
+    IsInitialized = true;
   }
 
   private void InitializeExchange()
   {
-    modelProvider.Current.ExchangeDeclare(exchangeName, ExchangeType.Headers, true, false, null);
+    modelProvider.Current.ExchangeDeclareAsync(
+        exchangeName,
+        ExchangeType.Headers,
+        durable: true,
+        autoDelete: false);
   }
 
   private void InitializeQueue()
   {
-    modelProvider.Current.QueueDeclare(queueName, true, false, false, new Dictionary<string, object>
-      {
-        { "x-queue-type", "quorum" },
-        { "x-dead-letter-exchange", deadLetterExchangeName },
-        { "x-dead-letter-routing-key", deadLetterQueueName },
-      });
+    modelProvider.Current.QueueDeclareAsync(
+        queue: queueName,
+        durable: true,
+        exclusive: false,
+        autoDelete: false,
+        arguments: new Dictionary<string, object>
+        {
+                { "x-queue-type", "quorum" },
+                { "x-dead-letter-exchange", deadLetterExchangeName },
+                { "x-dead-letter-routing-key", deadLetterQueueName },
+        });
   }
 
   private void InitializeDeadLetterQueue()
   {
-    modelProvider.Current.ExchangeDeclare(deadLetterExchangeName, ExchangeType.Direct, true, false, new Dictionary<string, object> { { "x-queue-type", "quorum" } });
-    modelProvider.Current.QueueDeclare(deadLetterQueueName, true, false, false, null);
-    modelProvider.Current.QueueBind(deadLetterQueueName, deadLetterExchangeName, deadLetterQueueName, null);
+    modelProvider.Current.ExchangeDeclareAsync(
+        exchange: deadLetterExchangeName,
+        type: ExchangeType.Direct,
+        durable: true,
+        autoDelete: false);
+
+    modelProvider.Current.QueueDeclareAsync(
+        queue: deadLetterQueueName,
+        durable: true,
+        exclusive: false,
+        autoDelete: false);
+
+    modelProvider.Current.QueueBindAsync(
+        queue: deadLetterQueueName,
+        exchange: deadLetterExchangeName,
+        routingKey: deadLetterQueueName);
   }
 
   private void InitializeExchangesForSubscriptions()
@@ -71,30 +98,39 @@ public class MessagingInitializer : IMessagingInitializer
     var entryAssembly = assemblyAccessor.GetEntryAssembly();
     var companyName = string.Join(".", entryAssembly.Name!.Split(".").Take(1));
 
-    AppDomain.CurrentDomain
-      .GetAssemblies()
-      .Where(assembly => !assembly.IsDynamic && assembly.FullName!.StartsWith(companyName))
-      .SelectMany(assembly => assembly.ExportedTypes)
-      .SelectMany(type => type.GetInterfaces())
-      .Where(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
-      .SelectMany(contract => contract.GenericTypeArguments)
-      .Where(type => type.GetInterfaces().Any(contract => contract.IsAssignableTo(typeof(IIntegrationEvent))))
-      .ToList()
-      .ForEach(integrationEventType =>
-      {
-        InitializeExchangeForSubscription(integrationEventType);
-      });
+    var integrationEvents =
+        AppDomain.CurrentDomain
+        .GetAssemblies()
+        .Where(a => !a.IsDynamic && a.FullName!.StartsWith(companyName))
+        .SelectMany(a => a.ExportedTypes)
+        .Where(t => t.GetInterfaces().Any(ifc =>
+            ifc.IsGenericType &&
+            ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>)))
+        .SelectMany(type => type.GetInterfaces())
+        .Where(ifc => ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
+        .Select(ifc => ifc.GetGenericArguments()[0])
+        .Where(t => typeof(IIntegrationEvent).IsAssignableFrom(t))
+        .Distinct();
+
+    foreach (var eventType in integrationEvents)
+    {
+      InitializeExchangeForSubscription(eventType);
+    }
   }
 
   private void InitializeExchangeForSubscription(Type integrationEventType)
   {
-    var exchangeSourceName = ExchangeNamer.GetEventExchangeName(integrationEventType.Assembly);
-    var classEventName = HeaderNamer.GetEventClassName(integrationEventType);
+    var sourceExchange = ExchangeNamer.GetEventExchangeName(integrationEventType.Assembly);
+    var eventName = HeaderNamer.GetEventClassName(integrationEventType);
 
-    modelProvider.Current.QueueBind(queueName, exchangeSourceName, string.Empty, new Dictionary<string, object>
-      {
-          { MessagingConstants.ClassName, classEventName },
-          { "x-match", "all" },
-      });
+    modelProvider.Current.QueueBindAsync(
+        queue: queueName,
+        exchange: sourceExchange,
+        routingKey: "",
+        arguments: new Dictionary<string, object>
+        {
+                { MessagingConstants.ClassName, eventName },
+                { "x-match", "all" }
+        });
   }
 }

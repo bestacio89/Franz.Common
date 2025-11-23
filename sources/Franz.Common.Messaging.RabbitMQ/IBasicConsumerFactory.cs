@@ -1,3 +1,4 @@
+using Franz.Common.Messaging.RabbitMQ.Modeling;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
@@ -5,5 +6,9 @@ namespace Franz.Common.Messaging.RabbitMQ;
 
 public interface IBasicConsumerFactory
 {
-    EventingBasicConsumer Build(IModel model);
+
+  /// <summary>
+  /// Build an asynchronous consumer. Uses AsyncEventingBasicConsumer.
+  /// </summary>
+  AsyncEventingBasicConsumer BuildAsync(IChannel model);
 }

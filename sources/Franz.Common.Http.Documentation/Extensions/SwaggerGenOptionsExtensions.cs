@@ -1,6 +1,6 @@
 using Franz.Common.Business.Extensions;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace Franz.Common.Http.Documentation.Extensions;
@@ -26,8 +26,8 @@ public static class SwaggerGenOptionsExtensions
   private static OpenApiSchema Generate(Type type)
   {
     var result = type.Equals(typeof(short)) | type.Equals(typeof(int)) | type.Equals(typeof(long))
-      ? new OpenApiSchema { Type = "integer", Format = type.Name.ToLower() }
-      : new OpenApiSchema { Type = type.Name };
+      ? new OpenApiSchema { Type = JsonSchemaType.Integer, Format = type.Name.ToLower() }
+      : new OpenApiSchema { Type = JsonSchemaType.String };
 
     return result;
   }

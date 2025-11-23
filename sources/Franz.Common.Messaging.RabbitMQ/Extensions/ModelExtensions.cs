@@ -6,7 +6,7 @@ public static class ModelExtensions
 {
   private const string FieldName = "_usesTransactions";
 
-  public static bool HasTransaction(this IModel model)
+  public static bool HasTransaction(this IChannel model)
   {
     var type = model.GetType();
     var field = type.GetField(FieldName, BindingFlags.NonPublic | BindingFlags.Instance)!;

@@ -3,32 +3,53 @@ using RabbitMQ.Client;
 
 namespace Franz.Common.Messaging.RabbitMQ.Modeling;
 
-public sealed class ModelProvider : IModelProvider, IDisposable
+
+
+public sealed class ModelProvider : IModelProvider, IAsyncDisposable, IDisposable
 {
-  private readonly IConnectionProvider connectionProvider;
-  private IModel? model;
+  private readonly IConnectionProvider _connectionProvider;
+  private IChannel? _channel;
 
   public ModelProvider(IConnectionProvider connectionProvider)
   {
-    this.connectionProvider = connectionProvider;
+    _connectionProvider = connectionProvider ?? throw new ArgumentNullException(nameof(connectionProvider));
   }
 
-  public IModel Current => GetCurrent();
+  public IChannel Current => _channel ??= CreateChannel();
 
-  private IModel GetCurrent()
+  private IChannel CreateChannel()
   {
-    if (model == null)
+    // ConnectionFactoryProvider already builds the ConnectionFactory
+    // and exposes IConnection via IConnectionProvider.Current
+    var connection = _connectionProvider.Current;
+
+    // RabbitMQ 7.x: CreateChannel / CreateChannelAsync
+    // sync variant is still available
+    return (IChannel)connection.CreateChannelAsync();
+  }
+
+  public async ValueTask DisposeAsync()
+  {
+    if (_channel is null)
+      return;
+
+    try
     {
-      model = connectionProvider.Current.CreateModel();
-      model.BasicQos(0, 1, false);
+      // Close via async extension methods in 7.x
+      await _channel.CloseAsync();
+    }
+    catch
+    {
+      // swallow on dispose
     }
 
-    return model;
+    await _channel.DisposeAsync();
+    _channel = null;
   }
 
-  public void Dispose()
+  void IDisposable.Dispose()
   {
-    if (model != null)
-      model.Dispose();
+    // bridge sync dispose to async
+    DisposeAsync().AsTask().GetAwaiter().GetResult();
   }
 }

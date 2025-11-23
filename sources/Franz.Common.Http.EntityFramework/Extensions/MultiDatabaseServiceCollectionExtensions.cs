@@ -3,7 +3,6 @@ using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.MariaDB.Extensions;
-using Franz.Common.EntityFramework.Oracle.Extensions;
 using Franz.Common.EntityFramework.Postgres.Extensions;
 using Franz.Common.EntityFramework.SQLServer.Extensions;
 using Franz.Common.Http.EntityFramework.Extensions;
@@ -36,7 +35,7 @@ public static class MultiDatabaseServiceCollectionExtensions
     switch (provider)
     {
       // --- EF Relational ---
-      case "mariadb" or "oracle" or "postgres" or "sqlserver":
+      case "mariadb" or "postgres" or "sqlserver":
         if (!typeof(DbContextBase).IsAssignableFrom(contextType))
           throw new InvalidOperationException(
               $"Provider '{provider}' requires a context inheriting from DbContextBase, " +
@@ -92,7 +91,6 @@ public static class MultiDatabaseServiceCollectionExtensions
     services = provider switch
     {
       "mariadb" => services.AddMariaDatabase<TContext>(config),
-      "oracle" => services.AddOracleDatabase<TContext>(config),
       "postgres" => services.AddPostgresDatabase<TContext>(config),
       "sqlserver" => services.AddSqlServerDatabase<TContext>(config),
       _ => throw new InvalidOperationException($"Unsupported relational provider '{provider}'.")

@@ -1,58 +1,74 @@
 using Microsoft.AspNetCore.Http;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Franz.Common.Http.Extensions;
 
 public static class HttpContextExtensions
 {
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public static string? TryGetValue(this HttpContext? httpContext, string headerName, string? claimType = null)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  /// <summary>
+  /// Attempts to get a value from a claim or header.
+  /// </summary>
+  public static string? TryGetValue(
+      this HttpContext? httpContext,
+      string headerName,
+      string? claimType = null)
   {
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    string? result = null;
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    if (httpContext != null)
-    {
-      if (claimType != null)
-        result = httpContext.User?.Claims.SingleOrDefault(c => c.Type == claimType)?.Value;
+    if (httpContext is null)
+      return null;
 
-      if (string.IsNullOrEmpty(result) &&
-          httpContext.Request.Headers.ContainsKey(headerName))
-      {
-        result = httpContext.Request.Headers[headerName];
-      }
+    // Try claims first
+    if (!string.IsNullOrWhiteSpace(claimType))
+    {
+      var claimValue = httpContext.User?
+          .Claims
+          .FirstOrDefault(c => c.Type == claimType)
+          ?.Value;
+
+      if (!string.IsNullOrEmpty(claimValue))
+        return claimValue;
     }
 
-    return result;
+    // Try headers
+    if (httpContext.Request.Headers.TryGetValue(headerName, out var values))
+    {
+      return values.FirstOrDefault();
+    }
+
+    return null;
   }
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public static IEnumerable<string>? TryGetValues(this HttpContext? httpContext, string headerName, string? claimType = null)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  /// <summary>
+  /// Attempts to get multiple values from claims or header.
+  /// </summary>
+  public static IEnumerable<string>? TryGetValues(
+      this HttpContext? httpContext,
+      string headerName,
+      string? claimType = null)
   {
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    IEnumerable<string>? results = null;
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    if (httpContext != null)
-    {
-      if (claimType != null)
-        results = httpContext?.User?.Claims.Where(claim => claim.Type == claimType).Select(claim => claim.Value);
+    if (httpContext is null)
+      return null;
 
-      if (results?.Any() != true &&
-          httpContext!.Request.Headers.ContainsKey(headerName))
-      {
-        results = httpContext.Request.Headers[headerName];
-      }
+    IEnumerable<string>? claimResults = null;
+
+    // Try claims first
+    if (!string.IsNullOrWhiteSpace(claimType))
+    {
+      claimResults = httpContext.User?
+          .Claims
+          .Where(c => c.Type == claimType)
+          .Select(c => c.Value);
+
+      if (claimResults is not null && claimResults.Any())
+        return claimResults;
     }
 
-    return results;
+    // Try headers
+    if (httpContext.Request.Headers.TryGetValue(headerName, out var headerValues))
+    {
+      return headerValues;
+    }
+
+    return null;
   }
 }

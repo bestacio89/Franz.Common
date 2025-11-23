@@ -1,7 +1,8 @@
-using Franz.Common.Messaging.Configuration;
+﻿using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
+using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
 namespace Franz.Common.Messaging.RabbitMQ.Replay;
@@ -13,59 +14,77 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
   public const string ExceptionMessageHeader = "x-exception-message";
   public const string ExceptionStackTraceHeader = "x-exception-stacktrace";
 
-  private readonly IModelProvider modelProvider;
-  private readonly string queueName;
-  private readonly string replayExchangeName;
-  private readonly string deadLetterQueueName;
+  private readonly IModelProvider _provider;
+  private readonly string _queueName;
+  private readonly string _replayExchange;
+  private readonly string _deadLetterQueue;
 
-  public ProgressiveFourStepReplayStrategy(IModelProvider modelProvider, IAssemblyAccessor assemblyAccessor, IOptions<MessagingOptions> messagingOptions)
+  public ProgressiveFourStepReplayStrategy(
+      IModelProvider provider,
+      IAssemblyAccessor accessor,
+      IOptions<MessagingOptions> options)
   {
-    this.modelProvider = modelProvider;
-    var assembly = assemblyAccessor.GetEntryAssembly();
-    queueName = QueueNamer.GetQueueName(assembly);
-    replayExchangeName = ExchangeNamer.GetReplayExchangeName(assembly);
-    deadLetterQueueName = QueueNamer.GetDeadLetterQueueName(assembly);
+    _provider = provider;
+
+    var entry = accessor.GetEntryAssembly();
+    _queueName = QueueNamer.GetQueueName(entry);
+    _replayExchange = ExchangeNamer.GetReplayExchangeName(entry);
+    _deadLetterQueue = QueueNamer.GetDeadLetterQueueName(entry);
   }
 
-  public void Replay(BasicDeliverEventArgs basicDeliverEventArgs, Exception ex)
+  public async Task ReplayAsync(BasicDeliverEventArgs e, Exception ex)
   {
-    var basicProperties = modelProvider.Current.CreateBasicProperties();
-    basicProperties.DeliveryMode = 2;
-    basicProperties.Headers = basicDeliverEventArgs.BasicProperties.Headers;
-    basicProperties.Headers ??= new Dictionary<string, object>();
+    var channel = _provider.Current;
 
-    var replay = 0;
-    if (basicProperties.Headers.ContainsKey(ReplayHeader))
-      replay = Convert.ToInt32(basicProperties.Headers[ReplayHeader]);
-    else
-      basicProperties.Headers.Add(ReplayHeader, replay);
-    replay++;
-
-    var timeDelay = replay switch
+    var props = new BasicProperties
     {
-      1 => 1,
-      2 => 10,
-      3 => 60,
-      _ => 300,
-    } * 1000;
+      DeliveryMode = (DeliveryModes)2,
+      Headers = e.BasicProperties.Headers ?? new Dictionary<string, object>()
+    };
 
-    if (replay < 5)
+    // Count replay attempts
+    var replayCount = props.Headers.ContainsKey(ReplayHeader)
+        ? Convert.ToInt32(props.Headers[ReplayHeader]) + 1
+        : 1;
+
+    props.Headers[ReplayHeader] = replayCount;
+
+    // Progressive delays
+    var delay = replayCount switch
     {
-      basicProperties.Headers[ReplayHeader] = replay;
-      if (basicProperties.Headers.ContainsKey(DelayHeader))
-        basicProperties.Headers[DelayHeader] = timeDelay;
-      else
-        basicProperties.Headers.Add(DelayHeader, timeDelay);
+      1 => 1_000,    // 1s
+      2 => 10_000,   // 10s
+      3 => 60_000,   // 60s
+      _ => 300_000   // 5 min before sending to DLQ
+    };
 
-      modelProvider.Current.BasicPublish(replayExchangeName, queueName, true, basicProperties, basicDeliverEventArgs.Body);
+    if (replayCount < 4)
+    {
+      // Replay to delayed exchange
+      props.Headers[DelayHeader] = delay;
+
+      await channel.BasicPublishAsync(
+          exchange: _replayExchange,
+          routingKey: _queueName,
+          mandatory: true,
+          basicProperties: props,
+          body: e.Body);
     }
     else
     {
-      basicProperties.Headers.Add(ExceptionMessageHeader, ex.Message);
-      basicProperties.Headers.Add(ExceptionStackTraceHeader, ex.StackTrace);
-      modelProvider.Current.BasicPublish(string.Empty, deadLetterQueueName, true, basicProperties, basicDeliverEventArgs.Body);
+      // FINAL attempt → send to DLQ
+      props.Headers[ExceptionMessageHeader] = ex.Message;
+      props.Headers[ExceptionStackTraceHeader] = ex.StackTrace ?? string.Empty;
+
+      await channel.BasicPublishAsync(
+          exchange: "",
+          routingKey: _deadLetterQueue,
+          mandatory: true,
+          basicProperties: props,
+          body: e.Body);
     }
 
-    modelProvider.Current.BasicAck(basicDeliverEventArgs.DeliveryTag, false);
+    // ACK the original failed message
+    await channel.BasicAckAsync(e.DeliveryTag, false);
   }
 }

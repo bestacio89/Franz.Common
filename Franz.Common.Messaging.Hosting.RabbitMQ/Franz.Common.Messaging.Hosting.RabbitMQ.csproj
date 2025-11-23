@@ -1,10 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
+  <Import Project="..\..\common.targets" />
 
   <ItemGroup>
     <PackageReference Include="RabbitMQ.Client" Version="7.1.2" />
@@ -13,7 +12,6 @@
   <ItemGroup>
     <ProjectReference Include="..\sources\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />
     <ProjectReference Include="..\sources\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
-    <ProjectReference Include="..\sources\Franz.Common.Messaging.RabbitMQ\Franz.Common.Messaging.RabbitMQ.csproj" />
     <ProjectReference Include="..\sources\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
   </ItemGroup>
 

@@ -9,35 +9,43 @@ namespace Franz.Common.Messaging.RabbitMQ.Replay;
 
 public class NoReplayStrategy : IReplayStrategy
 {
-  public const string ReplayHeader = "x-replay";
-  public const string DelayHeader = "x-delay";
   public const string ExceptionMessageHeader = "x-exception-message";
   public const string ExceptionStackTraceHeader = "x-exception-stacktrace";
 
-  private readonly IModelProvider modelProvider;
-  private readonly string deadLetterQueueName;
+  private readonly IModelProvider _provider;
+  private readonly string _deadLetterQueue;
 
-  public NoReplayStrategy(IModelProvider modelProvider, IAssemblyAccessor assemblyAccessor, IOptions<MessagingOptions> messagingOptions)
+  public NoReplayStrategy(
+      IModelProvider provider,
+      IAssemblyAccessor accessor,
+      IOptions<MessagingOptions> options)
   {
-    this.modelProvider = modelProvider;
-    var assembly = assemblyAccessor.GetEntryAssembly();
-    deadLetterQueueName = QueueNamer.GetDeadLetterQueueName(assembly);
+    _provider = provider;
+    var entry = accessor.GetEntryAssembly();
+    _deadLetterQueue = QueueNamer.GetDeadLetterQueueName(entry);
   }
 
-  public void Replay(BasicDeliverEventArgs basicDeliverEventArgs, Exception ex)
+  public async Task ReplayAsync(BasicDeliverEventArgs e, Exception ex)
   {
-    var basicProperties = modelProvider.Current.CreateBasicProperties();
-    basicProperties.DeliveryMode = 2;
-    basicProperties.Headers = basicDeliverEventArgs.BasicProperties.Headers;
-    basicProperties.Headers ??= new Dictionary<string, object>();
+    var channel = _provider.Current;
 
-    basicProperties.Headers.Add(ExceptionMessageHeader, ex.Message);
-    basicProperties.Headers.Add(ExceptionStackTraceHeader, ex.StackTrace);
+    var props = new BasicProperties
+    {
+      DeliveryMode = (DeliveryModes)2,
+      Headers = e.BasicProperties.Headers ?? new Dictionary<string, object>()
+    };
 
-    if (!modelProvider.Current.HasTransaction())
-      modelProvider.Current.TxSelect();
+    props.Headers[ExceptionMessageHeader] = ex.Message;
+    props.Headers[ExceptionStackTraceHeader] = ex.StackTrace ?? string.Empty;
 
-    modelProvider.Current.BasicPublish(string.Empty, deadLetterQueueName, true, basicProperties, basicDeliverEventArgs.Body);
-    modelProvider.Current.BasicAck(basicDeliverEventArgs.DeliveryTag, false);
+    await channel.BasicPublishAsync(
+        exchange: "",
+        routingKey: _deadLetterQueue,
+        mandatory: true,
+        basicProperties: props,
+        body: e.Body);
+
+    // Just ACK the failed message
+    await channel.BasicAckAsync(e.DeliveryTag, false);
   }
 }
