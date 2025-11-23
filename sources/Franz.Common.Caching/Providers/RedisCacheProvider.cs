@@ -14,7 +14,11 @@ public class RedisCacheProvider : ICacheProvider
   public async Task<T?> GetAsync<T>(string key, CancellationToken ct = default)
   {
     var value = await _db.StringGetAsync(key);
-    return value.HasValue ? JsonSerializer.Deserialize<T>(value!) : default;
+
+    if (!value.HasValue)
+      return default;
+
+    return JsonSerializer.Deserialize<T>(value.ToString()!);
   }
 
   public async Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct = default)
