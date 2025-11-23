@@ -1,141 +1,286 @@
-# **Franz.Common.Errors**
+﻿
+# 📡 **Franz.Common.Grpc**
 
-A library for handling and standardizing errors and exceptions in .NET applications. This library simplifies error management, making it easier to implement structured and meaningful error responses.
+### **v1.6.20 — .NET 10 Modernization Release**
 
----
-- **Current Version**: 1.6.20
-
----
-
-## **Features**
-
-- **Custom Exceptions**:
-  - `ForbiddenException`
-  - `FunctionalException`
-  - `NotFoundException`
-  - `PreconditionFailedException`
-  - `TechnicalException`
-  - `UnauthorizedException`
-- **Base Exception**:
-  - `ExceptionBase` for creating custom exceptions with consistent behavior.
-- **Error Response**:
-  - `ErrorResponse` for structuring API error responses.
+High-performance, pipeline-driven gRPC for distributed microservices
 
 ---
 
-## **Installation**
+Franz.Common.Grpc brings the **full Franz architectural standard** to gRPC:
 
-Install the package using NuGet Package Manager or the .NET CLI:
+* Canonical behavior pipelines (Validation → Tenant → Auth → Logging → Metrics → Exceptions)
+* Unified *GrpcCallContext* abstraction
+* Client-side and server-side interceptors
+* Behavior providers with ordered pipeline resolution
+* Metadata normalization + context propagation
+* Pure-core design with optional ASP.NET Core adapters
+* First-class DI integration
+* Flexible channel factory + service routing
+* No-op defaults so services boot cleanly
 
-```bash
-dotnet add package Franz.Common.Errors
+This release is aligned with the **Franz v1.6.20 refactor** and `.NET 10` modernization.
+
+---
+
+# 🚀 **What’s New in v1.6.20**
+
+### ✔ Complete folder and pipeline redesign
+
+Franz.Common.Grpc is now structured into:
+
+```
+Abstractions/
+Client/
+Server/
+Hosting/
+DependencyInjection/
+Configuration/
 ```
 
----
+### ✔ Full Server Pipeline
 
-## **Usage**
+Six canonical server interceptors:
 
-### **1. Handling Custom Exceptions**
+1. **ValidationServerBehavior**
+2. **TenantResolutionServerBehavior**
+3. **AuthorizationServerBehavior**
+4. **LoggingServerBehavior**
+5. **MetricServerBehavior**
+6. **ExceptionMappingServerBehavior**
 
-Each exception is tailored for specific error scenarios. Here's an example of using `NotFoundException`:
+### ✔ Full Client Pipeline
 
-```csharp
-using Franz.Common.Errors;
+Equivalent client behaviors (correctly named):
 
-public void FindResource(int id)
-{
-    var resource = GetResourceById(id);
-    if (resource == null)
-    {
-        throw new NotFoundException($"Resource with ID {id} was not found.");
+* ValidationClientBehavior
+* TenantResolutionClientBehavior
+* AuthorizationClientBehavior
+* LoggingClientBehavior
+* MetricClientBehavior
+* ExceptionMappingClientBehavior
+
+### ✔ Behavior Providers (pipeline resolvers)
+
+* `GrpcServerBehaviorProvider`
+* `GrpcClientBehaviorProvider`
+
+Both provide **ordered, cached** behavior pipelines per request/response pair.
+
+### ✔ Unified GrpcCallContext
+
+Core abstraction shared by both ends.
+
+### ✔ Channel Factory
+
+`FranzGrpcClientFactory` provides:
+
+* Named service routing
+* Channel creation
+* Auto-configuration
+* Timeout handling
+* Optional metadata injection
+* Safe instantiation of generated gRPC clients
+
+### ✔ No-Op Defaults
+
+Franz.Common.Grpc stays zero-config compatible:
+
+* `NoOpValidationEngine`
+* `NoOpAuthorizationService`
+* `NoOpTenantResolver`
+* `NoOpGrpcLogger`
+* `NoOpGrpcMetrics`
+
+### ✔ Pure Core — No ASP.NET Dependencies
+
+All ASP.NET Core routing / MapGrpcService integrations are now moved to the upcoming package:
+
+```
+Franz.Common.Grpc.AspNetCore
+```
+
+### ✔ Configuration Cleanup
+
+`FranzGrpcClientOptions` now includes:
+
+```json
+"Franz": {
+  "Grpc": {
+    "Client": {
+      "Services": {
+        "UserService": {
+          "BaseAddress": "https://localhost:6001"
+        }
+      }
     }
+  }
 }
 ```
 
-### **2. Returning Structured Error Responses**
+And a new type:
 
-Use `ErrorResponse` to provide consistent error information in your APIs:
+```
+FranzGrpcClientServiceConfig
+```
+
+---
+
+# 📁 **Final Project Structure (v1.6.20)**
+
+```
+Franz.Common.Grpc
+│
+├── Abstractions/
+│     ├── IGrpcServerBehavior.cs
+│     ├── IGrpcClientBehavior.cs
+│     ├── IGrpcServerBehaviorProvider.cs
+│     ├── IGrpcClientBehaviorProvider.cs
+│     ├── IFranzGrpcClientFactory.cs
+│     ├── IFranzValidationEngine.cs
+│     ├── IFranzAuthorizationService.cs
+│     ├── IFranzTenantResolver.cs
+│     ├── IFranzGrpcLogger.cs
+│     ├── IFranzGrpcMetrics.cs
+│     ├── GrpcCallContext.cs
+│
+├── Client/
+│     ├── GrpcClientBehaviorProvider.cs
+│     ├── FranzGrpcClientFactory.cs
+│     ├── Interceptors/
+│           ├── ValidationClientBehavior.cs
+│           ├── TenantResolutionClientBehavior.cs
+│           ├── AuthorizationClientBehavior.cs
+│           ├── LoggingClientBehavior.cs
+│           ├── MetricClientBehavior.cs
+│           ├── ExceptionMappingClientBehavior.cs
+│
+├── Server/
+│     ├── GrpcServerBehaviorProvider.cs
+│     ├── Interceptors/
+│           ├── ValidationServerBehavior.cs
+│           ├── TenantResolutionServerBehavior.cs
+│           ├── AuthorizationServerBehavior.cs
+│           ├── LoggingServerBehavior.cs
+│           ├── MetricServerBehavior.cs
+│           ├── ExceptionMappingServerBehavior.cs
+│
+├── Configuration/
+│     ├── FranzGrpcOptions.cs
+│     ├── FranzGrpcClientOptions.cs
+│     ├── FranzGrpcClientServiceConfig.cs
+│
+├── Hosting/
+│     ├── GrpcContextExtensions.cs
+│     ├── NoOp/
+│           ├── NoOpValidationEngine.cs
+│           ├── NoOpAuthorizationService.cs
+│           ├── NoOpTenantResolver.cs
+│           ├── NoOpGrpcLogger.cs
+│           ├── NoOpGrpcMetrics.cs
+│
+├── DependencyInjection/
+│     ├── GrpcServiceCollectionExtensions.cs
+│
+└── (ASP.NET Core integration coming in `Franz.Common.Grpc.AspNetCore`)
+```
+
+---
+
+# ⚙️ **Dependency Injection**
+
+The core DI setup:
 
 ```csharp
-using Franz.Common.Errors;
-
-public IActionResult HandleException(Exception ex)
-{
-    var errorResponse = new ErrorResponse
-    {
-        StatusCode = 500,
-        Message = ex.Message,
-        Details = "Additional details about the error."
-    };
-
-    return StatusCode(errorResponse.StatusCode, errorResponse);
-}
+builder.Services.AddFranzGrpcDefaults();
+builder.Services.AddFranzGrpcServer(configuration);
+builder.Services.AddFranzGrpcClient(configuration);
 ```
 
-### **3. Creating Custom Exceptions**
-
-Extend the `ExceptionBase` class to create your own exceptions with additional metadata:
+You must configure:
 
 ```csharp
-using Franz.Common.Errors;
-
-public class CustomException : ExceptionBase
-{
-    public CustomException(string message) : base(message) { }
-}
+builder.Services.AddGrpc();              // ASP.NET Core host only
+builder.Services.AddGrpcClient<TClient>();  // for each generated client
 ```
 
----
-
-## **Exception Types Overview**
-
-| Exception Type                | Description                                                   |
-|-------------------------------|---------------------------------------------------------------|
-| `ForbiddenException`          | Use for actions the user is not permitted to perform.         |
-| `FunctionalException`         | Represents a domain or business logic error.                  | 
-| `NotFoundException`           | Indicates that a requested resource could not be found.       |
-| `PreconditionFailedException` | Indicates a failed precondition for the request.              |
-| `TechnicalException`          | Represents an unexpected technical error.                     |
-| `UnauthorizedException`       | Indicates a lack of authorization to access a resource.       |
+These calls DO NOT live in Franz.Common.Grpc.
 
 ---
 
-## **Contributing**
+# 🧠 **Design Principles**
 
-We welcome contributions! Please follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a new branch for your feature or bug fix.
-3. Submit a pull request for review.
+### ✔ Pure-Core Philosophy
+
+No reference to ASP.NET Core inside the core library.
+
+### ✔ Canonical Pipeline Ordering
+
+The same strict behavior order as Franz.Common.Mediator, Messaging, HTTP.
+
+### ✔ 100% Predictable Execution
+
+Every call passes through the same ordered pipeline.
+
+### ✔ First-Class Context
+
+GrpcCallContext replaces ServerCallContext to ensure:
+
+* correlationId
+* requestId
+* tenantId
+* userId
+* serviceName
+* methodName
+* deadlines
+* cancellation
+
+Are all unified between client and server.
+
+### ✔ Behavior-Driven Architecture
+
+Like Middleware but transport-agnostic.
+
+### ✔ Adaptable
+
+Client & Server behaviors use generics:
+
+```
+IGrpcClientBehavior<TRequest, TResponse>
+IGrpcServerBehavior<TRequest, TResponse>
+```
+
+This allows typesafe interception at compile time.
 
 ---
 
-## **License**
+# 🌐 **Future: Franz.Common.Grpc.AspNetCore**
 
-This library is licensed under the MIT License. See the LICENSE file for more details.
+All of the following will move to the integration package:
+
+* MapFranzGrpcService
+* EndpointRouteBuilderExtensions
+* UseFranzGrpc middleware
+* Diagnostics + correlation pipeline
+* gRPC JSON transcoding support
+* OpenAPI & API explorer integration
+
+Core remains pure, integration becomes optional.
 
 ---
 
-## **Changelog**
+# 🏁 **Conclusion**
 
-### Version 1.2.065
-- Upgrade to .NET 9
+`Franz.Common.Grpc v1.6.20` delivers:
 
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
+* A complete microservice-grade gRPC pipeline
+* Clean architecture layering
+* Fully aligned behavior systems across Franz (Mediator, Messaging, Http, Grpc)
+* Modernized .NET 10 compatibility
+* Clear separation between **core** and **hosting adapters**
+* Production grade DI, context, factory, and routing design
 
-### Version 1.4.1
-- ?? Introduced **TestExceptions** for chaos engineering & demos  
-  - `BananaRepublicException` (EN/FR)  
-  - `MonsterException` (EN/FR)  
-  - `VodkaCoffeePotException` (EN/FR)  
-  - `FriendlyReminderException` (EN/FR)  
-- ?? **Bilingual Support**: every test exception available in **English & French**  
-- ?? **Consistent API**: wrapped under `TestExceptions` static class  
-- ?? Purpose: make resilience demos, test failures, and dev workshops **fun & obvious**  
-- ?? No impact on production code � these are **opt-in chaos exceptions**  
+This makes Franz one of the **strictest, most consistent, and most architecturally coherent** .NET gRPC stacks available.
 
-### Version 1.6.20
-- Updated to **.NET 10.0**
+---
+

@@ -14,7 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common.AzureCosmosDB\Franz.Common.AzureCosmosDB.csproj" />
     <ProjectReference Include="..\Franz.Common.EntityFramework.MariaDB\Franz.Common.EntityFramework.MariaDB.csproj" />
-    <ProjectReference Include="..\Franz.Common.EntityFramework.Oracle\Franz.Common.EntityFramework.Oracle.csproj" />
     <ProjectReference Include="..\Franz.Common.EntityFramework.PostGres\Franz.Common.EntityFramework.PostGres.csproj" />
     <ProjectReference Include="..\Franz.Common.EntityFramework.SQLServer\Franz.Common.EntityFramework.SQLServer.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />

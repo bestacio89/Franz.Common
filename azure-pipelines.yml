@@ -10,33 +10,68 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
+# ----------------------------------------
+# 🔧 Install .NET 10 SDK
+# ----------------------------------------
+- task: UseDotNet@2
+  displayName: 'Install .NET 10 SDK'
+  inputs:
+    packageType: 'sdk'
+    version: '10.0.x'
+    includePreviewVersions: true
+
+# ----------------------------------------
+# 📦 Install NuGet
+# ----------------------------------------
 - task: NuGetToolInstaller@1
   displayName: 'Install NuGet'
 
+# ----------------------------------------
+# 🔐 Authenticate to Azure Artifacts
+# ----------------------------------------
+- task: NuGetAuthenticate@1
+  displayName: 'Authenticate to Azure Artifacts'
+
+# ----------------------------------------
+# 📥 Restore Packages
+# ----------------------------------------
 - task: NuGetCommand@2
+  displayName: 'Restore NuGet Packages'
   inputs:
     restoreSolution: '$(solution)'
-  displayName: 'Restore NuGet Packages'
+    feedsToUse: 'select'
+    vstsFeed: 'AjnaTellus/FranzArtifact'
 
+# ----------------------------------------
+# 🏗️ Build Solution
+# ----------------------------------------
 - task: VSBuild@1
+  displayName: 'Build Solution (.NET 10)'
   inputs:
     solution: '$(solution)'
-    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:DesktopBuildPackageLocation="$(build.artifactStagingDirectory)\WebApp.zip" /p:DeployIisAppPath="Default Web Site"'
+    msbuildArgs: >
+      /p:SkipInvalidConfigurations=true
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
-  displayName: 'Build Solution'
 
+# ----------------------------------------
+# 🧪 Run Tests
+# ----------------------------------------
 - task: VSTest@2
+  displayName: 'Run Tests'
   inputs:
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
-  displayName: 'Run Tests'
+    diagnosticsEnabled: true
+    codeCoverageEnabled: true
 
+# ----------------------------------------
+# 📦 Publish NuGet Packages (all frameworks)
+# ----------------------------------------
 - task: NuGetCommand@2
+  displayName: 'Publish NuGet Packages to Azure Artifacts'
   inputs:
     command: 'push'
-    packagesToPush: '$(Build.ArtifactStagingDirectory)/**/bin/Release/net8.0/*.nupkg'
-    nuGetFeedType: 'internal'
-    publishVstsFeed: 'AjnaTellus/Franz/FranzArtifact'
-  displayName: 'Publish NuGet Packages to Azure Artifacts'
-
+    packagesToPush: '$(Build.SourcesDirectory)/**/*.nupkg'
+    publishVstsFeed: 'AjnaTellus/FranzArtifact'
+    allowPackageConflicts: true
