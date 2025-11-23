@@ -40,7 +40,7 @@ steps:
   inputs:
     restoreSolution: '$(solution)'
     feedsToUse: 'select'
-    vstsFeed: 'AjnaTellus/FranzArtifact'
+    vstsFeed: 'AjnaTellus/AjnaTellus'   # ✅ Correct feed name
 
 # ----------------------------------------
 # 🏗️ Build Solution
@@ -49,8 +49,7 @@ steps:
   displayName: 'Build Solution (.NET 10)'
   inputs:
     solution: '$(solution)'
-    msbuildArgs: >
-      /p:SkipInvalidConfigurations=true
+    msbuildArgs: '/p:SkipInvalidConfigurations=true'
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
 
@@ -73,5 +72,5 @@ steps:
   inputs:
     command: 'push'
     packagesToPush: '$(Build.SourcesDirectory)/**/*.nupkg'
-    publishVstsFeed: 'AjnaTellus/FranzArtifact'
+    publishVstsFeed: 'AjnaTellus/AjnaTellus'  # ✅ Correct feed name
     allowPackageConflicts: true
