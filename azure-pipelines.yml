@@ -40,7 +40,7 @@ steps:
   inputs:
     restoreSolution: '$(solution)'
     feedsToUse: 'select'
-    vstsFeed: 'AjnaTellus/AjnaTellus'   # ✅ Correct feed name
+    vstsFeed: 'AjnaTellus'   # ✅ Correct feed name
 
 # ----------------------------------------
 # 🏗️ Build Solution
@@ -72,5 +72,5 @@ steps:
   inputs:
     command: 'push'
     packagesToPush: '$(Build.SourcesDirectory)/**/*.nupkg'
-    publishVstsFeed: 'AjnaTellus/AjnaTellus'  # ✅ Correct feed name
+    publishVstsFeed: 'AjnaTellus'  # ✅ Correct feed name
     allowPackageConflicts: true
