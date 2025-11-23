@@ -43,6 +43,13 @@ public void ConfigureServices(IServiceCollection services, IConfiguration config
 Franz abstracts away broker-specific plumbing. Whether you pick **Kafka** or **RabbitMQ**,
 your code stays clean, enforced, and production-ready.
 
-````
-**Current Version**: 1.6.19
+
+**Current Version**: 1.6.20
 ---
+
+### Version 1.6.20
+- Updated to **.NET 10.0**
+- Improved dependency injection patterns for messaging services.
+- Enhanced documentation and usage examples.
+- Update to RabbitMQ client library to latest stable version.
+- Realligned messaging abstractions for better consistency across brokers.

@@ -161,7 +161,7 @@ builder.Services.AddOutboxHostedListener();
 
 ## 📝 Version Information
 
-* **Current Version**: 1.6.19
+* **Current Version**: 1.6.20
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -170,7 +170,6 @@ builder.Services.AddOutboxHostedListener();
 
 This library is licensed under the MIT License. See the `LICENSE` file for details.
 
-```
 
 
 
@@ -191,3 +190,6 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 - MessagingPublisher.Publish is now async Task.
 - MessagingInitializer scans INotificationHandler<> for events.
 - Kafka topics auto-created for all integration events.
+
+### Version 1.6.20
+- Updated to **.NET 10.0**

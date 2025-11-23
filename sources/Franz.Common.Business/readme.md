@@ -5,7 +5,7 @@ It provides abstractions, utilities, and patterns for building **scalable, audit
 
 ---
 
-* **Current Version**: 1.6.19
+* **Current Version**: 1.6.20
 
 ---
 
@@ -181,3 +181,8 @@ public interface IAggregateRootRepository<TAggregateRoot, TEvent>
 * Fixed a compile-time error in ReadRepository and IReadRepository caused by an incorrect cast from List<T> to IQueryable<T>.
 
 * Updated GetAll() to return an IReadOnlyCollection<T> for safer read-only semantics instead of forcing a materialized IQueryable<T>.
+---
+
+### Version 1.6.20
+
+- Updated to **.NET 10.0**

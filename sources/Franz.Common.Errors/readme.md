@@ -3,7 +3,7 @@
 A library for handling and standardizing errors and exceptions in .NET applications. This library simplifies error management, making it easier to implement structured and meaningful error responses.
 
 ---
-- **Current Version**: 1.6.19
+- **Current Version**: 1.6.20
 
 ---
 
@@ -137,3 +137,5 @@ This library is licensed under the MIT License. See the LICENSE file for more de
 - ?? Purpose: make resilience demos, test failures, and dev workshops **fun & obvious**  
 - ?? No impact on production code — these are **opt-in chaos exceptions**  
 
+### Version 1.6.20
+- Updated to **.NET 10.0**

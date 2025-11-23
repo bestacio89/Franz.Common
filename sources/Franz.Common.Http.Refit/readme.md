@@ -7,7 +7,7 @@ Provides **typed Refit clients** pre-wired with **correlation and tenant propaga
 
 ---
 
-* **Current Version**: 1.6.19
+* **Current Version**: 1.6.20
 
 ---
 

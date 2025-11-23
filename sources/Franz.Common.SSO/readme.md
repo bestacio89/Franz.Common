@@ -6,7 +6,7 @@ A library within the **Franz Framework** that provides streamlined support for *
 This package unifies configuration and registration of multiple SSO providers into a single, consistent bootstrapping mechanism, while normalizing all claims into a unified **`FranzIdentityContext`**.
 
 ---
--**Current Version**: 1.6.19
+-**Current Version**: 1.6.20
 ---
 
 ## **Features**
@@ -176,3 +176,6 @@ Console.WriteLine($"User: {identity.FullName}, Tenant: {identity.TenantId}, Role
 ---
 
 ⚡ With v1.6.2, **Franz.Common.SSO** is now a unified, production-ready SSO abstraction for all supported protocols.
+
+### Version 1.6.20
+- Updated to **.NET 10.0**

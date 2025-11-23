@@ -4,7 +4,7 @@ A foundational library within the **Franz Framework** that provides contracts an
 This package defines the **core abstractions** for accessing user identity information in a consistent, provider-agnostic way.
 
 ---
--**Current Version**: 1.6.19
+-**Current Version**: 1.6.20
 ---
 ## **Features**
 
@@ -113,3 +113,5 @@ Licensed under the MIT License. See the `LICENSE` file for details.
 
 ---
 
+### Version 1.6.20
+- Updated to **.NET 10.0**

@@ -18,7 +18,7 @@ It lets you treat ARAS as just another persistence provider — with **Entities**,
 - ? **Full samples** for Entities, Aggregates, UoW, Testing, and Snapshots  
 ````
 ---
-- **Current Version**: 1.6.19
+- **Current Version**: 1.6.20
 --- 
 ## ?? Installation
 
@@ -278,7 +278,8 @@ This repo includes a `samples/` folder with ready-to-run console apps:
 
 Franz.Common.Aras v1.5.0 — **bringing ARAS into the DDD world.**
 
-```
+### Version 1.6.20
+- Updated to **.NET 10.0**
 
 ---
 

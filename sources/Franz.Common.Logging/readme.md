@@ -4,7 +4,7 @@ A comprehensive logging library within the **Franz Framework**, designed to enha
 This package provides tools for centralized logging, tracing, and seamless integration with ASP.NET Core applications.
 
 ---
-- **Current Version**: 1.6.19
+- **Current Version**: 1.6.20
 
 ---
 
@@ -195,6 +195,10 @@ This library is licensed under the **MIT License**. See the `LICENSE` file for m
 ---
 
 ## **Changelog**
+
+### Version 1.6.20
+- Updated to **.NET 10.0**
+
 
 Franz 1.6.16 — Logging Overhaul & Platform Stability
 🔹 Highlights

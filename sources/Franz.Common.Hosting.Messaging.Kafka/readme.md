@@ -114,7 +114,7 @@ public class OutboxHostedService : BackgroundService
 
 ## 📝 Version Information
 
-* **Current Version**: 1.6.19
+* **Current Version**: 1.6.20
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -134,3 +134,6 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 * Added `KafkaHostingServiceCollectionExtensions` for simple DI registration.
 * Unified hosted services with `MessageContextAccessor` and inbox idempotency support.
 * Improved logging with emoji conventions and OpenTelemetry hooks.
+
+### Version 1.6.20
+- Updated to **.NET 10.0**

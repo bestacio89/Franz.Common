@@ -14,7 +14,7 @@ Unlike minimal mediators, Franz ships with:
 
 ---
 
-* **Current Version**: 1.6.19
+* **Current Version**: 1.6.20
 
 ---
 
@@ -371,3 +371,5 @@ Patch release aligning **commands, queries, and events** with proper semantics:
 
 ---
 
+### Version 1.6.20
+- Updated to **.NET 10.0**

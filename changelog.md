@@ -1,9 +1,3 @@
-Excellent 🔥
-Below is your **complete, educational, and Markdown-polished changelog**, preserving every version, all details, emojis, and spacing — now with **1.6.17** seamlessly integrated and formatted to render perfectly on GitHub, Azure DevOps, and private feeds.
-
-I also added the small educational note at the end — your juniors will love how easy it is to navigate this version history.
-
----
 
 # 📈 **Franz Framework – Full Changelog**
 
@@ -520,3 +514,164 @@ To standardize naming across all Franz messaging providers and make intent insta
 * Strengthens immutability and contract integrity in the Franz ecosystem.
 * Enables the “DTOs must be immutable” Tribunal rule to pass naturally.
 * Outperforms AutoMapper in instantiation efficiency and architectural compliance.
+
+Absolutely — let’s **merge everything you’ve done into one clean, enterprise-ready block** for:
+
+1. **Master README**
+2. **CHANGELOG.md**
+
+This will reflect:
+
+* The global **1.6.20 .NET 10 modernization**
+* The **RabbitMQ-specific improvements**
+* The **removal of Oracle**
+* The stabilized CI/CD
+* The updated templates
+* The updated messaging abstractions
+
+I’ll craft BOTH blocks now.
+
+---
+
+# ✅ **MASTER README — Version 1.6.20 Release Section**
+
+Paste this into the **main README** under your “Changelog” or “What’s New” section:
+
+---
+
+
+
+
+## **1.6.20 — .NET 10 Modernization Release**
+
+### **Runtime & Platform**
+
+* Migrated all Franz packages to **.NET 10.0**
+* Improved runtime consistency and cross-package dependency alignment
+* Stabilized all Azure DevOps pipelines for .NET 10
+
+### **Messaging**
+
+* **RabbitMQ**:
+
+  * Updated client dependencies to latest stable version
+  * Realigned abstractions for consistency with Kafka
+  * Improved dependency injection patterns for hosted services
+  * Unified outbox hosting and listener lifecycle
+* **Kafka**:
+
+  * No changes (already aligned with .NET 10+ architecture)
+
+### **Databases**
+
+* Updated SQL Server, PostgreSQL, MariaDB/Pomelo, MySQL, MongoDB, and Cosmos modules
+* **Removed Oracle EFCore provider**:
+
+  * Due to Oracle’s official provider lacking .NET 9/10 support
+  * Vendor update cycle consistently lags by multiple major versions
+  * Prevents microservice adoption, CI/CD modernization, and cloud-native alignment
+  * Last supported Franz version with Oracle: **1.6.19**
+
+### **Templates**
+
+* Updated API, Messaging, and Infra templates to .NET 10 defaults
+* Modernized bootstrapping (logging, mediator, messaging, OTEL)
+
+### **Documentation**
+
+* Updated READMEs, code samples, and high-level diagrams
+* Added compatibility matrix
+* Added Oracle deprecation notice
+* Improved messaging examples and templates
+
+### 🚀 **Major Features**
+
+* Introduced full **Franz gRPC Canonical Pipeline** for both Client and Server:
+
+  * Validation
+  * Tenant Resolution
+  * Authorization
+  * Logging
+  * Metrics
+  * Exception Mapping
+    Distributed evenly across client/server interceptors.
+
+* Added **GrpcServerBehaviorProvider** and **GrpcClientBehaviorProvider**, with pipeline caching and canonical ordering.
+
+* Implemented **GrpcCallContext** abstraction for unified call metadata:
+
+  * CorrelationId
+  * RequestId
+  * TenantId
+  * UserId
+  * ServiceName
+  * MethodName
+  * Deadline
+  * Cancellations
+
+* Added **FranzGrpcClientFactory** supporting:
+
+  * Named services (via `FranzGrpcClientOptions.Services`)
+  * Auto channel creation
+  * Timeout handling
+  * Metadata injection
+  * Optional retries (future-ready)
+
+* Full redesign of **FranzGrpcClientOptions**, including:
+
+  * `Services` dictionary for routing
+  * Default timeouts
+  * Metadata injection
+  * Logging toggles
+  * Retry configuration
+
+### 🧱 **New Configuration Types**
+
+* `FranzGrpcClientServiceConfig`
+* `FranzGrpcClientOptions`
+* `FranzGrpcOptions`
+
+### 🧰 **Hosting & Context Utilities**
+
+* `GrpcContextExtensions` for metadata extraction on server-side
+* Added `Hosting/NoOp` package:
+
+  * `NoOpValidationEngine`
+  * `NoOpAuthorizationService`
+  * `NoOpTenantResolver`
+  * `NoOpGrpcLogger`
+  * `NoOpGrpcMetrics`
+    Ensuring clean boot without user-defined behaviors.
+
+### 🔧 **Dependency Injection Improvements**
+
+* Added `AddFranzGrpcServer`, `AddFranzGrpcClient`, and `AddFranzGrpcDefaults`
+* Cleaned DI boundaries:
+
+  * Core library no longer calls `AddGrpc()` or `AddGrpcClient()`
+  * The host application owns ASP.NET Core integration
+* Removed all ASP.NET Core dependencies from core package
+
+### 🧹 **Project Structure Cleanup**
+
+* Corrected naming of client-side interceptors (`*ClientBehavior`)
+* Moved ASP.NET Core routing extensions out of core package
+  (now to be included in `Franz.Common.Grpc.AspNetCore`)
+* Ensured strict core/hosting separation, consistent with Franz ecosystem
+
+### ⚡ **Performance Enhancements**
+
+* Behavior pipelines now cached per `(TRequest, TResponse)` pair
+* No-op implementations ensure zero overhead when features are unused
+
+### 🛠️ **Refactor & Code Modernization**
+
+* Updated to .NET 10 targets
+* Simplified options binding with Microsoft.Extensions.Options
+* Unified server/client behavior architecture to mirror:
+
+  * Franz.Common.Http
+  * Franz.Common.Messaging
+  * Franz.Common.Mediator
+
+

@@ -28,7 +28,7 @@ This package ensures **transactional consistency** for outbox patterns in relati
 
 ## **Version Information**
 
-* **Current Version**: 1.6.19
+* **Current Version**: 1.6.20
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -179,5 +179,8 @@ The **Franz.Common.Messaging.EntityFramework** package integrates seamlessly wit
 
 * Upgraded version to **.NET 9**
 
+* ### Version 1.6.20
+- Updated to **.NET 10.0**
+- Removal and Deprecation of oracle support due to Oracle's shift away from EF Core.
 ---
 

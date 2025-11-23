@@ -40,7 +40,7 @@ It provides clean abstractions, auditing, soft deletes, repositories, and seamle
 
 ## **Version Information**
 
-* **Current Version**: 1.6.19
+* **Current Version**: 1.6.20
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -226,3 +226,5 @@ Licensed under the **MIT License**.
 ---
 
 
+### Version 1.6.20
+- Updated to **.NET 10.0**

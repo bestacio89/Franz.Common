@@ -17,7 +17,7 @@ A lightweight library within the **Franz Framework** designed to enable multi-te
 
 ## **Version Information**
 
-- **Current Version**: 1.6.19
+- **Current Version**: 1.6.20
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -160,3 +160,6 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
   - Provided InMemoryTenantStore for testing and prototyping.
   - Enhanced Domain Context Accessor and Tenant Context Accessor for setting and retrieving context within the request scope.
   - Prepared groundwork for Franz.Common.Http.MultiTenancy middleware and resolver implementations.
+
+  ### Version 1.6.20
+- Updated to **.NET 10.0**

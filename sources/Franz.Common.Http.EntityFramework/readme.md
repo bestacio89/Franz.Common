@@ -40,7 +40,7 @@ This package simplifies transactional handling, dependency injection, and middle
 
 ## **Version Information**
 
-* **Current Version**: 1.6.19
+* **Current Version**: 1.6.20
   → Adds **environment-aware validation**, stronger governance for multi-database setups, and provider-context alignment.
 * Part of the private **Franz Framework** ecosystem.
 
@@ -157,6 +157,10 @@ The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
 ---
 
 ## **Changelog**
+
+### Version 1.6.20
+- Updated to **.NET 10.0**
+- Deprecation of Oracle support due to Oracle's shift away from EF Core.
 
 ### Version 1.6.3
 

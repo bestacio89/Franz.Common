@@ -15,6 +15,7 @@
   <img src="https://img.shields.io/badge/Multi--Tenancy-Built--In-9cf" />
   <img src="https://img.shields.io/badge/License-MIT-lightgrey" />
   <img src="https://img.shields.io/badge/NuGet-250k%2B%20downloads-success" />
+  
 </p>
 
 ---
@@ -300,31 +301,76 @@ dotnet test --filter Category=Integration
 
 ---
 
-# 📜 Changelog Summary (1.4 → 1.6)
+## **Version 1.6.20 — .NET 10 Modernization Release**
 
-### 🧠 Constructor-aware Mapping Engine
+### 🚀 Platform & Runtime
 
-Immutability-first DTO mapping.
+* Updated **all Franz components** to target **.NET 10.0**
+* Improved build, packaging, and hosting alignment for .NET 10
+* Stabilized end-to-end CI/CD pipelines for .NET 10 on Azure DevOps
 
-### 🐇 Unified Messaging Naming
+### 🗄 Database Providers
 
-Consistent `AddKafka*` and `AddRabbit*` conventions.
+* Modernized DB dependencies:
 
-### 🔄 Resilience Pipelines
+  * SQL Server
+  * PostgreSQL
+  * MariaDB / Pomelo
+  * MySQL
+  * MongoDB
+  * Azure CosmosDB
+* **Removed Oracle EF provider**
 
-Retry, fallback, timeout, circuit breakers.
+  * Due to Oracle’s EFCore provider consistently lagging **2+ major .NET versions**
+  * Incompatible with .NET 9/10
+  * Not suitable for microservices or cloud-native pipelines
 
-### 🧰 Identity & SSO
+### 📦 Messaging Layer (Kafka, RabbitMQ)
 
-Keycloak / SAML2 / OIDC / WS-Fed unified flow.
+* **RabbitMQ reworked for 1.6.20**:
+
+  * Fully aligned with .NET 10
+  * Updated RabbitMQ client to latest stable
+  * Realigned abstractions to match Kafka conventions
+  * Improved DI shape for hosted listeners
+  * Unified outbox hosting across brokers
+* Kafka hosting already fully modernized (no changes required)
+
+**📡 Franz.Common.Grpc — v1.6.20**
+Modernized gRPC Pipeline for Distributed .NET Microservices
+
+* Franz.Common.Grpc v1.6.20 introduces a complete, production-grade gRPC pipeline aligned with the Franz ecosystem:
+  * Full canonical behavior chain (Validation → Tenant → Auth → Logging → Metrics → Exceptions)
+  * Client & Server behavior providers with ordered, cached pipelines
+  * Unified GrpcCallContext abstraction
+  * Named service routing through FranzGrpcClientOptions.Services
+  * FranzGrpcClientFactory for channel creation + metadata injection
+  * Pure core — no ASP.NET Core dependencies
+  * No-op default implementations for effortless setup
+  * **.NET 10 modernization compliance**
+
+### 🧰 Templates & Tooling
+
+* Updated all templates (API, Messaging, Infrastructure) to .NET 10 defaults
+* Improved starter configuration for logging, OTEL, mediator pipelines, and messaging
+* Updated example code, diagrams, and documentation across the ecosystem
+
+### 🔍 Architecture & Documentation
+
+* Introduced clearer **compatibility matrix** for supported databases and runtimes
+* Documentation rewritten to reflect the new .NET 10 ecosystem
+* Added improved usage examples and deployment guides
+
+---
 
 Full changelog in `changelog.md`.
 
 ---
 
+
+
 # 🛣️ Roadmap
 
-* `Franz.Common.Grpc` (fully deterministic gRPC pipelines)
 * Microsoft Azure Event Bus integration
 * Extended Cosmos/Mongo projection & TTL helpers
 * AWS/GCP multi-cloud samples

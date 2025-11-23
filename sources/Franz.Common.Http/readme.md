@@ -24,7 +24,7 @@ A library within the **Franz Framework** designed to simplify HTTP-related opera
 
 ## **Version Information**
 
-- **Current Version**: 1.6.19
+- **Current Version**: 1.6.20
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -167,3 +167,6 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Compatible with Franz 1.3.6 stack.
 - Self-contained middleware bootstrap (UseHttpArchitecture).
 - Swagger & pipeline setup hidden behind Franz extensions.
+
+### Version 1.6.20
+- Updated to **.NET 10.0**

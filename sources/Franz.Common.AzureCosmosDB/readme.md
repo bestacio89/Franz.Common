@@ -29,7 +29,7 @@ This package extends the polyglot persistence philosophy of the framework by ena
 
 ## **Version Information**
 
-* **Current Version**: 1.6.19
+* **Current Version**: 1.6.20
 * Part of the private **Franz Framework** ecosystem.
 * Extended capacities: Cosmos DB support introduced in 1.6.2.
 
@@ -145,3 +145,5 @@ Licensed under the MIT License. See the `LICENSE` file for more details.
 * Enabled **Outbox / Dead-Letter pattern** in Cosmos DB.
 * Extended polyglot persistence bootstrapper to include Cosmos alongside SQL and Mongo.
 
+### Version 1.6.20
+- Updated to **.NET 10.0**

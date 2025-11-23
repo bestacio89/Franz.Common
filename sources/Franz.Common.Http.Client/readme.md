@@ -31,7 +31,7 @@ A powerful library within the **Franz Framework** that simplifies the creation, 
 
 ## **Version Information**
 
-- **Current Version**: 1.6.19
+- **Current Version**: 1.6.20
 - Part of the private **Franz Framework** ecosystem.
 
 ---

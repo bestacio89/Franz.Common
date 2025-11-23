@@ -20,7 +20,7 @@ A library within the **Franz Framework** designed to enhance unit testing in .NE
 
 ## **Version Information**
 
--- **Current Version**: 1.6.19
+-- **Current Version**: 1.6.20
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -182,3 +182,6 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
+### Version 1.6.20
+- Updated to **.NET 10.0**

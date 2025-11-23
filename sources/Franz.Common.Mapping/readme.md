@@ -8,7 +8,7 @@ Here’s the **updated README draft** (in your project’s tone and formatting):
 
 *A lightweight, fast, and extensible object mapping library for the Franz ecosystem.*
 
-**Current Version:** 1.6.19
+**Current Version:** 1.6.20
 **Codename:** *Constructor-Aware Evolution*
 
 ---
@@ -107,6 +107,9 @@ Console.WriteLine(dto.Email);    // john@acme.com
 ```
 
 ---
+### Version 1.6.20
+- Updated to **.NET 10.0**
+
 
 ## ✨ New in 1.6.19
 
