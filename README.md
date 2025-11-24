@@ -7,7 +7,7 @@
 <p align="center"><b>Deterministic Architecture for Event-Driven .NET Microservices</b></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/.NET-9%2B-blueviolet" />
+  <img src="https://img.shields.io/badge/.NET-10%2B-blueviolet" />
   <img src="https://img.shields.io/badge/Architecture-Clean%20%7C%20DDD%20%7C%20CQRS-brightgreen" />
   <img src="https://img.shields.io/badge/Messaging-Kafka%20%7C%20RabbitMQ-orange" />
   <img src="https://img.shields.io/badge/Resilience-Polly-blue" />
@@ -22,7 +22,7 @@
 
 # 📘 Overview
 
-**Franz.Common** is the foundation of the **Franz Framework**, a modular, deterministic architecture layer for **building event-driven microservices in .NET 9+**.
+**Franz.Common** is the foundation of the **Franz Framework**, a modular, deterministic architecture layer for **building event-driven microservices in .NET 10**.
 
 It eliminates boilerplate, enforces architectural correctness, and provides **DDD, CQRS, messaging, multi-tenancy, resilience, observability, and identity** capabilities—designed for **scalable, long-lived enterprise systems**.
 
@@ -244,7 +244,7 @@ This makes Franz suitable for **large organizations**, where maintaining archite
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 1.6.19
+dotnet add package Franz.Common --version 1.6.20
 ```
 
 Messaging example:
