@@ -15,8 +15,18 @@ public sealed class FranzSagaOptions
 
   /// <summary>
   /// Whether saga mappings should be validated during application startup.
+  /// Alias of ValidateMappings for backward compatibility.
   /// </summary>
-  public bool EnableValidation { get; set; } = true;
+  public bool EnableValidation
+  {
+    get => ValidateMappings;
+    set => ValidateMappings = value;
+  }
+
+  /// <summary>
+  /// Strict mapping validation used by SagaBuilder.Build().
+  /// </summary>
+  public bool ValidateMappings { get; set; } = true;
 
   /// <summary>
   /// Whether audit logs should be written.
@@ -24,18 +34,17 @@ public sealed class FranzSagaOptions
   public bool EnableAuditing { get; set; } = false;
 
   /// <summary>
-  /// Optional: name of the Kafka compacted topic to use for state storage.
-  /// Only applies if Persistence == "Kafka"
+  /// Optional: Kafka compacted topic for saga state.
   /// </summary>
   public string? KafkaStateTopic { get; set; }
 
   /// <summary>
-  /// Optional: Redis connection string if Persistence == "Redis".
+  /// Redis connection string for Redis persistence.
   /// </summary>
   public string? RedisConnectionString { get; set; }
 
   /// <summary>
-  /// Optional schema for the EF-based saga persistence.
+  /// Optional EF schema for saga persistence.
   /// </summary>
   public string? EntityFrameworkSchema { get; set; }
 }
