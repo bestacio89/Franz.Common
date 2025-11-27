@@ -3,8 +3,8 @@
 OpenTelemetry integration for the **Franz Framework**.
 This package adds **automatic distributed tracing** to all Mediator requests, with the same **enriched context** you already see in Franz logging pipelines.
 
-- **Current Version**: 1.6.20
-
+- **Current Version**: 1.6.21
+- Part of the private **Franz Framework** ecosystem.
 ---
 
 ## ? Features

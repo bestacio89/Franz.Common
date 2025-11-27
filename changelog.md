@@ -674,4 +674,67 @@ Paste this into the **main README** under your “Changelog” or “What’s Ne
   * Franz.Common.Messaging
   * Franz.Common.Mediator
 
+---
 
+# ⭐ **Version 1.6.21 — Saga Orchestration Release**
+
+*(NEW — **This is the release we built together today**)
+
+The Franz 1.6.21 release introduces the **complete foundational Saga orchestration engine**, enabling **long-running distributed workflows** across microservices with deterministic execution.
+
+### 🧩 **Core Saga Primitives**
+
+* `ISaga<TState>`
+* `IStartWith<T>`, `IHandle<T>`, `ICompensateWith<T>`
+* `ISagaState`, `SagaTransition`, `SagaContext`
+
+### 🔍 **Runtime Registration**
+
+* Reflective discovery via `SagaRegistration.FromType`
+* Per-message handler resolution
+* Full validation with:
+
+  * `SagaTypeValidator`
+  * `SagaMappingValidator`
+
+### ⚙️ **Execution Engine**
+
+* `SagaOrchestrator` with deterministic ordering
+* `SagaRouter` for runtime saga resolution
+* `SagaExecutionPipeline` for middleware (logging, retries, observers)
+
+### 🗄️ **Persistence Layer**
+
+* In-memory saga store
+* EF Core saga store
+* Redis + Kafka compaction-ready stubs (future-proofing)
+
+### 📜 **Auditing**
+
+* Unified `SagaAuditRecord`
+* `ISagaAuditSink` abstraction
+* `DefaultSagaAuditSink` (ILogger-based)
+
+### 🛠️ **Configuration**
+
+* `FranzSagaOptions` (bound from appsettings)
+* `FranzSagaBuilder` with fluent API
+* Automatic discovery & validation in `AddFranzSagas()`
+
+### 🎯 **Architectural Impact**
+
+This release completes the last missing piece of the **enterprise microservice orchestration layer**:
+
+* Deterministic execution
+* Distributed workflow handling
+* Native message-driven state machines
+* Full compliance with Franz architectural governance
+
+Sagas now integrate seamlessly with:
+
+* The mediator
+* The messaging layer
+* The resilience subsystem
+* The logging + correlation core
+
+---

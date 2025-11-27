@@ -6,6 +6,9 @@
 High-performance, pipeline-driven gRPC for distributed microservices
 
 ---
+- **Current Version**: 1.6.21
+
+---
 
 Franz.Common.Grpc brings the **full Franz architectural standard** to gRPC:
 

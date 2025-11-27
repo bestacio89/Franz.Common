@@ -28,10 +28,8 @@ This package ensures seamless messaging health monitoring and transactional cons
 
 ## **Version Information**
 
-* **Current Version**: 1.6.20
+* **Current Version**: 1.6.21
 * Part of the private **Franz Framework** ecosystem.
-* Fully compatible with **.NET 9.0.8**.
-
 ---
 
 ## **Dependencies**
