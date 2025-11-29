@@ -304,15 +304,6 @@ docker-compose up -d
 dotnet test --filter Category=Integration
 ```
 
----
-
-# **Version 1.6.20 — .NET 10 Modernization Release**
-
-*(kept exactly as provided)*
-[... your full v1.6.20 section remains unchanged ...]
-
----
-
 # ⭐ **Version 1.6.21 — Saga Orchestration Release**
 
 ### 🔥 New: **Full Saga Engine for Distributed Workflows**
@@ -362,6 +353,13 @@ Franz.Common v1.6.21 introduces the complete Saga orchestration subsystem, enabl
 * `AddFranzSagas()` + `BuildFranzSagas()` pipeline
 
 This release finalizes the **foundation of distributed workflow orchestration** inside Franz and extends the messaging layer into enterprise-grade coordination patterns.
+
+For the complete historical evolution of Franz — including all releases from **1.2.65 → 1.6.21**, architecture milestones, and ecosystem-wide changes — please see:
+
+👉 **[changelog.md](./changelog.md)**
+
+For the complete guide on how to contribute please see:
+👉 **[contributing.md](./contributing.md)**
 
 ---
 
