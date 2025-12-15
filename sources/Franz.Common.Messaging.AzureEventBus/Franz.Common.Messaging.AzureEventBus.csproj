@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\..\common.targets" />
+
+
+  <PropertyGroup>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Errors\Franz.Common.Errors.csproj" />
+    <ProjectReference Include="..\Franz.Common.Headers\Franz.Common.Headers.csproj" />
+    <ProjectReference Include="..\Franz.Common.Logging\Franz.Common.Logging.csproj" />
+    <ProjectReference Include="..\Franz.Common.Mapping\Franz.Common.Mapping.csproj" />
+    <ProjectReference Include="..\Franz.Common.Mediator.Polly\Franz.Common.Mediator.Polly.csproj" />
+    <ProjectReference Include="..\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
+    <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="readme.md">
+      <PackagePath></PackagePath>
+      <Pack>true</Pack>
+    </None>
+  </ItemGroup>
+
+</Project>
