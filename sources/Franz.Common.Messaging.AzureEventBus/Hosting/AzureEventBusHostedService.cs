@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Franz.Common.Messaging.AzureEventBus.Hosting;
 
-internal sealed class AzureEventBusHostedService : IHostedService
+public sealed class AzureEventBusHostedService : IHostedService
 {
   private readonly AzureEventBusConsumer _consumer;
   private readonly ILogger<AzureEventBusHostedService> _logger;

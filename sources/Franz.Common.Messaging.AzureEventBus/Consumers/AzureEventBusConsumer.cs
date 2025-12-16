@@ -6,7 +6,7 @@ namespace Franz.Common.Messaging.AzureEventBus.Consumers;
 /// Coordinates one or more AzureEventBusProcessors.
 /// Represents the logical Azure consumer for the service.
 /// </summary>
-internal sealed class AzureEventBusConsumer : IAsyncDisposable
+public sealed class AzureEventBusConsumer : IAsyncDisposable
 {
   private readonly IReadOnlyCollection<AzureEventBusProcessor> _processors;
   private readonly ILogger<AzureEventBusConsumer> _logger;

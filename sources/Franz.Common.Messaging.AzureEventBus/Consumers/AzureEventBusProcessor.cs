@@ -11,7 +11,7 @@ namespace Franz.Common.Messaging.AzureEventBus.Consumers;
 /// Azure Service Bus message processor.
 /// Pure transport consumer: maps to Franz Message and publishes to mediator.
 /// </summary>
-internal sealed class AzureEventBusProcessor : IAsyncDisposable
+public sealed class AzureEventBusProcessor : IAsyncDisposable
 {
   private readonly ServiceBusProcessor _processor;
   private readonly IAzureEventBusMessageMapper _mapper;

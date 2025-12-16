@@ -5,7 +5,7 @@ using Franz.Common.Messaging.AzureEventBus.Mapping;
 
 namespace Franz.Common.Messaging.AzureEventBus.Producers;
 
-internal sealed class AzureEventBusProducer : IMessagingSender
+public sealed class AzureEventBusProducer : IMessagingSender
 {
   private readonly ServiceBusClient _client;
   private readonly IAzureEventBusMessageMapper _mapper;

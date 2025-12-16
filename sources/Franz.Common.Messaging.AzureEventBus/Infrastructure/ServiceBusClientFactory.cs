@@ -3,7 +3,7 @@ using Franz.Common.Messaging.AzureEventBus.Configuration;
 
 namespace Franz.Common.Messaging.AzureEventBus.Infrastructure;
 
-internal sealed class ServiceBusClientFactory
+public sealed class ServiceBusClientFactory
 {
   private readonly AzureEventBusOptions _options;
 
