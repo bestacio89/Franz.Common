@@ -64,13 +64,3 @@ steps:
     diagnosticsEnabled: true
     codeCoverageEnabled: true
 
-# ----------------------------------------
-# 📦 Publish NuGet Packages (all frameworks)
-# ----------------------------------------
-- task: NuGetCommand@2
-  displayName: 'Publish NuGet Packages to Azure Artifacts'
-  inputs:
-    command: 'push'
-    packagesToPush: '$(Build.SourcesDirectory)/**/*.nupkg'
-    publishVstsFeed: 'AjnaTellus'  # ✅ Correct feed name
-    allowPackageConflicts: true
