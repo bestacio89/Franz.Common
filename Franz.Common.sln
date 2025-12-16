@@ -128,6 +128,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.Host
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.Sagas", "sources\Franz.Common.Messaging.Sagas\Franz.Common.Messaging.Sagas.csproj", "{14AA79E6-2B28-48EA-8C6F-A90821F36E34}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.AzureEventBus", "sources\Franz.Common.Messaging.AzureEventBus\Franz.Common.Messaging.AzureEventBus.csproj", "{49FA9F32-D1F0-4C64-8E46-CBE3C63236A1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.AzureEventGrid", "sources\Franz.Common.Messaging.AzureEventGrid\Franz.Common.Messaging.AzureEventGrid.csproj", "{C85190DC-4F47-460B-9BBB-D851A2DC043B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.AzureEventHubs", "sources\Franz.Common.Messaging.AzureEventHubs\Franz.Common.Messaging.AzureEventHubs.csproj", "{D6542372-EE36-55B4-95D7-B142BF31ABC1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.Hosting.Azure", "sources\Franz.Common.Messaging.Hosting.Azure\Franz.Common.Messaging.Hosting.Azure.csproj", "{199D11BB-B86A-417F-9FFF-39D88EC2D8F1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -358,6 +366,22 @@ Global
 		{14AA79E6-2B28-48EA-8C6F-A90821F36E34}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{14AA79E6-2B28-48EA-8C6F-A90821F36E34}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{14AA79E6-2B28-48EA-8C6F-A90821F36E34}.Release|Any CPU.Build.0 = Release|Any CPU
+		{49FA9F32-D1F0-4C64-8E46-CBE3C63236A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{49FA9F32-D1F0-4C64-8E46-CBE3C63236A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{49FA9F32-D1F0-4C64-8E46-CBE3C63236A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{49FA9F32-D1F0-4C64-8E46-CBE3C63236A1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C85190DC-4F47-460B-9BBB-D851A2DC043B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C85190DC-4F47-460B-9BBB-D851A2DC043B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C85190DC-4F47-460B-9BBB-D851A2DC043B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C85190DC-4F47-460B-9BBB-D851A2DC043B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D6542372-EE36-55B4-95D7-B142BF31ABC1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D6542372-EE36-55B4-95D7-B142BF31ABC1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D6542372-EE36-55B4-95D7-B142BF31ABC1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D6542372-EE36-55B4-95D7-B142BF31ABC1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{199D11BB-B86A-417F-9FFF-39D88EC2D8F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{199D11BB-B86A-417F-9FFF-39D88EC2D8F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{199D11BB-B86A-417F-9FFF-39D88EC2D8F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{199D11BB-B86A-417F-9FFF-39D88EC2D8F1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -420,6 +444,10 @@ Global
 		{B2CA2B2E-8990-CB2E-606A-8BF5FA2D02C2} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 		{0451CDF4-FBC7-CDC2-F80D-22922B95BB20} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 		{14AA79E6-2B28-48EA-8C6F-A90821F36E34} = {2A34967E-2D10-4703-BFB0-D4883859D440}
+		{49FA9F32-D1F0-4C64-8E46-CBE3C63236A1} = {2A34967E-2D10-4703-BFB0-D4883859D440}
+		{C85190DC-4F47-460B-9BBB-D851A2DC043B} = {2A34967E-2D10-4703-BFB0-D4883859D440}
+		{D6542372-EE36-55B4-95D7-B142BF31ABC1} = {2A34967E-2D10-4703-BFB0-D4883859D440}
+		{199D11BB-B86A-417F-9FFF-39D88EC2D8F1} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {069A32C7-587A-42C8-B9D2-9CF7EE93E2BD}

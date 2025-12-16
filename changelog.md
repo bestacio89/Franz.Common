@@ -738,3 +738,114 @@ Sagas now integrate seamlessly with:
 * The logging + correlation core
 
 ---
+
+## Version 1.7.0 – Azure Messaging Expansion ☁️📨
+
+This release introduces **first-class Azure messaging support** to the Franz Framework, completing transport parity with Kafka and RabbitMQ while preserving Franz’s deterministic, mediator-driven architecture.
+
+---
+
+### ✨ Added
+
+#### 🟦 **Azure Service Bus Integration**
+
+**`Franz.Common.Messaging.AzureEventBus`**
+
+* Native **Azure Service Bus Topics & Subscriptions** adapter.
+* Pure transport implementation aligned with Franz messaging abstractions.
+* Franz-native mapping layer using **Franz.Common.Mapping** (no AutoMapper).
+* Deterministic propagation of:
+
+  * `MessageId`
+  * `CorrelationId`
+  * Tenant / domain headers
+  * Event type metadata
+* Mediator-driven consumption using `IDispatcher.PublishAsync`.
+* Azure-native retry semantics via delivery count.
+* Explicit dead-letter routing for poison messages.
+* Kafka / RabbitMQ **feature parity** in Azure environments.
+
+---
+
+#### 🌊 **Azure Event Hubs Integration**
+
+**`Franz.Common.Messaging.AzureEventHubs`**
+
+* Streaming-oriented adapter for **Azure Event Hubs**.
+* Built on `Azure.Messaging.EventHubs` (.NET 10 compatible).
+* Partition-aware consumption with checkpointing.
+* Transport-level mapping from `PartitionEvent` → Franz `Message`.
+* Clean separation between:
+
+  * streaming ingestion
+  * mediator dispatch
+* Designed for **high-throughput event streams** (Kafka-like workloads).
+
+---
+
+#### 🌐 **Azure Event Grid Integration**
+
+**`Franz.Common.Messaging.AzureEventGrid`**
+
+* HTTP-based ingress adapter for **Azure Event Grid**.
+* Supports:
+
+  * Subscription validation handshake
+  * Event ingestion
+* Maps Event Grid events into Franz messaging envelopes.
+* Dispatches events through the Franz mediator pipeline.
+* No transport logic leaks into business layers.
+* Ideal for SaaS, webhook, and platform event scenarios.
+
+---
+
+#### 🧭 **Azure Hosting Orchestration**
+
+**`Franz.Common.Messaging.Hosting.Azure`**
+
+* Opinionated **Azure runtime orchestration layer**.
+* Coordinates:
+
+  * Azure Service Bus consumers
+  * Azure Event Hubs processors
+  * Azure Event Grid HTTP endpoints
+* Built on top of `Franz.Common.Messaging.Hosting`.
+* Registers background listeners as `IHostedService`.
+* Preserves strict separation:
+
+  * transport adapters remain reusable
+  * hosting concerns live exclusively in this package
+* Enables “just works” Azure messaging with minimal setup.
+
+---
+
+### 🧠 Architectural Highlights
+
+* Azure messaging now fully aligned with Franz principles:
+
+  * mediator-first execution
+  * deterministic metadata
+  * explicit boundaries
+* No AutoMapper, no reflection magic.
+* No Azure SDK leakage outside transport adapters.
+* Hosting is **optional**, not mandatory.
+* Developers can still build **custom runtimes** on top of the transport packages.
+
+---
+
+### 🔧 Changed
+
+* Messaging ecosystem now supports **Kafka, RabbitMQ, and Azure** with a unified mental model.
+* Reinforced the **transport vs hosting split** across all messaging providers.
+
+---
+
+### 🏁 Summary
+
+> **Franz 1.7.0 completes the Azure messaging stack.**
+> Service Bus for durability, Event Hubs for streaming, Event Grid for ingress — all wired through the same deterministic Franz mediator core.
+
+This release marks a major step toward **cloud-agnostic, enterprise-grade messaging orchestration**.
+
+---
+

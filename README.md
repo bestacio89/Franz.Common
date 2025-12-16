@@ -249,7 +249,7 @@ This makes Franz suitable for **large organizations**, where maintaining archite
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 1.6.20
+dotnet add package Franz.Common --version 1.7.0
 ```
 
 Messaging example:
@@ -306,73 +306,51 @@ dotnet test --filter Category=Integration
 
 ---
 
-# **Version 1.6.20 — .NET 10 Modernization Release**
+# ⭐ Version 1.7.0 — Azure Messaging Expansion
 
-*(kept exactly as provided)*
-[... your full v1.6.20 section remains unchanged ...]
+* Franz.Common v1.7.0 introduces first-class Azure messaging support, completing cloud transport parity while preserving Franz’s deterministic, mediator-driven architecture.
 
----
+☁️ Azure Messaging Stack
 
-# ⭐ **Version 1.6.21 — Saga Orchestration Release**
+* Azure Service Bus adapter
+  Durable brokered messaging with Franz-native mapping and mediator dispatch.
 
-### 🔥 New: **Full Saga Engine for Distributed Workflows**
+* Azure Event Hubs adapter
+  High-throughput, partitioned streaming for Kafka-style workloads.
 
-Franz.Common v1.6.21 introduces the complete Saga orchestration subsystem, enabling **long-running**, **message-driven**, and **distributed workflow coordination** across microservices.
+* Azure Event Grid adapter
+  HTTP-based event ingress with subscription validation and mediator integration.
 
-### 🧩 Core Infrastructure
+🧭 Azure Hosting Orchestration
 
-* `ISaga<TState>`, `ISagaState`, `ISagaContext`
-* Handler interfaces:
+* New Azure hosting layer to orchestrate:
 
-  * `IStartWith<T>`
-  * `IHandle<T>`
-  * `ICompensateWith<T>`
-* `SagaTransition` for emitting outgoing events
-* Automatic handler discovery via `SagaRegistration.FromType`
+* Service Bus consumers
 
-### ⚙️ Execution Engine
+* Event Hubs processors
 
-* `SagaOrchestrator` for deterministic step execution
-* `SagaRouter` with full DI + discovery
-* `SagaExecutionPipeline` for wrapping middleware (retries, logging, etc.)
+* Event Grid HTTP endpoints
 
-### 🔍 Validation
+* Built on Franz.Common.Messaging.Hosting
 
-* `SagaTypeValidator` for structural correctness
-* `SagaMappingValidator` for handler verification
-* Enabled via `appsettings.json` (`EnableValidation: true`)
+* Preserves strict separation between transport and hosting
 
-### 📦 Persistence (Pluggable)
+🧠 Architectural Guarantees
 
-* In-memory repository (ideal for tests)
-* EntityFramework persistent storage
-* Redis + Kafka compacted-topic repositories (stubs)
+* No AutoMapper, no reflection magic
 
-### 📊 Auditing & Logging
+* Deterministic metadata propagation
 
-* `SagaAuditRecord` (structured audit model)
-* `ISagaAuditSink` pluggable sink abstraction
-* `DefaultSagaAuditSink` via ILogger
-* Structured logs via `SagaLogEvents`
+* Transport-agnostic mediator pipelines
 
-### ⚙️ Configuration & DI
+* Azure support added without coupling business logic
 
-* New `FranzSagaOptions` bound from configuration
-* Fluent registration via `FranzSagaBuilder`
-* `AddFranzSagas()` + `BuildFranzSagas()` pipeline
-
-This release finalizes the **foundation of distributed workflow orchestration** inside Franz and extends the messaging layer into enterprise-grade coordination patterns.
+* This release completes the Azure messaging pillar of the Franz ecosystem, alongside Kafka and RabbitMQ.
 
 ---
 
 # 🛣️ Roadmap
-
-* Microsoft Azure Event Bus integration
-* Extended Cosmos/Mongo projection & TTL helpers
-* AWS/GCP multi-cloud samples
-* Distributed cache providers (Redis, Memcached)
-* **Advanced Saga orchestration helpers (optional package)**
-
+* Graphql Adapters and Implementations
 ---
 
 # 🏢 Enterprise Adoption & Support

@@ -20,7 +20,7 @@ public static class ServiceCollectionExtensions
     // Transport registrations (each package owns its internals)
     services.AddFranzAzureEventBus(options.EventBus);
     services.AddFranzAzureEventHubs(options.EventHubs);
-    services.AddFranzAzureEventGrid(options.EventGrid);
+    services.AddFranzAzureEventGrid();
 
     // Hosted services (background listeners)
     services.AddHostedService<AzureEventBusHostedService>();
