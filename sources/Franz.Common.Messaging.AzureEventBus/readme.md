@@ -1,97 +1,127 @@
-﻿
-# Franz.Common.Messaging
+﻿# Franz.Common.Messaging.AzureEventBus
 
-A messaging abstraction library within the **Franz Framework** that provides a unified foundation for building reliable, resilient, and extensible distributed messaging systems.  
+`Franz.Common.Messaging.AzureEventBus` is the **Azure Service Bus transport adapter** for the **Franz Framework messaging stack**.
 
-It supports **outbox**, **inbox**, **retries**, **dead-letter queues**, and **multiple transports** (starting with **Kafka** and **MongoDB**).
+It implements Franz messaging abstractions to provide **durable, reliable, and mediator-driven event delivery** using **Azure Service Bus Topics & Subscriptions**, while preserving all Franz guarantees:
 
----
+* deterministic metadata
+* mediator pipelines
+* structured logging
+* retry & dead-letter semantics
+* transport isolation
 
-## ✨ Features
+This package is the **Azure equivalent** of:
 
-- **📦 Outbox Pattern**
-  - Reliable delivery with `OutboxPublisherService`.
-  - Retries with exponential backoff.
-  - Moves failed messages to a **Dead Letter Queue (DLQ)** after max retries.
-  - MongoDB-backed implementation (`MongoMessageStore`).
+* `Franz.Common.Messaging.Kafka`
+* `Franz.Common.Messaging.RabbitMQ`
+### 🟦 Azure Service Bus Transport
 
-- **📥 Inbox Pattern**
-  - Prevents duplicate processing with `IInboxStore`.
-  - MongoDB-backed implementation (`MongoInboxStore`).
-  - Guarantees **idempotency** under retries or replays.
-
-- **🧩 Serializer Abstraction**
-  - Unified `IMessageSerializer` contract.
-  - Default `JsonMessageSerializer` (camelCase, ignore nulls).
-  - Shared across Kafka, Mongo, and Outbox.
-
-- **📊 Observability & Monitoring**
-  - Structured logging (with emojis ✅⚠️🔥).
-  - OpenTelemetry-friendly hooks.
-  - Covers retries, DLQ moves, dispatch, and consumption.
-
-- **🎧 Listeners & Hosting**
-  - Transport-agnostic `IListener` interface.
-  - Dedicated listeners:
-    - `KafkaListener` (transport-only)
-    - `OutboxListener` (transport-only)
-  - Hosted service wrappers:
-    - `KafkaHostedService`
-    - `OutboxHostedService`
-  - Clean **separation of transport vs hosting concerns**.
-
-- **⚡ MongoDB Integration**
-  - `MongoMessageStore` with automatic index creation:
-    - `SentOn`
-    - `RetryCount`
-    - `CreatedOn`
-  - `MongoInboxStore` with unique index on message IDs.
-  - DI extensions: `AddMongoMessageStore`, `AddMongoInboxStore`.
+* Native integration with **Azure Service Bus**
+* Topic / Subscription model
+* Queue support (for commands, if enabled)
+* Azure-native retry & DLQ semantics
 
 ---
 
-## 📂 Project Structure
+### 🧠 Franz-Native Semantics
+
+* Uses **Franz.Common.Messaging** abstractions
+* Dispatches messages through **Franz.Common.Mediator**
+* Fully compatible with Franz outbox / inbox patterns
+* Deterministic correlation & causation propagation
+
+---
+
+### 🧩 Explicit Mapping Layer (No AutoMapper)
+
+* Uses **Franz.Common.Mapping**
+* Single authoritative translation layer:
+
+  * Franz message ⇄ Service Bus message
+* No reflection magic
+* Version-safe & auditable mappings
+
+---
+
+### 🔁 Retry & Dead Letter Handling
+
+* Retries handled by **Azure Service Bus delivery counts**
+* Explicit dead-letter routing for:
+
+  * Deserialization failures
+  * Validation errors
+  * Poison messages
+* Clear separation between **business failure** and **transport failure**
+
+---
+
+### 📊 Observability & Diagnostics
+
+* Integrated with **Franz.Common.Logging**
+* Structured logs with Franz conventions
+* CorrelationId & MessageId propagation
+* Compatible with OpenTelemetry (via mediator pipelines)
+
+---
+
+## 📦 Dependencies
+
+This package intentionally depends only on **core Franz building blocks**:
 
 ```
+Franz.Common.Messaging
+Franz.Common.Mediator
+Franz.Common.Mediator.Polly
+Franz.Common.Logging
+Franz.Common.Errors
+Franz.Common.Headers
+Franz.Common.Mapping
+Franz.Common.Serialization
+Azure.Messaging.ServiceBus
+```
 
-Franz.Common.Messaging/
-├── Configuration/
-├── Contexting/
-├── Delegating/
-├── Extensions/
-├── Factories/
-├── Headers/
-├── Outboxes/
-│    ├── OutboxOptions.cs
-│    ├── OutboxPublisherService.cs
-│    └── ServiceCollectionExtensions.cs
-├── Serialization/
-│    ├── ISerializer.cs
-│    ├── JsonMessageSerializer.cs
-│    └── ServiceCollectionExtensions.cs
-├── Storage/
-│    ├── InboxStore.cs
-│    ├── IMessageStore.cs
-│    ├── StoredMessage.cs
-│    ├── Mappings/MessageMappingExtensions.cs
-│    └── …
-├── Message.cs
-├── IMessageSender.cs
-└── …
-
-````
-
-Hosting-specific projects:
-- **Franz.Common.Messaging.Hosting** → defines `IListener`, `MessageContext`, base services.
-- **Franz.Common.Messaging.Hosting.Kafka** → `KafkaHostedService`.
-- **Franz.Common.Messaging.Hosting.Mongo** → `OutboxHostedService`, `InboxHostedService`.
-
----
-
+❌ No HTTP
+❌ No hosting logic
+❌ No business dependencies
+❌ No AutoMapper
+│   └── AzureEventBusOptions.cs
+│
+├── Constants/
+│   └── AzureEventBusHeaders.cs
+│
+├── Producers/
+│   └── AzureEventBusProducer.cs
+│
+├── Consumers/
+│   ├── AzureEventBusConsumer.cs
+│   └── AzureEventBusProcessor.cs
+│
+├── Mapping/
+│   └── AzureEventBusMessageMapper.cs
+│
+├── Infrastructure/
+│   ├── ServiceBusClientFactory.cs
+│   ├── ServiceBusSenderFactory.cs
+│   └── ServiceBusProcessorFactory.cs
+│
+├── DependencyInjection/
+│   └── ServiceCollectionExtensions.cs
+│
+└── README.md
+```
 ## ⚙️ Configuration
+```csharp
+services.AddFranzAzureEventBus(options =>
+{
+    options.ConnectionString = "<service-bus-connection-string>";
+    options.Namespace = "my-namespace";
 
-`MessagingOptions` in `appsettings.json`:
+    options.Retry.MaxDeliveryCount = 10;
+    options.DeadLetter.Enabled = true;
+});
+```
 
+Configuration is **explicit and strongly typed** — no magic strings.
 ```json
 "Messaging": {
   "BootstrapServers": "localhost:9092",
@@ -101,95 +131,104 @@ Hosting-specific projects:
   "InboxCollection": "InboxMessages"
 }
 ````
-
----
-
-## ⚡ Dependency Injection Setup
-
-```csharp
-builder.Services.AddMessagingCore();
-builder.Services.AddMongoMessageStore(configuration);
-builder.Services.AddMongoInboxStore(configuration);
-builder.Services.AddKafkaHostedListener();
-builder.Services.AddOutboxHostedListener();
+## ⚡ Dependency Injection
+builder.Services.AddFranzAzureEventBus(options =>
+{
+    options.ConnectionString = configuration["Azure:ServiceBus"];
+});
 ```
 
+This registers:
+
+* `ServiceBusClient`
+* `AzureEventBusProducer`
+* `AzureEventBusProcessor`
+* Mapping & serialization components
+
+⚠️ **Hosting is intentionally NOT included**
+See `Franz.Common.Messaging.Azure.Hosting` (planned) for orchestration.
+
+## 🔄 Message Flow
+
+### Producer
+
+1. Domain event published via Franz messaging API
+2. Mapped using `Franz.Common.Mapping`
+3. Serialized using Franz serializer
+4. Sent as `ServiceBusMessage`
+5. Headers mapped to `ApplicationProperties`
+
 ---
 
-## 🔄 Typical Flow
+### Consumer
 
-1. **Send Command/Event** → via `IMessagingSender`.
-2. **Persist in Outbox** → `MongoMessageStore`.
-3. **Publisher Service** → retries + DLQ if needed.
-4. **Transport** → Kafka.
-5. **Listener** → consumes message.
-6. **Inbox Check** → skip if already processed.
-7. **Dispatcher** → `SendAsync` (command) / `PublishAsync` (event).
+1. Azure Service Bus receives message
+2. Message mapped back to Franz envelope
+3. Metadata validated
+4. Dispatched through **Franz.Mediator**
+5. Result:
 
+   * ✅ Complete
+   * ⚠️ Retry
+   * 🔥 Dead-letter
+
+---
+
+## 📊 Header Mapping
+
+| Franz Header  | Azure Service Bus                               |
+| ------------- | ----------------------------------------------- |
+| MessageId     | `MessageId`                                     |
+| CorrelationId | `CorrelationId`                                 |
+| EventType     | `ApplicationProperties["franz-event-type"]`     |
+| TenantId      | `ApplicationProperties["franz-tenant-id"]`      |
+| SchemaVersion | `ApplicationProperties["franz-schema-version"]` |
+
+All headers are defined in **`AzureEventBusHeaders`**.
 ---
 
 ## 🚀 Extensibility
 
-* Add new transports (RabbitMQ, Azure Service Bus, etc.):
+This package is designed to evolve without breaking contracts:
 
-  * Implement `IListener` + HostedService in `Hosting.[Transport]`.
-  * Add DI registration extensions.
-* Swap Mongo for SQL by implementing `IMessageStore` and `IInboxStore`.
-* Replace JSON with custom serializers via `IMessageSerializer`.
+* Add sessions support
+* Integrate Franz Outbox publishing
+* Extend DLQ routing strategies
+* Support schema evolution & version fallback
 
----
+Other Azure transports are implemented separately:
 
-## 📊 Observability
+* `Franz.Common.Messaging.AzureEventGrid`
+* `Franz.Common.Messaging.AzureEventHubs`
 
-* Emoji-style structured logs for clarity:
+## 🧭 Roadmap
+* Azure Service Bus sessions
+* Outbox publisher integration
+* Hosting orchestration package
+* Azure Event Grid receiver hosting
+* Event Hubs streaming adapter (Kafka-style)
 
-  * ✅ Success
-  * ⚠️ Retry
-  * 🔁 Skipped (Inbox)
-  * 🔥 Dead Letter
-* Compatible with OpenTelemetry for tracing message lifecycles.
 
----
+* **Current Version**: **1.7.0**
+* Target Framework: **.NET 10**
+* Part of the **Franz Framework**
 
-## 📌 Roadmap
+##Licensing
 
-* Batch consumption support.
-* Message expiration / cleanup.
-* RabbitMQ transport (`Franz.Common.Messaging.Hosting.RabbitMq`).
-
----
-
-## 📝 Version Information
-
-* **Current Version**: 1.7.0
-* Part of the private **Franz Framework** ecosystem.
+MIT License — see `LICENSE`.
 
 ---
 
-## 📜 License
+## ✅ Changelog
 
-This library is licensed under the MIT License. See the `LICENSE` file for details.
+### Version 1.7.0
+
+* Added **Azure Service Bus adapter**
+* Franz-native mapping via `Franz.Common.Mapping`
+* Mediator-driven consumption pipeline
+* Deterministic header & metadata propagation
+* Kafka / Rabbit parity for Azure environments
+
+---
 
 
-
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.3.6
-- Integrated with Franz.Mediator (no MediatR).
-- MessagingPublisher.Publish is now async Task.
-- MessagingInitializer scans INotificationHandler<> for events.
-- Kafka topics auto-created for all integration events.
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
