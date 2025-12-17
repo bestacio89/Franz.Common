@@ -1,5 +1,8 @@
-﻿using Testcontainers.Kafka;
+﻿using DotNet.Testcontainers.Configurations;
+
+using Testcontainers.Kafka;
 using Xunit;
+using Xunit.Sdk;
 
 public sealed class KafkaContainerFixture : IAsyncLifetime
 {
@@ -9,8 +12,10 @@ public sealed class KafkaContainerFixture : IAsyncLifetime
 
   public KafkaContainerFixture()
   {
+   
     _container = new KafkaBuilder()
-        .WithImage("confluentinc/cp-kafka:7.6.1")
+        .WithImage("bitnami/kafka:3.7")
+        .WithEnvironment("ALLOW_PLAINTEXT_LISTENER", "yes")
         .Build();
   }
 
