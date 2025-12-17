@@ -5,8 +5,6 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  solution: '**/*.sln'
-  buildPlatform: 'Any CPU'
   buildConfiguration: 'Release'
 
 steps:
@@ -21,46 +19,28 @@ steps:
     includePreviewVersions: true
 
 # ----------------------------------------
-# 📦 Install NuGet
-# ----------------------------------------
-- task: NuGetToolInstaller@1
-  displayName: 'Install NuGet'
-
-# ----------------------------------------
 # 🔐 Authenticate to Azure Artifacts
 # ----------------------------------------
 - task: NuGetAuthenticate@1
   displayName: 'Authenticate to Azure Artifacts'
 
 # ----------------------------------------
-# 📥 Restore Packages
+# 📥 Restore (dotnet, no Mono)
 # ----------------------------------------
-- task: NuGetCommand@2
-  displayName: 'Restore NuGet Packages'
-  inputs:
-    restoreSolution: '$(solution)'
-    feedsToUse: 'select'
-    vstsFeed: 'AjnaTellus'   # ✅ Correct feed name
+- script: |
+    dotnet restore
+  displayName: 'Restore NuGet packages'
 
 # ----------------------------------------
-# 🏗️ Build Solution
+# 🏗️ Build
 # ----------------------------------------
-- task: VSBuild@1
-  displayName: 'Build Solution (.NET 10)'
-  inputs:
-    solution: '$(solution)'
-    msbuildArgs: '/p:SkipInvalidConfigurations=true'
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
+- script: |
+    dotnet build --configuration $(buildConfiguration) --no-restore
+  displayName: 'Build solution'
 
 # ----------------------------------------
-# 🧪 Run Tests
+# 🧪 Test (Kafka / Testcontainers included)
 # ----------------------------------------
-- task: VSTest@2
-  displayName: 'Run Tests'
-  inputs:
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
-    diagnosticsEnabled: true
-    codeCoverageEnabled: true
-
+- script: |
+    dotnet test --configuration $(buildConfiguration) --no-build --verbosity normal
+  displayName: 'Run tests'
