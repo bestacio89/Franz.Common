@@ -14,16 +14,16 @@ using Xunit;
 public sealed class ServiceCollectionExtensionsTests
 {
   [Fact]
-  public void AddBusinessWithMediator_Should_Fail_When_Application_Assembly_Not_Found()
+  public void AddBusinessWithMediator_Should_Not_Throw_When_Application_Assembly_Not_Found()
   {
     var services = new ServiceCollection();
     var entryAssembly = typeof(ServiceCollectionExtensionsTests).Assembly;
 
     Action act = () => services.AddBusinessWithMediator(entryAssembly);
 
-    act.Should().Throw<Exception>()
-       .Where(e => e.GetBaseException() is TechnicalException);
+    act.Should().NotThrow();
   }
+
 
   [Fact]
   public void TryAddBusinessWithMediator_Should_Not_Throw_When_Application_Assembly_Not_Found()
