@@ -1,20 +1,18 @@
 ﻿using Franz.Common.Hosting.Messaging.Kafka.Tests.Events;
-using Franz.Common.Hosting.Messaging.Kafka.Tests.Fakes;
 using Franz.Common.Hosting.Messaging.Kafka.Tests.Handlers;
-using Franz.Common.Messaging;
-using Franz.Common.Messaging.Serialization;
-using Franz.Common.Serialization;
+using Franz.Common.Mediator.Dispatchers;
+using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 public sealed class KafkaHostedMessagingTests
-  : IClassFixture<KafkaContainerFixture>
+  : IClassFixture<KafkaHostingFixture>
 {
-  private readonly KafkaContainerFixture _kafka;
+  private readonly KafkaHostingFixture _fixture;
 
-  public KafkaHostedMessagingTests(KafkaContainerFixture kafka)
+  public KafkaHostedMessagingTests(KafkaHostingFixture fixture)
   {
-    _kafka = kafka;
+    _fixture = fixture;
   }
 
   [Fact]
@@ -23,24 +21,19 @@ public sealed class KafkaHostedMessagingTests
     // Arrange
     TestEventHandler.Reset();
 
-    await using var hostFixture =
-        new KafkaHostingFixture(_kafka.BootstrapServers);
+    using var scope = _fixture.Services.CreateScope();
 
-    await hostFixture.StartAsync();
-
-    var producer = hostFixture.Host.Services.GetRequiredService<IMessagingSender>();
-    var serializer = hostFixture.Host.Services.GetRequiredService<IMessageSerializer>();
-
-    var evt = new TestEvent("hello-franz");
-    var message = TestMessageFactory.FromEvent(evt, serializer);
+    var dispatcher = scope.ServiceProvider
+      .GetRequiredService<IDispatcher>();
 
     // Act
-    await producer.SendAsync(message);
+    await dispatcher.PublishEventAsync(new TestEvent("hello"));
 
-    // Assert
+    // Assert (deterministic, async-safe)
     var received = await TestEventHandler.Received.Task
-        .WaitAsync(TimeSpan.FromSeconds(10));
+      .WaitAsync(TimeSpan.FromSeconds(10));
 
-    Assert.Equal(evt.Value, received.Value);
+    received.Should().NotBeNull();
+    received.Value.Should().Be("hello");
   }
 }

@@ -1,49 +1,51 @@
-﻿using Franz.Common.Messaging.Configuration;
+﻿using Franz.Common.Hosting.Messaging.Kafka.Tests.Fixtures;
+using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging.Hosting.Kafka;
 using Franz.Common.Messaging.Kafka.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Franz.Common.Mediator.Extensions;
-using System.Reflection;
-public sealed class KafkaHostingFixture : IAsyncDisposable
-{
-  public IHost Host { get; }
+using Testcontainers.Kafka;
 
-  public KafkaHostingFixture(string bootstrapServers)
+public sealed class KafkaHostingFixture
+  : HostedMessagingFixture<KafkaContainer>
+{
+  public string BootstrapServers => Container!.GetBootstrapAddress();
+
+  protected override KafkaContainer CreateContainer()
+    => new KafkaBuilder()
+        .WithImage("confluentinc/cp-kafka:7.6.1")
+        .WithCleanUp(true)
+        .Build();
+
+  protected override IHost BuildHost(KafkaContainer container)
   {
     var configuration = new ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?>
+      .AddInMemoryCollection(new Dictionary<string, string?>
+      {
+        ["Messaging:BootStrapServers"] = container.GetBootstrapAddress(),
+        ["Messaging:GroupID"] = "franz-test-group"
+      })
+      .Build();
+
+    return new HostBuilder()
+      .ConfigureServices(services =>
+      {
+        services.AddLogging();
+
+        services.AddFranzMediator(new[]
         {
-          ["Messaging:BootStrapServers"] = bootstrapServers,
-          ["Messaging:GroupID"] = "franz-test-group"
-        })
-        .Build();
+          typeof(KafkaHostingFixture).Assembly
+        });
 
-    Host = new HostBuilder()
-        .ConfigureServices(services =>
+        services.AddKafkaMessaging(configuration);
+
+        services.AddKafkaHostedListener(options =>
         {
-          services.AddLogging();
-          services.AddFranzMediator( new [] {Assembly.GetCallingAssembly()});
-
-          // Core messaging (binds MessagingOptions from IConfiguration)
-          services.AddKafkaMessaging(configuration);
-
-          // Hosted listener (explicit options, same values)
-          services.AddKafkaHostedListener(options =>
-          {
-            options.BootStrapServers = bootstrapServers;
-            options.GroupID = "franz-test-group";
-          });
-        })
-        .Build();
-  }
-
-  public Task StartAsync() => Host.StartAsync();
-
-  public async ValueTask DisposeAsync()
-  {
-    await Host.StopAsync();
-    Host.Dispose();
+          options.BootStrapServers = container.GetBootstrapAddress();
+          options.GroupID = "franz-test-group";
+        });
+      })
+      .Build();
   }
 }

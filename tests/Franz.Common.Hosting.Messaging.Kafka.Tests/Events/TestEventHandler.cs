@@ -5,6 +5,12 @@ namespace Franz.Common.Hosting.Messaging.Kafka.Tests.Handlers;
 
 public sealed class TestEventHandler : IEventHandler<TestEvent>
 {
+  private readonly ITestProbe _probe;
+
+  public TestEventHandler(ITestProbe probe)
+  {
+    _probe = probe;
+  }
   public static TaskCompletionSource<TestEvent> Received { get; private set; }
     = Create();
 
@@ -17,6 +23,7 @@ public sealed class TestEventHandler : IEventHandler<TestEvent>
   public Task HandleAsync(TestEvent notification, CancellationToken cancellationToken)
   {
     Received.TrySetResult(notification);
+    _probe.MarkHandled();
     return Task.CompletedTask;
   }
 }
