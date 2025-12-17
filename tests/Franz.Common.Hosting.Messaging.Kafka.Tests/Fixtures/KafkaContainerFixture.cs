@@ -13,8 +13,11 @@ public sealed class KafkaContainerFixture : IAsyncLifetime
   public KafkaContainerFixture()
   {
    
+
     _container = new KafkaBuilder()
-                .Build();
+        .WithImage("bitnami/kafka:3.7")
+        .WithEnvironment("ALLOW_PLAINTEXT_LISTENER", "yes")
+        .Build();
   }
 
   public async Task InitializeAsync()
