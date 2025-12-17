@@ -1,8 +1,11 @@
 ﻿using Franz.Common.Business.Domain;
-using Xunit;
-using FluentAssertions;
+using System;
+using System.Collections.Generic;
+using System.Text;
 
-public sealed class Money : ValueObject<Money>
+namespace Franz.Common.Business.Tests.Domain.ValueObjectTests;
+
+internal sealed class Money : ValueObject<Money>
 {
   public decimal Amount { get; }
   public string Currency { get; }
@@ -17,17 +20,5 @@ public sealed class Money : ValueObject<Money>
   {
     yield return Amount;
     yield return Currency;
-  }
-}
-
-public class ValueObjectEqualityTests
-{
-  [Fact]
-  public void ValueObjects_WithSameComponents_AreEqual()
-  {
-    var m1 = new Money(100, "EUR");
-    var m2 = new Money(100, "EUR");
-
-    m1.Should().Be(m2);
   }
 }

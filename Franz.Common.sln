@@ -136,6 +136,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.Azur
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.Hosting.Azure", "sources\Franz.Common.Messaging.Hosting.Azure\Franz.Common.Messaging.Hosting.Azure.csproj", "{199D11BB-B86A-417F-9FFF-39D88EC2D8F1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Hosting.Messaging.Kafka.Tests", "tests\Franz.Common.Hosting.Messaging.Kafka.Tests\Franz.Common.Hosting.Messaging.Kafka.Tests.csproj", "{F409F29D-BA8B-4DD2-9E91-10FF202B3A7A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -382,6 +384,10 @@ Global
 		{199D11BB-B86A-417F-9FFF-39D88EC2D8F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{199D11BB-B86A-417F-9FFF-39D88EC2D8F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{199D11BB-B86A-417F-9FFF-39D88EC2D8F1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F409F29D-BA8B-4DD2-9E91-10FF202B3A7A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F409F29D-BA8B-4DD2-9E91-10FF202B3A7A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F409F29D-BA8B-4DD2-9E91-10FF202B3A7A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F409F29D-BA8B-4DD2-9E91-10FF202B3A7A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -448,6 +454,7 @@ Global
 		{C85190DC-4F47-460B-9BBB-D851A2DC043B} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 		{D6542372-EE36-55B4-95D7-B142BF31ABC1} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 		{199D11BB-B86A-417F-9FFF-39D88EC2D8F1} = {2A34967E-2D10-4703-BFB0-D4883859D440}
+		{F409F29D-BA8B-4DD2-9E91-10FF202B3A7A} = {99C4C621-B376-4D7A-BB9B-C56DEB0AA0CB}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {069A32C7-587A-42C8-B9D2-9CF7EE93E2BD}
