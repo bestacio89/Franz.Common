@@ -1,4 +1,4 @@
-using Franz.Common.Headers;
+﻿using Franz.Common.Headers;
 using Franz.Common.Messaging.Contexting;
 using Microsoft.Extensions.Primitives;
 using Newtonsoft.Json;
@@ -17,33 +17,50 @@ public class HeaderContextAccessor : IHeaderContextAccessor
 
   public IEnumerable<KeyValuePair<string, StringValues>> ListAll()
   {
-    IEnumerable<KeyValuePair<string, StringValues>> result = new List<KeyValuePair<string, StringValues>>();
     var headers = messageContextAccessor.Current?.Message?.Headers;
 
-    if (headers != null)
-      result = headers;
+    if (headers == null)
+      return Enumerable.Empty<KeyValuePair<string, StringValues>>();
 
-    return result;
+    return headers.Select(kvp =>
+        new KeyValuePair<string, StringValues>(
+            kvp.Key,
+            kvp.Value switch
+            {
+              StringValues sv => sv,
+              IEnumerable<string> values => new StringValues(values.ToArray()),
+              _ => StringValues.Empty
+            }
+        ));
   }
 
-  public bool TryGetValue(string key, out StringValues value)
-  {
-    value = default;
 
-    var result = messageContextAccessor.Current?.Message?.Headers.TryGetValue(key, out value);
 
-    return result == true;
-  }
 
   public bool TryGetValue<T>(string key, [MaybeNull] out T value)
   {
-    StringValues stringValue = default;
+    value = default;
 
-    var result = messageContextAccessor.Current?.Message?.Headers.TryGetValue(key, out stringValue) == true;
-#pragma warning disable CS8604 // Possible null reference argument.
-    value = JsonConvert.DeserializeObject<T>(stringValue);
-#pragma warning restore CS8604 // Possible null reference argument.
+    var headers = messageContextAccessor.Current?.Message?.Headers;
+    if (headers == null)
+      return false;
 
-    return result;
+    if (!headers.TryGetValue(key, out var rawValues))
+      return false;
+
+    // Adapt IReadOnlyCollection<string> → StringValues
+    var stringValues = rawValues switch
+    {
+      StringValues sv => sv,
+      IEnumerable<string> values => new StringValues(values.ToArray()),
+      _ => StringValues.Empty
+    };
+
+#pragma warning disable CS8604
+    value = JsonConvert.DeserializeObject<T>(stringValues.ToString());
+#pragma warning restore CS8604
+
+    return true;
   }
+
 }
