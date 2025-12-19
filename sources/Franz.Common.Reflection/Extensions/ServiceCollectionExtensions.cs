@@ -12,7 +12,7 @@ public static class ServiceCollectionExtensions
     if (assembly == null)
       assembly = Assembly.GetCallingAssembly();
 
-    var assemblyAccessorWrapper = new AssemblyAccessorWrapper(assembly);
+    var assemblyAccessorWrapper = new AssemblyAccessorWrapper();
 
     services = services.AddSingleton<IAssemblyAccessor>(assemblyAccessorWrapper);
 
