@@ -1,54 +1,86 @@
-using Franz.Common.Errors;
+﻿using Franz.Common.Errors;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Hosting.Executing;
 using Franz.Common.Messaging.Hosting.Properties;
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Franz.Common.Messaging.Hosting.Kafka.HostedServices;
 
-public class MessagingHostedService : IHostedService
+public sealed class MessagingHostedService : BackgroundService
 {
-    private readonly IListener listener;
-    private readonly IServiceProvider serviceProvider;
+  private readonly IListener _listener;
+  private readonly IServiceProvider _serviceProvider;
+  private readonly ILogger<MessagingHostedService> _logger;
 
-    public MessagingHostedService(IListener listener, IServiceProvider serviceProvider)
+  public MessagingHostedService(
+      IListener listener,
+      IServiceProvider serviceProvider,
+      ILogger<MessagingHostedService> logger)
+  {
+    _listener = listener;
+    _serviceProvider = serviceProvider;
+    _logger = logger;
+  }
+
+  protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+  {
+    _listener.Received += OnMessageReceivedAsync;
+
+    try
     {
-        this.listener = listener;
-        this.serviceProvider = serviceProvider;
+      _logger.LogInformation("🚀 MessagingHostedService started");
+      await _listener.Listen(stoppingToken);
     }
-
-    public async Task StartAsync(CancellationToken cancellationToken)
+    catch (OperationCanceledException)
     {
-#pragma warning disable CS8622 // Nullability of reference types in type of parameter doesn't match the target delegate (possibly because of nullability attributes).
-        listener.Received += Listener_Received;
-#pragma warning restore CS8622 // Nullability of reference types in type of parameter doesn't match the target delegate (possibly because of nullability attributes).
-
-        await Task.Run(() => listener.Listen(), cancellationToken);
+      // Expected on shutdown
     }
-
-    internal void Listener_Received(object sender, MessageEventArgs messageEventArgs)
+    catch (Exception ex)
     {
-        var message = messageEventArgs.Message;
-
-        using var serviceProviderScope = serviceProvider.CreateScope();
-        var messageContextAccessor = serviceProviderScope.ServiceProvider.GetRequiredService<MessageContextAccessor>();
-        messageContextAccessor.Set(new MessageContext(message));
-
-        var messagingStrategyExecuters = serviceProviderScope.ServiceProvider.GetServices<IMessagingStrategyExecuter>();
-
-        var messagingStrategyExecuter = messagingStrategyExecuters
-          .FirstOrDefault(x => x.CanExecuteAsync(message).Result);
-
-        if (messagingStrategyExecuter == null)
-            throw new TechnicalException(Resources.StrategyExecuterNotFoundException);
-
-        messagingStrategyExecuter.ExecuteAsync(message).Wait();
+      _logger.LogCritical(ex, "❌ MessagingHostedService crashed");
+      throw;
     }
-
-    public async Task StopAsync(CancellationToken cancellationToken)
+    finally
     {
-        await Task.Run(() => listener.StopListen(), cancellationToken);
+      _listener.Received -= OnMessageReceivedAsync;
+      _logger.LogInformation("🛑 MessagingHostedService stopped");
     }
+  }
+
+  private async void OnMessageReceivedAsync(object? sender, MessageEventArgs args)
+  {
+    try
+    {
+      using var scope = _serviceProvider.CreateScope();
+
+      var messageContextAccessor =
+          scope.ServiceProvider.GetRequiredService<MessageContextAccessor>();
+
+      messageContextAccessor.Set(new MessageContext(args.Message));
+
+      var executers =
+          scope.ServiceProvider.GetServices<IMessagingStrategyExecuter>();
+
+      var executer = executers
+          .FirstOrDefault(x => x.CanExecuteAsync(args.Message).GetAwaiter().GetResult());
+
+      if (executer is null)
+        throw new TechnicalException(Resources.StrategyExecuterNotFoundException);
+
+      await executer.ExecuteAsync(args.Message);
+    }
+    catch (Exception ex)
+    {
+      // Do NOT crash the host because of a bad message
+      _logger.LogError(ex, "❌ Error handling incoming message");
+    }
+  }
+
+  public override async Task StopAsync(CancellationToken cancellationToken)
+  {
+    _listener.StopListen();
+    await base.StopAsync(cancellationToken);
+  }
 }

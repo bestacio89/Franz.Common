@@ -11,6 +11,7 @@ using Franz.Common.Messaging.Kafka.Transactions;
 using Microsoft.Extensions.DependencyInjection;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Messaging.Extensions;
+using Confluent.Kafka;
 
 namespace Franz.Common.Messaging.Kafka.Extensions;
 
@@ -90,16 +91,30 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  public static IServiceCollection AddKafkaMessagingConsumer(this IServiceCollection services, IConfiguration configuration)
+  public static IServiceCollection AddKafkaMessagingConsumer(
+    this IServiceCollection services,
+    IConfiguration configuration)
   {
     services
-      .AddOnlyHighLifetimeModelProvider(ServiceLifetime.Singleton)
-      .AddKafkaMessagingConfiguration(configuration)
-      .AddNoDuplicateScoped<MessageContextAccessor>()
-      .AddNoDuplicateScoped<IMessageContextAccessor>(sp => sp.GetRequiredService<MessageContextAccessor>())
-      .AddNoDuplicateSingleton<IListener, KafkaListener>()
-      .AddNoDuplicateSingleton<IKafkaConsumerFactory, KafkaConsumerFactory>();
+        // Messaging + modeling
+        .AddOnlyHighLifetimeModelProvider(ServiceLifetime.Singleton)
+        .AddKafkaMessagingConfiguration(configuration)
 
-    return services;
+        // Message context
+        .AddNoDuplicateScoped<MessageContextAccessor>()
+        .AddNoDuplicateScoped<IMessageContextAccessor>(
+            sp => sp.GetRequiredService<MessageContextAccessor>())
+
+        // Kafka consumer factory (builds the real Confluent consumer)
+        .AddNoDuplicateSingleton<IKafkaConsumerFactory, KafkaConsumerFactory>()
+
+        // The ACTUAL Kafka consumer (Confluent owns the abstraction)
+        .AddNoDuplicateSingleton<IConsumer<string, string>>(sp =>
+        {
+          var factory = sp.GetRequiredService<IKafkaConsumerFactory>();
+          return factory.Build();
+        }
+        );
+       return services;
   }
 }

@@ -4,5 +4,5 @@ using Confluent.Kafka;
 
 public interface IKafkaConsumerFactory
 {
-  public KafkaConsumer Build(IConsumer<string, object> consumer);
+  public IConsumer<string, string> Build();
 }

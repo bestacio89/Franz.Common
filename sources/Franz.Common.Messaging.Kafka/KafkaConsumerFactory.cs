@@ -1,39 +1,26 @@
 using Confluent.Kafka;
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.Kafka;
 using Microsoft.Extensions.Options;
 
-namespace Franz.Common.Messaging.Kafka;
-
-//This code is creating a Kafka consumer using the Confluent.Kafka library,
-//it's using the Confluent.Kafka library classes and methods,
-//and the way of consuming messages from a Kafka topic is different from AzureEventBus.
-public class KafkaConsumerFactory : IKafkaConsumerFactory
+public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
 {
-  private readonly IOptions<MessagingOptions> _messagingOptions;
+  private readonly IOptions<MessagingOptions> _options;
 
-  public KafkaConsumerFactory(IOptions<MessagingOptions> messagingOptions)
+  public KafkaConsumerFactory(IOptions<MessagingOptions> options)
   {
-    _messagingOptions = messagingOptions;
+    _options = options;
   }
 
-
-
-  public KafkaConsumer Build(IConsumer<string, object> consumer)
+  public IConsumer<string, string> Build()
   {
     var config = new ConsumerConfig
     {
-      BootstrapServers = _messagingOptions.Value.BootStrapServers,
-      GroupId = _messagingOptions.Value.GroupID,
+      BootstrapServers = _options.Value.BootStrapServers,
+      GroupId = _options.Value.GroupID,
       AutoOffsetReset = AutoOffsetReset.Earliest
     };
 
-    return (KafkaConsumer)new ConsumerBuilder<string, object>(config).Build();
+    return new ConsumerBuilder<string, string>(config).Build();
   }
 }
-
-
-
-
-
-
-

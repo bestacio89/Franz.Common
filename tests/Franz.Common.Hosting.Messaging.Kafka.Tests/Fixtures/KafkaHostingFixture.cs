@@ -1,4 +1,5 @@
-﻿using Franz.Common.Hosting.Messaging.Kafka.Tests.Fixtures;
+﻿using Confluent.Kafka;
+using Franz.Common.Hosting.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging.Hosting.Kafka;
 using Franz.Common.Messaging.Kafka.Extensions;
@@ -37,7 +38,15 @@ public sealed class KafkaHostingFixture
         {
           typeof(KafkaHostingFixture).Assembly
         });
+        services.AddSingleton<IConsumer<string, string>>(sp =>
+        {
+          var config = sp.GetRequiredService<KafkaConsumerConfiguration>();
 
+          return new ConsumerBuilder<string, string>(config.ToConfluent())
+            .SetKeyDeserializer(Deserializers.Utf8)
+            .SetValueDeserializer(Deserializers.Utf8)
+            .Build();
+        });
         services.AddKafkaMessaging(configuration);
 
         services.AddKafkaHostedListener(options =>
