@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Primitives;
+﻿using Franz.Common.Messaging.Headers;
+using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -52,7 +53,7 @@ namespace Franz.Common.Messaging.Storage
 
       var message = new Message(
         stored.Body,
-        (IDictionary<string, IReadOnlyCollection<string>>)stored.Headers.Select(h =>
+        (MessageHeaders)stored.Headers.Select(h =>
           new KeyValuePair<string, StringValues>(
             h.Key,
             new StringValues(h.Value?.ToArray() ?? Array.Empty<string>())

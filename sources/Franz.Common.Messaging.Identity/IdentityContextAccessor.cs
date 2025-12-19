@@ -15,63 +15,48 @@ public class IdentityContextAccessor : IIdentityContextAccessor
 
   public string? GetCurrentEmail()
   {
-    if (messageContextAccessor.Current != null &&
-        messageContextAccessor.Current.Message.Headers.TryGetIdentityEmail(out var userEmail))
-      return userEmail;
-
-    return null;
+    var headers = messageContextAccessor.Current?.Message.Headers;
+    return headers != null && headers.TryGetIdentityEmail(out var v) ? v : null;
   }
 
   public Guid? GetCurrentId()
   {
-    if (messageContextAccessor.Current != null &&
-        messageContextAccessor.Current.Message.Headers.TryGetIdentityId(out var userId))
-      return userId;
-
-    return null;
+    var headers = messageContextAccessor.Current?.Message.Headers;
+    return headers != null && headers.TryGetMessageId(out var v) ? v : null;
   }
 
   public string? GetCurrentFullName()
   {
-    if (messageContextAccessor.Current != null &&
-        messageContextAccessor.Current.Message.Headers.TryGetIdentityFullName(out var userFullName))
-      return userFullName;
-
-    return null;
+    var headers = messageContextAccessor.Current?.Message.Headers;
+    return headers != null && headers.TryGetIdentityFullName(out var v) ? v : null;
   }
 
   public Guid? GetCurrentTenantId()
   {
-    if (messageContextAccessor.Current != null &&
-        messageContextAccessor.Current.Message.Headers.TryGetTenantId(out var tenantId))
-      return tenantId;
-
-    return null;
+    var headers = messageContextAccessor.Current?.Message.Headers;
+    return headers != null && headers.TryGetTenantId(out var v) ? v : null;
   }
 
   public Guid? GetCurrentDomainId()
   {
-    if (messageContextAccessor.Current != null &&
-        messageContextAccessor.Current.Message.Headers.TryGetDomainId(out var domainId))
-      return domainId;
-
-    return null;
+    var headers = messageContextAccessor.Current?.Message.Headers;
+    return headers != null && headers.TryGetDomainId(out var v) ? v : null;
   }
 
   public string[] GetCurrentRoles()
   {
-    if (messageContextAccessor.Current != null &&
-        messageContextAccessor.Current.Message.Headers.TryGetIdentityRoles(out var roles))
-      return roles.ToArray();
-
-    return Enumerable.Empty<string>().ToArray();
+    var headers = messageContextAccessor.Current?.Message.Headers;
+    return headers != null && headers.TryGetIdentityRoles(out var v)
+      ? v.ToArray()
+      : Array.Empty<string>();
   }
 
   public FranzIdentityContext? GetCurrentIdentity()
   {
-    if (messageContextAccessor.Current == null) return null;
+    var ctx = messageContextAccessor.Current;
+    if (ctx == null) return null;
 
-    var headers = messageContextAccessor.Current.Message.Headers;
+    var headers = ctx.Message.Headers;
 
     headers.TryGetIdentityId(out var userId);
     headers.TryGetIdentityEmail(out var email);

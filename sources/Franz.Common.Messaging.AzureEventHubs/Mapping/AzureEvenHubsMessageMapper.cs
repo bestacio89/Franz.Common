@@ -11,7 +11,7 @@ public sealed class AzureEventHubsMessageMapper
   {
     var data = args.Data;
 
-    var message = new Message
+    var message = new Message()
     {
       Id = data.MessageId ?? Guid.NewGuid().ToString("N"),
       CorrelationId = data.CorrelationId ?? string.Empty,

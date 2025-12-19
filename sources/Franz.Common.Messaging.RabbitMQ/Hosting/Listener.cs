@@ -71,7 +71,7 @@ public sealed class Listener : IListener, IAsyncDisposable
     {
       var message = new Message
       {
-        Headers = (IDictionary<string, IReadOnlyCollection<string>>)ExtractHeaders(e),
+        Headers = ExtractHeaders(e),
         Body = Encoding.UTF8.GetString(e.Body.ToArray())
       };
 

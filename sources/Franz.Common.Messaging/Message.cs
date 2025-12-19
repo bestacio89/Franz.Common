@@ -1,19 +1,21 @@
 using Franz.Common.Mediator.Messages;
+using Franz.Common.Messaging.Headers;
 
 namespace Franz.Common.Messaging;
 
 public class Message : INotification
 {
   public Message() { }
+  public Message(string messageBody) { }
 
-  public Message(string? body)
+  public Message(string? body, IDictionary<string, IReadOnlyCollection<string>> dictionary)
   {
     Body = body;
   }
 
   public Message(
     string? body,
-    IDictionary<string, IReadOnlyCollection<string>> headers)
+    MessageHeaders headers)
   {
     Body = body;
     Headers = headers;
@@ -31,10 +33,10 @@ public class Message : INotification
 
   /// <summary>
   /// Transport-agnostic headers.
-  /// These are mapped by each transport adapter (Kafka, Azure, HTTP).
+  /// Owned by the messaging core.
   /// </summary>
-  public virtual IDictionary<string, IReadOnlyCollection<string>> Headers { get; set; }
-    = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
+  public virtual MessageHeaders Headers { get; set; }
+    = new(StringComparer.OrdinalIgnoreCase);
 
   /// <summary>
   /// Logical metadata not intended for transport headers.
@@ -47,7 +49,9 @@ public class Message : INotification
   /// </summary>
   public virtual string CorrelationId
   {
-    get => Properties.TryGetValue(nameof(CorrelationId), out var v) ? v.ToString()! : string.Empty;
+    get => Properties.TryGetValue(nameof(CorrelationId), out var v)
+        ? v?.ToString() ?? string.Empty
+        : string.Empty;
     set => Properties[nameof(CorrelationId)] = value;
   }
 
@@ -56,7 +60,9 @@ public class Message : INotification
   /// </summary>
   public virtual string? MessageType
   {
-    get => Properties.TryGetValue(nameof(MessageType), out var v) ? v.ToString() : null;
+    get => Properties.TryGetValue(nameof(MessageType), out var v)
+        ? v?.ToString()
+        : null;
     set => Properties[nameof(MessageType)] = value!;
   }
 
