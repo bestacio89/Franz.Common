@@ -3,6 +3,7 @@ using Franz.Common.Errors;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.AzureEventGrid.Constants;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Messaging.AzureEventGrid.Mapping;
 
@@ -10,7 +11,8 @@ internal sealed class AzureEventGridMessageMapper
 {
   private readonly ILogger<AzureEventGridMessageMapper> _logger;
 
-  public AzureEventGridMessageMapper(ILogger<AzureEventGridMessageMapper> logger)
+  public AzureEventGridMessageMapper(
+    ILogger<AzureEventGridMessageMapper> logger)
   {
     _logger = logger;
   }
@@ -24,30 +26,39 @@ internal sealed class AzureEventGridMessageMapper
     {
       Id = evt.Id,
       MessageType = evt.EventType,
-      CorrelationId = evt.Id
+      CorrelationId = evt.Id,
+      Body = evt.Data?.ToString()
     };
 
-    // Event Grid metadata headers (transport dialect)
-    message.Headers[AzureEventGridHeaders.EventType] = evt.EventType;
+    // Event Grid → Franz transport headers
+    message.Headers[AzureEventGridHeaders.EventType] =
+      new StringValues(evt.EventType);
 
     if (!string.IsNullOrWhiteSpace(evt.Subject))
-      message.Headers[AzureEventGridHeaders.Subject] = evt.Subject;
+    {
+      message.Headers[AzureEventGridHeaders.Subject] =
+        new StringValues(evt.Subject);
+    }
 
     if (!string.IsNullOrWhiteSpace(evt.Topic))
-      message.Headers[AzureEventGridHeaders.Topic] = evt.Topic;
+    {
+      message.Headers[AzureEventGridHeaders.Topic] =
+        new StringValues(evt.Topic);
+    }
 
-    message.Headers[AzureEventGridHeaders.EventTime] = evt.EventTime.ToString("O");
+    message.Headers[AzureEventGridHeaders.EventTime] =
+      new StringValues(evt.EventTime.ToString("O"));
 
     if (!string.IsNullOrWhiteSpace(evt.DataVersion))
-      message.Headers[AzureEventGridHeaders.DataVersion] = evt.DataVersion;
-
-    // Payload stays opaque
-    message.Body = evt.Data.ToString();
+    {
+      message.Headers[AzureEventGridHeaders.DataVersion] =
+        new StringValues(evt.DataVersion);
+    }
 
     _logger.LogDebug(
-        "Mapped EventGridEvent {EventId} ({EventType}) to Franz Message",
-        evt.Id,
-        evt.EventType);
+      "Mapped EventGridEvent {EventId} ({EventType}) to Franz Message",
+      evt.Id,
+      evt.EventType);
 
     return message;
   }

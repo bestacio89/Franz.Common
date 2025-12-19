@@ -1,4 +1,5 @@
 using Franz.Common.Headers;
+using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Messaging.Identity;
 
@@ -22,14 +23,16 @@ public class AuthorizationMessageBuilder : IMessageBuilder
         return result;
     }
 
-    public void Build(Message message)
-    {
-        AddAuthorization(message);
-    }
+  public void Build(Message message)
+  {
+    if (headerContextAccessor is null)
+      return;
 
-    private void AddAuthorization(Message message)
+    if (headerContextAccessor.TryGetValue(
+          HeaderConstants.Authorization,
+          out StringValues values))
     {
-        if (headerContextAccessor!.TryGetValue(HeaderConstants.Authorization, out var result))
-            message.Headers.Add(HeaderConstants.Authorization, result.ToString());
+      message.Headers[HeaderConstants.Authorization] = values;
     }
+  }
 }

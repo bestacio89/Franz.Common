@@ -1,6 +1,7 @@
 ﻿using Azure.Messaging.EventHubs.Processor;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.AzureEventHubs.Constants;
+using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Messaging.AzureEventHubs.Mapping;
 
@@ -17,17 +18,18 @@ public sealed class AzureEventHubsMessageMapper
       Body = body
     };
 
+    // Event Hubs → Franz transport headers
     message.Headers[AzureEventHubsHeaders.PartitionId] =
-        args.Partition.PartitionId;
+      new StringValues(args.Partition.PartitionId);
 
     message.Headers[AzureEventHubsHeaders.SequenceNumber] =
-        data.SequenceNumber.ToString();
+      new StringValues(data.SequenceNumber.ToString());
 
     message.Headers[AzureEventHubsHeaders.Offset] =
-        data.Offset.ToString();
+      new StringValues(data.Offset.ToString());
 
     message.Headers[AzureEventHubsHeaders.EnqueuedTime] =
-        data.EnqueuedTime.ToString("O");
+      new StringValues(data.EnqueuedTime.ToString("O"));
 
     return message;
   }
