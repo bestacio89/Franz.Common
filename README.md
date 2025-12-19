@@ -8,7 +8,9 @@
 <p align="center">
   <img src="https://img.shields.io/badge/.NET-10%2B-blueviolet" />
   <img src="https://img.shields.io/badge/Architecture-Clean%20%7C%20DDD%20%7C%20CQRS-brightgreen" />
-  <img src="https://img.shields.io/badge/Messaging-Kafka%20%7C%20RabbitMQ-orange" />
+  <img src="https://img.shields.io/badge/Messaging-Kafka-231f20?logo=apachekafka&logoColor=white" />
+  <img src="https://img.shields.io/badge/Messaging-RabbitMQ-ff6600?logo=rabbitmq&logoColor=white" />
+  <img src="https://img.shields.io/badge/Messaging-Azure-0078d4?logo=microsoftazure&logoColor=white" />
   <img src="https://img.shields.io/badge/Resilience-Polly-blue" />
   <img src="https://img.shields.io/badge/Observability-OpenTelemetry-yellow" />
   <img src="https://img.shields.io/badge/Multi--Tenancy-Built--In-9cf" />
@@ -249,7 +251,7 @@ This makes Franz suitable for **large organizations**, where maintaining archite
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 1.7.0
+dotnet add package Franz.Common --version 1.7.1
 ```
 
 Messaging example:
@@ -306,46 +308,33 @@ dotnet test --filter Category=Integration
 
 ---
 
-# ⭐ Version 1.7.0 — Azure Messaging Expansion
+## ⭐ Version 1.7.01 — Kafka Hosting & Transport Hardening
 
-* Franz.Common v1.7.0 introduces first-class Azure messaging support, completing cloud transport parity while preserving Franz’s deterministic, mediator-driven architecture.
+* Franz.Common v1.7.01 reinforces the Kafka pillar by finalizing a strict and explicit separation between **Kafka transport** and **Kafka hosting**, aligning Kafka with the same architectural guarantees already applied to Azure and RabbitMQ.
 
-☁️ Azure Messaging Stack
+🧱 Kafka Transport Clarification
 
-* Azure Service Bus adapter
-  Durable brokered messaging with Franz-native mapping and mediator dispatch.
+* Kafka transport (`Franz.Common.Messaging.Kafka`) is now **purely transport-focused**
+  * Native use of `Confluent.Kafka.IConsumer`
+  * Centralized consumer creation via `IKafkaConsumerFactory`
+  * No hosted services, no background execution
 
-* Azure Event Hubs adapter
-  High-throughput, partitioned streaming for Kafka-style workloads.
+🚀 Kafka Hosting Stabilization
 
-* Azure Event Grid adapter
-  HTTP-based event ingress with subscription validation and mediator integration.
+* Kafka hosting (`Franz.Common.Messaging.Hosting.Kafka`) now:
+  * Depends exclusively on messaging abstractions
+  * Owns all background execution and lifecycle management
+  * Handles graceful shutdown, scoping, and error isolation
 
-🧭 Azure Hosting Orchestration
+🧭 Architectural Guarantees
 
-* New Azure hosting layer to orchestrate:
+* Transport ≠ Hosting enforced at package boundaries
+* Deterministic consumer lifetimes aligned with Kafka semantics
+* CI-safe, Testcontainers-friendly execution model
+* No hidden threads, no implicit runtime behavior
 
-* Service Bus consumers
+* This release completes Kafka’s alignment with the Franz hosting model, ensuring parity with RabbitMQ and Azure messaging while strengthening long-term maintainability and testability.
 
-* Event Hubs processors
-
-* Event Grid HTTP endpoints
-
-* Built on Franz.Common.Messaging.Hosting
-
-* Preserves strict separation between transport and hosting
-
-🧠 Architectural Guarantees
-
-* No AutoMapper, no reflection magic
-
-* Deterministic metadata propagation
-
-* Transport-agnostic mediator pipelines
-
-* Azure support added without coupling business logic
-
-* This release completes the Azure messaging pillar of the Franz ecosystem, alongside Kafka and RabbitMQ.
 
 ---
 

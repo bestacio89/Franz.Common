@@ -1,216 +1,255 @@
-﻿# **Franz.Common.Messaging.Kafka**
+﻿# Franz.Common.Messaging.Kafka
 
-A Kafka integration library within the **Franz Framework** designed to simplify interaction with Kafka topics, producers, and consumers. This package provides tools for creating and managing Kafka connections, handling serialization, and integrating Kafka workflows into distributed systems.
+A Kafka transport integration for the **Franz Framework**, designed to provide
+clean, deterministic, and production-grade interaction with Kafka topics,
+producers, and consumers.
 
----
+This package focuses **exclusively on Kafka transport concerns**:
+configuration, producers, consumers, serialization, and transactions.
 
-## **Features**
-
-- **Kafka Connections**:
-  - `ConnectionProvider` and `ConnectionFactoryProvider` for managing Kafka connections and factories.
-- **Kafka Consumers**:
-  - `KafkaConsumerGroup` and `KafkaConsumerProvider` for managing consumer groups.
-- **Modeling**:
-  - `KafkaModel` and `ModelProvider` for managing and interacting with Kafka models.
-- **Serialization**:
-  - Includes `IMessageDeserializer` and `JsonMessageDeserializer` for message serialization and deserialization.
-- **Transactions**:
-  - Tools like `MessagingTransaction`, `KafkaSender`, and `KafkaConsumerFactory` for handling messaging transactions.
-- **Hosting Support**:
-  - `Listener` to enable Kafka-based message listening in hosting scenarios.
-- **Utilities**:
-  - Helper classes like `ExchangeNamer` and `TopicNamer` for topic management.
-- **Extensions**:
-  - `ServiceCollectionExtensions` for streamlined service registration.
+> 🧱 Hosting, background execution, and listeners are intentionally **not**
+> handled here. They live in **Franz.Common.Messaging.Hosting.Kafka**.
 
 ---
 
-## **Version Information**
+## ✨ Features
 
-- **Current Version**: 1.7.0
-- Part of the private **Franz Framework** ecosystem.
+### Kafka Transport & Configuration
+- Centralized Kafka configuration via `MessagingOptions`
+- `ConnectionProvider` and `ConnectionFactoryProvider` for managing Kafka connections
+- Deterministic, DI-friendly Kafka setup
+
+### Kafka Producers
+- `MessagingPublisher` for publishing integration events
+- `MessagingSender` for point-to-point messaging
+- Automatic topic resolution and naming strategies
+
+### Kafka Consumers
+- Native usage of `Confluent.Kafka.IConsumer<string, string>`
+- `IKafkaConsumerFactory` as the single authority for consumer creation
+- Correct lifetime management aligned with Kafka consumer group semantics
+
+### Modeling
+- `KafkaModel` and `ModelProvider` for Kafka-based domain modeling
+- Strong separation between messaging models and business logic
+
+### Serialization
+- `IMessageDeserializer`
+- `JsonMessageDeserializer`
+- Deterministic JSON serialization using Franz messaging contracts
+
+### Transactions
+- `MessagingTransaction` for Kafka-backed transactional workflows
+
+### Utilities
+- `ExchangeNamer` and `TopicNamer` for consistent topic naming
+- Messaging helpers shared across Franz transports
+
+### Dependency Injection
+- Fluent `ServiceCollectionExtensions` for Kafka transport registration
+- No accidental hosting or background execution side effects
 
 ---
 
-## **Dependencies**
+## 🧭 Architectural Scope
 
-This package relies on:
-- **Confluent.Kafka** (2.3.0): Provides the core Kafka client functionality.
-- **Franz.Common.Annotations**: For custom annotations used in Kafka models.
-- **Franz.Common.Hosting**: Enables hosting support for Kafka listeners.
-- **Franz.Common.Messaging**: Core messaging utilities and abstractions.
-- **Franz.Common.Messaging.Hosting**: Adds hosting integration for messaging workflows.
+This package is **transport-only**.
+
+| Responsibility | Package |
+|----------------|--------|
+| Kafka producers | ✅ Franz.Common.Messaging.Kafka |
+| Kafka consumers (transport) | ✅ Franz.Common.Messaging.Kafka |
+| Background listeners | ❌ |
+| Hosted services | ❌ |
+| Message dispatch pipelines | ❌ |
+| Hosting / workers | ➜ Franz.Common.Messaging.Hosting.Kafka |
+
+This separation ensures:
+- Testability with Testcontainers
+- Clean CI/CD pipelines
+- No hidden threads or background services
+- Reuse in CLI tools, workers, APIs, and serverless contexts
 
 ---
 
-## **Installation**
+## 📦 Dependencies
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+This package depends on:
+
+- **Confluent.Kafka** (2.3.0)  
+  Core Kafka client implementation
+
+- **Franz.Common.Messaging**  
+  Core messaging abstractions and contracts
+
+- **Franz.Common.Annotations**  
+  Messaging and modeling annotations
+
+> ⚠️ Hosting integration is intentionally excluded.
+> Use **Franz.Common.Messaging.Hosting.Kafka** for background listeners.
+
+---
+
+## 📥 Installation
+
+### From NuGet
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Messaging.Kafka  
-```
+dotnet add package Franz.Common.Messaging.Kafka
+````
 
 ---
 
-## **Usage**
+## 🚀 Usage
 
-### **1. Register Kafka Services**
-
-Use `ServiceCollectionExtensions` to register Kafka services:
+### 1️⃣ Register Kafka Transport
 
 ```csharp
 using Franz.Common.Messaging.Kafka.Extensions;
 
-public class Startup
+public void ConfigureServices(IServiceCollection services)
 {
-    public void ConfigureServices(IServiceCollection services)
+    services.AddKafkaMessaging(configuration);
+}
+```
+
+This registers:
+
+* Kafka producers
+* Kafka senders
+* Kafka consumers (transport only)
+
+No hosted services are started.
+
+---
+
+### 2️⃣ Publish Messages
+
+```csharp
+public class OrderPublisher
+{
+    private readonly IMessagingPublisher _publisher;
+
+    public OrderPublisher(IMessagingPublisher publisher)
     {
-        services.AddKafkaMessaging(options =>
-        {
-            options.BootstrapServers = "localhost:9092";
-            options.ClientId = "my-client-id";
-        });
+        _publisher = publisher;
+    }
+
+    public async Task PublishAsync(OrderCreatedEvent evt)
+    {
+        await _publisher.PublishAsync(evt);
     }
 }
 ```
 
-### **2. Consume Kafka Messages**
+---
 
-Set up a Kafka consumer group and process messages:
+### 3️⃣ Send Messages
 
 ```csharp
-using Franz.Common.Messaging.Kafka.Consumers;
-
-public class KafkaConsumerService
+public class PaymentSender
 {
-    private readonly IKafkaConsumerFactory _consumerFactory;
+    private readonly IMessagingSender _sender;
 
-    public KafkaConsumerService(IKafkaConsumerFactory consumerFactory)
+    public PaymentSender(IMessagingSender sender)
     {
-        _consumerFactory = consumerFactory;
+        _sender = sender;
     }
 
-    public async Task StartConsumingAsync()
+    public async Task SendAsync(PaymentCommand command)
     {
-        var consumer = _consumerFactory.CreateConsumer("my-group", "my-topic");
-        await foreach (var message in consumer.ConsumeAsync())
-        {
-            Console.WriteLine($"Received message: {message.Value}");
-        }
+        await _sender.SendAsync(command);
     }
 }
 ```
 
-### **3. Produce Kafka Messages**
+---
 
-Send messages to a Kafka topic:
+### 4️⃣ Kafka Consumers (Important)
+
+Franz **does not re-abstract Kafka consumers**.
+
+Consumers are provided **directly** by Confluent:
 
 ```csharp
-using Franz.Common.Messaging.Kafka;
-
-public class KafkaProducerService
-{
-    private readonly KafkaSender _kafkaSender;
-
-    public KafkaProducerService(KafkaSender kafkaSender)
-    {
-        _kafkaSender = kafkaSender;
-    }
-
-    public async Task SendMessageAsync(string topic, string key, string value)
-    {
-        await _kafkaSender.SendAsync(topic, key, value);
-    }
-}
+IConsumer<string, string>
 ```
 
-### **4. Serialize and Deserialize Messages**
+They are:
 
-Use `JsonMessageDeserializer` for deserializing Kafka messages:
+* Created by `IKafkaConsumerFactory`
+* Registered as long-lived singletons
+* Fully compatible with Confluent.Kafka tooling and documentation
 
-```csharp
-using Franz.Common.Messaging.Kafka.Serialisation;
+This avoids:
 
-var deserializer = new JsonMessageDeserializer<MyModel>();
-var myModel = deserializer.Deserialize(message.Value);
-```
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Messaging.Kafka** package integrates seamlessly with:
-- **Franz.Common.Messaging**: Provides foundational messaging utilities.
-- **Franz.Common.Hosting**: Enables hosting support for Kafka listeners.
-- **Confluent.Kafka**: Core Kafka client functionality for producers and consumers.
+* Interface drift
+* Partial re-implementations
+* Subtle incompatibilities during upgrades
 
 ---
 
-## **Contributing**
+## 🧪 Testing & CI
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
+This design is fully compatible with:
 
----
+* Testcontainers (Kafka)
+* Azure DevOps pipelines
+* Docker-based integration tests
+* Local developer environments
 
-## **License**
+Because:
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
-
----
-
-## **Changelog**
-
-### Version 1.2.65
-- Added `ConnectionFactoryProvider` and `KafkaConsumerGroup` for connection and consumer management.
-- Introduced `KafkaSender` and `KafkaConsumerFactory` for producer and consumer workflows.
-- Added serialization utilities with `JsonMessageDeserializer`.
-- Full integration with **Franz.Common.Messaging** and **Franz.Common.Hosting**.
-
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.3.6
-- Integrated with Franz.Mediator (no MediatR).
-- MessagingPublisher.Publish is now async Task.
-- MessagingInitializer scans INotificationHandler<> for events.
-- Kafka topics auto-created for all integration events.
-
-
-### **Version 1.6.17**
-
-* ✅ **Extension Method Rebrand for Uniformity & Intent Clarity**
-  All Kafka registration extensions were renamed to follow the **explicit `AddKafka*` convention**, ensuring every API call clearly indicates its messaging backend.
-  This improves **discoverability**, **autocompletion support**, and **parity** with RabbitMQ and upcoming AzureEventBus modules.
-
-  Updated method list:
-
-  * `AddKafkaMessaging()`
-  * `AddKafkaMessagingPublisher()`
-  * `AddKafkaMessagingSender()`
-  * `AddKafkaMessagingConsumer()`
-  * `AddKafkaMessagingConfiguration()`
-
-* 🧩 **Purpose**: To standardize naming across all Franz messaging providers and make intent instantly recognizable in dependency registration blocks.
+* No background services auto-start
+* No implicit threads are created
+* Kafka consumers are explicit and controlled
 
 ---
 
-Would you like me to reformat your full `Franz.Common.Messaging.Kafka` README (with this new section inserted cleanly into the existing changelog)? I can integrate it seamlessly below your **v1.3.6** entry.
+## 🔗 Integration with the Franz Framework
+
+This package integrates with:
+
+* **Franz.Common.Messaging**
+* **Franz.Common.Messaging.Hosting.Kafka** (optional, for background execution)
+* **Franz.Common.Mediator**
+* **Franz.Common.EntityFramework**
+* **Franz.Common.Business**
+
+Kafka is treated as a **transport**, not an execution model.
+
+---
+
+## 🧾 Versioning & Changelog
+
+### **Version 1.7.01**
+
+* 🧱 Corrected transport vs hosting separation
+* 🔌 Removed Kafka consumer re-abstraction
+* 🏭 Centralized consumer creation via `IKafkaConsumerFactory`
+* ♻️ Fixed DI lifetimes for Kafka consumers
+* 🧩 Clean separation between messaging and hosting layers
+* 🧪 Improved Testcontainers and CI reliability
+
+---
+
+## 📄 License
+
+MIT License
+See the `LICENSE` file for details.
+
+---
+
+## 🧠 Final Note
+
+This package intentionally mirrors **enterprise messaging frameworks**
+(MassTransit, NServiceBus, Brighter) by enforcing:
+
+> **Transport ≠ Hosting**
+
+That separation is what makes Franz:
+
+* Predictable
+* Testable
+* Scalable
+* Production-safe

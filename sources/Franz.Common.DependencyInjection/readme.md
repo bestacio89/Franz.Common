@@ -28,7 +28,7 @@ A core library within the **Franz Framework**, designed to simplify and enhance 
 
 ## **Version Information**
 
-- **Current Version**: 1.7.0
+- **Current Version**: 1.7.01
 - Part of the private **Franz Framework** ecosystem.
 
 ---

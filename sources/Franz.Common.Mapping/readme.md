@@ -8,7 +8,7 @@ Here’s the **updated README draft** (in your project’s tone and formatting):
 
 *A lightweight, fast, and extensible object mapping library for the Franz ecosystem.*
 
-**Current Version:** 1.6.21
+**Current Version:** 1.7.01
 **Codename:** *Constructor-Aware Evolution*
 - Part of the private **Franz Framework** ecosystem.
 ---

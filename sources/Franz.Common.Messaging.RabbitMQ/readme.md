@@ -44,7 +44,7 @@ Franz abstracts away broker-specific plumbing. Whether you pick **Kafka** or **R
 your code stays clean, enforced, and production-ready.
 
 
-**Current Version**: 1.7.0
+**Current Version**: 1.7.01
 ---
 
 ### Version 1.6.20

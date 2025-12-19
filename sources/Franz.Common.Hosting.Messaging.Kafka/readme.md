@@ -1,139 +1,222 @@
-﻿
-# Franz.Common.Messaging.Hosting.Kafka
+﻿# Franz.Common.Messaging.Hosting.Kafka
 
-A dedicated hosting library within the **Franz Framework** that provides **Kafka-specific hosted services** and **dependency injection extensions**.  
-This package bridges the Kafka transport layer (`Franz.Common.Messaging.Kafka`) with the .NET hosting infrastructure (`Microsoft.Extensions.Hosting`).
+A **Kafka hosting integration** for the **Franz Framework** that connects the Kafka
+transport layer (`Franz.Common.Messaging.Kafka`) to the .NET hosting runtime
+(`Microsoft.Extensions.Hosting`).
+
+This package is responsible **only** for:
+- background execution
+- hosted listeners
+- message dispatch orchestration
+
+> 🧱 Kafka transport, producers, consumers, and configuration live in  
+> **Franz.Common.Messaging.Kafka**
 
 ---
 
 ## ✨ Features
 
-- **Hosted Services**
-  - `KafkaHostedService` – continuously consumes Kafka messages and dispatches them.
-  - `OutboxHostedService` – publishes stored outbox messages to Kafka in the background.
-  - `MessagingHostedService` – general-purpose hosted message orchestrator.
+### Hosted Services
+- **`KafkaHostedService`**  
+  Runs a Kafka listener inside a .NET `BackgroundService`.
 
-- **Dependency Injection Extensions**
-  - `KafkaHostingServiceCollectionExtensions` simplifies service registration in `Startup`/`Program.cs`.
-  - Provides one-liners like `AddKafkaHostedListener()` and `AddOutboxHostedListener()`.
+- **`MessagingHostedService`**  
+  Orchestrates message dispatch:
+  - creates scoped execution contexts
+  - resolves messaging strategies
+  - dispatches messages safely
 
-- **Separation of Concerns**
-  - Keeps transport logic (`Franz.Common.Messaging.Kafka`) separate from hosting concerns.
-  - Makes testing listeners independent of the hosting runtime.
+- **`OutboxHostedService`**  
+  Publishes messages stored in an outbox (SQL / Mongo) to Kafka reliably.
 
-- **Observability**
-  - Structured logging with emoji conventions (✅ success, ⚠️ retries, 🔥 DLQ).
-  - Compatible with OpenTelemetry for distributed tracing.
+### Dependency Injection Extensions
+- `KafkaHostingServiceCollectionExtensions`
+- Simple registration via:
+  - `AddKafkaHostedListener()`
+  - `AddOutboxHostedListener()`
+
+### Separation of Concerns
+- **No Kafka configuration here**
+- **No Kafka consumer creation here**
+- Hosting depends on abstractions only
+
+### Observability
+- Structured logging
+- Emoji-based lifecycle signals
+- Compatible with OpenTelemetry
+- Correlation via `MessageContextAccessor`
 
 ---
 
 ## 📂 Project Structure
 
-```
-
+```text
 Franz.Common.Messaging.Hosting.Kafka/
 ├── Extensions/
-│    └── KafkaHostingServiceCollectionExtensions.cs
+│   └── KafkaHostingServiceCollectionExtensions.cs
 ├── HostedServices/
-│    ├── KafkaHostedService.cs
-│    ├── MessagingHostedService.cs
-│    └── OutboxHostedService.cs
-└── readme.md
-
+│   ├── KafkaHostedService.cs
+│   ├── MessagingHostedService.cs
+│   └── OutboxHostedService.cs
+└── README.md
 ````
 
 ---
 
 ## ⚙️ Dependencies
 
-- **Microsoft.Extensions.Hosting** (8.0.0)  
-- **Microsoft.Extensions.DependencyInjection.Abstractions** (8.0.0)  
-- **Franz.Common.Messaging** – core messaging abstractions  
-- **Franz.Common.Messaging.Kafka** – Kafka transport adapter  
-- **Franz.Common.Messaging.Hosting** – base hosting abstractions  
+* **Microsoft.Extensions.Hosting** (10.0.0)
+* **Microsoft.Extensions.DependencyInjection.Abstractions** (10.0.0)
+* **Franz.Common.Messaging**
+* **Franz.Common.Messaging.Kafka**
+* **Franz.Common.Messaging.Hosting**
+
+> ⚠️ This package assumes Kafka transport is already registered via
+> `Franz.Common.Messaging.Kafka`.
 
 ---
 
 ## 🚀 Usage
 
-### 1. Register Kafka Hosted Services
+### 1️⃣ Register Kafka Transport (required)
 
-In `Program.cs` or `Startup.cs`:
+```csharp
+using Franz.Common.Messaging.Kafka.Extensions;
+
+services.AddKafkaMessaging(configuration);
+```
+
+---
+
+### 2️⃣ Register Kafka Hosted Services
 
 ```csharp
 using Franz.Common.Messaging.Hosting.Kafka.Extensions;
 
-var host = Host.CreateDefaultBuilder(args)
-    .ConfigureServices((context, services) =>
-    {
-        services.AddKafkaHostedListener(context.Configuration);
-        services.AddOutboxHostedListener(context.Configuration);
-    })
-    .Build();
+services.AddKafkaHostedListener(configuration);
+services.AddOutboxHostedListener(configuration);
+```
 
-await host.RunAsync();
-````
+This will:
 
-### 2. Kafka Hosted Service
+* start background Kafka consumption
+* dispatch messages through Franz messaging strategies
+* process outbox messages reliably
 
-Runs in the background to consume Kafka messages and dispatch them via the mediator:
+---
+
+## 🔄 Kafka Hosted Service Lifecycle
 
 ```csharp
-public class KafkaHostedService : BackgroundService
+public sealed class KafkaHostedService : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Consumes Kafka messages and dispatches
+        // Subscribes to Kafka topics
+        // Listens until host shutdown
+        // Dispatches messages safely
     }
 }
 ```
 
-### 3. Outbox Hosted Service
+Behavior:
 
-Ensures pending messages in MongoDB/SQL outbox are published to Kafka reliably:
+* graceful shutdown
+* no host crashes on bad messages
+* scope-per-message execution
+
+---
+
+## 📦 Outbox Hosted Service
 
 ```csharp
-public class OutboxHostedService : BackgroundService
+public sealed class OutboxHostedService : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Reads outbox, sends to Kafka, handles retries/DLQ
+        // Reads outbox
+        // Publishes to Kafka
+        // Handles retries & DLQ
     }
 }
 ```
+
+Guarantees:
+
+* at-least-once delivery
+* retry control
+* no message loss on crashes
 
 ---
 
 ## 📊 Observability
 
-* Emoji logging (✅ processed, ⚠️ retry, 🔥 DLQ, 💤 idle).
-* Integrated with `MessageContextAccessor` for correlation IDs.
-* Tracing compatible with **OpenTelemetry**.
+* Emoji logging conventions:
+
+  * 🚀 startup
+  * 🛑 shutdown
+  * ⚠️ recoverable failure
+  * ❌ execution error
+  * 🔥 DLQ
+* Correlation IDs via `MessageContextAccessor`
+* OpenTelemetry-compatible spans
 
 ---
 
-## 📝 Version Information
+## 🧭 Architectural Role
 
-* **Current Version**: 1.7.0
-* Part of the private **Franz Framework** ecosystem.
+| Concern                 | Package                              |
+| ----------------------- | ------------------------------------ |
+| Kafka transport         | Franz.Common.Messaging.Kafka         |
+| Kafka consumer creation | Franz.Common.Messaging.Kafka         |
+| Hosted execution        | Franz.Common.Messaging.Hosting.Kafka |
+| Dispatch orchestration  | Franz.Common.Messaging.Hosting.Kafka |
+
+This ensures:
+
+* clean Testcontainers integration
+* deterministic CI behavior
+* no hidden threads
+* safe message handling
 
 ---
 
-## 📜 License
+## 🧾 Version Information
 
-This library is licensed under the MIT License. See the `LICENSE` file for details.
+* **Current Version**: **1.7.01**
+* **Target Framework**: **.NET 10.0**
+* Part of the **Franz Framework**
 
 ---
 
 ## 📖 Changelog
 
-### Version 1.6.2
+### **Version 1.7.01**
 
-* Introduced `KafkaHostedService` to run Kafka listeners inside .NET host.
-* Added `OutboxHostedService` to bridge Mongo outbox with Kafka publishing.
-* Added `KafkaHostingServiceCollectionExtensions` for simple DI registration.
-* Unified hosted services with `MessageContextAccessor` and inbox idempotency support.
-* Improved logging with emoji conventions and OpenTelemetry hooks.
+* 🧱 Enforced strict separation between Kafka transport and hosting
+* 🔌 Removed Kafka consumer creation from hosting layer
+* 🔄 Hosting now depends exclusively on `IListener`
+* ♻️ Fixed lifecycle handling and graceful shutdown
+* 🧪 Improved Testcontainers and CI reliability
+* ⬆️ Upgraded to **.NET 10.0**
+
+---
 
 ### Version 1.6.20
-- Updated to **.NET 10.0**
+
+* Initial Kafka hosting support
+* Added `KafkaHostedService`
+* Added `OutboxHostedService`
+* Introduced hosting DI extensions
+* Integrated `MessageContextAccessor`
+* Emoji-based logging conventions
+
+---
+
+## 📜 License
+
+MIT License
+See the `LICENSE` file for details.
+
+
+

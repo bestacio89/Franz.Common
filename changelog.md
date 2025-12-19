@@ -849,3 +849,58 @@ This release marks a major step toward **cloud-agnostic, enterprise-grade messag
 
 ---
 
+## ⭐ Version 1.7.01 — Messaging Architecture Stabilization & Alignment
+
+This release consolidates and stabilizes the messaging architecture introduced in **v1.7.0**, reinforcing clean separation between **transport**, **hosting**, and **execution**, while ensuring full parity across Kafka, RabbitMQ, and Azure providers.
+
+---
+
+### ✨ Improvements
+
+#### 🧩 Messaging–Hosting Boundary Enforcement
+
+* Kafka, RabbitMQ, and Azure messaging adapters are now **strictly transport-only**.
+* All runtime orchestration is centralized in `Franz.Common.Messaging.Hosting.*`.
+* Hosted listeners depend **only on Franz abstractions**, never on transport SDKs.
+* Transport packages remain reusable outside of hosted environments.
+
+---
+
+#### 🟦 Kafka Consumer Wiring Simplification
+
+* Removed redundant Kafka consumer wrapper abstractions.
+* Standardized on **`Confluent.Kafka.IConsumer<TKey, TValue>`** as the canonical consumer contract.
+* `KafkaConsumerFactory` now builds and configures native Confluent consumers directly.
+* Eliminated DI ambiguity and double-abstraction conflicts in hosted Kafka scenarios.
+
+---
+
+#### ☁️ Azure Messaging Parity Validation
+
+* Azure Service Bus, Event Hubs, and Event Grid adapters validated against:
+
+  * mediator dispatch guarantees
+  * deterministic metadata propagation
+  * hosting isolation rules
+* Azure hosting orchestration fully aligned with Kafka and RabbitMQ behavior.
+
+---
+
+### 🧠 Architectural Guarantees Reinforced
+
+* One **unified mental model** for all messaging providers.
+* No SDK leakage into business or mediator layers.
+* No reflection-based dispatching.
+* No AutoMapper or implicit conversions.
+* Hosting remains **optional**, not mandatory.
+
+---
+
+### 🏁 Summary
+
+> **Franz 1.7.01 hardens the messaging foundation.**
+> It resolves edge-case wiring issues, simplifies Kafka consumer integration, and ensures Azure, Kafka, and RabbitMQ operate under identical architectural rules.
+
+This release is a **stability and correctness milestone**, preparing the Franz messaging stack for large-scale, multi-transport production workloads.
+
+---
