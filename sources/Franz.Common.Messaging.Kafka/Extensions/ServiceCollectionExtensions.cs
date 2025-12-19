@@ -11,6 +11,7 @@ using Franz.Common.Messaging.Hosting;
 using Franz.Common.Messaging.Kafka.Connections;
 using Franz.Common.Messaging.Kafka.Modeling;
 using Franz.Common.Messaging.Kafka.Transactions;
+using Franz.Common.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -51,7 +52,9 @@ public static class ServiceCollectionExtensions
     this IServiceCollection services,
     IConfiguration? configuration)
   {
-    
+
+    services.AddNoDuplicateScoped<IAssemblyAccessor, AssemblyAccessorWrapper>();
+
     services.AddSingleton<IAdminClient>(sp =>
     {
       var config = new AdminClientConfig
