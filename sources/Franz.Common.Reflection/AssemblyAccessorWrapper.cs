@@ -2,19 +2,14 @@ using System.Reflection;
 
 namespace Franz.Common.Reflection;
 
-public class AssemblyAccessorWrapper : IAssemblyAccessor
+public sealed class AssemblyAccessorWrapper : IAssemblyAccessor
 {
-    private readonly Assembly assembly;
+  public IAssembly GetEntryAssembly()
+  {
+    var assembly =
+        Assembly.GetEntryAssembly()
+        ?? Assembly.GetExecutingAssembly();
 
-    public AssemblyAccessorWrapper(Assembly assembly)
-    {
-        this.assembly = assembly;
-    }
-
-    public IAssembly GetEntryAssembly()
-    {
-        var result = new AssemblyWrapper(assembly);
-
-        return result;
-    }
+    return new AssemblyWrapper(assembly);
+  }
 }
