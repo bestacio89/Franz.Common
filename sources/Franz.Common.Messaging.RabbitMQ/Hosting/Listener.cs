@@ -71,7 +71,7 @@ public sealed class Listener : IListener, IAsyncDisposable
     {
       var message = new Message
       {
-        Headers = ExtractHeaders(e),
+        Headers = (IDictionary<string, IReadOnlyCollection<string>>)ExtractHeaders(e),
         Body = Encoding.UTF8.GetString(e.Body.ToArray())
       };
 
@@ -107,15 +107,45 @@ public sealed class Listener : IListener, IAsyncDisposable
 
   private static MessageHeaders ExtractHeaders(BasicDeliverEventArgs e)
   {
-    var headers = e.BasicProperties.Headers?
-        .Where(h => !h.Key.StartsWith("x-"))
-        .ToDictionary(
-            h => h.Key,
-            h => new StringValues(Encoding.UTF8.GetString((byte[])h.Value)))
-        ?? new Dictionary<string, StringValues>();
+    if (e.BasicProperties.Headers is null)
+      return new MessageHeaders();
 
-    return new MessageHeaders(headers);
+    var headers = new MessageHeaders();
+
+    foreach (var (key, value) in e.BasicProperties.Headers)
+    {
+      // Ignore RabbitMQ internal headers
+      if (key.StartsWith("x-", StringComparison.OrdinalIgnoreCase))
+        continue;
+
+      switch (value)
+      {
+        case byte[] bytes:
+          headers[key] = new StringValues(Encoding.UTF8.GetString(bytes));
+          break;
+
+        case string str:
+          headers[key] = new StringValues(str);
+          break;
+
+        case IList<object> list:
+          headers[key] = new StringValues(
+            list
+              .OfType<byte[]>()
+              .Select(b => Encoding.UTF8.GetString(b))
+              .ToArray()
+          );
+          break;
+
+        default:
+          headers[key] = new StringValues(value?.ToString());
+          break;
+      }
+    }
+
+    return headers;
   }
+
 
   // REQUIRED by IListener
   public void StopListen()
