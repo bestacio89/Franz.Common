@@ -51,8 +51,21 @@ public static class ServiceCollectionExtensions
     this IServiceCollection services,
     IConfiguration? configuration)
   {
+    
+    services.AddSingleton<IAdminClient>(sp =>
+    {
+      var config = new AdminClientConfig
+      {
+        BootstrapServers = configuration["Messaging:BootStrapServers"]
+      };
+
+      return new AdminClientBuilder(config).Build();
+    });
+
+
     services
       .AddKafkaMessagingConfiguration(configuration)
+
 
       // Kafka producer (Confluent-native)
       .AddNoDuplicateSingleton<IProducer<string, byte[]>>(sp =>
