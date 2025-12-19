@@ -1,17 +1,19 @@
 #nullable enable
-using Microsoft.Extensions.Configuration;
+using Confluent.Kafka;
+using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Messaging;
-using Franz.Common.Messaging.Kafka.Connections;
+using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Delegating;
+using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Hosting;
+using Franz.Common.Messaging.Kafka.Connections;
 using Franz.Common.Messaging.Kafka.Modeling;
 using Franz.Common.Messaging.Kafka.Transactions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Franz.Common.DependencyInjection.Extensions;
-using Franz.Common.Messaging.Extensions;
-using Confluent.Kafka;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Messaging.Kafka.Extensions;
 
@@ -45,16 +47,39 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  private static IServiceCollection AddCommonMessagingProducer(this IServiceCollection services, IConfiguration? configuration)
+  private static IServiceCollection AddCommonMessagingProducer(
+    this IServiceCollection services,
+    IConfiguration? configuration)
   {
     services
-          .AddKafkaMessagingConfiguration(configuration)
-          .AddNoDuplicateScoped<IMessagingTransaction, MessagingTransaction>()
-          .AddNoDuplicateScoped<IMessageFactory, MessageFactory>()
-          .AddNoDuplicateScoped<IMessageHandler, MessageBuilderDelegatingHandler>();
+      .AddKafkaMessagingConfiguration(configuration)
+
+      // Kafka producer (Confluent-native)
+      .AddNoDuplicateSingleton<IProducer<string, byte[]>>(sp =>
+      {
+        var options = sp.GetRequiredService<IOptions<MessagingOptions>>().Value;
+
+        var config = new ProducerConfig
+        {
+          BootstrapServers = options.BootStrapServers,
+          Acks = Acks.All,
+          EnableIdempotence = true
+        };
+
+        return new ProducerBuilder<string, byte[]>(config)
+          .SetKeySerializer(Serializers.Utf8)
+          .SetValueSerializer(Serializers.ByteArray)
+          .Build();
+      })
+
+      // Franz messaging core
+      .AddNoDuplicateScoped<IMessagingTransaction, MessagingTransaction>()
+      .AddNoDuplicateScoped<IMessageFactory, MessageFactory>()
+      .AddNoDuplicateScoped<IMessageHandler, MessageBuilderDelegatingHandler>();
 
     return services;
   }
+
 
   public static IServiceCollection AddKafkaMessagingConfiguration(this IServiceCollection services, IConfiguration? configuration)
   {
