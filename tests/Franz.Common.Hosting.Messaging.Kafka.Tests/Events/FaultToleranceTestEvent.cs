@@ -6,8 +6,12 @@ using System.Text;
 
 namespace Franz.Common.Hosting.Messaging.Kafka.Tests.Events;
 
-public sealed class FaultToleranceTestEvent : IIntegrationEvent{
+public sealed class FaultToleranceTestEvent : IIntegrationEvent
+{
   public string Value { get; }
-  public FaultToleranceTestEvent(string value) => Value = value;
-}
 
+  public FaultToleranceTestEvent(string value)
+  {
+    Value = value;
+  }
+}
