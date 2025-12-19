@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using Franz.Common.Hosting.Messaging.Kafka.Tests.Events;
 using Franz.Common.Hosting.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging.Hosting.Kafka;
@@ -32,6 +33,7 @@ public sealed class KafkaHostingFixture
     return new HostBuilder()
       .ConfigureServices(services =>
       {
+        services.AddSingleton<ITestProbe, TestProbe>();
         services.AddLogging();
 
         // Mediator (handlers live in test assembly)
