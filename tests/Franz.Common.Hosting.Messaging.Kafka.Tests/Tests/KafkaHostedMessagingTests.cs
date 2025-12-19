@@ -1,10 +1,11 @@
-﻿using Franz.Common.Hosting.Messaging.Kafka.Tests.Events;
+﻿using FluentAssertions;
+using Franz.Common.Hosting.Messaging.Kafka.Tests.Events;
 using Franz.Common.Hosting.Messaging.Kafka.Tests.Handlers;
+using Franz.Common.Hosting.Messaging.Kafka.Tests.Probes;
 using Franz.Common.Mediator.Dispatchers;
-using FluentAssertions;
+using Franz.Common.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
-using Franz.Common.Hosting.Messaging.Kafka.Tests.Probes;
 
 public sealed class KafkaHostedMessagingTests
   : IClassFixture<KafkaHostingFixture>
@@ -49,10 +50,13 @@ public sealed class KafkaHostedMessagingTests
     FaultToleranceProbe.Reset();
 
     using var scope = _fixture.Services.CreateScope();
-    var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
+
+    var publisher = scope.ServiceProvider
+      .GetRequiredService<IMessagingPublisher>();
 
     // Act
-    await dispatcher.PublishEventAsync(new FaultToleranceTestEvent("still-alive"));
+    await publisher.Publish(
+      new FaultToleranceTestEvent("still-alive"));
 
     // Assert
     var received = await FaultToleranceProbe
@@ -60,6 +64,7 @@ public sealed class KafkaHostedMessagingTests
 
     received.Should().Be("still-alive");
   }
+
 
 
 
