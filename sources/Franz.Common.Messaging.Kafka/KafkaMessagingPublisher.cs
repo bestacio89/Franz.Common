@@ -1,77 +1,46 @@
-using Confluent.Kafka;
 using Franz.Common.Business.Domain;
-using Franz.Common.Errors; // TechnicalException
+using Franz.Common.Errors;
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Messaging.Factories;
-using System.Text;
 
 namespace Franz.Common.Messaging.Kafka;
 
-public class MessagingPublisher(
-    IProducer<string, byte[]> producer,
+public sealed class MessagingPublisher : IMessagingPublisher
+{
+  private readonly IMessagingInitializer messagingInitializer;
+  private readonly IMessageFactory messageFactory;
+  private readonly IDispatcher dispatcher;
+  private readonly IMessagingSender sender;
+
+  public MessagingPublisher(
     IMessagingInitializer messagingInitializer,
     IMessageFactory messageFactory,
-    IDispatcher dispatcher)
-  : IMessagingPublisher
-{
-  private readonly IProducer<string, byte[]> _producer = producer;
-  private readonly IMessagingInitializer _messagingInitializer = messagingInitializer;
-  private readonly IMessageFactory _messageFactory = messageFactory;
-  private readonly IDispatcher _dispatcher = dispatcher;
+    IDispatcher dispatcher,
+    IMessagingSender sender)
+  {
+    this.messagingInitializer = messagingInitializer;
+    this.messageFactory = messageFactory;
+    this.dispatcher = dispatcher;
+    this.sender = sender;
+  }
 
   public async Task Publish<TIntegrationEvent>(TIntegrationEvent integrationEvent)
-      where TIntegrationEvent : IIntegrationEvent
+    where TIntegrationEvent : IIntegrationEvent
   {
-    // Ensure messaging infra is ready
-    _messagingInitializer.Initialize();
+    if (integrationEvent is null)
+      throw new TechnicalException("Integration event cannot be null");
 
-    // Build message with Franz factory
-    var message = _messageFactory.Build(integrationEvent);
+    // Ensure Kafka infra exists (topics, DLQ, etc.)
+    messagingInitializer.Initialize();
 
-    // Run through Franz mediator pipeline
-    await _dispatcher.PublishAsync(message);
+    // Build Franz message
+    var message = messageFactory.Build(integrationEvent);
 
-    // Resolve Kafka topic
-    var integrationEventAssembly = integrationEvent.GetType().Assembly;
-    var topic = TopicNamer.GetTopicName(integrationEventAssembly);
+    // Run mediator pipeline (notifications must NOT fail the system)
+    await dispatcher.PublishAsync(message);
 
-    // Build Kafka headers
-    var confluentHeaders = new Confluent.Kafka.Headers();
-    foreach (var header in message.Headers)
-    {
-      var strValue = header.Value.ToString();
-      if (!string.IsNullOrEmpty(strValue))
-      {
-        confluentHeaders.Add(header.Key, Encoding.UTF8.GetBytes(strValue));
-      }
-    }
-
-    // Ensure body is not null
-    if (string.IsNullOrEmpty(message.Body))
-    {
-      throw new TechnicalException(
-          $"Cannot publish Kafka message: Body is null or empty for {typeof(TIntegrationEvent).Name}");
-    }
-
-    // Send to Kafka asynchronously
-    try
-    {
-      var deliveryResult = await _producer.ProduceAsync(
-          topic,
-          new Message<string, byte[]>
-          {
-            Headers = confluentHeaders,
-            Value = Encoding.UTF8.GetBytes(message.Body)
-          });
-
-      // Optional logging hook here
-      // _logger.LogInformation("Delivered {EventType} to {TopicPartitionOffset}", 
-      //   typeof(TIntegrationEvent).Name, deliveryResult.TopicPartitionOffset);
-    }
-    catch (Exception ex)
-    {
-      throw new TechnicalException("Failed to publish event to Kafka", ex);
-    }
+    // Delegate transport publishing
+    await sender.SendAsync(message);
   }
 }

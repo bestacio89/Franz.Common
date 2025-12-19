@@ -1,50 +1,46 @@
 using Franz.Common.Mediator.Messages;
-using Franz.Common.Messaging.Headers;
-using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Messaging;
 
 public class Message : INotification
 {
   public Message() { }
-  public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
-  public Message(string? body) => Body = body;
-
-  public Message(string? body, IEnumerable<KeyValuePair<string, StringValues>> headers)
+  public Message(string? body)
   {
     Body = body;
-    Headers = new MessageHeaders(headers);
   }
 
-  public Message(string? body, IEnumerable<KeyValuePair<string, string[]>> headers)
+  public Message(
+    string? body,
+    IDictionary<string, IReadOnlyCollection<string>> headers)
   {
     Body = body;
-    Headers = new MessageHeaders(
-        headers.Select(header =>
-            new KeyValuePair<string, StringValues>(
-                header.Key, new StringValues(header.Value)
-            )
-        )
-    );
+    Headers = headers;
   }
 
   /// <summary>
-  /// The raw message body (payload). Can be null if the transport didn't carry a body.
+  /// Unique message identifier.
+  /// </summary>
+  public string Id { get; set; } = Guid.NewGuid().ToString("N");
+
+  /// <summary>
+  /// Raw message payload.
   /// </summary>
   public virtual string? Body { get; set; }
 
   /// <summary>
-  /// Transport-level headers (Kafka, HTTP, etc.).
-  /// Always initialized to avoid null checks.
+  /// Transport-agnostic headers.
+  /// These are mapped by each transport adapter (Kafka, Azure, HTTP).
   /// </summary>
-  public virtual MessageHeaders Headers { get; set; } = new();
+  public virtual IDictionary<string, IReadOnlyCollection<string>> Headers { get; set; }
+    = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
 
   /// <summary>
-  /// User-defined metadata for business-level properties that should not be mixed with transport headers.
+  /// Logical metadata not intended for transport headers.
   /// </summary>
-  public virtual IDictionary<string, object> Properties { get; set; } =
-      new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+  public virtual IDictionary<string, object> Properties { get; set; }
+    = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
   /// <summary>
   /// Correlation identifier for distributed tracing.
@@ -56,7 +52,7 @@ public class Message : INotification
   }
 
   /// <summary>
-  /// Logical message type (used for deserialization).
+  /// Logical message type.
   /// </summary>
   public virtual string? MessageType
   {
@@ -65,11 +61,10 @@ public class Message : INotification
   }
 
   public T? GetProperty<T>(string key)
-  {
-    if (Properties.TryGetValue(key, out var value) && value is T castValue)
-      return castValue;
-    return default;
-  }
+    => Properties.TryGetValue(key, out var value) && value is T cast
+        ? cast
+        : default;
 
-  public void SetProperty<T>(string key, T value) => Properties[key] = value!;
+  public void SetProperty<T>(string key, T value)
+    => Properties[key] = value!;
 }

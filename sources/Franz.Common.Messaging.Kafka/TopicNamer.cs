@@ -1,74 +1,89 @@
+#nullable enable
 using Franz.Common.Annotations;
-using Franz.Common.Business.Domain;
+using Franz.Common.Reflection;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Linq;
 using System.Reflection;
+
 namespace Franz.Common.Messaging.Kafka;
+
 public static class TopicNamer
 {
   private const string TopicSuffixName = "-in";
   private const string DeadLetterTopicSuffixName = "-in-dlt";
 
-  public static string GetTopicName(Assembly assembly)
+  public static string GetTopicName(IAssembly assembly)
   {
-    var controllerType = assembly.GetTypes()
-        .FirstOrDefault(t => t.IsClass && !t.IsAbstract && typeof(ControllerBase).IsAssignableFrom(t));
+    if (assembly is null)
+      throw new ArgumentNullException(nameof(assembly));
 
-    if (controllerType != null)
+    var reflectionAssembly = assembly.Assembly;
+
+    var controllerType = reflectionAssembly
+      .GetTypes()
+      .FirstOrDefault(t =>
+        t.IsClass &&
+        !t.IsAbstract &&
+        typeof(ControllerBase).IsAssignableFrom(t));
+
+    if (controllerType is not null)
     {
       var attribute = controllerType.GetCustomAttribute<RequiredKafkaTopicAttribute>();
-      if (attribute != null)
+      if (attribute is not null)
       {
-        if (!string.IsNullOrEmpty(attribute.Format))
+        if (!string.IsNullOrWhiteSpace(attribute.Format))
         {
           var entityName = GetEntityNameFromController(controllerType);
           return string.Format(attribute.Format, entityName);
         }
-        else
-        {
+
+        if (!string.IsNullOrWhiteSpace(attribute.Topic))
           return attribute.Topic;
-        }
       }
     }
 
-    // Null-safe assembly name check
-    if (assembly.GetName().Name is string assemblyName)
-    {
-      return GetServiceName(assemblyName) + TopicSuffixName;
-    }
+    var assemblyName = reflectionAssembly.GetName().Name;
+    if (string.IsNullOrWhiteSpace(assemblyName))
+      throw new InvalidOperationException($"Assembly {reflectionAssembly.FullName} has no valid name");
 
-    throw new InvalidOperationException($"Assembly {assembly.FullName} has no valid name");
+    return GetServiceName(assemblyName) + TopicSuffixName;
   }
 
-  private static string GetEntityNameFromController(Type controllerType)
+  public static string GetDeadLetterTopicName(IAssembly assembly)
   {
-    return controllerType.Name.Replace("Controller", "");
-  }
+    if (assembly is null)
+      throw new ArgumentNullException(nameof(assembly));
 
-  private static string GetServiceName(string assemblyName)
-  {
-    var parts = assemblyName.Split('.');
-    if (parts.Length >= 2)
-    {
-      return parts[1].ToLower();
-    }
+    var reflectionAssembly = assembly.Assembly;
 
-    throw new InvalidOperationException($"Unable to extract service name from assembly name: {assemblyName}");
-  }
+    var controllerType = reflectionAssembly
+      .GetTypes()
+      .FirstOrDefault(t =>
+        t.IsClass &&
+        !t.IsAbstract &&
+        typeof(ControllerBase).IsAssignableFrom(t));
 
-  public static string GetDeadLetterTopicName(Assembly assembly)
-  {
-    var controllerType = assembly.GetTypes()
-        .FirstOrDefault(t => t.IsClass && !t.IsAbstract && typeof(ControllerBase).IsAssignableFrom(t));
-
-    if (controllerType != null)
+    if (controllerType is not null)
     {
       var attribute = controllerType.GetCustomAttribute<RequiredKafkaTopicAttribute>();
-      if (attribute != null && !string.IsNullOrEmpty(attribute.DeadLetterTopic))
-      {
+      if (attribute is not null && !string.IsNullOrWhiteSpace(attribute.DeadLetterTopic))
         return attribute.DeadLetterTopic;
-      }
     }
 
     return GetTopicName(assembly) + DeadLetterTopicSuffixName;
+  }
+
+  private static string GetEntityNameFromController(Type controllerType)
+    => controllerType.Name.Replace("Controller", "", StringComparison.Ordinal);
+
+  private static string GetServiceName(string assemblyName)
+  {
+    var parts = assemblyName.Split('.', StringSplitOptions.RemoveEmptyEntries);
+    if (parts.Length >= 2)
+      return parts[1].ToLowerInvariant();
+
+    throw new InvalidOperationException(
+      $"Unable to extract service name from assembly name: {assemblyName}");
   }
 }
