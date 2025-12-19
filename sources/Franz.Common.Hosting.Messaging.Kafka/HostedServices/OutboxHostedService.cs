@@ -7,7 +7,7 @@ namespace Franz.Common.Messaging.Hosting.Kafka.HostedServices;
 
 public class OutboxHostedService : BackgroundService
 {
-  private readonly OutboxMessageListener _listener;
+  private readonly IListener _listener;
   private readonly ILogger<OutboxHostedService> _logger;
 
   public OutboxHostedService(OutboxMessageListener listener, ILogger<OutboxHostedService> logger)
@@ -19,7 +19,24 @@ public class OutboxHostedService : BackgroundService
   protected override async Task ExecuteAsync(CancellationToken stoppingToken)
   {
     _logger.LogInformation("🚀 OutboxHostedService starting");
-    await _listener.Listen(stoppingToken);
-    _logger.LogInformation("🛑 OutboxHostedService stopping");
+
+    try
+    {
+      await _listener.Listen(stoppingToken);
+    }
+    catch (OperationCanceledException)
+    {
+      // Expected on shutdown
+    }
+    catch (Exception ex)
+    {
+      _logger.LogCritical(ex, "❌ OutboxHostedService crashed");
+      throw; // Let host decide (intentional crash)
+    }
+    finally
+    {
+      _logger.LogInformation("🛑 OutboxHostedService stopping");
+    }
   }
+
 }

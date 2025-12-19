@@ -1,5 +1,6 @@
 ﻿using Franz.Common.Mediator.Handlers;
 using Franz.Common.Hosting.Messaging.Kafka.Tests.Events;
+using Franz.Common.Hosting.Messaging.Kafka.Tests.Probes;
 
 namespace Franz.Common.Hosting.Messaging.Kafka.Tests.Handlers;
 

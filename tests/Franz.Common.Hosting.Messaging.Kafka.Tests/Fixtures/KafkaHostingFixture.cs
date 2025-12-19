@@ -1,6 +1,6 @@
 ﻿using Confluent.Kafka;
-using Franz.Common.Hosting.Messaging.Kafka.Tests.Events;
 using Franz.Common.Hosting.Messaging.Kafka.Tests.Fixtures;
+using Franz.Common.Hosting.Messaging.Kafka.Tests.Probes;
 using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging.Hosting.Kafka;
 using Franz.Common.Messaging.Kafka.Extensions;
