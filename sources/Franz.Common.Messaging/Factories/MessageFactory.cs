@@ -12,19 +12,16 @@ public class MessageFactory : IMessageFactory
         this.messageBuilderStrategies = messageBuilderStrategies;
     }
 
-    public Message Build(object value)
-    {
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-        IMessageBuilderStrategy? messageBuilderStrategy = messageBuilderStrategies.SingleOrDefault(messageBuilderStrategy => messageBuilderStrategy.CanBuild(value));
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  public Message Build(object value)
+  {
+    var strategy = messageBuilderStrategies
+        .SingleOrDefault(s => s.CanBuild(value));
 
-        if (messageBuilderStrategy == null)
-        {
-            throw new TechnicalException(string.Format(Resources.MessagingBuilderStrategyNotFoundException, value.GetType()));
-        }
+    if (strategy == null)
+      throw new TechnicalException(
+          string.Format(Resources.MessagingBuilderStrategyNotFoundException, value.GetType()));
 
-        var result = messageBuilderStrategy.Build(value);
+    return strategy.Build(value);
+  }
 
-        return result;
-    }
 }

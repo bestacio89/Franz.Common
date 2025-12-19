@@ -1,48 +1,49 @@
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Franz.Common.Serialization;
 
-public class JsonSerializer : IJsonSerializer
+public sealed class SystemTextJsonSerializer : IJsonSerializer
 {
-    private readonly IEnumerable<JsonConverter> converters;
+  private readonly JsonSerializerOptions _options;
 
-    public JsonSerializer(IEnumerable<JsonConverter> converters)
+  public SystemTextJsonSerializer(IEnumerable<JsonConverter> converters)
+  {
+    _options = new JsonSerializerOptions
     {
-        this.converters = converters;
-    }
+      PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+      PropertyNameCaseInsensitive = true,
+      DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+      WriteIndented = false
+    };
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    public string? Serialize(object? content)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+    foreach (var converter in converters)
     {
-        var result = content != null ? JsonConvert.SerializeObject(content, converters.ToArray()) : default;
-
-        return result;
+      _options.Converters.Add(converter);
     }
+  }
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    public TOut? Deserialize<TOut>(string? content)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    {
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-        var result = (TOut?)Deserialize(content, typeof(TOut));
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  public string? Serialize(object? content)
+  {
+    if (content is null)
+      return null;
 
-        return result;
-    }
+    return JsonSerializer.Serialize(content, content.GetType(), _options);
+  }
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    public object? Deserialize(string? content, Type targetType)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    {
-        var result = content != null ? JsonConvert.DeserializeObject(content.ToString()!, targetType, converters.ToArray()) : default;
+  public TOut? Deserialize<TOut>(string? content)
+  {
+    if (string.IsNullOrWhiteSpace(content))
+      return default;
 
-        return result;
-    }
+    return JsonSerializer.Deserialize<TOut>(content, _options);
+  }
+
+  public object? Deserialize(string? content, Type targetType)
+  {
+    if (string.IsNullOrWhiteSpace(content))
+      return null;
+
+    return JsonSerializer.Deserialize(content, targetType, _options);
+  }
 }

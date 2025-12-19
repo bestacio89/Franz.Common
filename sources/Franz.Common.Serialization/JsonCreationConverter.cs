@@ -1,40 +1,49 @@
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Franz.Common.Serialization;
 
-public abstract class JsonCreationConverter<T> : JsonConverter
+/// <summary>
+/// Safe factory-based converter replacing Newtonsoft JsonCreationConverter.
+/// Explicit construction, no reflection population, no polymorphism.
+/// </summary>
+public abstract class SystemTextCreationConverter<T> : JsonConverter<T>
 {
-    public override bool CanWrite => false;
+  public override bool CanConvert(Type typeToConvert)
+      => typeof(T).IsAssignableFrom(typeToConvert);
 
-    public override bool CanConvert(Type objectType)
-    {
-        return typeof(T).IsAssignableFrom(objectType);
-    }
+  public override T Read(
+      ref Utf8JsonReader reader,
+      Type typeToConvert,
+      JsonSerializerOptions options)
+  {
+    using var document = JsonDocument.ParseValue(ref reader);
+    var element = document.RootElement;
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    {
-        var jObject = JObject.Load(reader);
+    var target = Create(typeToConvert, element);
 
-        var target = Create(objectType, jObject);
+    // Populate explicitly (safe)
+    var json = element.GetRawText();
+    return (T)JsonSerializer.Deserialize(
+        json,
+        target.GetType(),
+        options)!;
+  }
 
-#pragma warning disable CS8604 // Possible null reference argument.
-        serializer.Populate(jObject.CreateReader(), target);
-#pragma warning restore CS8604 // Possible null reference argument.
+  public override void Write(
+      Utf8JsonWriter writer,
+      T value,
+      JsonSerializerOptions options)
+  {
+    JsonSerializer.Serialize(
+        writer,
+        value,
+        value.GetType(),
+        options);
+  }
 
-        return target;
-    }
-
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    public override void WriteJson(JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    {
-        throw new NotImplementedException();
-    }
-
-    protected abstract T Create(Type objectType, JObject jObject);
+  /// <summary>
+  /// Explicit factory method (NO reflection).
+  /// </summary>
+  protected abstract T Create(Type typeToConvert, JsonElement json);
 }

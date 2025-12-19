@@ -1,32 +1,33 @@
 using Franz.Common.Mediator;
+using Franz.Common.Messaging.Serialization;
+using Franz.Common.Serialization;
 using Microsoft.Extensions.Primitives;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace Franz.Common.Messaging.Factories;
 
-public class IntegrationEventMessageBuilderStrategy : IMessageBuilderStrategy
+public sealed class IntegrationEventMessageBuilderStrategy
+    : IMessageBuilderStrategy
 {
-    public bool CanBuild(object value)
-    {
-        var result = value is IIntegrationEvent;
+  public bool CanBuild(object value)
+      => value is IIntegrationEvent;
 
-        return result;
-    }
+  public Message Build(object value)
+  {
+    var integrationEvent = (IIntegrationEvent)value;
 
-    public Message Build(object value)
-    {
-        var messagingEvent = (IIntegrationEvent)value;
+    var body = JsonSerializer.Serialize(
+        integrationEvent,
+        FranzJson.Default);
 
-        var messageBody = JsonConvert.SerializeObject(messagingEvent);
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-        Message? result = new(messageBody);
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+    var message = new Message(body);
 
-    var headerName = HeaderNamer.GetEventClassName(value.GetType());
-    result.Headers.Add(
-      MessagingConstants.ClassName,
-      new StringValues(headerName)
-      );
-     return result;
-    }
+    var className = HeaderNamer.GetEventClassName(value.GetType());
+
+    message.Headers.Add(
+        MessagingConstants.ClassName,
+        new StringValues(className));
+
+    return message;
+  }
 }
