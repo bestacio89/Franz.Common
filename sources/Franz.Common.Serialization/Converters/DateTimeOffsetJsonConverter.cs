@@ -1,40 +1,55 @@
-using Newtonsoft.Json;
+using System;
 using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Franz.Common.Serialization.Converters;
 
-public class DateTimeOffsetJsonConverter : JsonConverter
+public sealed class DateTimeOffsetJsonConverter
+  : JsonConverter<DateTimeOffset?>
 {
-    public override bool CanConvert(Type objectType)
-    {
-        var result = objectType == typeof(DateTimeOffset) || objectType == typeof(DateTimeOffset?);
+  private const string Format = "yyyy-MM-ddTHH:mm:ssZ";
 
-        return result;
+  public override DateTimeOffset? Read(
+    ref Utf8JsonReader reader,
+    Type typeToConvert,
+    JsonSerializerOptions options)
+  {
+    if (reader.TokenType == JsonTokenType.Null)
+      return null;
+
+    if (reader.TokenType != JsonTokenType.String)
+      throw new JsonException("Expected string for DateTimeOffset.");
+
+    var raw = reader.GetString();
+
+    if (string.IsNullOrWhiteSpace(raw))
+      return null;
+
+    if (DateTimeOffset.TryParse(
+        raw,
+        CultureInfo.InvariantCulture,
+        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+        out var dto))
+    {
+      return dto;
     }
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+    throw new JsonException($"Invalid DateTimeOffset format: '{raw}'.");
+  }
+
+  public override void Write(
+    Utf8JsonWriter writer,
+    DateTimeOffset? value,
+    JsonSerializerOptions options)
+  {
+    if (!value.HasValue)
     {
-        DateTimeOffset? result = null;
-
-        if (reader.Value is DateTimeOffset dateTimeOffset)
-            result = dateTimeOffset;
-        else if (reader.Value != null)
-            throw new FormatException("Wrong Date Format");
-
-        return result;
+      writer.WriteNullValue();
+      return;
     }
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    public override void WriteJson(JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    {
-        var result = value as DateTimeOffset?;
-
-        if (result.HasValue)
-            writer.WriteValue(result.Value.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture));
-    }
+    writer.WriteStringValue(
+      value.Value.UtcDateTime.ToString(Format, CultureInfo.InvariantCulture));
+  }
 }

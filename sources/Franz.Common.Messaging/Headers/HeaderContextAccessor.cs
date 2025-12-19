@@ -1,23 +1,30 @@
-﻿using Franz.Common.Headers;
+﻿#nullable enable
+
+using Franz.Common.Headers;
 using Franz.Common.Messaging.Contexting;
+using Franz.Common.Serialization;
 using Microsoft.Extensions.Primitives;
-using Newtonsoft.Json;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 
 namespace Franz.Common.Messaging.Headers;
 
 public sealed class HeaderContextAccessor : IHeaderContextAccessor
 {
-  private readonly IMessageContextAccessor messageContextAccessor;
+  private readonly IMessageContextAccessor _messageContextAccessor;
+  private readonly JsonSerializerOptions _jsonOptions;
 
-  public HeaderContextAccessor(IMessageContextAccessor messageContextAccessor)
+  public HeaderContextAccessor(
+    IMessageContextAccessor messageContextAccessor,
+    JsonSerializerOptions? jsonOptions = null)
   {
-    this.messageContextAccessor = messageContextAccessor;
+    _messageContextAccessor = messageContextAccessor;
+    _jsonOptions = jsonOptions ?? FranzJson.Default;
   }
 
   public IEnumerable<KeyValuePair<string, StringValues>> ListAll()
   {
-    var headers = messageContextAccessor.Current?.Message?.Headers;
+    var headers = _messageContextAccessor.Current?.Message?.Headers;
 
     return headers ?? Enumerable.Empty<KeyValuePair<string, StringValues>>();
   }
@@ -26,8 +33,8 @@ public sealed class HeaderContextAccessor : IHeaderContextAccessor
   {
     value = default;
 
-    var headers = messageContextAccessor.Current?.Message?.Headers;
-    if (headers == null)
+    var headers = _messageContextAccessor.Current?.Message?.Headers;
+    if (headers is null)
       return false;
 
     return headers.TryGetValue(key, out value);
@@ -37,18 +44,26 @@ public sealed class HeaderContextAccessor : IHeaderContextAccessor
   {
     value = default;
 
-    var headers = messageContextAccessor.Current?.Message?.Headers;
-    if (headers == null)
+    var headers = _messageContextAccessor.Current?.Message?.Headers;
+    if (headers is null)
       return false;
 
     if (!headers.TryGetValue(key, out var stringValues))
       return false;
 
-    // StringValues → string → T
-#pragma warning disable CS8604
-    value = JsonConvert.DeserializeObject<T>(stringValues.ToString());
-#pragma warning restore CS8604
+    var raw = stringValues.ToString();
+    if (string.IsNullOrWhiteSpace(raw))
+      return false;
 
-    return true;
+    try
+    {
+      value = JsonSerializer.Deserialize<T>(raw, _jsonOptions);
+      return value is not null;
+    }
+    catch (JsonException)
+    {
+      // Header exists but cannot be deserialized to T
+      return false;
+    }
   }
 }

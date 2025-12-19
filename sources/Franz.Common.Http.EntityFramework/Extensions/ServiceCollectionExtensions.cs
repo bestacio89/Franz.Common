@@ -9,9 +9,8 @@ using Franz.Common.MongoDB.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.AzureCosmosDB;
-
+using Franz.Common.AzureCosmosDB.Extensions;
 namespace Franz.Common.Http.EntityFramework.Extensions;
 
 public static class ServiceCollectionExtensions
