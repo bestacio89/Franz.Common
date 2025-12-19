@@ -79,11 +79,20 @@ public static class TopicNamer
 
   private static string GetServiceName(string assemblyName)
   {
-    var parts = assemblyName.Split('.', StringSplitOptions.RemoveEmptyEntries);
-    if (parts.Length >= 2)
-      return parts[1].ToLowerInvariant();
+    // Test runner / dynamic host
+    if (assemblyName.Equals("testhost", StringComparison.OrdinalIgnoreCase))
+    {
+      return "franz-test";
+    }
 
-    throw new InvalidOperationException(
-      $"Unable to extract service name from assembly name: {assemblyName}");
+    var parts = assemblyName.Split('.');
+    if (parts.Length >= 2)
+    {
+      return parts[1].ToLowerInvariant();
+    }
+
+    // Final safety net (never throw in infra naming)
+    return assemblyName.ToLowerInvariant();
   }
+
 }
