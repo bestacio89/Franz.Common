@@ -4,69 +4,44 @@ using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Http.Client.Delegating;
 
-public class HeaderPropagationRequestBuilder : IRequestBuilder
+public sealed class HeaderPropagationRequestBuilder : IRequestBuilder
 {
-  private const int JustOne = 1;
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  private readonly IHeaderContextAccessor? headerContextAccessor;
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  private readonly HeaderPropagationOptions? headerPropagationOptions;
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  private readonly IHeaderPropagationRegistrer? headerPropagationRegistrer;
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  private readonly IHeaderContextAccessor _headerContextAccessor;
+  private readonly IReadOnlyCollection<string> _headersToPropagate;
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public HeaderPropagationRequestBuilder(IHeaderContextAccessor? headerContextAccessor = null, IHeaderPropagationRegistrer? headerPropagationRegistrer = null, HeaderPropagationOptions? headerPropagationOptions = null)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  public HeaderPropagationRequestBuilder(
+  IHeaderContextAccessor headerContextAccessor,
+  IHeaderPropagationRegistrer? headerPropagationRegistrer = null,
+  HeaderPropagationOptions? headerPropagationOptions = null)
   {
-    this.headerContextAccessor = headerContextAccessor;
-    this.headerPropagationOptions = headerPropagationOptions;
-    this.headerPropagationRegistrer = headerPropagationRegistrer;
+    _headerContextAccessor = headerContextAccessor;
+
+    _headersToPropagate =
+      (headerPropagationOptions?.Headers ?? Enumerable.Empty<string>())
+        .Concat(
+          headerPropagationRegistrer?.Headers.Select(h => h.HeaderName)
+          ?? Enumerable.Empty<string>()
+        )
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
   }
 
   public bool CanBuild(HttpRequestMessage request)
-  {
-    var result = headerContextAccessor is not null && (headerPropagationOptions?.Headers.Any() == true || headerPropagationRegistrer?.Headers.Any() == true);
-
-    return result;
-  }
+    => _headersToPropagate.Count > 0;
 
   public void Build(HttpRequestMessage request)
   {
-    headerPropagationOptions?.Headers
-    .ForEach(header =>
+    foreach (var headerName in _headersToPropagate)
     {
-      Add(request, header);
-    });
+      if (!_headerContextAccessor.TryGetValue(headerName, out StringValues values))
+        continue;
 
-    headerPropagationRegistrer?.Headers
-     .ForEach(header =>
-     {
-       Add(request, header.HeaderName);
-     });
-  }
+      if (StringValues.IsNullOrEmpty(values))
+        continue;
 
-  private void Add(HttpRequestMessage request, string header)
-  {
-    if (headerContextAccessor!.TryGetValue(header, out var stringValues))
-    {
-      if (HasMoreThanOneElement(stringValues))
-        request.Headers.Add(header, stringValues.ToArray());
-      else
-        request.Headers.Add(header, stringValues.SingleOrDefault());
+      // HttpClient handles multi-values correctly
+      request.Headers.Remove(headerName);
+      request.Headers.Add(headerName, values.ToArray());
     }
-  }
-
-  private static bool HasMoreThanOneElement(StringValues stringValues)
-  {
-    var result = stringValues.Count > JustOne;
-
-    return result;
   }
 }

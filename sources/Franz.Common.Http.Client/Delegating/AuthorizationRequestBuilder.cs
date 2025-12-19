@@ -1,30 +1,45 @@
 using Franz.Common.Headers;
+using Microsoft.Extensions.Primitives;
+using System.Net.Http.Headers;
 
 namespace Franz.Common.Http.Client.Delegating;
 
-public class AuthorizationRequestBuilder : IRequestBuilder
+public sealed class AuthorizationRequestBuilder : IRequestBuilder
 {
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  private readonly IHeaderContextAccessor? headerContextAccessor;
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  private readonly IHeaderContextAccessor _headerContextAccessor;
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public AuthorizationRequestBuilder(IHeaderContextAccessor? headerContextAccessor = null)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  public AuthorizationRequestBuilder(IHeaderContextAccessor headerContextAccessor)
   {
-    this.headerContextAccessor = headerContextAccessor;
+    _headerContextAccessor = headerContextAccessor;
   }
 
   public bool CanBuild(HttpRequestMessage request)
   {
-    var result = headerContextAccessor != null;
+    if (request.Headers.Authorization is not null)
+      return false;
 
-    return result;
+    return _headerContextAccessor.TryGetValue(
+             HeaderConstants.Authorization,
+             out StringValues values)
+           && values.Count > 0
+           && !StringValues.IsNullOrEmpty(values);
   }
 
   public void Build(HttpRequestMessage request)
   {
-    if (headerContextAccessor!.TryGetValue(HeaderConstants.Authorization, out var result))
-      request.Headers.Add(HeaderConstants.Authorization, result.ToString());
+    if (request.Headers.Authorization is not null)
+      return;
+
+    if (!_headerContextAccessor.TryGetValue(
+          HeaderConstants.Authorization,
+          out StringValues values))
+      return;
+
+    var token = values.FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(token))
+      return;
+
+    request.Headers.Authorization =
+        AuthenticationHeaderValue.Parse(token);
   }
 }

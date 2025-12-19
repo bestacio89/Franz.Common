@@ -1,51 +1,76 @@
 using Franz.Common.Headers;
+using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Messaging.Headers;
 
-public class HeaderPropagationMessageBuilder : IMessageBuilder
+public sealed class HeaderPropagationMessageBuilder : IMessageBuilder
 {
-    private readonly IHeaderContextAccessor headerContextAccessor;
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    private readonly IHeaderPropagationRegistrer? headerPropagationRegistrer;
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    private readonly HeaderPropagationOptions? headerPropagationOptions;
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  private readonly IHeaderContextAccessor _headerContextAccessor;
+  private readonly IHeaderPropagationRegistrer? _headerPropagationRegistrer;
+  private readonly HeaderPropagationOptions? _headerPropagationOptions;
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    public HeaderPropagationMessageBuilder(IHeaderContextAccessor headerContextAccessor, IHeaderPropagationRegistrer? headerPropagationRegistrer = null, HeaderPropagationOptions? headerPropagationOptions = null)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  public HeaderPropagationMessageBuilder(
+      IHeaderContextAccessor headerContextAccessor,
+      IHeaderPropagationRegistrer? headerPropagationRegistrer = null,
+      HeaderPropagationOptions? headerPropagationOptions = null)
+  {
+    _headerContextAccessor = headerContextAccessor;
+    _headerPropagationRegistrer = headerPropagationRegistrer;
+    _headerPropagationOptions = headerPropagationOptions;
+  }
+
+  public bool CanBuild(Message message)
+  {
+    return
+      (_headerPropagationOptions?.Headers?.Any() == true) ||
+      (_headerPropagationRegistrer?.Headers?.Any() == true);
+  }
+
+  public void Build(Message message)
+  {
+    if (message.Headers is null)
+      return;
+
+    // Explicit headers from options
+    if (_headerPropagationOptions?.Headers is not null)
     {
-        this.headerContextAccessor = headerContextAccessor;
-        this.headerPropagationRegistrer = headerPropagationRegistrer;
-        this.headerPropagationOptions = headerPropagationOptions;
+      foreach (var headerName in _headerPropagationOptions.Headers)
+      {
+        if (ShouldSkip(message, headerName))
+          continue;
+
+        if (_headerContextAccessor.TryGetValue(headerName, out StringValues value))
+        {
+          message.Headers[headerName] = value;
+        }
+      }
     }
 
-    public bool CanBuild(Message message)
+    // Registered headers
+    if (_headerPropagationRegistrer?.Headers is not null)
     {
-        var result = headerPropagationOptions?.Headers.Any() == true || headerPropagationRegistrer?.Headers.Any() == true;
+      foreach (var registration in _headerPropagationRegistrer.Headers)
+      {
+        var headerName = registration.HeaderName;
 
-        return result;
+        if (ShouldSkip(message, headerName))
+          continue;
+
+        if (_headerContextAccessor.TryGetValue(headerName, out StringValues value))
+        {
+          message.Headers[headerName] = value;
+        }
+      }
     }
+  }
 
-    public void Build(Message message)
-    {
-        headerPropagationOptions?.Headers
-          .ToList()
-          .ForEach(header =>
-          {
-              if (headerContextAccessor.TryGetValue(header, out var value))
-                  message.Headers.Add(header, value);
-          });
-
-        headerPropagationRegistrer?.Headers
-          .ToList()
-          .ForEach(header =>
-          {
-              if (headerContextAccessor.TryGetValue(header.HeaderName, out var value))
-                  message.Headers.Add(header.HeaderName, value);
-          });
-    }
+  private static bool ShouldSkip(Message message, string headerName)
+  {
+    // Never override Franz invariants
+    return
+      headerName.Equals("message-id", StringComparison.OrdinalIgnoreCase) ||
+      headerName.Equals("correlation-id", StringComparison.OrdinalIgnoreCase) ||
+      headerName.Equals("message-type", StringComparison.OrdinalIgnoreCase) ||
+      message.Headers.ContainsKey(headerName);
+  }
 }
