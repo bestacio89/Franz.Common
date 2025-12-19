@@ -5,7 +5,11 @@ using System.Text.Json;
 
 namespace Franz.Common.Messaging.Hosting.Kafka.HostedServices;
 
-public class KafkaMessageListener : IListener
+/// <summary>
+/// Kafka transport listener responsible for consuming messages
+/// and dispatching them to registered handlers in an isolated manner.
+/// </summary>
+public sealed class KafkaMessageListener : IListener
 {
   private readonly IConsumer<string, string> _consumer;
   private readonly ILogger<KafkaMessageListener> _logger;
@@ -16,55 +20,103 @@ public class KafkaMessageListener : IListener
       IEnumerable<string> topics,
       ILogger<KafkaMessageListener> logger)
   {
-    _consumer = consumer;
-    _topics = topics.ToArray();
-    _logger = logger;
+    _consumer = consumer ?? throw new ArgumentNullException(nameof(consumer));
+    _topics = topics?.ToArray() ?? throw new ArgumentNullException(nameof(topics));
+    _logger = logger ?? throw new ArgumentNullException(nameof(logger));
   }
 
   public event EventHandler<MessageEventArgs>? Received;
 
+  /// <summary>
+  /// Starts consuming Kafka messages and dispatching them
+  /// to registered handlers. Handler failures are isolated.
+  /// </summary>
   public async Task Listen(CancellationToken stoppingToken = default)
   {
     _consumer.Subscribe(_topics);
-    _logger.LogInformation("🎧 Kafka listener subscribed to {Topics}", string.Join(",", _topics));
+    _logger.LogInformation(
+      "🎧 Kafka listener subscribed to topics: {Topics}",
+      string.Join(", ", _topics));
 
     try
     {
       while (!stoppingToken.IsCancellationRequested)
       {
         ConsumeResult<string, string>? result;
+
         try
         {
           result = _consumer.Consume(stoppingToken);
         }
+        catch (OperationCanceledException)
+        {
+          // Expected during shutdown
+          break;
+        }
         catch (ConsumeException ex)
         {
-          _logger.LogError(ex, "❌ Error consuming Kafka message");
+          _logger.LogError(ex, "❌ Kafka consume error");
           continue;
         }
 
         if (result?.Message?.Value is null)
           continue;
 
-        var transport = JsonSerializer.Deserialize<Message>(result.Message.Value);
-        if (transport is null)
+        Message? transport;
+
+        try
         {
-          _logger.LogWarning("⚠️ Skipped message: cannot deserialize transport for {Topic}", result.Topic);
+          transport = JsonSerializer.Deserialize<Message>(result.Message.Value);
+        }
+        catch (JsonException ex)
+        {
+          _logger.LogError(
+            ex,
+            "❌ Failed to deserialize Kafka message from topic {Topic}",
+            result.Topic);
           continue;
         }
 
-        if (Received != null)
+        if (transport is null)
         {
-          var handlers = Received.GetInvocationList().Cast<Func<object, MessageEventArgs, Task>>();
-          await Task.WhenAll(handlers.Select(h => h(this, new MessageEventArgs(transport))));
+          _logger.LogWarning(
+            "⚠️ Skipped message: deserialized message was null (Topic: {Topic})",
+            result.Topic);
+          continue;
+        }
+
+        if (Received is null)
+          continue;
+
+        var args = new MessageEventArgs(transport);
+
+        foreach (var handler in Received
+                   .GetInvocationList()
+                   .Cast<Func<object, MessageEventArgs, Task>>())
+        {
+          try
+          {
+            await handler(this, args);
+          }
+          catch (Exception ex)
+          {
+            _logger.LogError(
+              ex,
+              "❌ Kafka handler failed while processing message {MessageId}",
+              transport.Id);
+          }
         }
       }
     }
     finally
     {
       _consumer.Close();
+      _logger.LogInformation("🛑 Kafka listener stopped");
     }
   }
 
-  public void StopListen() => _consumer.Unsubscribe();
+  public void StopListen()
+  {
+    _consumer.Unsubscribe();
+  }
 }
