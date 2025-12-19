@@ -8,10 +8,5 @@ namespace Franz.Common.Hosting.Messaging.Kafka.Tests.Events;
 
 public sealed class FaultToleranceTestEvent : IIntegrationEvent
 {
-  public string Value { get; }
-
-  public FaultToleranceTestEvent(string value)
-  {
-    Value = value;
-  }
+  public string Value { get; init; } = "boom";
 }
