@@ -34,21 +34,33 @@ public sealed class KafkaHostingFixture
       {
         services.AddLogging();
 
+        // Mediator (handlers live in test assembly)
         services.AddFranzMediator(new[]
         {
           typeof(KafkaHostingFixture).Assembly
         });
-        services.AddSingleton<IConsumer<string, string>>(sp =>
-        {
-          var config = sp.GetRequiredService<KafkaConsumerConfiguration>();
 
-          return new ConsumerBuilder<string, string>(config.ToConfluent())
+        // Kafka transport registrations (publisher / sender, etc.)
+        services.AddKafkaMessaging(configuration);
+
+        // Native Kafka consumer for tests (NO wrappers, NO custom config objects)
+        services.AddSingleton<IConsumer<string, string>>(_ =>
+        {
+          var consumerConfig = new ConsumerConfig
+          {
+            BootstrapServers = container.GetBootstrapAddress(),
+            GroupId = "franz-test-group",
+            AutoOffsetReset = AutoOffsetReset.Earliest,
+            EnableAutoCommit = true
+          };
+
+          return new ConsumerBuilder<string, string>(consumerConfig)
             .SetKeyDeserializer(Deserializers.Utf8)
             .SetValueDeserializer(Deserializers.Utf8)
             .Build();
         });
-        services.AddKafkaMessaging(configuration);
 
+        // Kafka hosted listener (execution layer)
         services.AddKafkaHostedListener(options =>
         {
           options.BootStrapServers = container.GetBootstrapAddress();

@@ -1,32 +1,41 @@
 ﻿namespace Franz.Common.Messaging.Kafka;
+
+using Confluent.Kafka;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Adapters;
+using System.Text.Json;
 
 public static class KafkaConsumerExtensions
 {
   /// <summary>
-  /// Consume the next message and convert it into a mediator command.
+  /// Consume the next Kafka message and convert it into a mediator command.
   /// </summary>
-  public static ICommand? ConsumeCommand(this KafkaConsumer consumer, TimeSpan timeout)
+  public static ICommand? ConsumeCommand(
+      this IConsumer<string, string> consumer,
+      TimeSpan timeout)
   {
     var result = consumer.Consume(timeout);
-    if (result == null || result.Message?.Value == null)
+
+    if (result?.Message?.Value is null)
       return null;
 
-    var msg = System.Text.Json.JsonSerializer.Deserialize<Message>(result.Message.Value);
-    return msg?.ToCommand();
+    var message = JsonSerializer.Deserialize<Message>(result.Message.Value);
+    return message?.ToCommand();
   }
 
   /// <summary>
-  /// Consume the next message and convert it into a mediator event.
+  /// Consume the next Kafka message and convert it into a mediator event.
   /// </summary>
-  public static IEvent? ConsumeEvent(this KafkaConsumer consumer, TimeSpan timeout)
+  public static IEvent? ConsumeEvent(
+      this IConsumer<string, string> consumer,
+      TimeSpan timeout)
   {
     var result = consumer.Consume(timeout);
-    if (result == null || result.Message?.Value == null)
+
+    if (result?.Message?.Value is null)
       return null;
 
-    var msg = System.Text.Json.JsonSerializer.Deserialize<Message>(result.Message.Value);
-    return msg?.ToEvent();
+    var message = JsonSerializer.Deserialize<Message>(result.Message.Value);
+    return message?.ToEvent();
   }
 }
