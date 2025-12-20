@@ -46,7 +46,10 @@ public sealed class KafkaMessageListener : IListener
         }
 
         if (result?.Message?.Value is null)
+        {
+          _consumer.Commit(result);
           continue;
+        }
 
         Message? transport;
         try
@@ -56,21 +59,21 @@ public sealed class KafkaMessageListener : IListener
         catch (Exception ex)
         {
           _logger.LogWarning(ex, "⚠️ Failed to deserialize Kafka message on topic {Topic}", result.Topic);
+          _consumer.Commit(result);
           continue;
         }
 
         if (transport is null || Received is null)
+        {
+          _consumer.Commit(result);
           continue;
+        }
 
-        var handlers = Received
-          .GetInvocationList()
-          .Cast<Func<object, MessageEventArgs, Task>>();
-
-        foreach (var handler in handlers)
+        foreach (EventHandler<MessageEventArgs> handler in Received.GetInvocationList())
         {
           try
           {
-            await handler(this, new MessageEventArgs(transport));
+            handler(this, new MessageEventArgs(transport));
           }
           catch (Exception ex)
           {
@@ -80,13 +83,11 @@ public sealed class KafkaMessageListener : IListener
               transport.Id,
               result.Topic
             );
-
-            // IMPORTANT:
-            // We swallow the exception to ensure:
-            // - other handlers still run
-            // - listener keeps consuming
           }
         }
+
+        // ✅ ALWAYS commit once the message is processed
+        _consumer.Commit(result);
       }
     }
     finally
@@ -95,6 +96,7 @@ public sealed class KafkaMessageListener : IListener
       _logger.LogInformation("🛑 Kafka listener stopped");
     }
   }
+
 
   public void StopListen() => _consumer.Unsubscribe();
 }
