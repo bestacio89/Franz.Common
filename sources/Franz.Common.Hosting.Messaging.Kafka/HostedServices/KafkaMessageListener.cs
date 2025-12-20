@@ -58,35 +58,50 @@ public sealed class KafkaMessageListener : IListener
         }
         catch (Exception ex)
         {
-          _logger.LogWarning(ex, "⚠️ Failed to deserialize Kafka message on topic {Topic}", result.Topic);
+          _logger.LogWarning(
+            ex,
+            "⚠️ Failed to deserialize Kafka message on topic {Topic}",
+            result.Topic);
+
           _consumer.Commit(result);
           continue;
         }
 
-        if (transport is null || Received is null)
+        if (transport is null)
         {
           _consumer.Commit(result);
           continue;
         }
 
-        foreach (EventHandler<MessageEventArgs> handler in Received.GetInvocationList())
+        if (Received != null)
         {
-          try
+          var handlers = Received
+            .GetInvocationList()
+            .Cast<EventHandler<MessageEventArgs>>()
+            .ToArray();
+
+          foreach (var handler in handlers)
           {
-            handler(this, new MessageEventArgs(transport));
-          }
-          catch (Exception ex)
-          {
-            _logger.LogError(
-              ex,
-              "🔥 Kafka handler failed for message {MessageId} on topic {Topic}",
-              transport.Id,
-              result.Topic
-            );
+            // 🔥 FIRE-AND-FORGET boundary
+            _ = Task.Run(() =>
+            {
+              try
+              {
+                handler(this, new MessageEventArgs(transport));
+              }
+              catch (Exception ex)
+              {
+                _logger.LogError(
+                  ex,
+                  "🔥 Kafka handler failed for message {MessageId} on topic {Topic}",
+                  transport.Id,
+                  result.Topic);
+              }
+            }, stoppingToken);
           }
         }
 
-        // ✅ ALWAYS commit once the message is processed
+        // ✅ Commit immediately after dispatch
         _consumer.Commit(result);
       }
     }
