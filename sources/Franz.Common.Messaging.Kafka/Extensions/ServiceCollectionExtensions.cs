@@ -90,7 +90,7 @@ public static class ServiceCollectionExtensions
 
       // Franz messaging core
       .AddNoDuplicateScoped<IMessagingTransaction, MessagingTransaction>()
-      .AddNoDuplicateScoped<IMessageFactory, MessageFactory>()
+
       .AddNoDuplicateScoped<IMessageHandler, MessageBuilderDelegatingHandler>();
 
     return services;
