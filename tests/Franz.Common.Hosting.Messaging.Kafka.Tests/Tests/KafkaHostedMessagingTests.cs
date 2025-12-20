@@ -60,7 +60,7 @@ public sealed class KafkaHostedMessagingTests
 
     // Assert
     var received = await FaultToleranceProbe
-      .WaitAsync(TimeSpan.FromSeconds(10));
+      .WaitAsync(TimeSpan.FromSeconds(2));
 
     received.Should().Be("boom");
   }
