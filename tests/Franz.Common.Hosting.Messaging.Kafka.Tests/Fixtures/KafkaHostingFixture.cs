@@ -2,11 +2,14 @@
 using Franz.Common.Hosting.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Hosting.Messaging.Kafka.Tests.Probes;
 using Franz.Common.Mediator.Extensions;
+using Franz.Common.Messaging.Hosting;
 using Franz.Common.Messaging.Hosting.Kafka;
+using Franz.Common.Messaging.Hosting.Kafka.HostedServices;
 using Franz.Common.Messaging.Kafka.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Testcontainers.Kafka;
 
 public sealed class KafkaHostingFixture
@@ -45,7 +48,7 @@ public sealed class KafkaHostingFixture
         // Kafka transport registrations (publisher / sender, etc.)
         services.AddKafkaMessaging(configuration);
 
-        // Native Kafka consumer for tests (NO wrappers, NO custom config objects)
+        // Native Kafka consumer for tests
         services.AddSingleton<IConsumer<string, string>>(_ =>
         {
           var consumerConfig = new ConsumerConfig
@@ -62,12 +65,21 @@ public sealed class KafkaHostingFixture
             .Build();
         });
 
-        // Kafka hosted listener (execution layer)
+        // Register the hosted listener (your package wiring)
         services.AddKafkaHostedListener(options =>
         {
           options.BootStrapServers = container.GetBootstrapAddress();
           options.GroupID = "franz-test-group";
         });
+
+        // ✅ OVERRIDE listener for tests: deterministic execution
+        // We reuse the topics registration that AddKafkaHostedListener already provides.
+        services.AddSingleton<IListener>(sp =>
+          new KafkaMessageListener(
+            sp.GetRequiredService<IConsumer<string, string>>(),
+            sp.GetRequiredService<IEnumerable<string>>(),
+            sp.GetRequiredService<ILogger<KafkaMessageListener>>(),
+            awaitHandlers: true));
       })
       .Build();
   }
