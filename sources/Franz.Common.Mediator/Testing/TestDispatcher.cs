@@ -147,7 +147,7 @@ namespace Franz.Common.Mediator.Testing
 
     // -------------------- NOTIFICATIONS --------------------
 
-    public async Task PublishAsync<TNotification>(
+    public async Task PublishNotificationAsync<TNotification>(
         TNotification notification,
         CancellationToken cancellationToken = default,
         DispatchingStrategies.PublishStrategy strategy = DispatchingStrategies.PublishStrategy.Sequential,

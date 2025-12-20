@@ -66,7 +66,7 @@ public sealed class AzureEventBusProcessor : IAsyncDisposable
     try
     {
       // 🔥 THIS IS THE MAGIC BOUNDARY
-      await _mediator.PublishAsync(franzMessage, args.CancellationToken);
+      await _mediator.PublishNotificationAsync(franzMessage, args.CancellationToken);
 
       await args.CompleteMessageAsync(args.Message, args.CancellationToken);
     }

@@ -75,7 +75,7 @@ internal sealed class AzureEventGridIngress : IAzureEventGridIngress
       var message = _mapper.ToMessage(evt);
 
       // 🔥 Franz boundary: transport → mediator
-      await _dispatcher.PublishAsync(message, cancellationToken);
+      await _dispatcher.PublishNotificationAsync(message, cancellationToken);
     }
 
     return null;

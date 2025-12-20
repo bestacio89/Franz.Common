@@ -44,7 +44,7 @@ public sealed class AzureEventHubsProcessor
     var body = _serializer.Deserialize(args.Data.EventBody.ToArray());
     var message = _mapper.FromEvent(args, body);
 
-    await _dispatcher.PublishAsync(message, args.CancellationToken);
+    await _dispatcher.PublishNotificationAsync(message, args.CancellationToken);
     await args.UpdateCheckpointAsync(args.CancellationToken);
   }
 

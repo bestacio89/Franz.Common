@@ -75,7 +75,7 @@ public class MessagingStrategyExecuter : IMessagingStrategyExecuter
     switch (classMessage)
     {
       case IIntegrationEvent integrationEvent:
-        await dispatcher.PublishAsync(integrationEvent);
+        await dispatcher.PublishNotificationAsync(integrationEvent);
         break;
 
       case ICommand command:
