@@ -1,4 +1,5 @@
 using Franz.Common.Mediator;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Serialization;
 using Microsoft.Extensions.Primitives;

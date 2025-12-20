@@ -1,7 +1,7 @@
 ﻿using Azure.Messaging.EventGrid;
 using Franz.Common.Errors;
-using Franz.Common.Messaging;
 using Franz.Common.Messaging.AzureEventGrid.Constants;
+using Franz.Common.Messaging.Messages;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 

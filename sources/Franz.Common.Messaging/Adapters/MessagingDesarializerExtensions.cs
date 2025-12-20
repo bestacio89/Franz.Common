@@ -1,5 +1,6 @@
 ﻿using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Logging;
+using Franz.Common.Messaging.Messages;
 using System.Reflection;
 using System.Text.Json;
 

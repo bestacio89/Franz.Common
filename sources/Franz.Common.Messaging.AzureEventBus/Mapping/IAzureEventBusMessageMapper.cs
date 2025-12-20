@@ -1,5 +1,5 @@
 ﻿using Azure.Messaging.ServiceBus;
-using Franz.Common.Messaging;
+using Franz.Common.Messaging.Messages;
 
 namespace Franz.Common.Messaging.AzureEventBus.Mapping;
 

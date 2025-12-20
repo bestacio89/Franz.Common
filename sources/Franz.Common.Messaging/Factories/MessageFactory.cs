@@ -1,4 +1,5 @@
 using Franz.Common.Errors;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Properties;
 
 namespace Franz.Common.Messaging.Factories;

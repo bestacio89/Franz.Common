@@ -1,4 +1,5 @@
 ﻿using Franz.Common.Messaging.Headers;
+using Franz.Common.Messaging.Messages;
 using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;

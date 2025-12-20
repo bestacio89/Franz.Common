@@ -1,4 +1,4 @@
-﻿using Franz.Common.Messaging;
+﻿using Franz.Common.Messaging.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;

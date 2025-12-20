@@ -1,6 +1,6 @@
 ﻿using Azure.Messaging.EventHubs.Processor;
-using Franz.Common.Messaging;
 using Franz.Common.Messaging.AzureEventHubs.Constants;
+using Franz.Common.Messaging.Messages;
 using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Messaging.AzureEventHubs.Mapping;

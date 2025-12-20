@@ -1,5 +1,5 @@
 ﻿using Franz.Common.Hosting.Messaging.Kafka.Tests.Events;
-using Franz.Common.Messaging;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Serialization;
 

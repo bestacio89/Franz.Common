@@ -1,4 +1,5 @@
 ﻿using Franz.Common.Messaging;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Storage;
 using MongoDB.Driver;
 

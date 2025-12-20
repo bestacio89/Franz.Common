@@ -1,8 +1,8 @@
 ﻿using Azure.Messaging.ServiceBus;
 using Franz.Common.Errors;
 using Franz.Common.Mediator.Dispatchers;
-using Franz.Common.Messaging;
 using Franz.Common.Messaging.AzureEventBus.Mapping;
+using Franz.Common.Messaging.Messages;
 using Microsoft.Extensions.Logging;
 
 namespace Franz.Common.Messaging.AzureEventBus.Consumers;

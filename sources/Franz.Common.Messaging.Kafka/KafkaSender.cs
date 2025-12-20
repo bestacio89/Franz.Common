@@ -1,7 +1,7 @@
 ﻿using Confluent.Kafka;
 using Franz.Common.Errors;
-using Franz.Common.Messaging;
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Logging;

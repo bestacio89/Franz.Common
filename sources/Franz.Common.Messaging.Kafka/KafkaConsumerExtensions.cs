@@ -3,6 +3,7 @@
 using Confluent.Kafka;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Adapters;
+using Franz.Common.Messaging.Messages;
 using System.Text.Json;
 
 public static class KafkaConsumerExtensions

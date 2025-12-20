@@ -56,13 +56,13 @@ public sealed class KafkaHostedMessagingTests
 
     // Act
     await publisher.Publish(
-      new FaultToleranceTestEvent("still-alive"));
+      new FaultToleranceTestEvent());
 
     // Assert
     var received = await FaultToleranceProbe
       .WaitAsync(TimeSpan.FromSeconds(10));
 
-    received.Should().Be("still-alive");
+    received.Should().Be("boom");
   }
 
 

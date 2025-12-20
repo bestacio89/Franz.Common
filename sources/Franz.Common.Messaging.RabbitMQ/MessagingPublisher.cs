@@ -8,6 +8,7 @@ using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Factories;
 using System.Text;
 using RabbitMQ.Client;
+using Franz.Common.Messaging.Messages;
 
 namespace Franz.Common.Messaging.RabbitMQ;
 

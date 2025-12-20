@@ -1,3 +1,5 @@
+using Franz.Common.Messaging.Messages;
+
 namespace Franz.Common.Messaging;
 
 public interface IMessagingSender

@@ -1,6 +1,7 @@
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Factories;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using RabbitMQ.Client;
 using System.Text;

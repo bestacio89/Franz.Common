@@ -1,4 +1,5 @@
 using Franz.Common.Headers;
+using Franz.Common.Messaging.Messages;
 using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Messaging.Identity;

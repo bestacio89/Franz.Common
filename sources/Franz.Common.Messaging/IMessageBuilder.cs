@@ -1,4 +1,5 @@
 using Franz.Common.DependencyInjection;
+using Franz.Common.Messaging.Messages;
 
 namespace Franz.Common.Messaging;
 

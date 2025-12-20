@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Franz.Common.Messaging.Hosting;
+using Franz.Common.Messaging.Messages;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 

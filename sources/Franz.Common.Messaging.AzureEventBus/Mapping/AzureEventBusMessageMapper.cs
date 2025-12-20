@@ -1,8 +1,8 @@
 ﻿using Azure.Messaging.ServiceBus;
 using Franz.Common.Errors;
 using Franz.Common.Headers;
-using Franz.Common.Messaging;
 using Franz.Common.Messaging.AzureEventBus.Constants;
+using Franz.Common.Messaging.Messages;
 using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Messaging.AzureEventBus.Mapping;

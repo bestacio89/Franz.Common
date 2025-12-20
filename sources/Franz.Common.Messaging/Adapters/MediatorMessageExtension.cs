@@ -1,4 +1,5 @@
 ﻿using Franz.Common.Mediator.Messages;
+using Franz.Common.Messaging.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;

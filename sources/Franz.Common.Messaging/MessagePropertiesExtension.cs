@@ -1,4 +1,6 @@
-﻿namespace Franz.Common.Messaging;
+﻿using Franz.Common.Messaging.Messages;
+
+namespace Franz.Common.Messaging;
 
 public static class MessagePropertiesExtensions
 {

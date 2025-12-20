@@ -1,8 +1,8 @@
 ﻿using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Producer;
-using Franz.Common.Messaging;
 using Franz.Common.Messaging.AzureEventHubs.Infrastructure;
 using Franz.Common.Messaging.AzureEventHubs.Serialization;
+using Franz.Common.Messaging.Messages;
 
 namespace Franz.Common.Messaging.AzureEventHubs.Producers;
 

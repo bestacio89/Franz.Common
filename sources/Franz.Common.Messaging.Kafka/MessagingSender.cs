@@ -1,8 +1,8 @@
 ﻿#nullable enable
 using Confluent.Kafka;
 using Franz.Common.Errors;
-using Franz.Common.Messaging;
 using Franz.Common.Messaging.Headers;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Logging;
 using System.Text;

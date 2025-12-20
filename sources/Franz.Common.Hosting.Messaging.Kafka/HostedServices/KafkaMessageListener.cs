@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
