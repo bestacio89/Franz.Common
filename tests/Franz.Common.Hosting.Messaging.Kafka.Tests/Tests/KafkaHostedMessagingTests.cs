@@ -6,6 +6,7 @@ using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using static Franz.Common.Mediator.Dispatchers.DispatchingStrategies;
 
 public sealed class KafkaHostedMessagingTests
   : IClassFixture<KafkaHostingFixture>
@@ -52,7 +53,8 @@ public sealed class KafkaHostedMessagingTests
     var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
 
     // Act
-    await dispatcher.PublishNotificationAsync(new FaultToleranceTestEvent()); // IMPORTANT: PublishAsync (notification), not PublishEventAsync
+    await dispatcher.PublishNotificationAsync(new FaultToleranceTestEvent(),
+  errorHandling: NotificationErrorHandling.ContinueOnError); // IMPORTANT: PublishAsync (notification), not PublishEventAsync
 
     // Assert
     var received = await FaultToleranceProbe.WaitAsync(TimeSpan.FromSeconds(2));

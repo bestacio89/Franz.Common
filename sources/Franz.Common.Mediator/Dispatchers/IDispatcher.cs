@@ -26,7 +26,7 @@ public interface IDispatcher
     TNotification notification,
     CancellationToken cancellationToken = default,
     PublishStrategy strategy = PublishStrategy.Sequential,
-    NotificationErrorHandling errorHandling = NotificationErrorHandling.StopOnFirstFailure)
+    NotificationErrorHandling errorHandling = NotificationErrorHandling.ContinueOnError)
     where TNotification : INotification;
 
   // NEW: Generic event publishing
