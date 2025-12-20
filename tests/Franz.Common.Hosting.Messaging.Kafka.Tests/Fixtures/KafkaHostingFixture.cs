@@ -23,11 +23,14 @@ public sealed class KafkaHostingFixture
 
   protected override IHost BuildHost(KafkaContainer container)
   {
+    // 🔑 UNIQUE GROUP PER FIXTURE INSTANCE
+    var groupId = $"franz-test-group-{Guid.NewGuid():N}";
+
     var configuration = new ConfigurationBuilder()
       .AddInMemoryCollection(new Dictionary<string, string?>
       {
         ["Messaging:BootStrapServers"] = container.GetBootstrapAddress(),
-        ["Messaging:GroupID"] = "franz-test-group"
+        ["Messaging:GroupID"] = groupId
       })
       .Build();
 
@@ -40,19 +43,19 @@ public sealed class KafkaHostingFixture
         // Mediator (handlers live in test assembly)
         services.AddFranzMediator(new[]
         {
-        typeof(KafkaHostingFixture).Assembly
+          typeof(KafkaHostingFixture).Assembly
         });
 
         // Kafka transport (producer, serializers, etc.)
         services.AddKafkaMessaging(configuration);
 
-        // Native Kafka consumer
+        // Native Kafka consumer (SAME group id)
         services.AddSingleton<IConsumer<string, string>>(_ =>
         {
           var consumerConfig = new ConsumerConfig
           {
             BootstrapServers = container.GetBootstrapAddress(),
-            GroupId = "franz-test-group",
+            GroupId = groupId,
             AutoOffsetReset = AutoOffsetReset.Earliest,
             EnableAutoCommit = true
           };
@@ -71,5 +74,4 @@ public sealed class KafkaHostingFixture
       })
       .Build();
   }
-
 }
