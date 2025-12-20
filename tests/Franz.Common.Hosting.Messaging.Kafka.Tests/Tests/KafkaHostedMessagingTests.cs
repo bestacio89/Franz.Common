@@ -44,25 +44,39 @@ public sealed class KafkaHostedMessagingTests
 
 
   [Fact]
-  public async Task Kafka_hosted_listener_continues_when_one_handler_fails()
+  public async Task IntegrationEvent_notification_does_not_fail_when_one_handler_throws()
   {
-    // Arrange
     FaultToleranceProbe.Reset();
 
     using var scope = _fixture.Services.CreateScope();
-
-    var publisher = scope.ServiceProvider
-      .GetRequiredService<IMessagingPublisher>();
+    var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
 
     // Act
-    await publisher.Publish(
-      new FaultToleranceTestEvent());
+    await dispatcher.PublishAsync(new FaultToleranceTestEvent()); // IMPORTANT: PublishAsync (notification), not PublishEventAsync
 
     // Assert
-    var received = await FaultToleranceProbe
-      .WaitAsync(TimeSpan.FromSeconds(2));
-
+    var received = await FaultToleranceProbe.WaitAsync(TimeSpan.FromSeconds(2));
     received.Should().Be("boom");
+  }
+
+  [Fact]
+  public async Task Kafka_listener_keeps_consuming_after_handler_failure()
+  {
+    FaultToleranceProbe.Reset();
+    MultiHandlerProbe.Reset();
+
+    using var scope = _fixture.Services.CreateScope();
+    var publisher = scope.ServiceProvider.GetRequiredService<IMessagingPublisher>();
+
+    // 1) publish message that will cause one handler to throw
+    await publisher.Publish(new FaultToleranceTestEvent()); // faulty handler throws
+
+    // 2) publish a second message that must still be processed
+    await publisher.Publish(new FanoutTestEvent2("still-alive"));
+
+    // Assert: second message processed even after failure
+    await MultiHandlerProbe.WaitAsync(TimeSpan.FromSeconds(10));
+    MultiHandlerProbe.Count.Should().Be(2);
   }
 
 
