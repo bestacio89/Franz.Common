@@ -1,21 +1,27 @@
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Headers;
+using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Messaging.Messages;
 
 public class Message : INotification
 {
   public Message() { }
-  public Message(string messageBody) { }
+
+  public Message(string messageBody)
+  {
+    Body = messageBody;
+  }
 
   public Message(string? body, IDictionary<string, IReadOnlyCollection<string>> dictionary)
   {
     Body = body;
+    // If you're keeping this ctor, actually use the param:
+    foreach (var kv in dictionary)
+      Headers[kv.Key] = new StringValues(kv.Value.ToArray());
   }
 
-  public Message(
-    string? body,
-    MessageHeaders headers)
+  public Message(string? body, MessageHeaders headers)
   {
     Body = body;
     Headers = headers;

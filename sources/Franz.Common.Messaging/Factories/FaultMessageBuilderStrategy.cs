@@ -24,6 +24,7 @@ public sealed class ExecutionFaultMessageBuilderStrategy
 
     var message = new Message(body)
     {
+      Body = body,
       Kind = MessageKind.Fault,
       MessageType = nameof(ExecutionFault)
     };

@@ -21,7 +21,11 @@ public sealed class IntegrationEventMessageBuilderStrategy
         integrationEvent,
         FranzJson.Default);
 
-    var message = new Message(body);
+    var message = new Message(body)
+    {
+      Body = body,
+      Kind = MessageKind.IntegrationEvent
+    };
 
     var className = HeaderNamer.GetEventClassName(value.GetType());
 

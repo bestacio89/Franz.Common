@@ -19,6 +19,7 @@ public sealed class CommandMessageBuilderStrategy
 
     var message = new Message(body)
     {
+      Body = body,
       Kind = MessageKind.Command
     };
 

@@ -36,7 +36,8 @@ public sealed class QueryMessageBuilderStrategy : IMessageBuilderStrategy
 
       var message = new Message(body)
     {
-      Kind = MessageKind.Query
+        Body = body,
+        Kind = MessageKind.Query
     };
     // Logical message identity
     var className = HeaderNamer.GetEventClassName(value.GetType());
