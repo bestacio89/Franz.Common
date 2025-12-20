@@ -11,15 +11,18 @@ public sealed class KafkaMessageListener : IListener
   private readonly IConsumer<string, string> _consumer;
   private readonly ILogger<KafkaMessageListener> _logger;
   private readonly string[] _topics;
+  private readonly bool _awaitHandlers;
 
   public KafkaMessageListener(
       IConsumer<string, string> consumer,
       IEnumerable<string> topics,
-      ILogger<KafkaMessageListener> logger)
+      ILogger<KafkaMessageListener> logger,
+      bool awaitHandlers = false) // 🔥 prod = fire-and-forget, tests = true
   {
     _consumer = consumer;
     _topics = topics.ToArray();
     _logger = logger;
+    _awaitHandlers = awaitHandlers;
   }
 
   public event EventHandler<MessageEventArgs>? Received;
@@ -27,7 +30,10 @@ public sealed class KafkaMessageListener : IListener
   public async Task Listen(CancellationToken stoppingToken = default)
   {
     _consumer.Subscribe(_topics);
-    _logger.LogInformation("🎧 Kafka listener subscribed to {Topics}", string.Join(",", _topics));
+    _logger.LogInformation(
+      "🎧 Kafka listener subscribed to {Topics} (AwaitHandlers={Await})",
+      string.Join(",", _topics),
+      _awaitHandlers);
 
     try
     {
@@ -80,28 +86,53 @@ public sealed class KafkaMessageListener : IListener
             .Cast<EventHandler<MessageEventArgs>>()
             .ToArray();
 
-          foreach (var handler in handlers)
+          if (_awaitHandlers)
           {
-            // 🔥 FIRE-AND-FORGET boundary
-            _ = Task.Run(() =>
+            // 🧪 TEST MODE — deterministic execution
+            var tasks = handlers.Select(handler =>
+              Task.Run(() =>
+              {
+                try
+                {
+                  handler(this, new MessageEventArgs(transport));
+                }
+                catch (Exception ex)
+                {
+                  _logger.LogError(
+                    ex,
+                    "🔥 Kafka handler failed for message {MessageId} on topic {Topic}",
+                    transport.Id,
+                    result.Topic);
+                }
+              }, stoppingToken));
+
+            await Task.WhenAll(tasks);
+          }
+          else
+          {
+            // 🚀 PROD MODE — fire-and-forget
+            foreach (var handler in handlers)
             {
-              try
+              _ = Task.Run(() =>
               {
-                handler(this, new MessageEventArgs(transport));
-              }
-              catch (Exception ex)
-              {
-                _logger.LogError(
-                  ex,
-                  "🔥 Kafka handler failed for message {MessageId} on topic {Topic}",
-                  transport.Id,
-                  result.Topic);
-              }
-            }, stoppingToken);
+                try
+                {
+                  handler(this, new MessageEventArgs(transport));
+                }
+                catch (Exception ex)
+                {
+                  _logger.LogError(
+                    ex,
+                    "🔥 Kafka handler failed for message {MessageId} on topic {Topic}",
+                    transport.Id,
+                    result.Topic);
+                }
+              }, stoppingToken);
+            }
           }
         }
 
-        // ✅ Commit immediately after dispatch
+        // ✅ Commit AFTER dispatch (but not after completion in prod)
         _consumer.Commit(result);
       }
     }
@@ -111,7 +142,6 @@ public sealed class KafkaMessageListener : IListener
       _logger.LogInformation("🛑 Kafka listener stopped");
     }
   }
-
 
   public void StopListen() => _consumer.Unsubscribe();
 }
