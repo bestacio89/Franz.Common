@@ -8,27 +8,26 @@ using System.Text.Json;
 namespace Franz.Common.Messaging.Factories;
 
 public sealed class CommandMessageBuilderStrategy
-    : IMessageBuilderStrategy
+  : IMessageBuilderStrategy
 {
   public bool CanBuild(object value)
-      => value is ICommand;
+    => value is ICommand;
 
   public Message Build(object value)
   {
-    var command = (ICommand)value;
+    var body = JsonSerializer.Serialize(value, FranzJson.Default);
 
-    var body = JsonSerializer.Serialize(
-        command,
-        FranzJson.Default);
-
-    var message = new Message(body);
-
-    var className = HeaderNamer.GetEventClassName(value.GetType());
+    var message = new Message(body)
+    {
+      Kind = MessageKind.Command
+    };
 
     message.Headers.Add(
-        MessagingConstants.ClassName,
-        new StringValues(className));
+      MessagingConstants.ClassName,
+      new StringValues(HeaderNamer.GetEventClassName(value.GetType()))
+    );
 
     return message;
   }
 }
+

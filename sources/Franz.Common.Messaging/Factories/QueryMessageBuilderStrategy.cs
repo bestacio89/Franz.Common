@@ -34,8 +34,10 @@ public sealed class QueryMessageBuilderStrategy : IMessageBuilderStrategy
       value,
       FranzJson.Default);
 
-    var message = new Message(body);
-
+      var message = new Message(body)
+    {
+      Kind = MessageKind.Query
+    };
     // Logical message identity
     var className = HeaderNamer.GetEventClassName(value.GetType());
 

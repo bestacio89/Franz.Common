@@ -22,7 +22,11 @@ public sealed class ExecutionFaultMessageBuilderStrategy
 
     var body = JsonSerializer.Serialize(fault, FranzJson.Default);
 
-    var message = new Message(body);
+    var message = new Message(body)
+    {
+      Kind = MessageKind.Fault,
+      MessageType = nameof(ExecutionFault)
+    };
 
     message.Headers.Add(
         MessagingConstants.ClassName,

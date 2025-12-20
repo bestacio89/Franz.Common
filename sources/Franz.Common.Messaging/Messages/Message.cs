@@ -31,6 +31,12 @@ public class Message : INotification
   /// </summary>
   public virtual string? Body { get; set; }
 
+
+  /// <summary>
+  /// Semantic kind of message (Command / Query / Event / Fault).
+  /// </summary>
+  public MessageKind Kind { get; set; } = MessageKind.Command;
+
   /// <summary>
   /// Transport-agnostic headers.
   /// Owned by the messaging core.
