@@ -61,6 +61,7 @@ public sealed class KafkaHostedMessagingTests
     received.Should().Be("boom");
   }
 
+
   [Fact]
   public async Task Kafka_listener_keeps_consuming_after_handler_failure()
   {
@@ -71,7 +72,10 @@ public sealed class KafkaHostedMessagingTests
     var publisher = scope.ServiceProvider.GetRequiredService<IMessagingPublisher>();
 
     // 1) publish message that will cause one handler to throw
-    await publisher.Publish(new FaultToleranceTestEvent()); // faulty handler throws
+    await publisher.Publish(new FaultToleranceTestEvent());
+
+    // 🔴 WAIT until the failure has been observed
+    await FaultToleranceProbe.WaitAsync(TimeSpan.FromSeconds(5));
 
     // 2) publish a second message that must still be processed
     await publisher.Publish(new FanoutTestEvent2("still-alive"));
@@ -80,6 +84,7 @@ public sealed class KafkaHostedMessagingTests
     await MultiHandlerProbe.WaitAsync(TimeSpan.FromSeconds(10));
     MultiHandlerProbe.Count.Should().Be(2);
   }
+
 
 
 
