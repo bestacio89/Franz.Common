@@ -132,103 +132,144 @@ namespace Franz.Common.Mediator.Dispatchers
     // -------------------- NOTIFICATIONS --------------------
 
     public Task PublishAsync<TNotification>(
-    TNotification notification,
-    CancellationToken cancellationToken = default,
-    PublishStrategy strategy = PublishStrategy.Sequential,
-    // ✅ Distributed-first default: don’t let one handler kill the notification fanout
-    NotificationErrorHandling errorHandling = NotificationErrorHandling.ContinueOnError)
-    where TNotification : INotification
+       TNotification notification,
+       CancellationToken cancellationToken = default,
+       PublishStrategy strategy = PublishStrategy.Sequential,
+       NotificationErrorHandling errorHandling = NotificationErrorHandling.ContinueOnError)
+       where TNotification : INotification
     {
       return ExecuteWithObservability(notification, async () =>
       {
-        var handlers = _serviceProvider.GetService<IEnumerable<INotificationHandler<TNotification>>>()
-                      ?? Array.Empty<INotificationHandler<TNotification>>();
+        try
+        {
+          var handlers = _serviceProvider
+            .GetService<IEnumerable<INotificationHandler<TNotification>>>()
+            ?? Enumerable.Empty<INotificationHandler<TNotification>>();
 
-        // Materialize to avoid multiple enumeration / DI scope weirdness
-        var handlerList = handlers as IList<INotificationHandler<TNotification>> ?? handlers.ToList();
+          var handlerList = handlers as IList<INotificationHandler<TNotification>>
+                            ?? handlers.ToList();
 
-        if (handlerList.Count == 0)
+          if (handlerList.Count == 0)
+            return (object?)null;
+
+          var pipelines = _serviceProvider
+            .GetServices<INotificationPipeline<TNotification>>()
+            .ToList();
+
+          var observers = _serviceProvider
+            .GetServices<IMediatorObserver>()
+            .ToList();
+
+          Func<INotificationHandler<TNotification>, Task> buildHandlerChain =
+            handler =>
+            {
+              Func<Task> next = () => handler.Handle(notification, cancellationToken);
+
+              foreach (var pipeline in pipelines.AsEnumerable().Reverse())
+              {
+                var current = next;
+                next = () => pipeline.Handle(notification, current, cancellationToken);
+              }
+
+              return next();
+            };
+
+          var correlationId = MediatorContext.Current.CorrelationId;
+
+          async Task InvokeOneHandlerAsync(INotificationHandler<TNotification> handler)
+          {
+            var handlerType = handler.GetType();
+            var start = DateTime.UtcNow;
+
+            await NotifyNotificationHandlerStarted(
+              notification!,
+              handlerType,
+              correlationId,
+              observers,
+              cancellationToken);
+
+            try
+            {
+              await buildHandlerChain(handler);
+
+              var duration = DateTime.UtcNow - start;
+
+              await NotifyNotificationHandlerCompleted(
+                notification!,
+                handlerType,
+                correlationId,
+                duration,
+                observers,
+                cancellationToken);
+            }
+            catch (Exception ex)
+            {
+              var duration = DateTime.UtcNow - start;
+
+              await NotifyNotificationHandlerFailed(
+                notification!,
+                handlerType,
+                correlationId,
+                ex,
+                duration,
+                observers,
+                cancellationToken);
+
+              // 🔴 STRICT MODE ONLY
+              if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
+                throw;
+            }
+          }
+
+          switch (strategy)
+          {
+            case PublishStrategy.Sequential:
+              foreach (var handler in handlerList)
+              {
+                await InvokeOneHandlerAsync(handler);
+              }
+              break;
+
+            case PublishStrategy.Parallel:
+              var tasks = handlerList
+                .Select(handler =>
+                  Task.Run(() => InvokeOneHandlerAsync(handler), cancellationToken))
+                .ToArray();
+
+              if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
+              {
+                // Fail-fast: any handler failure faults the publish
+                await Task.WhenAll(tasks);
+              }
+              else
+              {
+                // Best-effort: NEVER let Task.WhenAll fault the dispatcher
+                try
+                {
+                  await Task.WhenAll(tasks);
+                }
+                catch
+                {
+                  // intentionally swallowed — failures already observed
+                }
+              }
+              break;
+
+            default:
+              throw new ArgumentOutOfRangeException(nameof(strategy), strategy, null);
+          }
+
           return (object?)null;
-
-        var pipelines = _serviceProvider.GetServices<INotificationPipeline<TNotification>>().ToList();
-        var observers = _serviceProvider.GetServices<IMediatorObserver>().ToList();
-
-        Func<INotificationHandler<TNotification>, Task> buildHandlerChain =
-          handler =>
-          {
-            Func<Task> handlerDelegate = () => handler.Handle(notification, cancellationToken);
-
-            foreach (var pipeline in pipelines.AsEnumerable().Reverse())
-            {
-              var next = handlerDelegate;
-              handlerDelegate = () => pipeline.Handle(notification, next, cancellationToken);
-            }
-
-            return handlerDelegate();
-          };
-
-        var correlationId = MediatorContext.Current.CorrelationId;
-
-        async Task InvokeOneHandlerAsync(INotificationHandler<TNotification> handler)
-        {
-          var handlerType = handler.GetType();
-          var start = DateTime.UtcNow;
-
-          await NotifyNotificationHandlerStarted(notification!, handlerType, correlationId, observers, cancellationToken);
-
-          try
-          {
-            await buildHandlerChain(handler);
-
-            var duration = DateTime.UtcNow - start;
-            await NotifyNotificationHandlerCompleted(notification!, handlerType, correlationId, duration, observers, cancellationToken);
-          }
-          catch (Exception ex)
-          {
-            var duration = DateTime.UtcNow - start;
-            await NotifyNotificationHandlerFailed(notification!, handlerType, correlationId, ex, duration, observers, cancellationToken);
-
-            // ✅ Only strict mode stops the publish
-            if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
-              throw;
-          }
         }
-
-        switch (strategy)
+        catch when (errorHandling == NotificationErrorHandling.ContinueOnError)
         {
-          case PublishStrategy.Sequential:
-            foreach (var handler in handlerList)
-            {
-              // In ContinueOnFailure mode, exceptions are swallowed per handler in InvokeOneHandlerAsync
-              await InvokeOneHandlerAsync(handler);
-            }
-            break;
-
-          case PublishStrategy.Parallel:
-            // ✅ Key point: Task.WhenAll will throw if ANY task faults,
-            // even if we “handled” inside. So we swallow only in ContinueOnFailure mode.
-            var tasks = handlerList.Select(h => Task.Run(() => InvokeOneHandlerAsync(h), cancellationToken)).ToArray();
-
-            if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
-            {
-              // strict: first failure => fail the publish
-              await Task.WhenAll(tasks);
-            }
-            else
-            {
-              // resilient: best-effort fanout, never throw from PublishAsync
-              try { await Task.WhenAll(tasks); }
-              catch { /* swallowed by design; observers already captured failures */ }
-            }
-            break;
-
-          default:
-            throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown publish strategy.");
+          // 🛡️ ABSOLUTE SAFETY NET
+          // No notification must EVER fault the outer dispatcher task
+          return (object?)null;
         }
-
-        return (object?)null;
       }, cancellationToken);
     }
+
 
     // -------------------- EVENTS --------------------
 
