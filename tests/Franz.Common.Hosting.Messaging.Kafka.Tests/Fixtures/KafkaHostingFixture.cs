@@ -49,6 +49,20 @@ public sealed class KafkaHostingFixture
         // Kafka transport (producer, serializers, etc.)
         services.AddKafkaMessaging(configuration);
 
+        services.AddSingleton<IHostedService>(sp =>
+        {
+          return new KafkaTestTopicInitializer(
+            container.GetBootstrapAddress(),
+            topics: new[]
+            {
+      "FaultToleranceTestEvent",
+      "FanoutTestEvent2",
+      "FanoutTestEvent",
+      "TestEvent"
+            });
+        });
+
+
         // Native Kafka consumer (SAME group id)
         services.AddSingleton<IConsumer<string, string>>(_ =>
         {
@@ -58,6 +72,7 @@ public sealed class KafkaHostingFixture
             GroupId = groupId,
             AutoOffsetReset = AutoOffsetReset.Earliest,
             EnableAutoCommit = true
+           
           };
 
           return new ConsumerBuilder<string, string>(consumerConfig)
@@ -71,7 +86,9 @@ public sealed class KafkaHostingFixture
 
         // 🔥 Hosted service that actually runs the listener
         services.AddHostedService<KafkaHostedService>();
+
       })
+
       .Build();
   }
 }
