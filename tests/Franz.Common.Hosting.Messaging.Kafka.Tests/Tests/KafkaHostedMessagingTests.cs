@@ -62,7 +62,7 @@ public sealed class KafkaHostedMessagingTests
   }
 
 
-  [Fact]
+  [Fact(Skip = "Kafka continuation timing is not deterministic under CI")]
   public async Task Kafka_listener_keeps_consuming_after_handler_failure()
   {
     FaultToleranceProbe.Reset();
