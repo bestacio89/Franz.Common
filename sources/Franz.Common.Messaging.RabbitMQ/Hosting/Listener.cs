@@ -1,5 +1,6 @@
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Hosting;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Messaging.RabbitMQ.Replay;
 using Franz.Common.Reflection;
