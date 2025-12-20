@@ -38,7 +38,7 @@ public sealed class MessagingPublisher : IMessagingPublisher
     var message = messageFactory.Build(integrationEvent);
 
     // Run mediator pipeline (notifications must NOT fail the system)
-    await dispatcher.PublishAsync(message);
+    await dispatcher.PublishNotificationAsync(message);
 
     // Delegate transport publishing
     await sender.SendAsync(message);

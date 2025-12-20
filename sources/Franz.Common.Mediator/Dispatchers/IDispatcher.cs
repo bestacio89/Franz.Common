@@ -22,7 +22,7 @@ public interface IDispatcher
 
   // 🔹 NEW: Overload for notifications (includes DomainEvents, IntegrationEvents, etc.)
 
-  public Task PublishAsync<TNotification>(
+  public Task PublishNotificationAsync<TNotification>(
     TNotification notification,
     CancellationToken cancellationToken = default,
     PublishStrategy strategy = PublishStrategy.Sequential,

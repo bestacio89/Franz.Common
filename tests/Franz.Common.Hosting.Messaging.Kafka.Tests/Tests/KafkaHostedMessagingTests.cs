@@ -52,7 +52,7 @@ public sealed class KafkaHostedMessagingTests
     var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
 
     // Act
-    await dispatcher.PublishAsync(new FaultToleranceTestEvent()); // IMPORTANT: PublishAsync (notification), not PublishEventAsync
+    await dispatcher.PublishNotificationAsync(new FaultToleranceTestEvent()); // IMPORTANT: PublishAsync (notification), not PublishEventAsync
 
     // Assert
     var received = await FaultToleranceProbe.WaitAsync(TimeSpan.FromSeconds(2));
