@@ -2,6 +2,7 @@ using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Errors;
 using Franz.Common.Headers;
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Properties;
 using Microsoft.Extensions.Configuration;
@@ -19,6 +20,20 @@ public static class ServiceCollectionExtensions
 
     return services;
   }
+
+
+  public static IServiceCollection AddMessagingFactories(this IServiceCollection services)
+  {
+    services.AddNoDuplicateSingleton<IMessageFactory, MessageFactory>();
+
+    services.AddNoDuplicateSingleton<IMessageBuilderStrategy, CommandMessageBuilderStrategy>();
+    services.AddNoDuplicateSingleton<IMessageBuilderStrategy, QueryMessageBuilderStrategy>();
+    services.AddNoDuplicateSingleton<IMessageBuilderStrategy, IntegrationEventMessageBuilderStrategy>();
+    services.AddNoDuplicateSingleton<IMessageBuilderStrategy, ExecutionFaultMessageBuilderStrategy>();
+
+    return services;
+  }
+
 
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
   public static IServiceCollection AddMessagingOptions(this IServiceCollection services, IConfiguration? configuration)

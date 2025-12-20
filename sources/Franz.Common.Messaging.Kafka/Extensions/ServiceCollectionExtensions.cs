@@ -100,6 +100,7 @@ public static class ServiceCollectionExtensions
   public static IServiceCollection AddKafkaMessagingConfiguration(this IServiceCollection services, IConfiguration? configuration)
   {
     services
+      .AddMessagingFactories()
       .AddMessagingOptions(configuration)
       .AddOnlyHighLifetimeModelProvider(ServiceLifetime.Scoped)
       .AddNoDuplicateSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>()
