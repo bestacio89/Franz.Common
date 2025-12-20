@@ -132,16 +132,23 @@ namespace Franz.Common.Mediator.Dispatchers
     // -------------------- NOTIFICATIONS --------------------
 
     public Task PublishAsync<TNotification>(
-        TNotification notification,
-        CancellationToken cancellationToken = default,
-        PublishStrategy strategy = PublishStrategy.Sequential,
-        NotificationErrorHandling errorHandling = NotificationErrorHandling.StopOnFirstFailure)
-        where TNotification : INotification
+    TNotification notification,
+    CancellationToken cancellationToken = default,
+    PublishStrategy strategy = PublishStrategy.Sequential,
+    // ✅ Distributed-first default: don’t let one handler kill the notification fanout
+    NotificationErrorHandling errorHandling = NotificationErrorHandling.ContinueOnError)
+    where TNotification : INotification
     {
       return ExecuteWithObservability(notification, async () =>
       {
         var handlers = _serviceProvider.GetService<IEnumerable<INotificationHandler<TNotification>>>()
                       ?? Array.Empty<INotificationHandler<TNotification>>();
+
+        // Materialize to avoid multiple enumeration / DI scope weirdness
+        var handlerList = handlers as IList<INotificationHandler<TNotification>> ?? handlers.ToList();
+
+        if (handlerList.Count == 0)
+          return (object?)null;
 
         var pipelines = _serviceProvider.GetServices<INotificationPipeline<TNotification>>().ToList();
         var observers = _serviceProvider.GetServices<IMediatorObserver>().ToList();
@@ -162,61 +169,61 @@ namespace Franz.Common.Mediator.Dispatchers
 
         var correlationId = MediatorContext.Current.CorrelationId;
 
+        async Task InvokeOneHandlerAsync(INotificationHandler<TNotification> handler)
+        {
+          var handlerType = handler.GetType();
+          var start = DateTime.UtcNow;
+
+          await NotifyNotificationHandlerStarted(notification!, handlerType, correlationId, observers, cancellationToken);
+
+          try
+          {
+            await buildHandlerChain(handler);
+
+            var duration = DateTime.UtcNow - start;
+            await NotifyNotificationHandlerCompleted(notification!, handlerType, correlationId, duration, observers, cancellationToken);
+          }
+          catch (Exception ex)
+          {
+            var duration = DateTime.UtcNow - start;
+            await NotifyNotificationHandlerFailed(notification!, handlerType, correlationId, ex, duration, observers, cancellationToken);
+
+            // ✅ Only strict mode stops the publish
+            if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
+              throw;
+          }
+        }
+
         switch (strategy)
         {
           case PublishStrategy.Sequential:
-            foreach (var handler in handlers)
+            foreach (var handler in handlerList)
             {
-              var handlerType = handler.GetType();
-              var start = DateTime.UtcNow;
-
-              await NotifyNotificationHandlerStarted(notification!, handlerType, correlationId, observers, cancellationToken);
-
-              try
-              {
-                await buildHandlerChain(handler);
-
-                var duration = DateTime.UtcNow - start;
-                await NotifyNotificationHandlerCompleted(notification!, handlerType, correlationId, duration, observers, cancellationToken);
-              }
-              catch (Exception ex)
-              {
-                var duration = DateTime.UtcNow - start;
-                await NotifyNotificationHandlerFailed(notification!, handlerType, correlationId, ex, duration, observers, cancellationToken);
-
-                if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
-                  throw;
-              }
+              // In ContinueOnFailure mode, exceptions are swallowed per handler in InvokeOneHandlerAsync
+              await InvokeOneHandlerAsync(handler);
             }
             break;
 
           case PublishStrategy.Parallel:
-            var tasks = handlers.Select(async handler =>
+            // ✅ Key point: Task.WhenAll will throw if ANY task faults,
+            // even if we “handled” inside. So we swallow only in ContinueOnFailure mode.
+            var tasks = handlerList.Select(h => Task.Run(() => InvokeOneHandlerAsync(h), cancellationToken)).ToArray();
+
+            if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
             {
-              var handlerType = handler.GetType();
-              var start = DateTime.UtcNow;
-
-              await NotifyNotificationHandlerStarted(notification!, handlerType, correlationId, observers, cancellationToken);
-
-              try
-              {
-                await buildHandlerChain(handler);
-
-                var duration = DateTime.UtcNow - start;
-                await NotifyNotificationHandlerCompleted(notification!, handlerType, correlationId, duration, observers, cancellationToken);
-              }
-              catch (Exception ex)
-              {
-                var duration = DateTime.UtcNow - start;
-                await NotifyNotificationHandlerFailed(notification!, handlerType, correlationId, ex, duration, observers, cancellationToken);
-
-                if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
-                  throw;
-              }
-            });
-
-            await Task.WhenAll(tasks);
+              // strict: first failure => fail the publish
+              await Task.WhenAll(tasks);
+            }
+            else
+            {
+              // resilient: best-effort fanout, never throw from PublishAsync
+              try { await Task.WhenAll(tasks); }
+              catch { /* swallowed by design; observers already captured failures */ }
+            }
             break;
+
+          default:
+            throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown publish strategy.");
         }
 
         return (object?)null;
