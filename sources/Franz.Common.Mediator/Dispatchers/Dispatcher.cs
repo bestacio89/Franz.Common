@@ -132,13 +132,13 @@ namespace Franz.Common.Mediator.Dispatchers
     // -------------------- NOTIFICATIONS --------------------
 
     public async Task PublishNotificationAsync<TNotification>(
-   TNotification notification,
-   CancellationToken cancellationToken = default,
-   PublishStrategy strategy = PublishStrategy.Sequential,
-   NotificationErrorHandling errorHandling = NotificationErrorHandling.ContinueOnError)
-   where TNotification : INotification
+  TNotification notification,
+  CancellationToken cancellationToken = default,
+  PublishStrategy strategy = PublishStrategy.Sequential,
+  NotificationErrorHandling errorHandling = NotificationErrorHandling.ContinueOnError)
+  where TNotification : INotification
     {
-      // 🔐 STRICT MODE: propagate failures
+      // STRICT MODE: propagate failures
       if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
       {
         await ExecuteWithObservability(
@@ -146,36 +146,30 @@ namespace Franz.Common.Mediator.Dispatchers
           () => PublishNotificationCore(
             notification,
             cancellationToken,
-            strategy),
+            strategy,
+            errorHandling),
           cancellationToken);
 
         return;
       }
 
-      // 🛡️ BEST-EFFORT MODE: observe but never propagate
-      try
-      {
-        await ExecuteWithObservabilitySafe(
+      // BEST-EFFORT MODE: observe but never propagate
+      await ExecuteWithObservabilitySafe(
+        notification,
+        () => PublishNotificationCore(
           notification,
-          () => PublishNotificationCore(
-            notification,
-            cancellationToken,
-            strategy),
-          cancellationToken);
-      }
-      catch
-      {
-        // Intentionally swallowed:
-        // - Observability already recorded the failure
-        // - Notifications / IntegrationEvents must never fault the dispatcher
-      }
+          cancellationToken,
+          strategy,
+          errorHandling),
+        cancellationToken);
     }
 
     private async Task<object?> PublishNotificationCore<TNotification>(
-  TNotification notification,
-  CancellationToken cancellationToken,
-  PublishStrategy strategy)
-  where TNotification : INotification
+      TNotification notification,
+      CancellationToken cancellationToken,
+      PublishStrategy strategy,
+      NotificationErrorHandling errorHandling)
+      where TNotification : INotification
     {
       var handlers = _serviceProvider
         .GetService<IEnumerable<INotificationHandler<TNotification>>>()
@@ -250,8 +244,11 @@ namespace Franz.Common.Mediator.Dispatchers
             observers,
             cancellationToken);
 
-          // 🔥 ALWAYS rethrow — policy handled outside
-          throw;
+          // ✅ The *policy* is enforced here (per handler)
+          if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
+            throw;
+
+          // ContinueOnError => swallow and keep going
         }
       }
 
@@ -263,11 +260,28 @@ namespace Franz.Common.Mediator.Dispatchers
           break;
 
         case PublishStrategy.Parallel:
-          var tasks = handlerList
-            .Select(h => Task.Run(() => InvokeOneHandlerAsync(h), cancellationToken))
-            .ToArray();
+          if (errorHandling == NotificationErrorHandling.StopOnFirstFailure)
+          {
+            // fail-fast: bubble out
+            var strictTasks = handlerList
+              .Select(h => InvokeOneHandlerAsync(h))
+              .ToArray();
 
-          await Task.WhenAll(tasks);
+            await Task.WhenAll(strictTasks);
+          }
+          else
+          {
+            // best-effort: never fault
+            var tasks = handlerList
+              .Select(async h =>
+              {
+                try { await InvokeOneHandlerAsync(h); }
+                catch { /* unreachable in ContinueOnError, but extra safety */ }
+              })
+              .ToArray();
+
+            await Task.WhenAll(tasks);
+          }
           break;
 
         default:
