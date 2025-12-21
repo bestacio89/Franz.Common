@@ -39,7 +39,7 @@ public class RabbitMqMessageModelTests
     services.AddFranzMediator(new[]{
           typeof(TestIntegrationEvent).Assembly});
     services.AddRabbitMQMessaging(config);
-
+    services. AddSingleton<IRabbitMqMessageModel, RabbitMqMessageModel>();
     using var provider = services.BuildServiceProvider();
     using var scope = provider.CreateScope();
 

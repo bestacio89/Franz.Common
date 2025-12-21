@@ -138,7 +138,7 @@ public class RabbitMQHostingExtensionsTests
     services.AddMongoMessageStore(
       connectionString: _mongo.ConnectionString,
       dbName: _mongo.DatabaseName);
-
+    services.AddLogging();
     services.AddFranzMediator(new[]
     {
       typeof(TestIntegrationEvent).Assembly
