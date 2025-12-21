@@ -904,3 +904,115 @@ This release consolidates and stabilizes the messaging architecture introduced i
 This release is a **stability and correctness milestone**, preparing the Franz messaging stack for large-scale, multi-transport production workloads.
 
 ---
+
+# 📦 Franz.Common.Messaging.RabbitMQ — v1.7.2
+
+## 🚀 Overview
+
+Version **1.7.2** focuses on **correctness, determinism, and production-grade reliability** of the RabbitMQ transport layer.
+
+This release completes the RabbitMQ stack by:
+
+* fixing async channel creation issues introduced by RabbitMQ.Client 7.x,
+* closing the DI graph for hosted listeners and publishers,
+* aligning RabbitMQ behavior with Kafka semantics already present in Franz,
+* and validating everything against **real infrastructure** using Testcontainers (RabbitMQ + MongoDB).
+
+No breaking architectural changes — only **hardening, correctness, and full infrastructure wiring**.
+
+---
+
+## ✅ Added
+
+### 🧱 Full RabbitMQ Infrastructure Wiring
+
+* Added **complete RabbitMQ messaging infrastructure registration** for:
+
+  * publishers
+  * consumers
+  * hosted listeners
+* Ensured `AddRabbitMQMessaging(...)` provides **all required transport dependencies** consistently across applications and tests.
+
+### 📦 Inbox / Outbox Support (MongoDB)
+
+* Integrated **MongoDB-backed Inbox and Outbox stores** for RabbitMQ:
+
+  * `MongoInboxStore`
+  * `MongoMessageStore`
+* Enabled **exactly-once / at-least-once delivery semantics** with replay safety.
+* Fully validated against **real MongoDB containers** in integration tests.
+
+### 🧪 Infrastructure-Level Integration Tests
+
+* Added **full RabbitMQ hosted service test suite** using Testcontainers.
+* Tests now validate:
+
+  * host startup & shutdown
+  * listener lifecycle
+  * outbox polling
+  * real message publication
+* No mocks, no fakes — **real RabbitMQ + real MongoDB**.
+
+---
+
+## 🔧 Fixed
+
+### 🐇 RabbitMQ 7.x Async Channel Creation
+
+* Fixed incorrect casting of `CreateChannelAsync()` results.
+* Ensured **proper async channel creation and reuse** across:
+
+  * `ModelProvider`
+  * `RabbitMqMessageModel`
+* Eliminated runtime `InvalidCastException` caused by mixing sync/async APIs.
+
+### 🔌 Dependency Injection Graph Closure
+
+* Fixed missing DI registrations that caused runtime host failures:
+
+  * `IAssemblyAccessor`
+  * messaging initializer dependencies
+  * message builder strategies
+* Ensured **hosted services can start deterministically** without hidden dependencies.
+
+### 🧠 Messaging Builder Strategies Registration
+
+* Registered all **message builder strategies** as part of RabbitMQ messaging infrastructure.
+* Fixed cases where `MessageFactory` could not resolve a builder for integration events.
+* Aligns RabbitMQ behavior with Kafka transport expectations.
+
+### 🔄 Hosted Listener Wiring
+
+* Corrected hosted service registration so listeners **always receive full messaging infrastructure**.
+* Prevented partial wiring that previously caused startup failures.
+
+---
+
+## 🧪 Tests
+
+* RabbitMQ messaging now has **100% passing integration tests**.
+* Tests cover:
+
+  * publishing
+  * consuming
+  * hosted services
+  * outbox processing
+  * inbox deduplication
+* All tests run against **real containers**, not mocks.
+
+---
+
+## 🧠 Architectural Notes
+
+* No breaking changes to public APIs.
+* No behavioral divergence between Kafka and RabbitMQ transports.
+* Messaging remains:
+
+  * transport-agnostic
+  * database-agnostic
+  * deterministic
+* RabbitMQ is now a **first-class citizen** in the Franz messaging ecosystem.
+
+---
+
+

@@ -1,20 +1,21 @@
-﻿# 📝 **README Section for `Franz.Common.Messaging.RabbitMQ` (v1.6.2)**
+﻿# Franz.Common.Messaging.RabbitMQ
 
-````markdown
-# Franz.Common.Messaging.RabbitMQ
+Franz now speaks **RabbitMQ**.  
+The same architectural contract used for Kafka applies here — **one pipeline, one model, zero spaghetti**.
 
-Franzchitecture now speaks RabbitMQ.  
-The same architectural creed that powers Kafka applies here — one contract, one pipeline, zero spaghetti.
+RabbitMQ is just a transport. Franz does the rest.
+
+---
 
 ## 🚀 Getting Started
 
-Install the NuGet package:
+Install the package:
 
 ```bash
 dotnet add package Franz.Common.Messaging.RabbitMQ
-````
+```
 
-Register RabbitMQ messaging in your service container:
+Register RabbitMQ messaging:
 
 ```csharp
 using Franz.Common.Messaging.RabbitMQ.Extensions;
@@ -25,31 +26,66 @@ public void ConfigureServices(IServiceCollection services, IConfiguration config
 }
 ```
 
+---
+
 ## 📦 Features
 
-* **Publisher & Sender** wired via DI (`IMessagingPublisher`, `IMessagingSender`)
-* **Consumer** as a hosted listener (`IListener`)
-* **Transactions** (`IMessagingTransaction`)
-* **Replay Strategies** (default: `NoReplayStrategy`, extensible)
-* **Message Context Accessor** for scoped metadata
-* **Enforced lifetimes** via `AddOnlyHighLifetimeModelProvider` to prevent misconfigurations
-* **No duplicates** — registrations protected against accidental overrides
+- **Publisher & Sender** via DI (`IMessagingPublisher`, `IMessagingSender`)
+- **Consumers** as hosted listeners
+- **Inbox / Outbox** support (MongoDB-backed)
+- **Transactional publishing** (`IMessagingTransaction`)
+- **Replay strategies** (default + extensible)
+- **Message context accessor** for scoped metadata
+- **Enforced lifetimes** to prevent invalid wiring
+- **Duplicate-safe DI registration**
+
+Kafka and RabbitMQ share the **exact same messaging semantics** in Franz.
+
+---
 
 ## ⚖️ Philosophy
 
-> *“We don’t care about MQ. We make it work anyway.
-> Just pick what hill you want to die on.”*
+> *“We don’t care about MQ.  
+> We make it behave.”*
 
-Franz abstracts away broker-specific plumbing. Whether you pick **Kafka** or **RabbitMQ**,
-your code stays clean, enforced, and production-ready.
+Franz removes broker-specific complexity.  
+Choose **Kafka** or **RabbitMQ** — your application code does not change.
 
-
-**Current Version**: 1.7.01
 ---
 
-### Version 1.6.20
-- Updated to **.NET 10.0**
-- Improved dependency injection patterns for messaging services.
-- Enhanced documentation and usage examples.
-- Update to RabbitMQ client library to latest stable version.
-- Realligned messaging abstractions for better consistency across brokers.
+**Current Version**: **1.7.2**
+
+---
+
+## 🆕 v1.7.2 — Stability & Infrastructure Hardening
+
+This release finalizes RabbitMQ as a **first-class transport** in Franz.
+
+### ✔ Highlights
+
+- Fully wired **RabbitMQ infrastructure** (publisher, consumers, hosted services)
+- **Inbox & Outbox** validated with real MongoDB containers
+- RabbitMQ now behaves **identically to Kafka** at the abstraction level
+
+### 🔧 Improvements
+
+- Correct **RabbitMQ.Client 7.x async channel handling**
+- Closed all **DI wiring gaps** in hosted services and tests
+- All **message builder strategies** registered by default
+- Deterministic startup / shutdown behavior
+
+### 🧪 Reliability
+
+- Tested against **real RabbitMQ + MongoDB** using Testcontainers
+- No mocks. No shortcuts. Real brokers, real persistence.
+
+> **Result:** RabbitMQ is production-ready and battle-tested.
+
+---
+
+### v1.6.20
+
+- Migration to **.NET 10**
+- Improved messaging DI patterns
+- Updated RabbitMQ client
+- Alignment of messaging abstractions across transports

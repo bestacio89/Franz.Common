@@ -29,7 +29,7 @@ This package extends the polyglot persistence philosophy of the framework by ena
 
 ## **Version Information**
 
-* **Current Version**: 1.7.01
+* **Current Version**: 1.7.2
 * Part of the private **Franz Framework** ecosystem.
 * Extended capacities: Cosmos DB support introduced in 1.6.2.
 

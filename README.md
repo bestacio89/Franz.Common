@@ -251,7 +251,7 @@ This makes Franz suitable for **large organizations**, where maintaining archite
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 1.7.1
+dotnet add package Franz.Common --version 1.7.2
 ```
 
 Messaging example:
@@ -308,32 +308,16 @@ dotnet test --filter Category=Integration
 
 ---
 
-## ⭐ Version 1.7.01 — Kafka Hosting & Transport Hardening
+## Version **1.7.2** focuses on **correctness, determinism, and production-grade reliability** of the RabbitMQ transport layer.
 
-* Franz.Common v1.7.01 reinforces the Kafka pillar by finalizing a strict and explicit separation between **Kafka transport** and **Kafka hosting**, aligning Kafka with the same architectural guarantees already applied to Azure and RabbitMQ.
+This release completes the RabbitMQ stack by:
 
-🧱 Kafka Transport Clarification
+* fixing async channel creation issues introduced by RabbitMQ.Client 7.x,
+* closing the DI graph for hosted listeners and publishers,
+* aligning RabbitMQ behavior with Kafka semantics already present in Franz,
+* and validating everything against **real infrastructure** using Testcontainers (RabbitMQ + MongoDB).
 
-* Kafka transport (`Franz.Common.Messaging.Kafka`) is now **purely transport-focused**
-  * Native use of `Confluent.Kafka.IConsumer`
-  * Centralized consumer creation via `IKafkaConsumerFactory`
-  * No hosted services, no background execution
-
-🚀 Kafka Hosting Stabilization
-
-* Kafka hosting (`Franz.Common.Messaging.Hosting.Kafka`) now:
-  * Depends exclusively on messaging abstractions
-  * Owns all background execution and lifecycle management
-  * Handles graceful shutdown, scoping, and error isolation
-
-🧭 Architectural Guarantees
-
-* Transport ≠ Hosting enforced at package boundaries
-* Deterministic consumer lifetimes aligned with Kafka semantics
-* CI-safe, Testcontainers-friendly execution model
-* No hidden threads, no implicit runtime behavior
-
-* This release completes Kafka’s alignment with the Franz hosting model, ensuring parity with RabbitMQ and Azure messaging while strengthening long-term maintainability and testability.
+No breaking architectural changes — only **hardening, correctness, and full infrastructure wiring**.
 
 
 ---
