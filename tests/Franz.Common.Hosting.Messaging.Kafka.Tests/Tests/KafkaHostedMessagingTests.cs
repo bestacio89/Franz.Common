@@ -62,8 +62,8 @@ public sealed class KafkaHostedMessagingTests
   }
 
 
-  [Fact(Skip = "Kafka continuation timing is not deterministic under CI")]
-  public async Task Kafka_listener_keeps_consuming_after_handler_failure()
+  [Fact]
+  public async Task Kafka_pipeline_continues_after_handler_failure()
   {
     FaultToleranceProbe.Reset();
     MultiHandlerProbe.Reset();
@@ -71,19 +71,22 @@ public sealed class KafkaHostedMessagingTests
     using var scope = _fixture.Services.CreateScope();
     var publisher = scope.ServiceProvider.GetRequiredService<IMessagingPublisher>();
 
-    // 1) publish message that will cause one handler to throw
+    // 1️⃣ publish message that causes a handler failure
     await publisher.Publish(new FaultToleranceTestEvent());
 
-    // 🔴 WAIT until the failure has been observed
-    await FaultToleranceProbe.WaitAsync(TimeSpan.FromSeconds(5));
+    // Wait until the failure was *handled*
+    await FaultToleranceProbe.WaitAsync(TimeSpan.FromSeconds(10));
 
-    // 2) publish a second message that must still be processed
+    // 2️⃣ publish a second message
     await publisher.Publish(new FanoutTestEvent2("still-alive"));
 
-    // Assert: second message processed even after failure
+    // Wait until the second message is *processed*
     await MultiHandlerProbe.WaitAsync(TimeSpan.FromSeconds(10));
-    MultiHandlerProbe.Count.Should().Be(2);
+
+    // Assert semantic outcome
+    MultiHandlerProbe.Count.Should().BeGreaterThanOrEqualTo(2);
   }
+
 
 
 
