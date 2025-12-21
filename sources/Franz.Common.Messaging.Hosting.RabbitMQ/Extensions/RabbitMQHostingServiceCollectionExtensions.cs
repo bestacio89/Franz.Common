@@ -17,7 +17,7 @@ public static class RabbitMQHostingServiceCollectionExtensions
   {
     services.Configure(configureOptions);
  
-    // Transport-level Kafka listener
+    // Transport-level listener
     services.AddSingleton<Listener>();
 
     // Hosted service wrapping the listener

@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.RabbitMQ\Franz.Common.Messaging.Hosting.RabbitMQ.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.MongoDB\Franz.Common.MongoDB.csproj" />
