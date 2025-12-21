@@ -5,6 +5,7 @@ using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Properties;
+using Franz.Common.Messaging.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,13 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
+  public static IServiceCollection AddMessagingSerialization(this IServiceCollection services)
+  {
+    services
+      .AddNoDuplicateScoped<IMessageSerializer, JsonMessageSerializer>();
+
+    return services;
+  }
 
   public static IServiceCollection AddMessagingFactories(this IServiceCollection services)
   {

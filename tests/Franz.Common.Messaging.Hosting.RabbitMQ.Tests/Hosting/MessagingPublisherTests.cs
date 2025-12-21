@@ -1,4 +1,5 @@
 ﻿using Franz.Common.Messaging.Delegating;
+using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fakes;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fixtures;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
@@ -39,7 +40,7 @@ public class MessagingPublisherTests
       {
         services.AddLogging();
         services.AddRabbitMQMessagingPublisher(config);
-
+        services.AddMessagingSerialization();
         // override default delegating handler
         services.AddSingleton<IMessageHandler, TestMessageHandler>();
       })

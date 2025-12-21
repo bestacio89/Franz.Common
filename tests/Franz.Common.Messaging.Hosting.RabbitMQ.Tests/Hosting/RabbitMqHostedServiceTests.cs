@@ -1,4 +1,5 @@
-﻿using Franz.Common.Messaging.Configuration;
+﻿using Franz.Common.Mediator.Extensions;
+using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fakes;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fixtures;
@@ -22,15 +23,28 @@ public class RabbitMqHostedServiceTests
   {
     _rabbit = fixture;
   }
-
+  private IConfiguration BuildRabbitConfiguration()
+  {
+    return new ConfigurationBuilder()
+      .AddInMemoryCollection(new Dictionary<string, string?>
+      {
+        ["Messaging:HostName"] = _rabbit.Host,
+        ["Messaging:Port"] = _rabbit.Port.ToString()
+      })
+      .Build();
+  }
   [Fact]
   public async Task RabbitMQHostedService_starts_and_stops()
   {
+    var configuration = BuildRabbitConfiguration();
+
+    // 🔑 REQUIRED INFRA
+ 
     using var host = Host.CreateDefaultBuilder()
       .ConfigureServices(services =>
       {
         services.AddLogging();
-
+        services.AddRabbitMQMessaging(configuration);
         // 🔑 RabbitMQ messaging stack (THIS WAS MISSING)
         services.AddRabbitMQMessagingConfiguration(new ConfigurationBuilder()
           .AddInMemoryCollection(new Dictionary<string, string?>
@@ -39,6 +53,8 @@ public class RabbitMqHostedServiceTests
             ["Messaging:Port"] = _rabbit.Port.ToString()
           })
           .Build());
+        services.AddFranzMediator(new[]{
+          typeof(TestIntegrationEvent).Assembly});
 
         services.AddRabbitMQHostedListener(opts =>
         {
