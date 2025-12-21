@@ -1,5 +1,6 @@
 ﻿using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Hosting.Listeners;
 using Franz.Common.Messaging.Hosting.RabbitMQ;
 using Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices;
@@ -49,6 +50,7 @@ public class RabbitMQHostingExtensionsTests
     var configuration = BuildRabbitConfiguration();
 
     // 🔑 REQUIRED INFRA
+    services.AddMessagingSerialization();
     services.AddRabbitMQMessaging(configuration);
     services.AddMongoMessageStore(
       connectionString: _mongo.ConnectionString,
@@ -103,6 +105,7 @@ public class RabbitMQHostingExtensionsTests
         services.AddLogging();
 
         // 🔑 REQUIRED INFRA
+        services.AddMessagingSerialization();
         services.AddRabbitMQMessaging(configuration);
         services.AddMongoMessageStore(
           connectionString: _mongo.ConnectionString,
@@ -129,6 +132,7 @@ public class RabbitMQHostingExtensionsTests
     var configuration = BuildRabbitConfiguration();
 
     // 🔑 REQUIRED INFRA
+    services.AddMessagingSerialization();
     services.AddRabbitMQMessaging(configuration);
     services.AddMongoMessageStore(
       connectionString: _mongo.ConnectionString,
@@ -165,6 +169,7 @@ public class RabbitMQHostingExtensionsTests
         services.AddLogging();
 
         // 🔑 REQUIRED INFRA
+        services.AddMessagingSerialization();
         services.AddRabbitMQMessaging(configuration);
         services.AddMongoMessageStore(
           connectionString: _mongo.ConnectionString,

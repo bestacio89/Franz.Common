@@ -1,6 +1,7 @@
 ﻿using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Delegating;
+using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fakes;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fixtures;
 using Franz.Common.Messaging.RabbitMQ.Connections;
@@ -44,6 +45,7 @@ public class RabbitMqHostedServiceTests
       .ConfigureServices(services =>
       {
         services.AddLogging();
+        services.AddMessagingSerialization();
         services.AddRabbitMQMessaging(configuration);
         // 🔑 RabbitMQ messaging stack (THIS WAS MISSING)
         services.AddRabbitMQMessagingConfiguration(new ConfigurationBuilder()
