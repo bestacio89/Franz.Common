@@ -11,18 +11,24 @@ using Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fixtures;
 using Franz.Common.Messaging.Outbox;
 using Franz.Common.Messaging.RabbitMQ.Hosting;
+using Franz.Common.MongoDB.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
 
 public class RabbitMQHostingExtensionsTests
-  : IClassFixture<RabbitMqContainerFixture>
+  : IClassFixture<RabbitMqContainerFixture>,
+    IClassFixture<MongoContainerFixture>
 {
-  private readonly RabbitMqContainerFixture _fixture;
+  private readonly RabbitMqContainerFixture _rabbit;
+  private readonly MongoContainerFixture _mongo;
 
-  public RabbitMQHostingExtensionsTests(RabbitMqContainerFixture fixture)
+  public RabbitMQHostingExtensionsTests(
+    RabbitMqContainerFixture rabbit,
+    MongoContainerFixture mongo)
   {
-    _fixture = fixture;
+    _rabbit = rabbit;
+    _mongo = mongo;
   }
 
   [Fact]
@@ -32,8 +38,8 @@ public class RabbitMQHostingExtensionsTests
 
     services.AddRabbitMQHostedListener(opts =>
     {
-      opts.HostName = _fixture.Host;
-      opts.Port = _fixture.Port;
+      opts.HostName = _rabbit.Host;
+      opts.Port = _rabbit.Port;
     });
 
     var provider = services.BuildServiceProvider();
@@ -75,8 +81,8 @@ public class RabbitMQHostingExtensionsTests
 
         services.AddRabbitMQHostedListener(opts =>
         {
-          opts.HostName = _fixture.Host;
-          opts.Port = _fixture.Port;
+          opts.HostName = _rabbit.Host;
+          opts.Port = _rabbit.Port;
         });
       })
       .Build();
@@ -111,6 +117,12 @@ public class RabbitMQHostingExtensionsTests
       .ConfigureServices(services =>
       {
         services.AddLogging();
+
+        // 🔑 REQUIRED dependency for Outbox
+        services.AddMongoMessageStore(
+          connectionString: _mongo.ConnectionString,
+          dbName: _mongo.DatabaseName);
+
         services.AddOutboxHostedListener(opts =>
         {
           opts.PollingInterval = TimeSpan.FromMilliseconds(100);

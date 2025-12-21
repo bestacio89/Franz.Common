@@ -6,6 +6,7 @@
     <PackageReference Include="FluentAssertions" Version="8.8.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Testcontainers" Version="4.9.0" />
+    <PackageReference Include="Testcontainers.MongoDb" Version="4.9.0" />
     <PackageReference Include="Testcontainers.RabbitMQ" Version="4.9.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
@@ -16,6 +17,7 @@
     <ProjectReference Include="..\..\sources\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.RabbitMQ\Franz.Common.Messaging.Hosting.RabbitMQ.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.MongoDB\Franz.Common.MongoDB.csproj" />
   </ItemGroup>
 
   <ItemGroup>

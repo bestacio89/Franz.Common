@@ -21,24 +21,29 @@ public sealed class ConnectionProvider : IConnectionProvider, IDisposable
     get
     {
       ThrowIfDisposed();
-      return GetOrCreateConnection();
+      return GetOrCreateConnectionAsync()
+        .GetAwaiter()
+        .GetResult();
     }
   }
 
-  private IConnection GetOrCreateConnection()
+  private async Task<IConnection> GetOrCreateConnectionAsync()
   {
     if (_connection is { IsOpen: true })
       return _connection;
 
-    // Fast path failed → secure creation via lock
-    _sync.Wait();
+    await _sync.WaitAsync().ConfigureAwait(false);
     try
     {
       if (_connection is { IsOpen: true })
         return _connection;
 
       var factory = _factoryProvider.Current;
-      _connection = (IConnection?)factory.CreateConnectionAsync();
+
+      // 🔑 Correct: await async factory
+      _connection = await factory
+        .CreateConnectionAsync()
+        .ConfigureAwait(false);
 
       return _connection;
     }
@@ -70,7 +75,6 @@ public sealed class ConnectionProvider : IConnectionProvider, IDisposable
       // swallow — closing a dead connection may throw
     }
 
-    _connection?.Dispose();
     _sync.Dispose();
   }
 }
