@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\sources\Franz.Common.Hosting.Messaging.Kafka\Franz.Common.Messaging.Hosting.Kafka.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.Kafka\Franz.Common.Messaging.Hosting.Kafka.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
   </ItemGroup>
 
