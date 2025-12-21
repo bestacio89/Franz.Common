@@ -64,7 +64,7 @@ public static class ServiceCollectionExtensions
     services
       .AddMessagingOptions(configuration)
       .AddOnlyHighLifetimeModelProvider(ServiceLifetime.Scoped)
-
+      .AddMessagingFactories()
       .AddNoDuplicateSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>()
       .AddNoDuplicateSingleton<IConnectionProvider, ConnectionProvider>()
       .AddNoDuplicateScoped<IMessagingInitializer, MessagingInitializer>();

@@ -50,6 +50,7 @@ public class RabbitMQHostingExtensionsTests
     var configuration = BuildRabbitConfiguration();
 
     // 🔑 REQUIRED INFRA
+    services.AddLogging();
     services.AddMessagingSerialization();
     services.AddRabbitMQMessaging(configuration);
     services.AddMongoMessageStore(

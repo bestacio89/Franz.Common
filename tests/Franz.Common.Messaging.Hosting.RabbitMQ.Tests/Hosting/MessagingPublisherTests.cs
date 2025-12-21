@@ -45,10 +45,8 @@ public class MessagingPublisherTests
         services.AddRabbitMQMessaging(configuration);
         services.AddFranzMediator(new[]{
           typeof(TestIntegrationEvent).Assembly});
-        // Publisher layer
-        services.AddRabbitMQMessagingPublisher(configuration);
-
-        // Serialization
+       
+          // Serialization
         services.AddMessagingSerialization();
 
         // Override delegating handler

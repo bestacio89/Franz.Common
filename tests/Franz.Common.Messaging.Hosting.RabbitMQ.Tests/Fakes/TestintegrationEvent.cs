@@ -5,5 +5,6 @@ using System.Text;
 
 namespace Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fakes;
 
-public sealed record TestIntegrationEvent(Guid Id) : IIntegrationEvent;
+public sealed record TestIntegrationEvent(Guid Id)
+  : IIntegrationEvent;
 
