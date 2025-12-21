@@ -1,6 +1,4 @@
-﻿
-
-using Franz.Common.Mediator.Extensions;
+﻿using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Hosting.Listeners;
 using Franz.Common.Messaging.Hosting.RabbitMQ;
@@ -8,11 +6,14 @@ using Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fakes;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fixtures;
 using Franz.Common.Messaging.Outbox;
+using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.RabbitMQ.Hosting;
 using Franz.Common.MongoDB.Extensions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
+
 namespace Franz.Common.Messaging.Hosting.RabbitMQ.Tests.ServiceCollections;
 
 public class RabbitMQHostingExtensionsTests
@@ -30,23 +31,36 @@ public class RabbitMQHostingExtensionsTests
     _mongo = mongo;
   }
 
+  private IConfiguration BuildRabbitConfiguration()
+  {
+    return new ConfigurationBuilder()
+      .AddInMemoryCollection(new Dictionary<string, string?>
+      {
+        ["Messaging:HostName"] = _rabbit.Host,
+        ["Messaging:Port"] = _rabbit.Port.ToString()
+      })
+      .Build();
+  }
+
   [Fact]
   public void AddRabbitMQHostedListener_registers_listener_and_hosted_service()
   {
     var services = new ServiceCollection();
+    var configuration = BuildRabbitConfiguration();
 
-    services.AddRabbitMQHostedListener(opts =>
-    {
-      opts.HostName = _rabbit.Host;
-      opts.Port = _rabbit.Port;
-    });
+    // 🔑 REQUIRED INFRA
+    services.AddRabbitMQMessaging(configuration);
     services.AddMongoMessageStore(
-        connectionString: _mongo.ConnectionString,
-        dbName: _mongo.DatabaseName);
+      connectionString: _mongo.ConnectionString,
+      dbName: _mongo.DatabaseName);
+
     services.AddFranzMediator(new[]
-        {
-          typeof(TestIntegrationEvent).Assembly
-        });
+    {
+      typeof(TestIntegrationEvent).Assembly
+    });
+
+    // Hosting
+    services.AddRabbitMQHostedListener(_ => { });
 
     var provider = services.BuildServiceProvider();
 
@@ -70,6 +84,7 @@ public class RabbitMQHostingExtensionsTests
     });
 
     var provider = services.BuildServiceProvider();
+
     var options = provider.GetRequiredService<
       Microsoft.Extensions.Options.IOptions<MessagingOptions>>().Value;
 
@@ -80,45 +95,55 @@ public class RabbitMQHostingExtensionsTests
   [Fact]
   public async Task RabbitMQHostedService_starts_and_stops()
   {
+    var configuration = BuildRabbitConfiguration();
+
     using var host = Host.CreateDefaultBuilder()
       .ConfigureServices(services =>
       {
-        services.AddMongoMessageStore(
-        connectionString: _mongo.ConnectionString,
-        dbName: _mongo.DatabaseName);
         services.AddLogging();
+
+        // 🔑 REQUIRED INFRA
+        services.AddRabbitMQMessaging(configuration);
+        services.AddMongoMessageStore(
+          connectionString: _mongo.ConnectionString,
+          dbName: _mongo.DatabaseName);
+
         services.AddFranzMediator(new[]
         {
           typeof(TestIntegrationEvent).Assembly
         });
-        services.AddRabbitMQHostedListener(opts =>
-        {
-          opts.HostName = _rabbit.Host;
-          opts.Port = _rabbit.Port;
-        });
+
+        // Hosting
+        services.AddRabbitMQHostedListener(_ => { });
       })
       .Build();
 
     await host.StartAsync();
     await host.StopAsync();
   }
+
   [Fact]
   public void AddOutboxHostedListener_registers_outbox_listener_and_service()
   {
     var services = new ServiceCollection();
+    var configuration = BuildRabbitConfiguration();
 
-    services.AddOutboxHostedListener(opts =>
-    {
-      opts.PollingInterval = TimeSpan.FromMilliseconds(100);
-    });
+    // 🔑 REQUIRED INFRA
+    services.AddRabbitMQMessaging(configuration);
+    services.AddMongoMessageStore(
+      connectionString: _mongo.ConnectionString,
+      dbName: _mongo.DatabaseName);
+
     services.AddFranzMediator(new[]
     {
       typeof(TestIntegrationEvent).Assembly
     });
 
-    services.AddMongoMessageStore(
-        connectionString: _mongo.ConnectionString,
-        dbName: _mongo.DatabaseName);
+    services.AddOutboxHostedListener(opts =>
+    {
+      opts.PollingInterval = TimeSpan.FromMilliseconds(100);
+    });
+
     var provider = services.BuildServiceProvider();
 
     var listener = provider.GetService<OutboxMessageListener>();
@@ -132,19 +157,24 @@ public class RabbitMQHostingExtensionsTests
   [Fact]
   public async Task OutboxHostedService_starts_and_stops()
   {
+    var configuration = BuildRabbitConfiguration();
+
     using var host = Host.CreateDefaultBuilder()
       .ConfigureServices(services =>
       {
         services.AddLogging();
-        services.AddFranzMediator(new[]
-{
-  typeof(TestIntegrationEvent).Assembly
-});
 
-        // 🔑 REQUIRED dependency for Outbox
+        // 🔑 REQUIRED INFRA
+        services.AddRabbitMQMessaging(configuration);
         services.AddMongoMessageStore(
           connectionString: _mongo.ConnectionString,
           dbName: _mongo.DatabaseName);
+
+        services.AddFranzMediator(new[]
+        {
+          typeof(TestIntegrationEvent).Assembly
+        });
+
         services.AddOutboxHostedListener(opts =>
         {
           opts.PollingInterval = TimeSpan.FromMilliseconds(100);
