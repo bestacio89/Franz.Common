@@ -122,7 +122,6 @@ public class RabbitMQHostingExtensionsTests
         services.AddMongoMessageStore(
           connectionString: _mongo.ConnectionString,
           dbName: _mongo.DatabaseName);
-
         services.AddOutboxHostedListener(opts =>
         {
           opts.PollingInterval = TimeSpan.FromMilliseconds(100);

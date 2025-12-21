@@ -57,17 +57,26 @@ public static class MongoServiceCollectionExtensions
   }
 
   public static IServiceCollection AddMongoMessageStore(
-       this IServiceCollection services,
-       string connectionString,
-       string dbName,
-       string outboxCollectionName = "OutboxMessages",
-       string deadLetterCollectionName = "DeadLetterMessages")
+    this IServiceCollection services,
+    string connectionString,
+    string dbName,
+    string outboxCollectionName = "OutboxMessages",
+    string deadLetterCollectionName = "DeadLetterMessages")
   {
     var client = new MongoClient(connectionString);
     var database = client.GetDatabase(dbName);
 
-    services.AddSingleton<IMessageStore>(new MongoMessageStore(database, outboxCollectionName, deadLetterCollectionName));
+    // Infrastructure primitives
+    services.AddSingleton<IMongoClient>(client);
+    services.AddSingleton<IMongoDatabase>(database);
+
+    // Messaging persistence
+    services.AddSingleton<IMessageStore>(
+      new MongoMessageStore(database, outboxCollectionName, deadLetterCollectionName));
+
+    services.AddSingleton<IInboxStore, MongoInboxStore>();
 
     return services;
   }
+
 }

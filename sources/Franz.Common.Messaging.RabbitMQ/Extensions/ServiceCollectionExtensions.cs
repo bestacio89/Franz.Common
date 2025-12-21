@@ -1,14 +1,15 @@
+using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Delegating;
+using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Hosting;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Hosting;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Messaging.RabbitMQ.Replay;
-using Franz.Common.DependencyInjection.Extensions;
-using Franz.Common.Messaging.Extensions;
+using Franz.Common.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -58,9 +59,12 @@ public static class ServiceCollectionExtensions
 
   public static IServiceCollection AddRabbitMQMessagingConfiguration(this IServiceCollection services, IConfiguration? configuration)
   {
+    services.AddSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
+
     services
       .AddMessagingOptions(configuration)
       .AddOnlyHighLifetimeModelProvider(ServiceLifetime.Scoped)
+
       .AddNoDuplicateSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>()
       .AddNoDuplicateSingleton<IConnectionProvider, ConnectionProvider>()
       .AddNoDuplicateScoped<IMessagingInitializer, MessagingInitializer>();
