@@ -51,7 +51,6 @@ public static class ServiceCollectionExtensions
     services
           .AddRabbitMQMessagingConfiguration(configuration)
           
-          .AddNoDuplicateScoped<IMessageFactory, MessageFactory>()
           .AddNoDuplicateScoped<IMessageHandler, MessageBuilderDelegatingHandler>();
 
     return services;
