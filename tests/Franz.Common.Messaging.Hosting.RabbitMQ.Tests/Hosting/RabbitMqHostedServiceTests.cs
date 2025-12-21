@@ -16,34 +16,40 @@ namespace Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Hosting;
 public class RabbitMqHostedServiceTests
   : IClassFixture<RabbitMqContainerFixture>
 {
-  private readonly RabbitMqContainerFixture _fixture;
+  private readonly RabbitMqContainerFixture _rabbit;
 
   public RabbitMqHostedServiceTests(RabbitMqContainerFixture fixture)
   {
-    _fixture = fixture;
+    _rabbit = fixture;
   }
 
   [Fact]
-  public async Task HostedService_starts_and_stops_cleanly()
+  public async Task RabbitMQHostedService_starts_and_stops()
   {
-    var config = new ConfigurationBuilder()
-      .AddInMemoryCollection(new Dictionary<string, string?>
-      {
-        ["Messaging:HostName"] = _fixture.Host,
-        ["Messaging:Port"] = _fixture.Port.ToString()
-      })
-      .Build();
-
     using var host = Host.CreateDefaultBuilder()
       .ConfigureServices(services =>
       {
         services.AddLogging();
-        services.AddRabbitMQMessagingConsumer(config);
-        services.AddRabbitMQHostedListener(_ => { });
+
+        // 🔑 RabbitMQ messaging stack (THIS WAS MISSING)
+        services.AddRabbitMQMessagingConfiguration(new ConfigurationBuilder()
+          .AddInMemoryCollection(new Dictionary<string, string?>
+          {
+            ["Messaging:HostName"] = _rabbit.Host,
+            ["Messaging:Port"] = _rabbit.Port.ToString()
+          })
+          .Build());
+
+        services.AddRabbitMQHostedListener(opts =>
+        {
+          opts.HostName = _rabbit.Host;
+          opts.Port = _rabbit.Port;
+        });
       })
       .Build();
 
     await host.StartAsync();
     await host.StopAsync();
   }
+
 }
