@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.Kafka\Franz.Common.Messaging.Hosting.Kafka.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.MongoDB\Franz.Common.MongoDB.csproj" />
   </ItemGroup>
 
   <ItemGroup>

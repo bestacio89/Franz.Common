@@ -10,6 +10,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
+using Franz.Common.MongoDB.Extensions;
+using Franz.Common.Hosting.Messaging.Kafka.Tests.Fixtures;
 
 namespace Franz.Common.Messaging.Hosting.Kafka.Tests.ServiceCollections;
 
@@ -17,7 +19,7 @@ public sealed class KafkaHostingExtensionsTests
   : IClassFixture<KafkaContainerFixture>
 {
   private readonly KafkaContainerFixture _kafka;
-
+  private readonly MongoContainerFixture _mongo = new();
   public KafkaHostingExtensionsTests(KafkaContainerFixture kafka)
   {
     _kafka = kafka;
@@ -56,7 +58,9 @@ public sealed class KafkaHostingExtensionsTests
 
     // Hosting
     services.AddKafkaHostedListener(_ => { });
-
+    services.AddMongoMessageStore(
+          connectionString: _mongo.ConnectionString,
+          dbName: _mongo.DatabaseName);
     var provider = services.BuildServiceProvider();
 
     var listener = provider.GetService<KafkaMessageListener>();
@@ -108,7 +112,7 @@ public sealed class KafkaHostingExtensionsTests
         // 🔑 REQUIRED INFRA
         services.AddMessagingSerialization();
         services.AddKafkaMessaging(configuration);
-
+     
         services.AddFranzMediator(new[]
         {
           typeof(KafkaHostingExtensionsTests).Assembly
@@ -142,7 +146,9 @@ public sealed class KafkaHostingExtensionsTests
     {
       typeof(KafkaHostingExtensionsTests).Assembly
     });
-
+    services.AddMongoMessageStore(
+          connectionString: _mongo.ConnectionString,
+          dbName: _mongo.DatabaseName);
     services.AddOutboxHostedListener(opts =>
     {
       opts.PollingInterval = TimeSpan.FromMilliseconds(100);
@@ -171,7 +177,9 @@ public sealed class KafkaHostingExtensionsTests
         // 🔑 REQUIRED INFRA
         services.AddMessagingSerialization();
         services.AddKafkaMessaging(configuration);
-
+        services.AddMongoMessageStore(
+          connectionString: _mongo.ConnectionString,
+          dbName: _mongo.DatabaseName);
         services.AddFranzMediator(new[]
         {
           typeof(KafkaHostingExtensionsTests).Assembly
