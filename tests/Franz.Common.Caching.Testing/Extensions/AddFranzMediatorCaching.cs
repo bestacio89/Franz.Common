@@ -24,7 +24,7 @@ public sealed class AddFranzMediatorCachingTests
     });
 
     var pipelines = serviceProvider
-      .GetServices<IPipeline<TestRequest, TestResponse>>()
+      .GetServices<CachingPipeline<TestRequest, TestResponse>>()
       .ToList();
 
     pipelines.Should().ContainSingle();
