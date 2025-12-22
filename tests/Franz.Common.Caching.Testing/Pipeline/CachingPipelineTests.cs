@@ -49,9 +49,7 @@ public sealed class CachingPipelineTests
     var serviceProvider = services.BuildServiceProvider();
 
     return serviceProvider
-      .GetServices<IPipeline<TestRequest, TestResponse>>()
-      .OfType<CachingPipeline<TestRequest, TestResponse>>()
-      .Single();
+      .GetRequiredService<CachingPipeline<TestRequest, TestResponse>>();
   }
 
   [Fact]
