@@ -17,7 +17,10 @@ public sealed class AddFranzMediatorCachingTests
   public void Should_Register_CachingPipeline()
   {
     using var sp = ServiceTestHelper.Build(services =>
-      services.AddFranzMediatorCaching());
+    {
+      services.AddFranzMemoryCaching();
+      services.AddFranzMediatorCaching();
+    });
 
     var pipeline = sp.GetServices(typeof(IPipeline<,>));
 
