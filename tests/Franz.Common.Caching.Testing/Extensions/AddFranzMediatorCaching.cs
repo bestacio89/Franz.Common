@@ -16,20 +16,22 @@ using Microsoft.Extensions.DependencyInjection;
 
 public sealed class AddFranzMediatorCachingTests
 {
+  private sealed record TestRequest;
+  private sealed record TestResponse;
+
   [Fact]
   public void Should_Register_CachingPipeline()
   {
     using var sp = ServiceTestHelper.Build(services =>
     {
+      services.AddLogging();
       services.AddFranzMemoryCaching();
       services.AddFranzMediatorCaching();
-      services.AddLogging();
-     
     });
 
-    var pipeline = sp.GetServices(typeof(IPipeline<,>));
+    var pipelines = sp.GetServices<IPipeline<TestRequest, TestResponse>>();
 
-    pipeline.Should().ContainSingle(p =>
-      p.GetType().GetGenericTypeDefinition() == typeof(CachingPipeline<,>));
+    pipelines.Should().ContainSingle(p =>
+      p is CachingPipeline<TestRequest, TestResponse>);
   }
 }
