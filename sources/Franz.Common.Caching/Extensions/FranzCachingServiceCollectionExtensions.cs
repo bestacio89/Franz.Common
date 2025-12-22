@@ -75,7 +75,25 @@ namespace Franz.Common.Caching.Extensions
       return services;
     }
 
+    // Factory overload (DI-friendly, test-friendly)
+    public static IServiceCollection AddFranzRedisCaching(
+      this IServiceCollection services,
+      Func<IServiceProvider, IConnectionMultiplexer> multiplexerFactory,
+      Action<CacheEntryOptions>? configure = null)
+    {
+      services.AddSingleton<IConnectionMultiplexer>(multiplexerFactory);
 
+      services.AddSingleton<ICacheProvider>(sp =>
+        new RedisCacheProvider(sp.GetRequiredService<IConnectionMultiplexer>()));
+
+      services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
+      services.TryAddSingleton<ISettingsCache, SettingsCache>();
+
+      if (configure != null)
+        services.Configure(configure);
+
+      return services;
+    }
     /// <summary>
     /// Convenience method: defaults to in-memory caching.
     /// </summary>

@@ -26,13 +26,15 @@ public sealed class AddFranzRedisCachingTests
     sp.GetRequiredService<ICacheProvider>()
       .GetType().Name.Should().Be("RedisCacheProvider");
   }
+
   [Fact]
   public void Redis_Factory_Overload_Should_Be_Used()
   {
     var muxer = new Mock<IConnectionMultiplexer>().Object;
 
     using var sp = ServiceTestHelper.Build(services =>
-      services.AddFranzRedisCaching(_ => muxer));
+      services.AddFranzRedisCaching(
+        multiplexerFactory: _ => muxer));
 
     sp.GetRequiredService<IConnectionMultiplexer>()
       .Should().BeSameAs(muxer);
