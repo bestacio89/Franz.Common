@@ -308,22 +308,21 @@ dotnet test --filter Category=Integration
 
 ---
 
-## Version **1.7.2** focuses on **correctness, determinism, and production-grade reliability** of the RabbitMQ transport layer.
+## Version **1.7.3** focuses on **correctness, determinism, and production-grade reliability** of the Caching layer
 
 This release completes the RabbitMQ stack by:
 
-* fixing async channel creation issues introduced by RabbitMQ.Client 7.x,
-* closing the DI graph for hosted listeners and publishers,
-* aligning RabbitMQ behavior with Kafka semantics already present in Franz,
-* and validating everything against **real infrastructure** using Testcontainers (RabbitMQ + MongoDB).
+* Introduced lazy infrastructure initialization to prevent Redis connections during service registration.
+* Completed full response caching support in the Mediator pipeline. MongoDB).
 
 No breaking architectural changes — only **hardening, correctness, and full infrastructure wiring**.
-
 
 ---
 
 # 🛣️ Roadmap
+
 * Graphql Adapters and Implementations
+
 ---
 
 # 🏢 Enterprise Adoption & Support
@@ -343,4 +342,3 @@ All PRs must include **tests**, **documentation**, and comply with **Franz Tribu
 # 📜 License
 
 MIT License.
-

@@ -1015,4 +1015,17 @@ No breaking architectural changes — only **hardening, correctness, and full in
 
 ---
 
+## Version 1.7.3 – 2025-12-22
 
+### Fixed
+- Stabilized mediator caching pipeline registration with constrained generics
+- Aligned Redis caching with factory-based DI to prevent eager connections
+- Fixed caching pipeline resolution in unit tests
+- Clarified separation between pipeline unit tests and mediator composition tests
+
+### Tests
+- Full unit coverage for caching pipeline behavior (hit / miss / disabled)
+- Redis caching validated via Testcontainers
+- Distributed and memory cache providers fully verified
+
+---

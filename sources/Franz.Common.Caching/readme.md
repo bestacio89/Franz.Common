@@ -4,7 +4,7 @@ A full-featured caching module for the** Franz Framework**.
 Provides pluggable cache providers(Memory, Distributed, Redis), request caching via Mediator pipelines, settings cache, and built-in observability with Serilog + OpenTelemetry.
 
 ---
-- **Current Version**: 1.7.2
+- **Current Version**: 1.7.3
 ---
 
 ## ? Features
@@ -137,6 +137,10 @@ services.AddFranzRedisCaching(sp =>
 # Franz.Common.Caching is production-ready:
 
 ? Cache providers + Mediator integration + observability, all out of the box.
+
+### Version 1.7.3
+- Implemented Lazy infra loading to avoid Redis connection issues during startup.
+- Implemented null response caching support in Mediator pipeline.
 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
