@@ -49,15 +49,23 @@ namespace Franz.Common.Caching.Extensions
     /// Adds Franz Caching with a Redis provider.
     /// </summary>
     public static IServiceCollection AddFranzRedisCaching(
-        this IServiceCollection services,
-        string connectionString,
-        int database = 0,
-        Action<CacheEntryOptions>? configure = null)
+    this IServiceCollection services,
+    string connectionString,
+    int database = 0,
+    Action<CacheEntryOptions>? configure = null)
     {
-      var muxer = ConnectionMultiplexer.Connect(connectionString);
-      services.AddSingleton<IConnectionMultiplexer>(muxer);
+      services.AddSingleton<IConnectionMultiplexer>(_ =>
+        ConnectionMultiplexer.Connect(
+          new StackExchange.Redis.ConfigurationOptions
+          {
+            EndPoints = { connectionString },
+            AbortOnConnectFail = false,
+            DefaultDatabase = database
+          }));
+
       services.AddSingleton<ICacheProvider>(sp =>
-          new RedisCacheProvider(sp.GetRequiredService<IConnectionMultiplexer>()));
+        new RedisCacheProvider(sp.GetRequiredService<IConnectionMultiplexer>()));
+
       services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
       services.TryAddSingleton<ISettingsCache, SettingsCache>();
 
@@ -67,23 +75,6 @@ namespace Franz.Common.Caching.Extensions
       return services;
     }
 
-    // NEW: factory overload (use existing multiplexer from DI/config)
-    public static IServiceCollection AddFranzRedisCaching(
-        this IServiceCollection services,
-        Func<IServiceProvider, IConnectionMultiplexer> multiplexerFactory,
-        Action<CacheEntryOptions>? configure = null)
-    {
-      services.AddSingleton<IConnectionMultiplexer>(multiplexerFactory);
-
-      services.AddSingleton<ICacheProvider>(sp =>
-          new RedisCacheProvider(sp.GetRequiredService<IConnectionMultiplexer>()));
-
-      services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
-      services.TryAddSingleton<ISettingsCache, SettingsCache>();
-
-      if (configure != null) services.Configure(configure);
-      return services;
-    }
 
     /// <summary>
     /// Convenience method: defaults to in-memory caching.

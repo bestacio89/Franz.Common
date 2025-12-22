@@ -4,6 +4,7 @@ using Franz.Common.Caching.Extensions;
 using Franz.Common.Caching.Providers;
 using Franz.Common.Caching.Testing.Models;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
@@ -28,13 +29,16 @@ public sealed class AddFranzRedisCachingTests
   [Fact]
   public void Redis_Factory_Overload_Should_Be_Used()
   {
-    var muxer = StackExchange.Redis.ConnectionMultiplexer.Connect("localhost:6379");
+    var muxer = new Mock<IConnectionMultiplexer>().Object;
 
     using var sp = ServiceTestHelper.Build(services =>
       services.AddFranzRedisCaching(_ => muxer));
 
     sp.GetRequiredService<IConnectionMultiplexer>()
       .Should().BeSameAs(muxer);
+
+    sp.GetRequiredService<ICacheProvider>()
+      .Should().BeOfType<RedisCacheProvider>();
   }
 
   [Fact]
