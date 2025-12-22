@@ -25,36 +25,33 @@ public sealed class CachingPipelineTests
   private sealed record TestResponse(string Value);
 
   private static CachingPipeline<TestRequest, TestResponse> BuildPipeline(
-    Action<MediatorCachingOptions>? configureOptions = null,
-    Mock<ICacheProvider>? cacheMock = null)
+  Action<MediatorCachingOptions>? configureOptions = null,
+  Mock<ICacheProvider>? cacheMock = null)
   {
     var services = new ServiceCollection();
 
-    // Cache provider (mock)
     var cache = cacheMock ?? new Mock<ICacheProvider>();
     services.AddSingleton<ICacheProvider>(cache.Object);
 
-    // Deterministic cache key strategy
     services.AddSingleton<ICacheKeyStrategy>(
       Mock.Of<ICacheKeyStrategy>(k =>
         k.BuildKey(It.IsAny<TestRequest>()) == "key"));
 
-    // 🔑 Fake logging (HOST responsibility in prod)
     services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 
-    // Options binding (appsettings.json equivalent)
     services.Configure<MediatorCachingOptions>(options =>
     {
       configureOptions?.Invoke(options);
     });
 
-    // Register pipeline
     services.AddFranzMediatorCaching();
 
     var serviceProvider = services.BuildServiceProvider();
 
-    return (CachingPipeline<TestRequest, TestResponse>)
-      serviceProvider.GetRequiredService<IPipeline<TestRequest, TestResponse>>();
+    return serviceProvider
+      .GetServices<IPipeline<TestRequest, TestResponse>>()
+      .OfType<CachingPipeline<TestRequest, TestResponse>>()
+      .Single();
   }
 
   [Fact]
