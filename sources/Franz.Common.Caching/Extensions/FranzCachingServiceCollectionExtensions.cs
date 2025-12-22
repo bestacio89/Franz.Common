@@ -102,11 +102,16 @@ namespace Franz.Common.Caching.Extensions
         Action<CacheEntryOptions>? configure = null)
         => services.AddFranzMemoryCaching(configure);
 
-    public static IServiceCollection AddFranzMediatorCaching(this IServiceCollection services,
-    Action<MediatorCachingOptions>? configure = null)
+    public static IServiceCollection AddFranzMediatorCaching(
+      this IServiceCollection services,
+      Action<MediatorCachingOptions>? configure = null)
     {
-      if (configure != null) services.Configure(configure);
-      services.AddScoped(typeof(IPipeline<,>), typeof(CachingPipeline<,>));
+      if (configure != null)
+        services.Configure(configure);
+
+      // Register concrete pipeline contributor
+      services.AddScoped(typeof(CachingPipeline<,>));
+
       return services;
     }
 

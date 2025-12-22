@@ -24,6 +24,7 @@ public sealed class AddFranzMediatorCachingTests
       services.AddFranzMemoryCaching();
       services.AddFranzMediatorCaching();
       services.AddLogging();
+     
     });
 
     var pipeline = sp.GetServices(typeof(IPipeline<,>));
