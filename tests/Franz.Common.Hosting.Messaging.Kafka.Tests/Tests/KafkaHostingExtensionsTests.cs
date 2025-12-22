@@ -16,13 +16,15 @@ using Franz.Common.Hosting.Messaging.Kafka.Tests.Fixtures;
 namespace Franz.Common.Messaging.Hosting.Kafka.Tests.ServiceCollections;
 
 public sealed class KafkaHostingExtensionsTests
-  : IClassFixture<KafkaContainerFixture>
+  : IClassFixture<KafkaContainerFixture>,
+    IClassFixture<MongoContainerFixture>
 {
   private readonly KafkaContainerFixture _kafka;
-  private readonly MongoContainerFixture _mongo = new();
-  public KafkaHostingExtensionsTests(KafkaContainerFixture kafka)
+  private readonly MongoContainerFixture _mongo;
+  public KafkaHostingExtensionsTests(KafkaContainerFixture kafka, MongoContainerFixture mongo)
   {
     _kafka = kafka;
+    _mongo = mongo;   
   }
 
   private IConfiguration BuildKafkaConfiguration()
@@ -58,9 +60,7 @@ public sealed class KafkaHostingExtensionsTests
 
     // Hosting
     services.AddKafkaHostedListener(_ => { });
-    services.AddMongoMessageStore(
-          connectionString: _mongo.ConnectionString,
-          dbName: _mongo.DatabaseName);
+
     var provider = services.BuildServiceProvider();
 
     var listener = provider.GetService<KafkaMessageListener>();
