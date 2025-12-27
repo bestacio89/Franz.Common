@@ -10,9 +10,8 @@ public static class ServiceCollectionExtensions
   {
     services
       .AddNoDuplicateSingleton<IJsonSerializer, Franz.Common.Serialization.SystemTextJsonSerializer>()
-      .AddNoDuplicateSingleton<IByteArraySerializer, ByteArraySerializer>()
-      .AddInheritedClassSingleton<JsonConverter>();
-
+      .AddNoDuplicateSingleton<IByteArraySerializer, ByteArraySerializer>();
+     
     return services;
   }
 }
