@@ -28,7 +28,7 @@ This package ensures seamless messaging health monitoring and transactional cons
 
 ## **Version Information**
 
-* **Current Version**: 1.7.3
+* **Current Version**: 1.7.4
 * Part of the private **Franz Framework** ecosystem.
 ---
 

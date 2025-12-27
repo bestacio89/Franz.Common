@@ -308,13 +308,13 @@ dotnet test --filter Category=Integration
 
 ---
 
-## Version **1.7.3** focuses on **correctness, determinism, and production-grade reliability** of the Caching layer
+## Version **1.7.4** focuses on **correctness, determinism, and production-grade reliability** of the Serialization Process
 
 This release completes the RabbitMQ stack by:
 
-* Introduced lazy infrastructure initialization to prevent Redis connections during service registration.
-* Completed full response caching support in the Mediator pipeline. MongoDB).
-
+### Version 1.7.4
+- Minor bug fixes and performance improvements
+- Updated dependencies to latest versions of System.Text.Json
 No breaking architectural changes — only **hardening, correctness, and full infrastructure wiring**.
 
 ---

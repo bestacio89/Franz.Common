@@ -20,7 +20,7 @@ A serialization utility library within the **Franz Framework** that simplifies J
 
 ## **Version Information**
 
-- **Current Version**: 1.7.3
+- **Current Version**: 1.7.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -149,3 +149,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
+
+
+### Version 1.7.4
+- Minor bug fixes and performance improvements
+- Updated dependencies to latest versions of System.Text.Json

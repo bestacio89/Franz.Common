@@ -1029,3 +1029,10 @@ No breaking architectural changes — only **hardening, correctness, and full in
 - Distributed and memory cache providers fully verified
 
 ---
+
+## Version 1.7.4
+
+* Minor bug fixes and performance improvements
+* Updated dependencies to latest versions of System.Text.Json
+
+---

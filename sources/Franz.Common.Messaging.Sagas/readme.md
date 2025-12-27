@@ -17,7 +17,7 @@ Sagas allow you to coordinate multiple microservices, enforce consistency across
 
 ---
 
-**Current Version**: 1.7.3
+**Current Version**: 1.7.4
 
 ---
 

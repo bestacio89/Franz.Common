@@ -7,9 +7,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- Versioning -->
-    <Version>1.7.3</Version>
-    <AssemblyVersion>1.7.3</AssemblyVersion>
-    <FileVersion>1.7.3</FileVersion>
+    <Version>1.7.4</Version>
+    <AssemblyVersion>1.7.4</AssemblyVersion>
+    <FileVersion>1.7.4</FileVersion>
     <!-- Author -->
     <Authors>Bernardo Estacio Abreu</Authors>
   </PropertyGroup>
