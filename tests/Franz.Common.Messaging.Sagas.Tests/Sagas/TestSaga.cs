@@ -3,8 +3,6 @@
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Tests.Events;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Sagas;
 
@@ -13,17 +11,27 @@ public sealed class TestSaga :
   IStartWith<StartEvent>,
   IHandle<StepEvent>,
   ICompensateWith<CompensationEvent>,
+  IMessageCorrelation<StartEvent>,
   IMessageCorrelation<StepEvent>
 {
+  // 🔑 CRITICAL: saga identity MUST be established before any handler runs
+  public override Task OnCreatedAsync(
+    ISagaContext context,
+    CancellationToken ct)
+  {
+    State.Id = context.CorrelationId
+      ?? throw new InvalidOperationException("CorrelationId is required");
+
+    State.Counter = 0;
+    return Task.CompletedTask;
+  }
+
   public Task<ISagaTransition> HandleAsync(
     StartEvent message,
     ISagaContext context,
     CancellationToken ct)
   {
-    State.Id = message.Id;
     State.Counter = 1;
-
-    // Explicitly continue without emitting a message
     return Task.FromResult(SagaTransition.Continue(null));
   }
 
@@ -33,7 +41,6 @@ public sealed class TestSaga :
     CancellationToken ct)
   {
     State.Counter++;
-
     return Task.FromResult(SagaTransition.Continue(null));
   }
 
@@ -43,11 +50,13 @@ public sealed class TestSaga :
     CancellationToken ct)
   {
     State.Counter--;
-
     return Task.FromResult(SagaTransition.Continue(null));
   }
 
-  // ✅ INSTANCE method — correctly implements IMessageCorrelation<T>
+  // 🔑 Correlation must exist for EVERY entry point
+  public string GetCorrelationId(StartEvent message)
+    => message.Id;
+
   public string GetCorrelationId(StepEvent message)
     => message.Id;
 }

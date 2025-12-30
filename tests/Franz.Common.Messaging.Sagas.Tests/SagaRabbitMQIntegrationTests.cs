@@ -52,6 +52,14 @@ public sealed class SagaRabbitMqIntegrationTests :
     var configuration = BuildRabbitConfiguration();
 
     using var host = Host.CreateDefaultBuilder()
+
+      // 🔧 FIX #1: Do NOT crash host on background service shutdown
+      .ConfigureHostOptions(options =>
+      {
+        options.BackgroundServiceExceptionBehavior =
+          BackgroundServiceExceptionBehavior.Ignore;
+      })
+
       .ConfigureServices(services =>
       {
         services.AddLogging();
@@ -81,7 +89,7 @@ public sealed class SagaRabbitMqIntegrationTests :
         services.AddSingleton<ISagaRepository, InMemorySagaRepository>();
 
         // =========================
-        // Saga registration (PHASE 1)
+        // Saga registration
         // =========================
         services.AddFranzSagas();
 
@@ -96,7 +104,7 @@ public sealed class SagaRabbitMqIntegrationTests :
       })
       .Build();
 
-    // 🔑 CRITICAL: finalize saga registration
+    // 🔑 Finalize saga registration
     host.Services.BuildFranzSagas();
 
     await host.StartAsync();
@@ -110,17 +118,30 @@ public sealed class SagaRabbitMqIntegrationTests :
     await mediator.PublishNotificationAsync(new StepEvent("saga-1"));
 
     // =========================
-    // ASSERT
+    // ASSERT (eventual consistency)
     // =========================
     var store = host.Services.GetRequiredService<InMemorySagaStateStore>();
     var serializer = host.Services.GetRequiredService<ISagaStateSerializer>();
 
-    Assert.True(store.Store.TryGetValue("saga-1", out var json));
+    TestSagaState? state = null;
+    var timeout = TimeSpan.FromSeconds(5);
+    var start = DateTime.UtcNow;
 
-    var state = (TestSagaState)
-      serializer.Deserialize(json!, typeof(TestSagaState));
+    // 🔧 FIX #2: wait until saga executes
+    while (DateTime.UtcNow - start < timeout)
+    {
+      if (store.Store.TryGetValue("saga-1", out var json))
+      {
+        state = (TestSagaState)
+          serializer.Deserialize(json!, typeof(TestSagaState));
+        break;
+      }
 
-    Assert.Equal("saga-1", state.Id);
+      await Task.Delay(100);
+    }
+
+    Assert.NotNull(state);
+    Assert.Equal("saga-1", state!.Id);
     Assert.Equal(2, state.Counter);
 
     await host.StopAsync();
