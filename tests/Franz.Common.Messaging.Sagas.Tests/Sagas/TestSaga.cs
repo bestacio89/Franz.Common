@@ -2,7 +2,8 @@
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Tests.Events;
-using Franz.Common.Messaging.Sagas.Tests.Sagas;
+
+namespace Franz.Common.Messaging.Sagas.Tests.Sagas;
 
 public sealed class TestSaga :
   SagaBase<TestSagaState>,
