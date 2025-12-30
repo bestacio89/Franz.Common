@@ -1,14 +1,16 @@
-﻿using Franz.Common.Messaging.Sagas.Abstractions;
+﻿#nullable enable
+
+using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Sagas;
 
 public sealed class TestSagaState : ISagaState, ISagaStateWithId
 {
-  public string Id { get; set; } = default!;
+  public string Id { get; set; } = string.Empty;
+
   public int Counter { get; set; }
-  public string? ConcurrencyToken { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+
+  // Minimal concurrency support for tests
+  public string? ConcurrencyToken { get; set; } = Guid.NewGuid().ToString();
 }
