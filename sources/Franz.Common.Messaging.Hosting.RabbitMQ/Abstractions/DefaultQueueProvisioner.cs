@@ -7,14 +7,17 @@ namespace Franz.Common.Messaging.Hosting.RabbitMQ.Abstractions;
 
 public sealed class DefaultQueueProvisioner : IQueueProvisioner
 {
-  public void EnsureQueueExists(IModelProvider channel, string queueName)
+  public async Task EnsureQueueExistsAsync(
+    IModelProvider channel,
+    string queueName,
+    CancellationToken ct = default)
   {
-    // Idempotent in RabbitMQ if parameters match
-    channel.Current.QueueDeclareAsync(
+    await channel.Current.QueueDeclareAsync(
       queue: queueName,
       durable: true,
       exclusive: false,
       autoDelete: false,
-      arguments: null);
+      arguments: null,
+      cancellationToken: ct);
   }
 }
