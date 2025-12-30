@@ -1,12 +1,8 @@
-﻿#nullable enable
-
+﻿using Docker.DotNet.Models;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Tests.Events;
-
-namespace Franz.Common.Messaging.Sagas.Tests.Sagas;
-
-#nullable enable
+using Franz.Common.Messaging.Sagas.Tests.Sagas;
 
 public sealed class TestSaga :
   SagaBase<TestSagaState>,
@@ -14,19 +10,19 @@ public sealed class TestSaga :
   IHandle<StepEvent>,
   ICompensateWith<CompensationEvent>,
   IMessageCorrelation<StartEvent>,
-  IMessageCorrelation<StepEvent>
+  IMessageCorrelation<StepEvent>,
+  IMessageCorrelation<CompensationEvent> // ✅ MISSING
 {
-  public override Task OnCreatedAsync(
-    ISagaContext context,
-    CancellationToken ct)
+  public override Task OnCreatedAsync(ISagaContext context, CancellationToken ct)
   {
-    State.Id = context.CorrelationId
+    State.Id =
+      context.CorrelationId
       ?? context.Message switch
       {
         StartEvent e => e.Id,
         StepEvent e => e.Id,
-        _ => throw new InvalidOperationException(
-          "Unable to derive saga id from message")
+        CompensationEvent e => e.Id, // ✅ add for completeness
+        _ => throw new InvalidOperationException("Unable to derive saga id")
       };
 
     State.Counter = 0;
@@ -62,4 +58,5 @@ public sealed class TestSaga :
 
   public string GetCorrelationId(StartEvent message) => message.Id;
   public string GetCorrelationId(StepEvent message) => message.Id;
+  public string GetCorrelationId(CompensationEvent message) => message.Id; // ✅
 }

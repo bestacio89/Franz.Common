@@ -4,6 +4,7 @@ using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Hosting.RabbitMQ;
+using Franz.Common.Messaging.Hosting.RabbitMQ.Abstractions; // 🔑 ADD
 using Franz.Common.Messaging.Outbox;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.Sagas.Configuration;
@@ -53,7 +54,6 @@ public sealed class SagaRabbitMqIntegrationTests :
 
     using var host = Host.CreateDefaultBuilder()
 
-      // 🔧 FIX #1: Do NOT crash host on background service shutdown
       .ConfigureHostOptions(options =>
       {
         options.BackgroundServiceExceptionBehavior =
@@ -69,6 +69,10 @@ public sealed class SagaRabbitMqIntegrationTests :
         // =========================
         services.AddMessagingSerialization();
         services.AddRabbitMQMessaging(configuration);
+
+        // 🔑 THIS IS THE FIX
+        services.AddSingleton<IQueueProvisioner, DefaultQueueProvisioner>();
+
         services.AddMongoMessageStore(
           connectionString: _mongo.ConnectionString,
           dbName: _mongo.DatabaseName);
@@ -82,7 +86,7 @@ public sealed class SagaRabbitMqIntegrationTests :
         });
 
         // =========================
-        // Saga persistence (INTENTIONAL: in-memory)
+        // Saga persistence
         // =========================
         services.AddSingleton<InMemorySagaStateStore>();
         services.AddSingleton<ISagaStateSerializer, JsonSagaStateSerializer>();
@@ -104,9 +108,9 @@ public sealed class SagaRabbitMqIntegrationTests :
       })
       .Build();
 
-    // 🔑 Finalize saga registration
     host.Services.BuildFranzSagas();
 
+    // 🔑 Provisioning runs implicitly during startup
     await host.StartAsync();
 
     // =========================
@@ -118,7 +122,7 @@ public sealed class SagaRabbitMqIntegrationTests :
     await mediator.PublishNotificationAsync(new StepEvent("saga-1"));
 
     // =========================
-    // ASSERT (eventual consistency)
+    // ASSERT
     // =========================
     var store = host.Services.GetRequiredService<InMemorySagaStateStore>();
     var serializer = host.Services.GetRequiredService<ISagaStateSerializer>();
@@ -127,7 +131,6 @@ public sealed class SagaRabbitMqIntegrationTests :
     var timeout = TimeSpan.FromSeconds(5);
     var start = DateTime.UtcNow;
 
-    // 🔧 FIX #2: wait until saga executes
     while (DateTime.UtcNow - start < timeout)
     {
       if (store.Store.TryGetValue("saga-1", out var json))
