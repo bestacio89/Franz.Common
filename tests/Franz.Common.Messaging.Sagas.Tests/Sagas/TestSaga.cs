@@ -6,6 +6,8 @@ using Franz.Common.Messaging.Sagas.Tests.Events;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Sagas;
 
+#nullable enable
+
 public sealed class TestSaga :
   SagaBase<TestSagaState>,
   IStartWith<StartEvent>,
@@ -14,13 +16,18 @@ public sealed class TestSaga :
   IMessageCorrelation<StartEvent>,
   IMessageCorrelation<StepEvent>
 {
-  // 🔑 CRITICAL: saga identity MUST be established before any handler runs
   public override Task OnCreatedAsync(
     ISagaContext context,
     CancellationToken ct)
   {
     State.Id = context.CorrelationId
-      ?? throw new InvalidOperationException("CorrelationId is required");
+      ?? context.Message switch
+      {
+        StartEvent e => e.Id,
+        StepEvent e => e.Id,
+        _ => throw new InvalidOperationException(
+          "Unable to derive saga id from message")
+      };
 
     State.Counter = 0;
     return Task.CompletedTask;
@@ -53,10 +60,6 @@ public sealed class TestSaga :
     return Task.FromResult(SagaTransition.Continue(null));
   }
 
-  // 🔑 Correlation must exist for EVERY entry point
-  public string GetCorrelationId(StartEvent message)
-    => message.Id;
-
-  public string GetCorrelationId(StepEvent message)
-    => message.Id;
+  public string GetCorrelationId(StartEvent message) => message.Id;
+  public string GetCorrelationId(StepEvent message) => message.Id;
 }
