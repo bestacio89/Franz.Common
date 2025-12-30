@@ -3,8 +3,8 @@
 using Franz.Common.Messaging.Sagas.Tests.Events;
 using Franz.Common.Messaging.Sagas.Tests.Sagas;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
-using Xunit;
 using Franz.Common.Messaging.Sagas.Tests.Fixtures;
+using Xunit;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Integration;
 
@@ -24,7 +24,7 @@ public sealed class SagaIntegrationTests
     // Act
     await _fixture.Orchestrator.HandleEventAsync(
       new StartEvent("saga-1"),
-      correlationId: null,
+      correlationId: "saga-1",
       causationId: null,
       CancellationToken.None);
 
@@ -42,7 +42,9 @@ public sealed class SagaIntegrationTests
     // Arrange
     await _fixture.Orchestrator.HandleEventAsync(
       new StartEvent("saga-2"),
-      null, null, CancellationToken.None);
+      correlationId: "saga-2",
+      causationId: null,
+      CancellationToken.None);
 
     // Act
     await _fixture.Orchestrator.HandleEventAsync(
@@ -64,16 +66,22 @@ public sealed class SagaIntegrationTests
     // Arrange
     await _fixture.Orchestrator.HandleEventAsync(
       new StartEvent("saga-3"),
-      null, null, CancellationToken.None);
+      correlationId: "saga-3",
+      causationId: null,
+      CancellationToken.None);
 
     await _fixture.Orchestrator.HandleEventAsync(
       new StepEvent("saga-3"),
-      "saga-3", null, CancellationToken.None);
+      correlationId: "saga-3",
+      causationId: null,
+      CancellationToken.None);
 
     // Act
     await _fixture.Orchestrator.HandleEventAsync(
       new CompensationEvent("saga-3"),
-      "saga-3", null, CancellationToken.None);
+      correlationId: "saga-3",
+      causationId: null,
+      CancellationToken.None);
 
     // Assert
     var json = _fixture.StateStore.Store["saga-3"];
@@ -88,18 +96,19 @@ public sealed class SagaIntegrationTests
     // Arrange
     await _fixture.Orchestrator.HandleEventAsync(
       new StartEvent("saga-4"),
-      null, null, CancellationToken.None);
+      correlationId: "saga-4",
+      causationId: null,
+      CancellationToken.None);
 
     // New orchestrator, same store
-    var newFixture = new SagaRuntimeFixture
-    {
-      // reuse the same store intentionally
-    };
+    var newFixture = new SagaRuntimeFixture(_fixture.StateStore);
 
     // Act
     await newFixture.Orchestrator.HandleEventAsync(
       new StepEvent("saga-4"),
-      "saga-4", null, CancellationToken.None);
+      correlationId: "saga-4",
+      causationId: null,
+      CancellationToken.None);
 
     // Assert
     var json = newFixture.StateStore.Store["saga-4"];
