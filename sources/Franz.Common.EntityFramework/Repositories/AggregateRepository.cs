@@ -5,6 +5,7 @@ using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Messages;
 using Microsoft.EntityFrameworkCore;
 
+namespace Franz.Common.EntityFramework.Repositories;
 
 public abstract class AggregateRepository<TDbContext, TAggregateRoot, TEvent>
     : IAggregateRootRepository<TAggregateRoot, TEvent>

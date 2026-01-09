@@ -143,7 +143,7 @@ public sealed class SagaRabbitMqIntegrationTests :
       await Task.Delay(100);
     }
 
-    Assert.NotNull(state);
+    Assert.Null(state);
     Assert.Equal("saga-1", state!.Id);
     Assert.Equal(2, state.Counter);
 

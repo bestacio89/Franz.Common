@@ -1,5 +1,6 @@
 ﻿using Franz.Common.AzureCosmosDB;
 using Franz.Common.AzureCosmosDB.Extensions;
+using Franz.Common.AzureCosmosDB.Messaging;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.MariaDB.Extensions;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Reflection;
+using CosmosServiceCollectionExtensions = Franz.Common.AzureCosmosDB.Extensions.CosmosServiceCollectionExtensions;
 
 
 public static class MultiDatabaseServiceCollectionExtensions
@@ -66,13 +68,13 @@ public static class MultiDatabaseServiceCollectionExtensions
 
       // --- Cosmos ---
       case "cosmos":
-        if (!typeof(AzureCosmosStore).IsAssignableFrom(contextType))
+        if (!typeof(CosmosEfMessageStore).IsAssignableFrom(contextType))
           throw new InvalidOperationException(
               $"Provider 'cosmos' requires a context inheriting from AzureCosmosStore, " +
               $"but '{contextType.Name}' does not.");
 
-        var addCosmos = typeof(AzureCosmosDbServiceCollectionExtensions)
-            .GetMethod("AddCosmosStore")
+        var addCosmos = typeof(CosmosServiceCollectionExtensions)
+            .GetMethod("AddFranzCosmosMessaging")
             ?.MakeGenericMethod(contextType);
         addCosmos?.Invoke(null, new object[] { services, section });
         break;

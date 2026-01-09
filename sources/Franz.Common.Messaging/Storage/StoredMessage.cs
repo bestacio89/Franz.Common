@@ -23,6 +23,8 @@
 
     public string? LastError { get; set; }
 
-    public DateTime? LastTriedOn { get; set; }
+    public DateTime? LastTriedOn { get; set; } 
+
+    public bool IsDeadLetter { get; set; } = false;
   }
 }

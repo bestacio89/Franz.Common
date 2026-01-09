@@ -1,104 +1,105 @@
-﻿using Microsoft.Azure.Cosmos;
-using Microsoft.Extensions.DependencyInjection;
-
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
+﻿using Franz.Common.AzureCosmosDB.Context;
+using Franz.Common.AzureCosmosDB.Messaging;
+using Franz.Common.AzureCosmosDB.Options;
 using Franz.Common.Messaging.Storage;
-using Franz.Common.AzureCosmosDB.Storage;
+using Microsoft.Azure.Cosmos;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Franz.Common.AzureCosmosDB.Extensions;
 
-/// <summary>
-/// Provides extension methods for registering Cosmos DB in the DI container.
-/// </summary>
-public static class AzureCosmosDbServiceCollectionExtensions
+public static class CosmosServiceCollectionExtensions
 {
   /// <summary>
-  /// Registers Cosmos DB client and database in the DI container.
+  /// Registers CosmosOptions and the EF Core Cosmos DbContext.
   /// </summary>
-  public static IServiceCollection AddCosmosDatabase(
+  public static IServiceCollection AddFranzCosmosDbContext<TContext>(
       this IServiceCollection services,
       IConfiguration configuration)
+      where TContext : CosmosDbContextBase
   {
-    var section = configuration.GetSection("CosmosDb");
-    var connectionString = section.GetValue<string>("ConnectionString");
-    var databaseName = section.GetValue<string>("DatabaseName");
+    // Bind CosmosOptions from "Cosmos" section
+    services.Configure<CosmosOptions>(configuration.GetSection("Cosmos"));
+    var cosmos = configuration.GetSection("Cosmos").Get<CosmosOptions>()
+                 ?? throw new InvalidOperationException("Cosmos configuration missing.");
 
-    if (string.IsNullOrWhiteSpace(connectionString))
-      throw new InvalidOperationException("Missing 'CosmosDb:ConnectionString'.");
-    if (string.IsNullOrWhiteSpace(databaseName))
-      throw new InvalidOperationException("Missing 'CosmosDb:DatabaseName'.");
+    if (!cosmos.Enabled)
+      return services;
 
-    // CosmosClient should be singleton
-    services.AddSingleton<CosmosClient>(_ => new CosmosClient(connectionString));
-
-    // Database reference scoped per request
-    services.AddScoped<Database>(sp =>
+    // Register EF Core Cosmos DbContext
+    services.AddDbContext<TContext>(options =>
     {
-      var client = sp.GetRequiredService<CosmosClient>();
-      return client.GetDatabase(databaseName);
-    });
+      options.UseCosmos(
+          cosmos.AccountEndpoint,
+          cosmos.AccountKey,
+          cosmos.DatabaseName,
+          cosmosOptions =>
+          {
+            if (!string.IsNullOrWhiteSpace(cosmos.ApplicationName))
+            {
+              cosmosOptions.HttpClientFactory(() =>
+              {
+                var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("User-Agent", cosmos.ApplicationName);
+                return client;
+              });
+            }
 
-    return services;
-  }
-  /// <summary>
-  /// Registers a typed Cosmos Store derived from AzureCosmosStore.
-  /// </summary>
-  public static IServiceCollection AddCosmosStore<TCosmosStore>(
-      this IServiceCollection services,
-      IConfiguration configuration)
-      where TCosmosStore : AzureCosmosStore
-  {
-    var section = configuration.GetSection("CosmosDb");
-    var connectionString = section.GetValue<string>("ConnectionString");
-    var databaseName = section.GetValue<string>("DatabaseName");
-
-    if (string.IsNullOrWhiteSpace(connectionString))
-      throw new InvalidOperationException("Missing 'CosmosDb:ConnectionString'.");
-    if (string.IsNullOrWhiteSpace(databaseName))
-      throw new InvalidOperationException("Missing 'CosmosDb:DatabaseName'.");
-
-    // CosmosClient is already singleton
-    services.AddSingleton<CosmosClient>(_ => new CosmosClient(connectionString));
-
-    // Database is scoped
-    services.AddScoped<Database>(sp =>
-    {
-      var client = sp.GetRequiredService<CosmosClient>();
-      return client.GetDatabase(databaseName);
-    });
-
-    // Register the concrete store
-    services.AddScoped<TCosmosStore>(sp =>
-    {
-      var client = sp.GetRequiredService<CosmosClient>();
-      var database = sp.GetRequiredService<Database>();
-      return (TCosmosStore)Activator.CreateInstance(typeof(TCosmosStore), client, database)!;
+            if (cosmos.DatabaseThroughput.HasValue)
+              cosmosOptions.LimitToEndpoint(cosmos.DatabaseThroughput.Value);
+          }
+      );
     });
 
     return services;
   }
 
   /// <summary>
-  /// Registers Cosmos-based message store (Outbox & DeadLetter).
+  /// Registers the EF Core Cosmos DbContext for messaging (Outbox + Inbox),
+  /// and the EF-based MessageStore + InboxStore.
   /// </summary>
-  public static IServiceCollection AddCosmosMessageStore(
+  public static IServiceCollection AddFranzCosmosMessaging(
       this IServiceCollection services,
-      string connectionString,
-      string dbName,
-      string outboxContainer = "OutboxMessages",
-      string deadLetterContainer = "DeadLetterMessages")
+      IConfiguration configuration)
   {
-    var client = new CosmosClient(connectionString);
-    var database = client.GetDatabase(dbName);
+    // 1️⃣ Bind CosmosOptions
+    services.Configure<CosmosOptions>(configuration.GetSection("Cosmos"));
 
-    services.AddSingleton<IMessageStore>(
-        new CosmosDBMessageStore(database, outboxContainer, deadLetterContainer));
+    var cosmos = configuration.GetSection("Cosmos").Get<CosmosOptions>()
+                 ?? throw new InvalidOperationException("Cosmos configuration missing.");
+
+    if (!cosmos.Enabled)
+      return services;
+
+    // 2️⃣ Register the CosmosMessagingDbContext
+    services.AddDbContext<CosmosMessagingDbContext>(options =>
+    {
+      options.UseCosmos(
+          cosmos.AccountEndpoint,
+          cosmos.AccountKey,
+          cosmos.DatabaseName,
+          cosmosOptions =>
+          {
+            if (!string.IsNullOrWhiteSpace(cosmos.ApplicationName))
+            {
+              cosmosOptions.HttpClientFactory(() =>
+              {
+                var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("User-Agent", cosmos.ApplicationName);
+                return client;
+              });
+            }
+
+            if (cosmos.DatabaseThroughput.HasValue)
+              cosmosOptions.LimitToEndpoint(cosmos.DatabaseThroughput.Value);
+          }
+      );
+    });
+
+    // 3️⃣ Register Outbox + Inbox Stores
+    services.AddScoped<IMessageStore, CosmosEfMessageStore>();
+    services.AddScoped<IInboxStore, CosmosEfInboxStore>();
 
     return services;
   }

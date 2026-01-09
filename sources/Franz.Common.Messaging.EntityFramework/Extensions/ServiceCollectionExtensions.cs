@@ -8,6 +8,7 @@ using Franz.Common.EntityFramework.Postgres.Extensions;
 using Franz.Common.MongoDB.Extensions;
 using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.MongoDB;
+using Franz.Common.AzureCosmosDB.Context;
 
 namespace Franz.Common.Messaging.EntityFramework.Extensions;
 
@@ -36,7 +37,7 @@ public static class ServiceCollectionExtensions
 
       // NoSQL providers
       "mongo" => services.AddMongoDbContext<MongoDbContext>(configuration),
-      "cosmos" => services.AddCosmosDatabase(configuration),
+      "cosmos" => services.AddFranzCosmosDbContext<CosmosDbContextBase>(configuration),
 
       _ => throw new InvalidOperationException(
           $"Unsupported DB provider '{provider}'. " +

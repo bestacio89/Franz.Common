@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Franz.Common.AzureCosmosDB;
 using Franz.Common.AzureCosmosDB.Extensions;
+using Franz.Common.AzureCosmosDB.Context;
 namespace Franz.Common.Http.EntityFramework.Extensions;
 
 public static class ServiceCollectionExtensions
@@ -65,20 +66,24 @@ public static class ServiceCollectionExtensions
   }
 
   public static IServiceCollection AddCosmosDatabase<TCosmosContext>(
-    this IServiceCollection services,
-    IConfiguration config)
-    where TCosmosContext : AzureCosmosStore
+      this IServiceCollection services,
+      IConfiguration config)
+      where TCosmosContext : CosmosDbContextBase
   {
     var provider = config["Database:Provider"]?.ToLowerInvariant();
-    if (provider != "cosmos")
-      throw new InvalidOperationException("AzureCosmosStore requires provider 'cosmos'.");
 
-    return services.AddCosmosDatabase(config);
+    if (provider != "cosmos")
+      throw new InvalidOperationException("Cosmos database provider requires 'Database:Provider' = 'cosmos'.");
+
+    // Use the new EF Core Cosmos DI registration
+    services.AddFranzCosmosDbContext<TCosmosContext>(config);
+
+    return services;
   }
 
 
 
 
-  
+
 
 }
