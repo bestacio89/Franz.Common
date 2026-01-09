@@ -1,7 +1,13 @@
 ﻿#nullable enable
 
+using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging;
+using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.Delegating;
+using Franz.Common.Messaging.Hosting.RabbitMQ;
 using Franz.Common.Messaging.Outbox;
+using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Fixtures;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
@@ -9,140 +15,141 @@ using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Franz.Common.Messaging.Sagas.Tests.Events;
 using Franz.Common.Messaging.Sagas.Tests.Sagas;
 using Franz.Common.Messaging.Serialization;
+using Franz.Common.Messaging.Extensions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Fixtures;
 
-/// <summary>
-/// Full end-to-end saga fixture using:
-///  - Testcontainers RabbitMQ
-///  - Real Saga orchestrator
-///  - In-memory saga state persistence
-///  - Real messaging & outbox pipeline (you fill RabbitMQ registration)
-/// </summary>
 public sealed class SagaRabbitMQFixture : IAsyncDisposable
 {
   private readonly IHost _host;
 
   public InMemorySagaStateStore StateStore { get; }
-  public IMessageSerializer MessageSerializer { get; }
   public ISagaStateSerializer SagaStateSerializer { get; }
+  public IMessageSerializer MessageSerializer { get; }
 
   public IServiceProvider Services => _host.Services;
 
   public SagaRabbitMQFixture()
   {
-    // -----------------------------------
-    // Start RabbitMQ test container
-    // -----------------------------------
+    // ---------------------------------------------
+    // Testcontainers: start RabbitMQ
+    // ---------------------------------------------
     var rabbitFixture = new RabbitMqContainerFixture();
     rabbitFixture.InitializeAsync().GetAwaiter().GetResult();
 
-    var rabbitHost = rabbitFixture.Host;
-    var rabbitPort = rabbitFixture.Port;
+    // Build configuration block EXACTLY as in RabbitMQ tests
+    IConfiguration rabbitConfig = new ConfigurationBuilder()
+      .AddInMemoryCollection(new Dictionary<string, string?>
+      {
+        ["Messaging:HostName"] = rabbitFixture.Host,
+        ["Messaging:Port"] = rabbitFixture.Port.ToString()
+      })
+      .Build();
 
-    // -----------------------------------
-    // Saga State + Serializer
-    // -----------------------------------
+    // ---------------------------------------------
+    // Saga state infrastructure
+    // ---------------------------------------------
     StateStore = new InMemorySagaStateStore();
     SagaStateSerializer = new JsonSagaStateSerializer();
+    MessageSerializer = new JsonMessageSerializer();
 
     var sagaRepository = new InMemorySagaRepository(StateStore, SagaStateSerializer);
     var sagaPipeline = new SagaExecutionPipeline();
 
-    // -----------------------------------
-    // Serialization for messaging
-    // -----------------------------------
-    MessageSerializer = new JsonMessageSerializer();
-
-    // -----------------------------------
+    // ---------------------------------------------
     // Host + DI
-    // -----------------------------------
+    // ---------------------------------------------
     _host = Host.CreateDefaultBuilder()
-        .ConfigureLogging(lb =>
-        {
-          lb.ClearProviders();
-          lb.AddConsole();
-          lb.AddDebug();
-        })
-        .ConfigureServices(services =>
-        {
-          // -----------------------------
-          // Saga DI
-          // -----------------------------
-          services.AddSingleton(StateStore);
-          services.AddSingleton<ISagaStateSerializer>(SagaStateSerializer);
-          services.AddSingleton<IMessageSerializer>(MessageSerializer);
+    .ConfigureLogging(lb =>
+    {
+      lb.ClearProviders();
+      lb.AddConsole();
+      lb.AddDebug();
+    })
+    .ConfigureServices(services =>
+    {
+      // -------------------------------
+      // Core serialization
+      // -------------------------------
+      services.AddMessagingSerialization();
+      services.AddSingleton<IMessageSerializer>(MessageSerializer);
+      services.AddSingleton<ISagaStateSerializer>(SagaStateSerializer);
 
-          services.AddSingleton<TestSaga>();
+      // -------------------------------
+      // RabbitMQ Messaging Stack
+      // -------------------------------
+      services.AddRabbitMQMessaging(rabbitConfig);               // transport wiring
+      services.AddRabbitMQMessagingConfiguration(rabbitConfig); // retries, naming, QoS
 
-          services.AddSingleton(provider =>
+      // -------------------------------
+      // Mediator (dispatcher pipeline)
+      // -------------------------------
+      services.AddFranzMediator(new[]
           {
-            // Inner provider that knows only saga types
-            var sagaServices = new ServiceCollection();
-            sagaServices.AddSingleton<TestSaga>();
+                typeof(StartEvent).Assembly, // Register handlers from saga/test assemblies
+                typeof(TestSaga).Assembly
+        });
 
-            var sagaProvider = sagaServices.BuildServiceProvider();
+      // -------------------------------
+      // Outbox configuration
+      // -------------------------------
+      services.Configure<OutboxOptions>(opts =>
+      {
+        opts.Enabled = true;
+        opts.DeadLetterEnabled = true;
+        opts.PollingInterval = TimeSpan.FromMilliseconds(200);
+        opts.MaxRetries = 3;
+      });
 
-            // Router registers all sagas
-            var router = new SagaRouter(sagaProvider);
-            router.RegisterSaga(typeof(TestSaga));
+      // -------------------------------
+      // Saga system
+      // -------------------------------
+      services.AddSingleton(TestSaga.Create);  // factory
+      services.AddSingleton(StateStore);
 
-            return new SagaOrchestrator(
-                    router,
-                    sagaRepository,
-                    sagaPipeline,
-                    publisher: NullMessagingPublisher.Instance,
-                    sagaProvider);
-          });
+      services.AddSingleton(provider =>
+      {
+        // Inner saga provider only aware of saga types
+        var sagaServices = new ServiceCollection();
+        sagaServices.AddSingleton(TestSaga.Create);
 
-          // -----------------------------
-          // Messaging + Outbox pipeline
-          // YOU MUST FILL THESE LINES
-          // -----------------------------
+        var sagaProvider = sagaServices.BuildServiceProvider();
 
-          // Example: (use your real extension methods)
-          //
-          // services.AddRabbitMqMessaging(options =>
-          // {
-          //     options.HostName = rabbitHost;
-          //     options.Port = rabbitPort;
-          //     options.UserName = "guest";
-          //     options.Password = "guest";
-          // });
-          //
-          // services.AddOutboxPublisher();
-          // services.Configure<OutboxOptions>(opts =>
-          // {
-          //     opts.Enabled = true;
-          //     opts.PollingInterval = TimeSpan.FromMilliseconds(200);
-          //     opts.MaxRetries = 3;
-          //     opts.DeadLetterEnabled = true;
-          // });
-          //
-          // services.AddSingleton<IQueueProvisioner, DefaultQueueProvisioner>();
+        // Router discovers sagas
+        var router = new SagaRouter(sagaProvider);
+        router.RegisterSaga(typeof(TestSaga));
 
-        })
-        .Build();
+        return new SagaOrchestrator(
+                router,
+                sagaRepository,
+                sagaPipeline,
+                publisher: provider.GetRequiredService<IMessagingPublisher>(),
+                sagaProvider);
+      });
+
+      // -------------------------------
+      // Hosted listener for RabbitMQ
+      // -------------------------------
+      services.AddRabbitMQHostedListener(opts =>
+      {
+        opts.HostName = rabbitFixture.Host;
+        opts.Port = rabbitFixture.Port;
+      });
+    })
+    .Build();
   }
 
-  public async Task StartAsync(CancellationToken ct = default) =>
-      await _host.StartAsync(ct);
+  public async Task StartAsync() => await _host.StartAsync();
 
-  public async Task StopAsync(CancellationToken ct = default) =>
-      await _host.StopAsync(ct);
+  public async Task StopAsync() => await _host.StopAsync();
 
   public async ValueTask DisposeAsync()
   {
-    try
-    {
-      await _host.StopAsync();
-    }
-    finally
-    {
-      _host.Dispose();
-    }
+    try { await _host.StopAsync(); }
+    finally { _host.Dispose(); }
   }
 }

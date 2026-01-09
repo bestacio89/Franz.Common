@@ -1,4 +1,5 @@
-﻿using Docker.DotNet.Models;
+﻿#nullable enable
+
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Tests.Events;
@@ -12,8 +13,11 @@ public sealed class TestSaga :
   ICompensateWith<CompensationEvent>,
   IMessageCorrelation<StartEvent>,
   IMessageCorrelation<StepEvent>,
-  IMessageCorrelation<CompensationEvent> // ✅ MISSING
+  IMessageCorrelation<CompensationEvent>
 {
+  // ✅ Simple factory for tests that expect TestSaga.Create()
+  public static TestSaga Create() => new TestSaga();
+
   public override Task OnCreatedAsync(ISagaContext context, CancellationToken ct)
   {
     State.Id =
@@ -22,7 +26,7 @@ public sealed class TestSaga :
       {
         StartEvent e => e.Id,
         StepEvent e => e.Id,
-        CompensationEvent e => e.Id, // ✅ add for completeness
+        CompensationEvent e => e.Id,
         _ => throw new InvalidOperationException("Unable to derive saga id")
       };
 
@@ -30,28 +34,19 @@ public sealed class TestSaga :
     return Task.CompletedTask;
   }
 
-  public Task<ISagaTransition> HandleAsync(
-    StartEvent message,
-    ISagaContext context,
-    CancellationToken ct)
+  public Task<ISagaTransition> HandleAsync(StartEvent message, ISagaContext context, CancellationToken ct)
   {
     State.Counter = 1;
     return Task.FromResult(SagaTransition.Continue(null));
   }
 
-  public Task<ISagaTransition> HandleAsync(
-    StepEvent message,
-    ISagaContext context,
-    CancellationToken ct)
+  public Task<ISagaTransition> HandleAsync(StepEvent message, ISagaContext context, CancellationToken ct)
   {
     State.Counter++;
     return Task.FromResult(SagaTransition.Continue(null));
   }
 
-  public Task<ISagaTransition> HandleAsync(
-    CompensationEvent message,
-    ISagaContext context,
-    CancellationToken ct)
+  public Task<ISagaTransition> HandleAsync(CompensationEvent message, ISagaContext context, CancellationToken ct)
   {
     State.Counter--;
     return Task.FromResult(SagaTransition.Continue(null));
@@ -59,5 +54,5 @@ public sealed class TestSaga :
 
   public string GetCorrelationId(StartEvent message) => message.Id;
   public string GetCorrelationId(StepEvent message) => message.Id;
-  public string GetCorrelationId(CompensationEvent message) => message.Id; // ✅
+  public string GetCorrelationId(CompensationEvent message) => message.Id;
 }
