@@ -43,7 +43,8 @@ public sealed class SagaRuntimeFixture
     // Router
     // =========================
     var router = new SagaRouter(serviceProvider);
-    router.RegisterSaga(typeof(TestSaga));
+    router.RegisterSagasFromAssembly(typeof(TestSaga).Assembly);
+    ;
 
     // =========================
     // Pipeline

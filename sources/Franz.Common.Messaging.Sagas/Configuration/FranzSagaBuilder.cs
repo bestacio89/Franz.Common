@@ -1,5 +1,6 @@
 ﻿#nullable enable
 
+using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Logging;
 using Franz.Common.Messaging.Sagas.Validation;
@@ -7,12 +8,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 
 namespace Franz.Common.Messaging.Sagas.Configuration;
 
-/// <summary>
-/// Fluent builder used to configure sagas and their registrations.
-/// </summary>
 public sealed class FranzSagaBuilder
 {
   private readonly IServiceCollection _services;
@@ -21,50 +21,98 @@ public sealed class FranzSagaBuilder
   public FranzSagaBuilder(IServiceCollection services)
   {
     _services = services;
-    _services.AddSingleton<FranzSagaBuilder>(this); // Needed for BuildFranzSagas()
+    _services.AddSingleton(this);
   }
 
-  /// <summary>
-  /// Registers a saga type implementing ISaga<TState>.
-  /// </summary>
+  // ----------------------------------------------------
+  // Explicit registration
+  // ----------------------------------------------------
   public FranzSagaBuilder AddSaga<TSaga>()
   {
-    var sagaType = typeof(TSaga);
-    _sagaTypes.Add(sagaType);
+    return AddSaga(typeof(TSaga));
+  }
 
+  public FranzSagaBuilder AddSaga(Type sagaType)
+  {
+    if (!IsSagaType(sagaType))
+      throw new InvalidOperationException($"{sagaType.Name} is not a valid saga. It must implement ISaga<TState>");
+
+    _sagaTypes.Add(sagaType);
     _services.AddTransient(sagaType);
     return this;
   }
 
-  /// <summary>
-  /// Registers a custom audit sink.
-  /// </summary>
-  public FranzSagaBuilder AddAuditSink<TSink>()
-      where TSink : class, ISagaAuditSink
+  // ----------------------------------------------------
+  // Assembly scanning
+  // ----------------------------------------------------
+  public FranzSagaBuilder AddSagaAssembly(Assembly assembly)
   {
-    _services.TryAddEnumerable(ServiceDescriptor.Singleton<ISagaAuditSink, TSink>());
+    var sagas = assembly
+      .GetTypes()
+      .Where(IsSagaType);
+
+    foreach (var saga in sagas)
+      AddSaga(saga);
+
     return this;
   }
 
-  /// <summary>
-  /// Internal usage: finalizes saga registrations.
-  /// Called by BuildFranzSagas(IServiceProvider).
-  /// </summary>
-  internal void Build(IServiceProvider provider, bool validateMappings)
+  public FranzSagaBuilder AddSagasFromAssemblyContaining<T>()
+  {
+    return AddSagaAssembly(typeof(T).Assembly);
+  }
+
+  // ----------------------------------------------------
+  // Audit sink
+  // ----------------------------------------------------
+  public FranzSagaBuilder AddAuditSink<TSink>()
+      where TSink : class, ISagaAuditSink
+  {
+    _services.TryAddEnumerable(
+      ServiceDescriptor.Singleton<ISagaAuditSink, TSink>()
+    );
+    return this;
+  }
+
+  // ----------------------------------------------------
+  // Internal Build for DI
+  // ----------------------------------------------------
+  internal void Build(IServiceProvider provider, bool validate)
   {
     var router = provider.GetRequiredService<SagaRouter>();
+    RegisterIntoRouter(router, validate);
+  }
 
-    foreach (var sagaType in _sagaTypes)
+  // ----------------------------------------------------
+  // Manual registration for Tests
+  // ----------------------------------------------------
+  public void RegisterIntoRouter(SagaRouter router, bool validate)
+  {
+    foreach (var type in _sagaTypes)
     {
-      // Build registration only to validate mapping
-      if (validateMappings)
+      if (validate)
       {
-        var registration = SagaRegistration.FromType(sagaType);
-        SagaMappingValidator.ValidateRegistration(registration);
+        var reg = SagaRegistration.FromType(type);
+        SagaMappingValidator.ValidateRegistration(reg);
       }
 
-      // Register through the router
-      router.RegisterSaga(sagaType);
+      router.RegisterSaga(type);
     }
+  }
+
+  // ----------------------------------------------------
+  // Helper: detect saga types
+  // ----------------------------------------------------
+  private static bool IsSagaType(Type type)
+  {
+    if (type.IsAbstract || type.IsInterface)
+      return false;
+
+    return type
+      .GetInterfaces()
+      .Any(i =>
+          i.IsGenericType &&
+          i.GetGenericTypeDefinition() == typeof(ISaga<>)
+      );
   }
 }
