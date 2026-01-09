@@ -1,5 +1,6 @@
 ﻿#nullable enable
 
+using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
@@ -13,44 +14,50 @@ public sealed class SagaRuntimeFixture
 {
   public SagaOrchestrator Orchestrator { get; }
   public InMemorySagaStateStore StateStore { get; }
+  public JsonSagaStateSerializer Serializer { get; }
 
   public SagaRuntimeFixture(InMemorySagaStateStore? sharedStore = null)
   {
     // =========================
-    // Saga persistence
+    // Persistence
     // =========================
     StateStore = sharedStore ?? new InMemorySagaStateStore();
-
-    var serializer = new JsonSagaStateSerializer();
-    var repository = new InMemorySagaRepository(StateStore, serializer);
-
-    // =========================
-    // Execution pipeline
-    // =========================
-    var pipeline = new SagaExecutionPipeline();
+    Serializer = new JsonSagaStateSerializer();
+    var repository = new InMemorySagaRepository(StateStore, Serializer);
 
     // =========================
-    // Service provider
+    // IoC container
     // =========================
     var services = new ServiceCollection();
+
+    // Real mediator
+    services.AddSingleton<IDispatcher, FranzDispatcher>();
+
+    // Saga type
     services.AddSingleton<TestSaga>();
 
+    // Build provider
     var serviceProvider = services.BuildServiceProvider();
 
     // =========================
-    // Router + registration
+    // Router
     // =========================
     var router = new SagaRouter(serviceProvider);
     router.RegisterSaga(typeof(TestSaga));
 
     // =========================
+    // Pipeline
+    // =========================
+    var pipeline = new SagaExecutionPipeline();
+
+    // =========================
     // Orchestrator
     // =========================
     Orchestrator = new SagaOrchestrator(
-      router,
-      repository,
-      pipeline,
-      publisher: NullMessagingPublisher.Instance,
-      serviceProvider);
+        router,
+        repository,
+        pipeline,
+        publisher: NullMessagingPublisher.Instance,
+        serviceProvider);
   }
 }
