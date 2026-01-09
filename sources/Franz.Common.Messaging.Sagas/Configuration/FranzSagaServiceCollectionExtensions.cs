@@ -1,6 +1,5 @@
 ﻿#nullable enable
 
-using Franz.Common.Messaging.Sagas.Configuration;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,7 +9,11 @@ namespace Franz.Common.Messaging.Sagas.Configuration;
 
 public static class FranzSagaServiceCollectionExtensions
 {
-  public static IServiceCollection AddFranzSagas(
+  /// <summary>
+  /// Registers Franz Saga infrastructure and returns the builder
+  /// so callers can register saga types.
+  /// </summary>
+  public static FranzSagaBuilder AddFranzSagas(
       this IServiceCollection services,
       Action<FranzSagaOptions>? configure = null)
   {
@@ -19,30 +22,29 @@ public static class FranzSagaServiceCollectionExtensions
 
     services.AddSingleton(options);
 
-    // Register router + orchestrator dependencies
+    // Core infrastructure
     services.AddSingleton<SagaRouter>();
     services.AddTransient<SagaExecutionPipeline>();
     services.AddTransient<SagaOrchestrator>();
 
-    // Default audit sink if none registered
+    // Default audit sink
     services.TryAddSingleton<ISagaAuditSink, DefaultSagaAuditSink>();
 
-    // The builder gets injected so we can finalize registration later
+    // Create + register the builder
     var builder = new FranzSagaBuilder(services);
+    services.AddSingleton(builder);
 
-    return services;
+    return builder;
   }
 
   /// <summary>
-  /// Must be called at the END of DI building (inside app startup).
-  /// Ensures all sagas are validated and registered.
+  /// Finalizes saga registrations.
   /// </summary>
   public static void BuildFranzSagas(this IServiceProvider provider)
   {
     var builder = provider.GetRequiredService<FranzSagaBuilder>();
     var options = provider.GetRequiredService<FranzSagaOptions>();
 
-    // FIX: pass BOTH arguments as required by the builder signature
     builder.Build(provider, options.ValidateMappings);
   }
 }

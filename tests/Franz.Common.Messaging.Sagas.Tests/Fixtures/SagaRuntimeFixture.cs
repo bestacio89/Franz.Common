@@ -1,10 +1,12 @@
 ﻿#nullable enable
 
 using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
+using Franz.Common.Messaging.Sagas.Tests.Events;
 using Franz.Common.Messaging.Sagas.Tests.Sagas;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -31,7 +33,10 @@ public sealed class SagaRuntimeFixture
     var services = new ServiceCollection();
 
     // Real mediator
-    services.AddSingleton<IDispatcher, FranzDispatcher>();
+    services.AddFranzMediator(new[]
+    {
+      typeof(StartEvent).Assembly
+    });
 
     // Saga type
     services.AddSingleton<TestSaga>();
