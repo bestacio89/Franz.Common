@@ -9,10 +9,8 @@ namespace Franz.Common.Messaging.Sagas.Tests.Sagas;
 public sealed class TestSaga :
   SagaBase<TestSagaState>,
   IStartWith<StartEvent>,
-  IHandle<StepEvent>,
   ICompensateWith<CompensationEvent>,
   IMessageCorrelation<StartEvent>,
-  IMessageCorrelation<StepEvent>,
   IMessageCorrelation<CompensationEvent>
 {
   // ✅ Simple factory for tests that expect TestSaga.Create()
@@ -25,7 +23,6 @@ public sealed class TestSaga :
       ?? context.Message switch
       {
         StartEvent e => e.Id,
-        StepEvent e => e.Id,
         CompensationEvent e => e.Id,
         _ => throw new InvalidOperationException("Unable to derive saga id")
       };
@@ -40,11 +37,6 @@ public sealed class TestSaga :
     return Task.FromResult(SagaTransition.Continue(null));
   }
 
-  public Task<ISagaTransition> HandleAsync(StepEvent message, ISagaContext context, CancellationToken ct)
-  {
-    State.Counter++;
-    return Task.FromResult(SagaTransition.Continue(null));
-  }
 
   public Task<ISagaTransition> HandleAsync(CompensationEvent message, ISagaContext context, CancellationToken ct)
   {
@@ -53,6 +45,6 @@ public sealed class TestSaga :
   }
 
   public string GetCorrelationId(StartEvent message) => message.Id;
-  public string GetCorrelationId(StepEvent message) => message.Id;
+
   public string GetCorrelationId(CompensationEvent message) => message.Id;
 }
