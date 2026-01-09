@@ -1,15 +1,14 @@
 ﻿#nullable enable
 
-using Franz.Common.Mediator.Dispatchers;
-using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging;
+using Franz.Common.Messaging.Sagas.Configuration;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Franz.Common.Messaging.Sagas.Tests.Events;
 using Franz.Common.Messaging.Sagas.Tests.Sagas;
 using Microsoft.Extensions.DependencyInjection;
-
+using Franz.Common.Mediator.Extensions;
 namespace Franz.Common.Messaging.Sagas.Tests.Fixtures;
 
 public sealed class SagaRuntimeFixture
@@ -32,29 +31,30 @@ public sealed class SagaRuntimeFixture
     // =========================
     var services = new ServiceCollection();
 
-    // Real mediator
+    // Register mediator (event types)
     services.AddFranzMediator(new[]
     {
       typeof(StartEvent).Assembly
     });
 
-    // Saga type
-    services.AddSingleton<TestSaga>();
+    // Register saga infrastructure
+    var builder = services.AddFranzSagas(opts =>
+    {
+      opts.ValidateMappings = true;
+    });
+
+    // Register test saga
+    builder.AddSaga<TestSaga>();
 
     // Build provider
-    var serviceProvider = services.BuildServiceProvider();
+    var provider = services.BuildServiceProvider();
 
-    // =========================
-    // Router
-    // =========================
-    var router = new SagaRouter(serviceProvider);
-    router.RegisterSagasFromAssembly(typeof(TestSaga).Assembly);
-    ;
+    // Finalize saga registrations (CRITICAL!)
+    provider.BuildFranzSagas();
 
-    // =========================
-    // Pipeline
-    // =========================
-    var pipeline = new SagaExecutionPipeline();
+    // Resolve router and pipeline
+    var router = provider.GetRequiredService<SagaRouter>();
+    var pipeline = provider.GetRequiredService<SagaExecutionPipeline>();
 
     // =========================
     // Orchestrator
@@ -64,6 +64,6 @@ public sealed class SagaRuntimeFixture
         repository,
         pipeline,
         publisher: NullMessagingPublisher.Instance,
-        serviceProvider);
+        provider);
   }
 }
