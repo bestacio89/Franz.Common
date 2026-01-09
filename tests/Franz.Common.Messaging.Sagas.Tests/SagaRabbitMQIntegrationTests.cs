@@ -1,9 +1,9 @@
 ﻿#nullable enable
 
-using Franz.Common.Mediator.Dispatchers;
-using Franz.Common.Mediator.Extensions;
+using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Tests.Events;
 using Franz.Common.Messaging.Sagas.Tests.Fixtures;
+using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Franz.Common.Messaging.Sagas.Tests.Sagas;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -22,51 +22,40 @@ public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQFix
   [Fact]
   public async Task Saga_executes_end_to_end_inside_real_rabbitmq_host()
   {
-    // -------------------------------------------------
-    // Arrange – start full host (RabbitMQ + Outbox + Sagas)
-    // -------------------------------------------------
-    await _fixture.StartAsync();
+    var publisher = _fixture.Services.GetRequiredService<IMessagingPublisher>();
+    var stateStore = _fixture.StateStore;
+    var serializer = _fixture.Serializer;
 
-    var stateStore = _fixture.StateStore;          // InMemorySagaStateStore
-    var stateSerializer = _fixture.SagaStateSerializer; // JsonSagaStateSerializer
+    var id = "saga-rabbit-1";
 
-    // Dispatcher is the entry point into the messaging pipeline:
-    // StartEvent/StepEvent -> mediator -> messaging -> outbox -> RabbitMQ -> saga
-    var dispatcher = _fixture.Services.GetRequiredService<IDispatcher>();
+    // ========================
+    // Publish real events
+    // ========================
+    await publisher.Publish(new StartEvent(id));
+    await publisher.Publish(new StepEvent(id));
 
-    var id = "saga-1";
-
-    // -------------------------------------------------
-    // Act – publish saga events through mediator
-    // (serialization to Message is done by the messaging pipeline)
-    // -------------------------------------------------
-    await dispatcher.PublishNotificationAsync(new StartEvent(id));
-    await dispatcher.PublishNotificationAsync(new StepEvent(id));
-
-    // -------------------------------------------------
-    // Wait for saga state to be materialized by the orchestrator
-    // -------------------------------------------------
+    // ========================
+    // Wait for saga side effects
+    // ========================
     TestSagaState? state = null;
+    var timeout = TimeSpan.FromSeconds(20);
     var start = DateTime.UtcNow;
-    var timeout = TimeSpan.FromSeconds(10);
 
     while (DateTime.UtcNow - start < timeout)
     {
-      if (stateStore.Store.TryGetValue(id, out var json) && json is not null)
+      if (stateStore.Store.TryGetValue(id, out var json) && json != null)
       {
-        // Here we deserialize *saga state*, so we use the saga state serializer
-        state = (TestSagaState?)stateSerializer.Deserialize(json, typeof(TestSagaState));
+        state = (TestSagaState?)serializer.Deserialize(json, typeof(TestSagaState));
         break;
       }
-
       await Task.Delay(200);
     }
 
-    // -------------------------------------------------
-    // Assert – the saga ran end-to-end correctly
-    // -------------------------------------------------
+    // ========================
+    // Assert
+    // ========================
     Assert.NotNull(state);
     Assert.Equal(id, state!.Id);
-    Assert.Equal(2, state.Counter); // StartEvent + StepEvent
+    Assert.Equal(2, state.Counter);   // StartEvent + StepEvent
   }
 }
