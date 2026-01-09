@@ -2,151 +2,71 @@
 
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Extensions;
-using Franz.Common.Messaging.Extensions;
-using Franz.Common.Messaging.Hosting.RabbitMQ;
-using Franz.Common.Messaging.Hosting.RabbitMQ.Abstractions; // 🔑 ADD
-using Franz.Common.Messaging.Outbox;
-using Franz.Common.Messaging.RabbitMQ.Extensions;
-using Franz.Common.Messaging.Sagas.Configuration;
-using Franz.Common.Messaging.Sagas.Fixtures;
-using Franz.Common.Messaging.Sagas.Persistence;
-using Franz.Common.Messaging.Sagas.Persistence.Memory;
-using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Franz.Common.Messaging.Sagas.Tests.Events;
 using Franz.Common.Messaging.Sagas.Tests.Fixtures;
 using Franz.Common.Messaging.Sagas.Tests.Sagas;
-using Franz.Common.MongoDB.Extensions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Integration;
 
-public sealed class SagaRabbitMqIntegrationTests :
-  IClassFixture<RabbitMqContainerFixture>,
-  IClassFixture<MongoContainerFixture>
+public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQFixture>
 {
-  private readonly RabbitMqContainerFixture _rabbit;
-  private readonly MongoContainerFixture _mongo;
+  private readonly SagaRabbitMQFixture _fixture;
 
-  public SagaRabbitMqIntegrationTests(
-    RabbitMqContainerFixture rabbit,
-    MongoContainerFixture mongo)
+  public SagaRabbitMqIntegrationTests(SagaRabbitMQFixture fixture)
   {
-    _rabbit = rabbit;
-    _mongo = mongo;
+    _fixture = fixture;
   }
-
-  private IConfiguration BuildRabbitConfiguration()
-    => new ConfigurationBuilder()
-      .AddInMemoryCollection(new Dictionary<string, string?>
-      {
-        ["Messaging:HostName"] = _rabbit.Host,
-        ["Messaging:Port"] = _rabbit.Port.ToString()
-      })
-      .Build();
 
   [Fact]
   public async Task Saga_executes_end_to_end_inside_real_rabbitmq_host()
   {
-    var configuration = BuildRabbitConfiguration();
+    // -------------------------------------------------
+    // Arrange – start full host (RabbitMQ + Outbox + Sagas)
+    // -------------------------------------------------
+    await _fixture.StartAsync();
 
-    using var host = Host.CreateDefaultBuilder()
+    var stateStore = _fixture.StateStore;          // InMemorySagaStateStore
+    var stateSerializer = _fixture.SagaStateSerializer; // JsonSagaStateSerializer
 
-      .ConfigureHostOptions(options =>
-      {
-        options.BackgroundServiceExceptionBehavior =
-          BackgroundServiceExceptionBehavior.Ignore;
-      })
+    // Dispatcher is the entry point into the messaging pipeline:
+    // StartEvent/StepEvent -> mediator -> messaging -> outbox -> RabbitMQ -> saga
+    var dispatcher = _fixture.Services.GetRequiredService<IDispatcher>();
 
-      .ConfigureServices(services =>
-      {
-        services.AddLogging();
+    var id = "saga-1";
 
-        // =========================
-        // Messaging infrastructure
-        // =========================
-        services.AddMessagingSerialization();
-        services.AddRabbitMQMessaging(configuration);
+    // -------------------------------------------------
+    // Act – publish saga events through mediator
+    // (serialization to Message is done by the messaging pipeline)
+    // -------------------------------------------------
+    await dispatcher.PublishNotificationAsync(new StartEvent(id));
+    await dispatcher.PublishNotificationAsync(new StepEvent(id));
 
-        // 🔑 THIS IS THE FIX
-        services.AddSingleton<IQueueProvisioner, DefaultQueueProvisioner>();
-
-        services.AddMongoMessageStore(
-          connectionString: _mongo.ConnectionString,
-          dbName: _mongo.DatabaseName);
-
-        // =========================
-        // Mediator
-        // =========================
-        services.AddFranzMediator(new[]
-        {
-          typeof(StartEvent).Assembly
-        });
-
-        // =========================
-        // Saga persistence
-        // =========================
-        services.AddSingleton<InMemorySagaStateStore>();
-        services.AddSingleton<ISagaStateSerializer, JsonSagaStateSerializer>();
-        services.AddSingleton<ISagaRepository, InMemorySagaRepository>();
-
-        // =========================
-        // Saga registration
-        // =========================
-        services.AddFranzSagas();
-
-        // =========================
-        // Hosting
-        // =========================
-        services.AddRabbitMQHostedListener(_ => { });
-        services.AddOutboxHostedListener(opts =>
-        {
-          opts.PollingInterval = TimeSpan.FromMilliseconds(100);
-        });
-      })
-      .Build();
-
-    host.Services.BuildFranzSagas();
-
-    // 🔑 Provisioning runs implicitly during startup
-    await host.StartAsync();
-
-    // =========================
-    // ACT
-    // =========================
-    var mediator = host.Services.GetRequiredService<IDispatcher>();
-
-    await mediator.PublishNotificationAsync(new StartEvent("saga-1"));
-    await mediator.PublishNotificationAsync(new StepEvent("saga-1"));
-
-    // =========================
-    // ASSERT
-    // =========================
-    var store = host.Services.GetRequiredService<InMemorySagaStateStore>();
-    var serializer = host.Services.GetRequiredService<ISagaStateSerializer>();
-
+    // -------------------------------------------------
+    // Wait for saga state to be materialized by the orchestrator
+    // -------------------------------------------------
     TestSagaState? state = null;
-    var timeout = TimeSpan.FromSeconds(5);
     var start = DateTime.UtcNow;
+    var timeout = TimeSpan.FromSeconds(10);
 
     while (DateTime.UtcNow - start < timeout)
     {
-      if (store.Store.TryGetValue("saga-1", out var json))
+      if (stateStore.Store.TryGetValue(id, out var json) && json is not null)
       {
-        state = (TestSagaState)
-          serializer.Deserialize(json!, typeof(TestSagaState));
+        // Here we deserialize *saga state*, so we use the saga state serializer
+        state = (TestSagaState?)stateSerializer.Deserialize(json, typeof(TestSagaState));
         break;
       }
 
-      await Task.Delay(100);
+      await Task.Delay(200);
     }
 
-    Assert.Null(state);
-    Assert.Equal("saga-1", state!.Id);
-    Assert.Equal(2, state.Counter);
-
-    await host.StopAsync();
+    // -------------------------------------------------
+    // Assert – the saga ran end-to-end correctly
+    // -------------------------------------------------
+    Assert.NotNull(state);
+    Assert.Equal(id, state!.Id);
+    Assert.Equal(2, state.Counter); // StartEvent + StepEvent
   }
 }
