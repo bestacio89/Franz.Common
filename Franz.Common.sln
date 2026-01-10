@@ -142,8 +142,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.Host
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Caching.Testing", "tests\Franz.Common.Caching.Testing\Franz.Common.Caching.Testing.csproj", "{0DA7F2A0-087E-4056-9C18-DFDA235CD0BB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.Sagas.Tests", "tests\Franz.Common.Messaging.Sagas.Tests\Franz.Common.Messaging.Sagas.Tests.csproj", "{03492422-6392-40D8-826E-01EE8184C10A}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -402,10 +400,6 @@ Global
 		{0DA7F2A0-087E-4056-9C18-DFDA235CD0BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0DA7F2A0-087E-4056-9C18-DFDA235CD0BB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0DA7F2A0-087E-4056-9C18-DFDA235CD0BB}.Release|Any CPU.Build.0 = Release|Any CPU
-		{03492422-6392-40D8-826E-01EE8184C10A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{03492422-6392-40D8-826E-01EE8184C10A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{03492422-6392-40D8-826E-01EE8184C10A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{03492422-6392-40D8-826E-01EE8184C10A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -475,7 +469,6 @@ Global
 		{42155453-90CD-B771-FC22-8DA061262514} = {2A34967E-2D10-4703-BFB0-D4883859D440}
 		{0AD09AF3-BA8B-1AB5-8149-B763FB71FE42} = {99C4C621-B376-4D7A-BB9B-C56DEB0AA0CB}
 		{0DA7F2A0-087E-4056-9C18-DFDA235CD0BB} = {99C4C621-B376-4D7A-BB9B-C56DEB0AA0CB}
-		{03492422-6392-40D8-826E-01EE8184C10A} = {99C4C621-B376-4D7A-BB9B-C56DEB0AA0CB}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {069A32C7-587A-42C8-B9D2-9CF7EE93E2BD}
