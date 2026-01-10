@@ -1,6 +1,7 @@
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Errors;
 using Franz.Common.Headers;
+using Franz.Common.Mediator;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Headers;

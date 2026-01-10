@@ -10,6 +10,7 @@
 
 
   <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.AzureCosmosDB\Franz.Common.AzureCosmosDB.csproj" />
     <ProjectReference Include="..\Franz.Common.Business\Franz.Common.Business.csproj" />
     <ProjectReference Include="..\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
     <ProjectReference Include="..\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
@@ -25,6 +26,10 @@
       <PackagePath></PackagePath>
       <Pack>true</Pack>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="NewFolder\" />
   </ItemGroup>
 
 </Project>

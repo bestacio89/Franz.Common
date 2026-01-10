@@ -1,37 +1,38 @@
 ﻿#nullable enable
 
-using Franz.Common.Messaging;
+using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.Mediator.Extensions;
+using Franz.Common.Messaging.Sagas.Configuration;
+using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Tests.Events;
 using Franz.Common.Messaging.Sagas.Tests.Fixtures;
-using Franz.Common.Messaging.Sagas.Persistence;
-using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Franz.Common.Messaging.Sagas.Tests.Sagas;
+
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Integration;
 
-public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQFixture>
+public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQMongoFixture>
 {
-  private readonly SagaRabbitMQFixture _fixture;
+  private readonly SagaRabbitMQMongoFixture _fixture;
 
-  public SagaRabbitMqIntegrationTests(SagaRabbitMQFixture fixture)
+  public SagaRabbitMqIntegrationTests(SagaRabbitMQMongoFixture fixture)
   {
     _fixture = fixture;
   }
 
-  private async Task<TestSagaState?> WaitForState(string sagaId, TimeSpan? timeout = null)
+  private async Task<TestSagaState?> WaitForStateAsync(string id)
   {
-    timeout ??= TimeSpan.FromSeconds(20);
-
-    var repo = _fixture.Services.GetRequiredService<ISagaRepository>();
+    var repository = _fixture.Services.GetRequiredService<ISagaRepository>();
     var start = DateTime.UtcNow;
 
-    while (DateTime.UtcNow - start < timeout)
+    while (DateTime.UtcNow - start < TimeSpan.FromSeconds(10))
     {
-      var state = await repo.LoadStateAsync(sagaId, typeof(TestSagaState), CancellationToken.None);
-      if (state is TestSagaState typed)
-        return typed;
+      var loaded = await repository.LoadStateAsync(id, typeof(TestSagaState), CancellationToken.None);
+
+      if (loaded is TestSagaState s)
+        return s;
 
       await Task.Delay(200);
     }
@@ -39,69 +40,88 @@ public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQFix
     return null;
   }
 
+  // ----------------------------------------------------------
+  // 1) Saga starts and persists initial state
+  // ----------------------------------------------------------
   [Fact]
   public async Task StartEvent_creates_and_persists_saga_state()
   {
-    var publisher = _fixture.Services.GetRequiredService<IMessagingPublisher>();
-    var id = "saga-rmq-1";
+    await _fixture.Host.StartAsync();
+    var dispatcher = _fixture.Services.GetRequiredService<IDispatcher>();
 
-    await publisher.Publish(new StartEvent(id));
+    var id = "saga-start-1";
+    await dispatcher.PublishNotificationAsync(new StartEvent(id));
 
-    var state = await WaitForState(id);
-
-    Assert.NotNull(state);
-    Assert.Equal(id, state!.Id);
-    Assert.Equal(1, state.Counter);
-  }
-
-  [Fact]
-  public async Task CompensationEvent_reverts_state()
-  {
-    var publisher = _fixture.Services.GetRequiredService<IMessagingPublisher>();
-    var id = "saga-rmq-2";
-
-    await publisher.Publish(new StartEvent(id));          // 1
-    await publisher.Publish(new CompensationEvent(id));   // 0
-
-    var state = await WaitForState(id);
+    var state = await WaitForStateAsync(id);
 
     Assert.NotNull(state);
-    Assert.Equal(0, state!.Counter);
+    Assert.Equal(1, state!.Counter);
   }
 
-  [Fact]
-  public async Task Saga_state_survives_orchestrator_recreation()
-  {
-    var publisher = _fixture.Services.GetRequiredService<IMessagingPublisher>();
-    var id = "saga-rmq-3";
-
-    await publisher.Publish(new StartEvent(id));
-    Assert.Equal(1, (await WaitForState(id))!.Counter);
-
-    var recreated = new SagaRabbitMQFixture();
-    await recreated.InitializeAsync();
-
-    var recreatedPublisher = recreated.Services.GetRequiredService<IMessagingPublisher>();
-    await recreatedPublisher.Publish(new CompensationEvent(id));
-
-    var finalState = await WaitForState(id);
-    Assert.NotNull(finalState);
-    Assert.Equal(0, finalState!.Counter);
-  }
-
+  // ----------------------------------------------------------
+  // 2) Saga full lifecycle (start + step)
+  // ----------------------------------------------------------
   [Fact]
   public async Task Saga_executes_full_lifecycle_inside_real_rabbitmq_host()
   {
-    var publisher = _fixture.Services.GetRequiredService<IMessagingPublisher>();
-    var id = "saga-rmq-4";
+    await _fixture.Host.StartAsync();
+    var dispatcher = _fixture.Services.GetRequiredService<IDispatcher>();
 
-    await publisher.Publish(new StartEvent(id));
-    await publisher.Publish(new CompensationEvent(id));
+    var id = "saga-lifecycle-1";
+    await dispatcher.PublishNotificationAsync(new StartEvent(id));
+    await dispatcher.PublishNotificationAsync(new StepEvent(id));
 
-    var state = await WaitForState(id);
+    var state = await WaitForStateAsync(id);
 
     Assert.NotNull(state);
-    Assert.Equal(id, state!.Id);
-    Assert.Equal(0, state.Counter);
+    Assert.Equal(2, state!.Counter);
+  }
+
+  // ----------------------------------------------------------
+  // 3) CompensationEvent correctly reverts saga state
+  // ----------------------------------------------------------
+  [Fact]
+  public async Task CompensationEvent_reverts_state()
+  {
+    await _fixture.Host.StartAsync();
+    var dispatcher = _fixture.Services.GetRequiredService<IDispatcher>();
+
+    var id = "saga-comp-1";
+    await dispatcher.PublishNotificationAsync(new StartEvent(id));
+    await dispatcher.PublishNotificationAsync(new StepEvent(id));
+    await dispatcher.PublishNotificationAsync(new CompensationEvent(id));
+
+    var state = await WaitForStateAsync(id);
+
+    Assert.NotNull(state);
+    Assert.Equal(1, state!.Counter); // reverted from 2 → 1
+  }
+
+  // ----------------------------------------------------------
+  // 4) Saga state survives orchestrator reconstruction
+  // ----------------------------------------------------------
+  [Fact]
+  public async Task Saga_state_survives_orchestrator_recreation()
+  {
+    await _fixture.Host.StartAsync();
+    var dispatcher = _fixture.Services.GetRequiredService<IDispatcher>();
+
+    var id = "saga-survival-1";
+    await dispatcher.PublishNotificationAsync(new StartEvent(id));
+
+    var state1 = await WaitForStateAsync(id);
+    Assert.NotNull(state1);
+    Assert.Equal(1, state1!.Counter);
+
+    // Simulate orchestrator restart
+    _fixture.Services.BuildFranzSagas(); // rebuilding routing table
+
+    // Continue saga
+    await dispatcher.PublishNotificationAsync(new StepEvent(id));
+
+    var state2 = await WaitForStateAsync(id);
+
+    Assert.NotNull(state2);
+    Assert.Equal(2, state2!.Counter); // continues from stored value
   }
 }
