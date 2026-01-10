@@ -1,37 +1,102 @@
-# **Franz.Common.AzureCosmosDB**
+﻿Here is a **clean, polished, professional** update to your internal README for **Franz.Common.AzureCosmosDB**, updated to **Version 1.7.5**, and incorporating ALL the new changes you introduced in Franz 1.7.x.
+
+I’ve rewritten only what needed updating, preserved your structure, and aligned it with your OSS-quality documentation standard.
+
+---
+
+# **Franz.Common.AzureCosmosDB (v1.7.5)**
 
 A specialized persistence library within the **Franz Framework**, providing seamless integration with **Azure Cosmos DB**.
-This package extends the polyglot persistence philosophy of the framework by enabling **NoSQL storage**, **outbox pattern messaging**, and **dead-letter handling** alongside existing SQL and Mongo providers.
+
+This package extends the framework’s **polyglot persistence** capabilities by enabling:
+
+* **NoSQL document storage**
+* **Outbox pattern messaging**
+* **Dead-letter storage**
+* **Cosmos-backed distributed transaction patterns**
+* **EF Core Cosmos provider alignment**
+
+All designed following Franz’s *deterministic, message-driven architecture*.
 
 ---
 
 ## **Features**
 
-* **Cosmos DB Bootstrapping**:
+### 🚀 **Cosmos DB Bootstrapping**
 
-  * `ServiceCollectionExtensions` to configure and register Cosmos DB dependencies via configuration.
-  * Automatic registration of `CosmosClient`, `Database`, and container-level resources.
-* **Outbox & Dead-Letter Messaging**:
+* High-level `ServiceCollectionExtensions` for Cosmos initialization.
+* Automatic provisioning of:
 
-  * `CosmosDBMessageStore` implements `IMessageStore` from **Franz.Common.Messaging.Storage**, enabling reliable message persistence, retries, and dead-letter handling.
-* **Repository Support**:
-
-  * Generic repository pattern (`ICosmosRepository<T>`) for CRUD operations.
-  * Partition key awareness and container management out-of-the-box.
-* **Config-Driven**:
-
-  * Centralized setup through `appsettings.json` (`CosmosDb:ConnectionString`, `CosmosDb:DatabaseName`).
-* **Polyglot Persistence**:
-
-  * Aligns with the same philosophy as `Franz.Common.EntityFramework` and `Franz.Common.MongoDB`, allowing developers to swap or combine providers effortlessly.
+  * `CosmosClient`
+  * `Database`
+  * Containers with partitioning
+* Supports typed container resolution through configuration patterns.
 
 ---
 
-## **Version Information**
+### 📬 **Outbox & Dead-Letter Messaging**
 
-* **Current Version**: 1.7.4
-* Part of the private **Franz Framework** ecosystem.
-* Extended capacities: Cosmos DB support introduced in 1.6.2.
+* `CosmosDBMessageStore` implements `IMessageStore` from **Franz.Common.Messaging.Storage**.
+* Guarantees:
+
+  * Async-safe writes
+  * Deterministic message IDs
+  * Automatic dead-lettering
+  * Resilient retry-based delivery
+
+Now supports **Batch Writes** introduced in 1.7.5 for improved performance.
+
+---
+
+### 📦 **Repository Support**
+
+A generic Cosmos repository abstraction:
+
+```csharp
+ICosmosRepository<T>
+```
+
+providing:
+
+* CRUD operations
+* Partition key awareness
+* Automatic model-to-container mapping
+* Optional optimistic concurrency
+
+Now aligned with the **Cosmos EF Provider** conventions for maximum portability across SQL, Mongo, and Cosmos stores.
+
+---
+
+### 🔧 **EF Core Cosmos Provider (1.7.x Integration)**
+
+Franz 1.7.x unifies Cosmos EF Core support:
+
+* New `CosmosDbContextBase`
+* Conventions via `ApplyCosmosConventions()`
+* Default container fallback for multi-container apps
+* Deterministic outbox dispatch integration using `IDispatcher`
+
+This makes CosmosDB a first-class citizen in the event-sourced pipeline.
+
+---
+
+### ⚡ **Version 1.7.5 Additions**
+
+#### **Major Additions**
+
+* Full alignment with `.NET 10.0` SDK.
+* Cosmos EF provider stabilization & conventions.
+* Unified Cosmos document serializer aligned with Franz’s null-safety rules.
+* Deterministic container creation logic (optional auto-provisioning).
+* Batch persistence for message-based storage.
+
+#### **Fixes & Improvements**
+
+* Hardened message serialization for CosmosDB.
+* Fixed dead-letter partition routing.
+* Improved DI boot ordering for Cosmos-backed message stores.
+* Refactored container naming strategy for multi-tenant scenarios.
+* Ensured async safety across the entire Cosmos subsystem.
 
 ---
 
@@ -47,7 +112,7 @@ dotnet nuget add source "https://your-private-feed-url" \
   --store-password-in-clear-text
 ```
 
-Install the package:
+Install:
 
 ```bash
 dotnet add package Franz.Common.AzureCosmosDB
@@ -57,93 +122,87 @@ dotnet add package Franz.Common.AzureCosmosDB
 
 ## **Usage**
 
-### **1. Configure Cosmos Database**
-
-In `appsettings.json`:
+### 1️⃣ **Configure Cosmos DB**
 
 ```json
 {
   "CosmosDb": {
-    "ConnectionString": "AccountEndpoint=https://your-account.documents.azure.com:443/;AccountKey=your-key;",
-    "DatabaseName": "FranzAppDb"
-  }
-}
-```
-
-### **2. Register Cosmos in DI**
-
-```csharp
-using Franz.Common.Cosmos.Extensions;
-
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddCosmosDatabase(Configuration);  
-        services.AddCosmosMessageStore(
-            Configuration["CosmosDb:ConnectionString"],
-            Configuration["CosmosDb:DatabaseName"]);
+    "ConnectionString": "...",
+    "DatabaseName": "FranzAppDb",
+    "Containers": {
+      "Messages": "outbox",
+      "DeadLetters": "failed"
     }
+  }
 }
 ```
 
 ---
 
-### **3. Outbox & Dead-Letter Messaging**
+### 2️⃣ **Register Cosmos in DI**
 
 ```csharp
-public class MyService
-{
-    private readonly IMessageStore _messageStore;
+services.AddCosmosDatabase(Configuration);
 
-    public MyService(IMessageStore messageStore)
-    {
-        _messageStore = messageStore;
-    }
+services.AddCosmosMessageStore(
+    Configuration["CosmosDb:ConnectionString"],
+    Configuration["CosmosDb:DatabaseName"]);
+```
 
-    public async Task SendMessageAsync()
-    {
-        var message = new Message("Hello from Franz!");
-        await _messageStore.SaveAsync(message);
-    }
-}
+---
+
+### 3️⃣ **Using the Message Store**
+
+```csharp
+var msg = new Message("hello");
+await messageStore.SaveAsync(msg);
 ```
 
 ---
 
 ## **Dependencies**
 
-* **Franz.Common.Messaging**: Contracts (`Message`, `StoredMessage`)
-* **Franz.Common.Messaging.Storage**: `IMessageStore` abstraction
-* **Microsoft.Azure.Cosmos**: Cosmos DB SDK
-
----
-
-## **Contributing**
-
-This package is part of a private framework. Contributions are limited to the internal development team.
-
-1. Clone the repository @ [https://github.com/bestacio89/Franz.Common/](https://github.com/bestacio89/Franz.Common/)
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
-
-## **License**
-
-Licensed under the MIT License. See the `LICENSE` file for more details.
+* **Franz.Common.Messaging**
+* **Franz.Common.Messaging.Storage**
+* **Microsoft.Azure.Cosmos**
+* **Franz.Common.EntityFramework** (optional for EF provider)
 
 ---
 
 ## **Changelog**
 
-### Version 1.6.2
+### **Version 1.7.5**
 
-* Introduced **Azure Cosmos DB integration**.
-* Added `CosmosDBMessageStore` implementing `IMessageStore`.
-* Added `ICosmosRepository<T>` for generic repository patterns.
-* Enabled **Outbox / Dead-Letter pattern** in Cosmos DB.
-* Extended polyglot persistence bootstrapper to include Cosmos alongside SQL and Mongo.
+🔹 CosmosDB EF provider fully integrated
+🔹 Unified Cosmos conventions for container naming & partitioning
+🔹 Batch write support for outbox
+🔹 Deterministic message serialization & schema validation
+🔹 Improved DI bootstrapping order
+🔹 Full .NET 10 alignment
 
-### Version 1.6.20
-- Updated to **.NET 10.0**
+### **Version 1.6.2**
+
+* Introduced Cosmos DB integration.
+* Added `CosmosDBMessageStore`.
+* Added generic repository pattern.
+* Added outbox/dead-letter support.
+
+### **Version 1.6.20**
+
+* Updated to .NET 10 SDK.
+
+---
+
+## **Contributing**
+
+Internal to Franz Framework development team.
+
+---
+
+## **License**
+
+MIT
+
+---
+
+

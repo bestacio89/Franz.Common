@@ -10,13 +10,15 @@
   <img src="https://img.shields.io/badge/Architecture-Clean%20%7C%20DDD%20%7C%20CQRS-brightgreen" />
   <img src="https://img.shields.io/badge/Messaging-Kafka-231f20?logo=apachekafka&logoColor=white" />
   <img src="https://img.shields.io/badge/Messaging-RabbitMQ-ff6600?logo=rabbitmq&logoColor=white" />
-  <img src="https://img.shields.io/badge/Messaging-Azure-0078d4?logo=microsoftazure&logoColor=white" />
+  <img src="https://img.shields.io/badge/Messaging-AzureServiceBus-0078d4?logo=microsoftazure&logoColor=white" />
+  <img src="https://img.shields.io/badge/Persistence-SQL%20%7C%20MongoDB%20%7C%20CosmosDB-blue" />
   <img src="https://img.shields.io/badge/Resilience-Polly-blue" />
   <img src="https://img.shields.io/badge/Observability-OpenTelemetry-yellow" />
   <img src="https://img.shields.io/badge/Multi--Tenancy-Built--In-9cf" />
   <img src="https://img.shields.io/badge/License-MIT-lightgrey" />
-  <img src="https://img.shields.io/badge/NuGet-300k%2B%20downloads-success" />
+  <img src="https://img.shields.io/badge/NuGet-400k%2B%20downloads-success" />
 </p>
+
 
 ---
 
@@ -308,14 +310,116 @@ dotnet test --filter Category=Integration
 
 ---
 
+Below is a **clean, drop-in replacement** for the **Version 1.7.4** section *plus the updated badges at the top*, fully aligned with the Franz tone and formatting.
+
+Everything is provided as **ready-to-paste Markdown**.
+
+---
+
+# ✅ **1. BADGES — Updated with Polyglot Persistence**
+
+Replace your badge block with this one:
+
+```markdown
+<p align="center">
+  <img width="180" src="Docs/assets/FranzLogo.png" alt="Franz Logo"/>
+</p>
+
+<h1 align="center">Franz.Common</h1>
+<p align="center"><b>Deterministic Architecture for Event-Driven .NET Microservices</b></p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/.NET-10%2B-blueviolet" />
+  <img src="https://img.shields.io/badge/Architecture-Clean%20%7C%20DDD%20%7C%20CQRS-brightgreen" />
+  <img src="https://img.shields.io/badge/Messaging-Kafka-231f20?logo=apachekafka&logoColor=white" />
+  <img src="https://img.shields.io/badge/Messaging-RabbitMQ-ff6600?logo=rabbitmq&logoColor=white" />
+  <img src="https://img.shields.io/badge/Messaging-AzureServiceBus-0078d4?logo=microsoftazure&logoColor=white" />
+  <img src="https://img.shields.io/badge/Persistence-SQL%20%7C%20MongoDB%20%7C%20CosmosDB-blue" />
+  <img src="https://img.shields.io/badge/Resilience-Polly-blue" />
+  <img src="https://img.shields.io/badge/Observability-OpenTelemetry-yellow" />
+  <img src="https://img.shields.io/badge/Multi--Tenancy-Built--In-9cf" />
+  <img src="https://img.shields.io/badge/License-MIT-lightgrey" />
+  <img src="https://img.shields.io/badge/NuGet-300k%2B%20downloads-success" />
+</p>
+```
+
+---
+
+# ✅ **2. Updated Version Section — Replace 1.7.4 with 1.7.5**
+
+Locate this block:
+
+```
 ## Version **1.7.4** focuses on **correctness, determinism, and production-grade reliability** of the Serialization Process
+```
 
-This release completes the RabbitMQ stack by:
+And replace the entire section with this:
 
-### Version 1.7.4
-- Minor bug fixes and performance improvements
-- Updated dependencies to latest versions of System.Text.Json
-No breaking architectural changes — only **hardening, correctness, and full infrastructure wiring**.
+---
+
+## **Version 1.7.5 — CosmosDB, Saga Persistence & Deterministic Messaging**
+
+Version **1.7.5** delivers major infrastructure and reliability upgrades focused on **polyglot persistence**, **saga orchestration**, and **message serialization correctness**.
+
+This release completes the Cosmos DB and SagaStorage line of the framework while further strengthening messaging consistency across all transports.
+
+### 🔹 **Azure Cosmos DB Support (New)**
+
+Franz now fully supports Cosmos DB as a first-class persistence provider:
+
+* Added `Franz.Common.AzureCosmosDB`
+* New `CosmosDbContextBase` with automatic conventions
+* Outbox & dead-letter storage via `CosmosDBMessageStore`
+* Generic repository support (`ICosmosRepository<>`)
+* Unified bootstrapping through configuration
+
+Cosmos DB now joins **SQL (EF)** and **MongoDB** as equal citizens in Franz’ polyglot persistence model.
+
+---
+
+### 🔹 **Saga Orchestration Enhancements**
+
+A major rework of saga infrastructure:
+
+* Added **Mongo-backed** and **Cosmos-backed** saga storage
+* New `MongoSagaRepository` & `CosmosSagaRepository`
+* Correct saga ID propagation via the Saga itself (not the orchestrator)
+* Deterministic correlation resolution using `IMessageCorrelation<>`
+* Cleanup and removal of unstable saga integration tests for CI stability
+
+Sagas are now **transport-agnostic**, **store-agnostic**, and fully deterministic.
+
+---
+
+### 🔹 **Messaging & Serialization Hardening**
+
+* Unified serializer pipeline across all transports
+* Improved message envelope normalization
+* Stricter validation of correlation/causation fields
+* Async-safe message publishing for RabbitMQ & Kafka
+* Resilience improvements for hosted consumers
+
+---
+
+### 🔹 **Null Safety & Infrastructure Reliability**
+
+* Continued enforcement of `<Nullable>enable` across sub-packages
+* Input sanitization and safer state persistence
+* Defensive protections around deserialization and dynamic loading
+
+---
+
+### 🔹 **Developer Experience Improvements**
+
+* Better bootstrapping diagnostics for misconfigured persistence
+* Clearer saga registration flow: `AddFranzSagas()` + `BuildFranzSagas()`
+* Simplified Mongo/Cosmos initialization for integration testing
+* Internal test improvements using Testcontainers
+
+---
+
+**No breaking changes.**
+This is a **stability, correctness, and infrastructure-hardening release** preparing for the upcoming 1.8.x feature wave.
 
 ---
 

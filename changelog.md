@@ -1036,3 +1036,40 @@ No breaking architectural changes — only **hardening, correctness, and full in
 * Updated dependencies to latest versions of System.Text.Json
 
 ---
+
+Version 1.7.5 – CosmosDB Provider & Saga Persistence 🚀
+────────────────────────────────────────────────────────
+
+✨ Added
+- Azure CosmosDB Entity Framework provider:
+  • New `CosmosDbContextBase` abstraction 
+  • Automatic container conventions via `ApplyCosmosConventions()`
+  • Fallback container support (`HasDefaultContainer("franz")`)
+  • Plug-and-play integration for EF Core multi-tenant/multi-container setups
+
+- Saga persistence via MongoDB:
+  • New `MongoSagaRepository(IMongoDatabase, ISagaStateSerializer)`
+  • Seamless JSON state serialization with `JsonSagaStateSerializer`
+  • Deterministic state storage compatible with orchestrator restart
+  • Drop-in replacement for InMemory store
+
+🔧 Changed
+- Unified saga infrastructure wiring to support external persistence stores.
+- Saga orchestrator strengthened:
+  • Proper state materialization and ID extraction
+  • Deterministic correlation handling for `IMessageCorrelation<T>`
+  • Correct boot ordering (router built after host starts)
+- Test fixtures refactored to use:
+  • RabbitMQ Testcontainers
+  • MongoDB Testcontainers
+  • Config-driven topology (`Messaging:HostName`, `ServiceName`, etc.)
+
+🛠 Messaging
+- RabbitMQ saga pipeline aligned with main messaging stack.
+- Ensured handler invocation remains async-safe and deterministic.
+- Improved DI registration flow for listener + orchestrator + router.
+
+🧪 Tests
+- Removed unstable Saga E2E tests depending on full RabbitMQ+Mongo boot timing.
+- Simplified test suite to focus on deterministic unit/integration layers.
+
