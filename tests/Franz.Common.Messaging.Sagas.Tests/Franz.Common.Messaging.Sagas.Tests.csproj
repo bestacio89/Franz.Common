@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\sources\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.RabbitMQ\Franz.Common.Messaging.Hosting.RabbitMQ.csproj" />

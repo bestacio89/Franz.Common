@@ -3,6 +3,7 @@
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Tests.Events;
 using Franz.Common.Messaging.Sagas.Tests.Fixtures;
+using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Franz.Common.Messaging.Sagas.Tests.Sagas;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,17 +24,14 @@ public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQFix
   {
     timeout ??= TimeSpan.FromSeconds(20);
 
-    var stateStore = _fixture.StateStore;
-    var serializer = _fixture.Serializer;
-
+    var repo = _fixture.Services.GetRequiredService<ISagaRepository>();
     var start = DateTime.UtcNow;
 
     while (DateTime.UtcNow - start < timeout)
     {
-      if (stateStore.Store.TryGetValue(sagaId, out var json) && json != null)
-      {
-        return (TestSagaState?)serializer.Deserialize(json, typeof(TestSagaState));
-      }
+      var state = await repo.LoadStateAsync(sagaId, typeof(TestSagaState), CancellationToken.None);
+      if (state is TestSagaState typed)
+        return typed;
 
       await Task.Delay(200);
     }
@@ -41,9 +39,6 @@ public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQFix
     return null;
   }
 
-  // ---------------------------------------------------------------------
-  // TEST 1 — StartEvent creates saga state
-  // ---------------------------------------------------------------------
   [Fact]
   public async Task StartEvent_creates_and_persists_saga_state()
   {
@@ -59,17 +54,14 @@ public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQFix
     Assert.Equal(1, state.Counter);
   }
 
-  // ---------------------------------------------------------------------
-  // TEST 2 — Compensation event modifies existing saga state
-  // ---------------------------------------------------------------------
   [Fact]
   public async Task CompensationEvent_reverts_state()
   {
     var publisher = _fixture.Services.GetRequiredService<IMessagingPublisher>();
     var id = "saga-rmq-2";
 
-    await publisher.Publish(new StartEvent(id));          // counter = 1
-    await publisher.Publish(new CompensationEvent(id));   // counter = 0
+    await publisher.Publish(new StartEvent(id));          // 1
+    await publisher.Publish(new CompensationEvent(id));   // 0
 
     var state = await WaitForState(id);
 
@@ -77,37 +69,26 @@ public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQFix
     Assert.Equal(0, state!.Counter);
   }
 
-  // ---------------------------------------------------------------------
-  // TEST 3 — Saga state survives orchestrator recreation
-  // ---------------------------------------------------------------------
   [Fact]
   public async Task Saga_state_survives_orchestrator_recreation()
   {
     var publisher = _fixture.Services.GetRequiredService<IMessagingPublisher>();
     var id = "saga-rmq-3";
 
-    await publisher.Publish(new StartEvent(id)); // counter = 1
+    await publisher.Publish(new StartEvent(id));
+    Assert.Equal(1, (await WaitForState(id))!.Counter);
 
-    var before = await WaitForState(id);
-    Assert.NotNull(before);
-    Assert.Equal(1, before!.Counter);
-
-    // ---- recreate fixture (broker still running, persistence store shared) ----
     var recreated = new SagaRabbitMQFixture();
     await recreated.InitializeAsync();
+
     var recreatedPublisher = recreated.Services.GetRequiredService<IMessagingPublisher>();
+    await recreatedPublisher.Publish(new CompensationEvent(id));
 
-    await recreatedPublisher.Publish(new CompensationEvent(id)); // counter = 0
-
-    var state = await WaitForState(id);
-
-    Assert.NotNull(state);
-    Assert.Equal(0, state!.Counter);
+    var finalState = await WaitForState(id);
+    Assert.NotNull(finalState);
+    Assert.Equal(0, finalState!.Counter);
   }
 
-  // ---------------------------------------------------------------------
-  // TEST 4 — Full end-to-end lifecycle: Start + Compensation
-  // ---------------------------------------------------------------------
   [Fact]
   public async Task Saga_executes_full_lifecycle_inside_real_rabbitmq_host()
   {

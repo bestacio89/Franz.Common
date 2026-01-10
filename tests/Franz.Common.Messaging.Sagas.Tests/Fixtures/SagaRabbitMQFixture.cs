@@ -1,5 +1,7 @@
 ﻿#nullable enable
+using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Mediator.Extensions;
+using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Hosting.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ;
@@ -8,6 +10,7 @@ using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.Sagas.Configuration;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Fixtures;
+using Franz.Common.Messaging.Sagas.Handlers;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
@@ -78,6 +81,8 @@ public sealed class SagaRabbitMQFixture : IAsyncLifetime
           services.AddTransient<SagaOrchestrator>();
 
           // Register messaging
+          services.AddNoDuplicateScoped<IMessageHandler, SagaDispatchingMessageHandler>();
+
           services.AddMessagingSerialization();
           services.AddRabbitMQMessaging(config);
           services.AddRabbitMQHostedListener(o =>
