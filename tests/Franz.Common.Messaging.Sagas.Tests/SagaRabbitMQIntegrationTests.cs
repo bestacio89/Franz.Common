@@ -46,7 +46,7 @@ public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQMon
   [Fact]
   public async Task StartEvent_creates_and_persists_saga_state()
   {
-    await _fixture.Host.StartAsync();
+    // Host already started by fixture
     var dispatcher = _fixture.Services.GetRequiredService<IDispatcher>();
 
     var id = "saga-start-1";
@@ -64,7 +64,6 @@ public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQMon
   [Fact]
   public async Task Saga_executes_full_lifecycle_inside_real_rabbitmq_host()
   {
-    await _fixture.Host.StartAsync();
     var dispatcher = _fixture.Services.GetRequiredService<IDispatcher>();
 
     var id = "saga-lifecycle-1";
@@ -83,7 +82,6 @@ public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQMon
   [Fact]
   public async Task CompensationEvent_reverts_state()
   {
-    await _fixture.Host.StartAsync();
     var dispatcher = _fixture.Services.GetRequiredService<IDispatcher>();
 
     var id = "saga-comp-1";
@@ -103,7 +101,6 @@ public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQMon
   [Fact]
   public async Task Saga_state_survives_orchestrator_recreation()
   {
-    await _fixture.Host.StartAsync();
     var dispatcher = _fixture.Services.GetRequiredService<IDispatcher>();
 
     var id = "saga-survival-1";
@@ -114,7 +111,7 @@ public sealed class SagaRabbitMqIntegrationTests : IClassFixture<SagaRabbitMQMon
     Assert.Equal(1, state1!.Counter);
 
     // Simulate orchestrator restart
-    _fixture.Services.BuildFranzSagas(); // rebuilding routing table
+    _fixture.Services.BuildFranzSagas(); // 🔥 rebuild routing table
 
     // Continue saga
     await dispatcher.PublishNotificationAsync(new StepEvent(id));
