@@ -82,8 +82,9 @@ public sealed class SagaRabbitMQMongoFixture : IAsyncLifetime
         .Build();
 
     // Host MUST start before building sagas
-    await Host.StartAsync();
     Host.Services.BuildFranzSagas();
+    await Host.StartAsync();
+    
   }
 
   public async Task DisposeAsync()
