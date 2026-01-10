@@ -18,7 +18,7 @@ public sealed class TestSaga :
 
   public override Task OnCreatedAsync(ISagaContext context, CancellationToken ct)
   {
-    State.Id =
+    var id =
       context.CorrelationId
       ?? context.Message switch
       {
@@ -27,7 +27,10 @@ public sealed class TestSaga :
         _ => throw new InvalidOperationException("Unable to derive saga id")
       };
 
+    
+    State.Id = id;     // Optional but nice
     State.Counter = 0;
+
     return Task.CompletedTask;
   }
 

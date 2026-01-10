@@ -74,21 +74,16 @@ public sealed class SagaOrchestrator
 
     if (isStart)
     {
-      // -----------------------------
-      // NEW SAGA INSTANCE
-      // -----------------------------
       saga = _services.GetService(reg.SagaType)
           ?? throw new InvalidOperationException($"Saga not found: {reg.SagaType.Name}");
 
       state = (ISagaState)Activator.CreateInstance(reg.StateType)!;
 
-      // attach state to saga
       reg.SagaType.GetProperty("State")!.SetValue(saga, state);
 
-      // At this point the saga/state have not yet derived their ID.
-      // We create a temporary context with an empty SagaId.
+      // temporary context (SagaId not known yet)
       var ctx = new SagaContext(
-          sagaId: string.Empty,
+          null!,
           reg.SagaType,
           state,
           evt,
@@ -96,21 +91,26 @@ public sealed class SagaOrchestrator
           causationId,
           token);
 
-      // Let the saga initialize itself (usually sets SagaId/State.Id)
+      // let saga initialize State.Id
       await CallOnCreatedAsync(saga, ctx, token);
 
-      // Now retrieve the REAL saga id
-      var sagaId = GetSagaId(saga);
-      if (string.IsNullOrWhiteSpace(sagaId))
-        throw new SagaConfigurationException(
-          $"Saga {reg.SagaType.Name} returned empty SagaId after OnCreatedAsync.");
+      // 🔥 AFTER OnCreated, refresh actual SagaId (comes from State.Id)
+      var finalId = GetSagaId(saga);
 
-      // Execute the start handler
-      var startHandler = reg.StartHandlers[msgType];
-      await ExecuteHandlerAsync(saga, evt, startHandler, ctx, token);
+      // correct context for handlers & persistence
+      ctx = new SagaContext(
+          finalId,
+          reg.SagaType,
+          state,
+          evt,
+          correlationId,
+          causationId,
+          token);
 
-      // Persist state using the resolved saga id
-      await _repository.SaveStateAsync(sagaId, state, token);
+      // now do the first handler with correct id
+      await ExecuteHandlerAsync(saga, evt, reg.StartHandlers[msgType], ctx, token);
+
+      await _repository.SaveStateAsync(finalId, state, token);
       return;
     }
 
