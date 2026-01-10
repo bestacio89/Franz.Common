@@ -316,50 +316,7 @@ Everything is provided as **ready-to-paste Markdown**.
 
 ---
 
-# ✅ **1. BADGES — Updated with Polyglot Persistence**
-
-Replace your badge block with this one:
-
-```markdown
-<p align="center">
-  <img width="180" src="Docs/assets/FranzLogo.png" alt="Franz Logo"/>
-</p>
-
-<h1 align="center">Franz.Common</h1>
-<p align="center"><b>Deterministic Architecture for Event-Driven .NET Microservices</b></p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/.NET-10%2B-blueviolet" />
-  <img src="https://img.shields.io/badge/Architecture-Clean%20%7C%20DDD%20%7C%20CQRS-brightgreen" />
-  <img src="https://img.shields.io/badge/Messaging-Kafka-231f20?logo=apachekafka&logoColor=white" />
-  <img src="https://img.shields.io/badge/Messaging-RabbitMQ-ff6600?logo=rabbitmq&logoColor=white" />
-  <img src="https://img.shields.io/badge/Messaging-AzureServiceBus-0078d4?logo=microsoftazure&logoColor=white" />
-  <img src="https://img.shields.io/badge/Persistence-SQL%20%7C%20MongoDB%20%7C%20CosmosDB-blue" />
-  <img src="https://img.shields.io/badge/Resilience-Polly-blue" />
-  <img src="https://img.shields.io/badge/Observability-OpenTelemetry-yellow" />
-  <img src="https://img.shields.io/badge/Multi--Tenancy-Built--In-9cf" />
-  <img src="https://img.shields.io/badge/License-MIT-lightgrey" />
-  <img src="https://img.shields.io/badge/NuGet-300k%2B%20downloads-success" />
-</p>
-```
-
----
-
-# ✅ **2. Updated Version Section — Replace 1.7.4 with 1.7.5**
-
-Locate this block:
-
-```
-## Version **1.7.4** focuses on **correctness, determinism, and production-grade reliability** of the Serialization Process
-```
-
-And replace the entire section with this:
-
----
-
-## **Version 1.7.5 — CosmosDB, Saga Persistence & Deterministic Messaging**
-
-Version **1.7.5** delivers major infrastructure and reliability upgrades focused on **polyglot persistence**, **saga orchestration**, and **message serialization correctness**.
+## Version **1.7.5** delivers major infrastructure and reliability upgrades focused on **polyglot persistence**, **saga orchestration**, and **message serialization correctness**.
 
 This release completes the Cosmos DB and SagaStorage line of the framework while further strengthening messaging consistency across all transports.
 
