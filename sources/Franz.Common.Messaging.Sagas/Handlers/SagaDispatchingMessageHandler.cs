@@ -1,9 +1,9 @@
-﻿using Franz.Common.Mediator;
+﻿#nullable enable
+using Franz.Common.Mediator;
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Messages;
-using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Serialization;
-using System.Text.Json;
+using Franz.Common.Messaging.Sagas.Core;
 
 namespace Franz.Common.Messaging.Sagas.Handlers;
 
@@ -22,34 +22,45 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
 
   public void Process(Message message)
   {
-    // 1. Resolve message type from headers
-    if (!message.Headers.TryGetValue("message-type", out var typeHeader))
+    // 1. Resolve the .NET type name from metadata / headers
+    var typeName =
+      message.MessageType
+      ?? (message.Headers.TryGetValue("type", out var typeValues)
+            ? typeValues.ToString()
+            : null);
+
+    if (string.IsNullOrWhiteSpace(typeName))
+      return; // Not a typed message, nothing for sagas
+
+    var type = Type.GetType(typeName, throwOnError: false);
+    if (type is null || !typeof(IIntegrationEvent).IsAssignableFrom(type))
+      return; // Not an integration event we care about
+
+    // 2. Deserialize the payload into an integration event instance
+    if (string.IsNullOrWhiteSpace(message.Body))
       return;
 
-    var eventType = Type.GetType(typeHeader.ToString()!);
-    if (eventType == null)
+    var evt = (IIntegrationEvent?)_serializer.Deserialize(message.Body!, type);
+    if (evt is null)
       return;
 
-    // 2. Deserialize IntegrationEvent from JSON body
-    var evt = (IIntegrationEvent?)_serializer.Deserialize(message.Body, eventType);
-    if (evt == null)
-      return;
-
-    // 3. Extract correlation headers
+    // 3. Correlation / causation
     var correlationId =
-        message.Headers.TryGetValue("correlation-id", out var c)
-            ? c.ToString()
-            : null;
+      !string.IsNullOrWhiteSpace(message.CorrelationId)
+        ? message.CorrelationId
+        : (message.Headers.TryGetValue("correlation-id", out var cid)
+              ? cid.ToString()
+              : null);
 
     var causationId =
-        message.Headers.TryGetValue("causation-id", out var cc)
-            ? cc.ToString()
-            : null;
+      message.Headers.TryGetValue("causation-id", out var caid)
+        ? caid.ToString()
+        : null;
 
-    // 4. Process through SagaOrchestrator
+    // 4. Hand off to the orchestrator (sync wrapper around async)
     _orchestrator
-        .HandleEventAsync(evt, correlationId, causationId, CancellationToken.None)
-        .GetAwaiter()
-        .GetResult();
+      .HandleEventAsync(evt, correlationId, causationId, CancellationToken.None)
+      .GetAwaiter()
+      .GetResult();
   }
 }
