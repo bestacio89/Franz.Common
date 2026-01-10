@@ -16,8 +16,10 @@ using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Franz.Common.Messaging.Sagas.Tests.Events;
 using Franz.Common.Messaging.Sagas.Tests.Sagas;
+using Franz.Common.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using RabbitMQ.Client;
 using System.Collections.Concurrent;
@@ -81,7 +83,12 @@ public sealed class SagaRabbitMQFixture : IAsyncLifetime
           services.AddTransient<SagaOrchestrator>();
 
           // Register messaging
-          services.AddNoDuplicateScoped<IMessageHandler, SagaDispatchingMessageHandler>();
+          services.RemoveAll<IMessageHandler>();  // remove any default handlers
+
+          services.AddSingleton<IAssemblyAccessor>(
+              new TestAssemblyAccessor(new AssemblyWrapper(typeof(TestSaga).Assembly))); // ensures queue name alignment
+
+          services.AddSingleton<IMessageHandler, SagaDispatchingMessageHandler>();
 
           services.AddMessagingSerialization();
           services.AddRabbitMQMessaging(config);
