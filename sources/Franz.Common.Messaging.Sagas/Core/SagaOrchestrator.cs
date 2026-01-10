@@ -74,15 +74,21 @@ public sealed class SagaOrchestrator
 
     if (isStart)
     {
+      // -----------------------------
+      // NEW SAGA INSTANCE
+      // -----------------------------
       saga = _services.GetService(reg.SagaType)
           ?? throw new InvalidOperationException($"Saga not found: {reg.SagaType.Name}");
 
       state = (ISagaState)Activator.CreateInstance(reg.StateType)!;
 
+      // attach state to saga
       reg.SagaType.GetProperty("State")!.SetValue(saga, state);
 
+      // At this point the saga/state have not yet derived their ID.
+      // We create a temporary context with an empty SagaId.
       var ctx = new SagaContext(
-          GetSagaId(saga),
+          sagaId: string.Empty,
           reg.SagaType,
           state,
           evt,
@@ -90,19 +96,31 @@ public sealed class SagaOrchestrator
           causationId,
           token);
 
+      // Let the saga initialize itself (usually sets SagaId/State.Id)
       await CallOnCreatedAsync(saga, ctx, token);
 
-      await ExecuteHandlerAsync(saga, evt, reg.StartHandlers[msgType], ctx, token);
+      // Now retrieve the REAL saga id
+      var sagaId = GetSagaId(saga);
+      if (string.IsNullOrWhiteSpace(sagaId))
+        throw new SagaConfigurationException(
+          $"Saga {reg.SagaType.Name} returned empty SagaId after OnCreatedAsync.");
 
-      await _repository.SaveStateAsync(ctx.SagaId, state, token);
+      // Execute the start handler
+      var startHandler = reg.StartHandlers[msgType];
+      await ExecuteHandlerAsync(saga, evt, startHandler, ctx, token);
+
+      // Persist state using the resolved saga id
+      await _repository.SaveStateAsync(sagaId, state, token);
       return;
     }
 
-    // Existing saga
-    var sagaId = ExtractCorrelationId(evt, reg);
+    // -----------------------------
+    // EXISTING SAGA INSTANCE
+    // -----------------------------
+    var existingSagaId = ExtractCorrelationId(evt, reg);
 
-    state = (ISagaState)(await _repository.LoadStateAsync(sagaId, reg.StateType, token)
-        ?? throw new SagaNotFoundException($"Saga {reg.SagaType.Name} with ID {sagaId} not found."));
+    state = (ISagaState)(await _repository.LoadStateAsync(existingSagaId, reg.StateType, token)
+        ?? throw new SagaNotFoundException($"Saga {reg.SagaType.Name} with ID {existingSagaId} not found."));
 
     saga = _services.GetService(reg.SagaType)
         ?? throw new InvalidOperationException($"Saga not found: {reg.SagaType.Name}");
@@ -110,7 +128,7 @@ public sealed class SagaOrchestrator
     reg.SagaType.GetProperty("State")!.SetValue(saga, state);
 
     var context = new SagaContext(
-        sagaId,
+        existingSagaId,
         reg.SagaType,
         state,
         evt,
@@ -127,7 +145,7 @@ public sealed class SagaOrchestrator
 
     await ExecuteHandlerAsync(saga, evt, handler, context, token);
 
-    await _repository.SaveStateAsync(sagaId, state, token);
+    await _repository.SaveStateAsync(existingSagaId, state, token);
   }
 
   private async Task ExecuteHandlerAsync(
