@@ -1,8 +1,12 @@
-﻿using Franz.Common.Mediator.Messages;
+﻿using Franz.Common.Mediator.Context;
+using Franz.Common.Mediator.Messages;
+using Franz.Common.Mediator.OpenTelemetry.Core;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Mediator.Validation.Events;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Trace;
 using System.Diagnostics;
 
 namespace Franz.Common.Mediator.OpenTelemetry.Pipelines;
@@ -10,14 +14,15 @@ namespace Franz.Common.Mediator.OpenTelemetry.Pipelines;
 public sealed class EventTracingPipeline<TEvent> : IEventPipeline<TEvent>
   where TEvent : IEvent
 {
-  // You can also inject this via DI if you prefer.
-  private static readonly ActivitySource ActivitySource = new("Franz.Mediator.Events");
-
   private readonly ILogger<EventTracingPipeline<TEvent>> _logger;
+  private readonly IHostEnvironment _env;
 
-  public EventTracingPipeline(ILogger<EventTracingPipeline<TEvent>> logger)
+  public EventTracingPipeline(
+    ILogger<EventTracingPipeline<TEvent>> logger,
+    IHostEnvironment env)
   {
     _logger = logger;
+    _env = env;
   }
 
   public async Task HandleAsync(
@@ -25,35 +30,22 @@ public sealed class EventTracingPipeline<TEvent> : IEventPipeline<TEvent>
     Func<Task> next,
     CancellationToken cancellationToken = default)
   {
-    var eventName = typeof(TEvent).Name;
-    var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
+    var ctx = MediatorContext.Current;
 
-    using var activity = ActivitySource.StartActivity(
-      $"Event:{eventName}",
-      ActivityKind.Consumer);
-
-    // Tag the span/activity (safe if activity is null)
-    activity?.SetTag("franz.event.name", eventName);
-    activity?.SetTag("franz.event.type", typeof(TEvent).FullName ?? eventName);
-    activity?.SetTag("franz.correlation_id", correlationId);
+    using var activity =
+      FranzActivityFactory.StartEventActivity<TEvent>(_env, ctx);
 
     try
     {
-      _logger.LogDebug("Handling event {EventName} [{CorrelationId}]", eventName, correlationId);
-
       await next();
-
       activity?.SetStatus(ActivityStatusCode.Ok);
-      _logger.LogInformation("Handled event {EventName} [{CorrelationId}]", eventName, correlationId);
     }
     catch (Exception ex)
     {
+      activity?.AddException(ex);
       activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-      activity?.SetTag("exception.type", ex.GetType().FullName);
-      activity?.SetTag("exception.message", ex.Message);
-      activity?.SetTag("exception.stacktrace", ex.StackTrace);
-
-      _logger.LogError(ex, "Event {EventName} [{CorrelationId}] failed", eventName, correlationId);
+      _logger.LogError(ex, "Event {Event} failed [{CorrelationId}]",
+        typeof(TEvent).Name, ctx.CorrelationId);
       throw;
     }
   }

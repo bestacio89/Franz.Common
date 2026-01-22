@@ -1,55 +1,50 @@
-# Franz.Common.Mediator.OpenTelemetry
+﻿# Franz.Common.OpenTelemetry
 
 OpenTelemetry integration for the **Franz Framework**.
-This package adds **automatic distributed tracing** to all Mediator requests, with the same **enriched context** you already see in Franz logging pipelines.
+This package provides **automatic distributed tracing** across applications using the Franz ecosystem, including Mediator pipelines, HTTP calls, and custom instrumentation.
 
-- **Current Version**: 1.7.5
-- Part of the private **Franz Framework** ecosystem.
+* **Current Version**: 1.7.6
+* Part of the private **Franz Framework** ecosystem.
+
 ---
 
-## ? Features
+## 🚀 What’s New in 1.7.6
 
-* ?? **Automatic tracing** for every Mediator request via `OpenTelemetryPipeline`.
-* ?? **Enriched tags out of the box**:
+* **Self-contained OpenTelemetry configuration** — no need to call `AddOpenTelemetry()` manually in your API.
+* **Automatic production-grade defaults**: OTLP exporter, sampling, instrumentation, and enriched span tags are configured internally.
+* **Fail-fast OTLP enforcement in production** — prevents missing endpoint misconfiguration.
+* **Seamless integration with Franz Mediator** pipelines.
+
+---
+
+## ⚡ Features
+
+* **Automatic tracing** for all Mediator requests via `OpenTelemetryPipeline`.
+
+* **Enriched context tags** for every span:
 
   * `franz.correlation_id`
   * `franz.user_id`
   * `franz.tenant_id`
   * `franz.culture`
   * `franz.environment`
-  * `franz.metadata.*` (custom values)
-* ? **Seamless error tagging**: exception type & message recorded in spans.
-* ?? **Environment-aware**: uses `IHostEnvironment` for runtime environment.
-* ?? **Plug-and-play**: single extension method `AddMediatorOpenTelemetry()`.
-* ?? **Consistent with Serilog logging**: logs and traces share the same enrichment keys for easy correlation.
+  * `franz.metadata.*` (custom metadata values)
+
+* **Error tagging**: exceptions automatically recorded in spans.
+
+* **Environment-aware**: adjusts configuration between dev/test/prod automatically.
+
+* **Logging correlation**: spans and Serilog logs share the same enrichment keys.
+
+* **Flexible exporters**: Console (optional), OTLP, Jaeger, or Zipkin.
+
+* **Sampling control**: configurable via `FranzTelemetryOptions` or environment defaults.
 
 ---
 
-## ?? Installation
+## 🛠 Usage
 
-```powershell
-dotnet add package Franz.Common.Mediator.OpenTelemetry --version 1.3.15
-```
-
----
-
-## ?? Usage
-
-### 1. Register OpenTelemetry in your app
-
-```csharp
-builder.Services.AddOpenTelemetry()
-    .WithTracing(tracer =>
-    {
-        tracer
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddSource("Franz.Mediator") // important: matches the ActivitySource
-            .AddConsoleExporter();      // or Jaeger/Zipkin/OTEL collector
-    });
-```
-
-### 2. Register Franz Mediator with OpenTelemetry
+### 1. Register Franz Mediator with OpenTelemetry
 
 ```csharp
 builder.Services
@@ -57,15 +52,28 @@ builder.Services
     .AddMediatorOpenTelemetry("Franz.Mediator");
 ```
 
-### 3. Enjoy automatic spans ??
+That’s it. **No manual OpenTelemetry setup is required.** All exporters, sampling, and instrumentation are configured internally.
 
-Every Mediator request will produce an OpenTelemetry activity with enriched tags.
+### 2. Optional Configuration via FranzTelemetryOptions
+
+```json
+"Franz": {
+  "Telemetry": {
+    "OtlpEndpoint": "http://otel-collector:4317",
+    "ExportToConsole": false,
+    "SamplingRatio": 0.5,
+    "ServiceName": "MyService"
+  }
+}
+```
+
+* OTLP endpoint is mandatory in production — fail-fast enforced.
+* Console exporter is typically used in development only.
+* Sampling ratio can be tuned per environment.
 
 ---
 
-## ?? Example Trace
-
-A sample span in Jaeger/Zipkin:
+## 📊 Example Trace
 
 ```
 Name: Mediator CreateBookCommand
@@ -82,10 +90,10 @@ Tags:
 
 ---
 
-## ??? Roadmap
+## 🛣 Roadmap
 
-* ?? Export Polly resilience metrics as OTEL counters & histograms.
-* ?? Trace correlation between HTTP, Mediator, and DB layers.
-* ?? Prebuilt dashboards for Prometheus + Grafana.
-
+* Export Polly resilience metrics as OTEL counters & histograms.
+* Full trace correlation between HTTP, Mediator, and DB layers.
+* Prebuilt dashboards for Prometheus + Grafana.
+* Unified logging + tracing observability across all Franz applications.
 
