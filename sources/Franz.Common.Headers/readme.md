@@ -23,7 +23,7 @@ A utility library within the **Franz Framework** designed to simplify and standa
 
 ## **Version Information**
 
-- **Current Version**: 1.7.5
+- **Current Version**: 1.7.6
 - Part of the private **Franz Framework** ecosystem.
 
 ---

@@ -1073,3 +1073,38 @@ Version 1.7.5 – CosmosDB Provider & Saga Persistence 🚀
 - Removed unstable Saga E2E tests depending on full RabbitMQ+Mongo boot timing.
 - Simplified test suite to focus on deterministic unit/integration layers.
 
+Perfect — since both **Franz.Common.OpenTelemetry** and **Franz.Common.Logging** were upgraded together in **v1.7.6**, here’s a **main Changelog entry** you can drop into the top of your central `CHANGELOG.md`:
+
+---
+
+### **v1.7.6 — [Patch]**
+
+**Summary:** Production-ready telemetry & logging improvements for the Franz Framework.
+
+#### **Franz.Common.OpenTelemetry**
+
+* Fully self-contained OpenTelemetry configuration; no manual `AddOpenTelemetry()` required.
+* OTLP exporter with **fail-fast enforcement** in production.
+* Automatic instrumentation for **Mediator pipelines**, HTTP calls, and custom ActivitySources.
+* Out-of-the-box enriched span tags: `franz.correlation_id`, `franz.user_id`, `franz.tenant_id`, `franz.environment`, `franz.metadata.*`.
+* README and usage updated for production-grade defaults.
+
+#### **Franz.Common.Logging**
+
+* **Dual production logging**:
+
+  * `prod-sre-.json` → structured JSON, SRE-consumable.
+  * `prod-dev-.log` → human-readable, verbose, Dev-friendly.
+* UTF-8 safe, rolling files with 30-day retention.
+* Console logs preserved for live monitoring.
+* Noise suppression applied consistently across all logs.
+* Fully compatible with **Franz.Common.OpenTelemetry** for automatic log-trace correlation.
+
+#### **General**
+
+* Simplified, production-ready defaults for tracing & logging.
+* Dev/Prod environment-aware configuration maintained.
+* Backward compatible with existing `UseLog()`, `UseHybridLog()`, and `AddMediatorOpenTelemetry()` usage.
+* Turned the Franz Core stack into a **plug-and-play, production-grade telemetry artillery**.
+
+---

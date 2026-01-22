@@ -316,62 +316,48 @@ Everything is provided as **ready-to-paste Markdown**.
 
 ---
 
-## Version **1.7.5** delivers major infrastructure and reliability upgrades focused on **polyglot persistence**, **saga orchestration**, and **message serialization correctness**.
+## **Franz Framework Core Updates — v1.7.6**
 
-This release completes the Cosmos DB and SagaStorage line of the framework while further strengthening messaging consistency across all transports.
+**Release Highlights:**
 
-### 🔹 **Azure Cosmos DB Support (New)**
+* **Franz.Common.OpenTelemetry**
 
-Franz now fully supports Cosmos DB as a first-class persistence provider:
+  * Fully **self-contained OpenTelemetry configuration** — no need for manual `AddOpenTelemetry()` in APIs.
+  * **OTLP exporter** with **fail-fast enforcement** in production.
+  * Automatic instrumentation for **Mediator pipelines**, HTTP calls, and custom ActivitySources.
+  * **Enriched span tags** out-of-the-box (`franz.correlation_id`, `franz.user_id`, `franz.tenant_id`, `franz.environment`, `franz.metadata.*`).
+  * Updated **README & usage** to reflect production-ready defaults.
 
-* Added `Franz.Common.AzureCosmosDB`
-* New `CosmosDbContextBase` with automatic conventions
-* Outbox & dead-letter storage via `CosmosDBMessageStore`
-* Generic repository support (`ICosmosRepository<>`)
-* Unified bootstrapping through configuration
+* **Franz.Common.Logging**
 
-Cosmos DB now joins **SQL (EF)** and **MongoDB** as equal citizens in Franz’ polyglot persistence model.
+  * **Dual production logging**:
 
----
+    * `prod-sre-.json` → structured JSON, SRE-consumable.
+    * `prod-dev-.log` → human-readable, verbose, Dev-friendly.
+  * UTF-8 safe, rolling files with 30-day retention.
+  * Console logs preserved for live monitoring.
+  * Noise suppression consistently applied across all logs.
+  * Fully compatible with **Franz.Common.OpenTelemetry** for automatic log-trace correlation.
 
-### 🔹 **Saga Orchestration Enhancements**
+* **General Improvements**
 
-A major rework of saga infrastructure:
-
-* Added **Mongo-backed** and **Cosmos-backed** saga storage
-* New `MongoSagaRepository` & `CosmosSagaRepository`
-* Correct saga ID propagation via the Saga itself (not the orchestrator)
-* Deterministic correlation resolution using `IMessageCorrelation<>`
-* Cleanup and removal of unstable saga integration tests for CI stability
-
-Sagas are now **transport-agnostic**, **store-agnostic**, and fully deterministic.
-
----
-
-### 🔹 **Messaging & Serialization Hardening**
-
-* Unified serializer pipeline across all transports
-* Improved message envelope normalization
-* Stricter validation of correlation/causation fields
-* Async-safe message publishing for RabbitMQ & Kafka
-* Resilience improvements for hosted consumers
+  * Production-grade defaults for tracing & logging.
+  * Simplified configuration for Dev/Prod environments.
+  * Ready for seamless integration in APIs, background services, and enterprise pipelines.
+  * Backward compatible with existing `UseLog()`, `UseHybridLog()`, and `AddMediatorOpenTelemetry()` usage.
 
 ---
 
-### 🔹 **Null Safety & Infrastructure Reliability**
+**Tag / Commit:** `[Patch] v1.7.6`
 
-* Continued enforcement of `<Nullable>enable` across sub-packages
-* Input sanitization and safer state persistence
-* Defensive protections around deserialization and dynamic loading
+This version makes the **Franz Core stack fully plug-and-play** for tracing and logging, turning it into a **production-ready telemetry artillery**.
 
 ---
 
-### 🔹 **Developer Experience Improvements**
+If you want, I can also draft a **one-paragraph “release note” style summary** for the README front page, so anyone glancing at the repo sees **at a glance that logging & telemetry are now fully automated and production-grade**.
 
-* Better bootstrapping diagnostics for misconfigured persistence
-* Clearer saga registration flow: `AddFranzSagas()` + `BuildFranzSagas()`
-* Simplified Mongo/Cosmos initialization for integration testing
-* Internal test improvements using Testcontainers
+Do you want me to do that?
+
 
 ---
 
