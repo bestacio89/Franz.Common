@@ -1,32 +1,78 @@
 ﻿using Franz.Common.Caching.Abstractions;
 using Microsoft.Extensions.Caching.Memory;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Franz.Common.Caching.Providers;
-public class MemoryCacheProvider : ICacheProvider
+
+public sealed class MemoryCacheProvider : ICacheProvider
 {
   private readonly IMemoryCache _cache;
-  public MemoryCacheProvider(IMemoryCache cache) => _cache = cache;
 
-  public Task<T?> GetAsync<T>(string key, CancellationToken ct = default) =>
-      Task.FromResult(_cache.TryGetValue(key, out var value) ? (T?)value : default);
+  private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(5);
 
-  public Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct = default)
+  public MemoryCacheProvider(IMemoryCache cache)
   {
-    _cache.Set(key, value, ttl);
-    return Task.CompletedTask;
+    _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+  }
+
+  public async Task<T?> GetOrSetAsync<T>(
+      string key,
+      Func<CancellationToken, Task<T>> factory,
+      CacheOptions? options = null,
+      CancellationToken ct = default)
+  {
+    if (string.IsNullOrWhiteSpace(key))
+      throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
+
+    if (factory is null)
+      throw new ArgumentNullException(nameof(factory));
+
+    ValidateOptions(options);
+
+    if (_cache.TryGetValue(key, out var existing))
+      return (T?)existing;
+
+    // ⚠ No stampede protection by design
+    var value = await factory(ct);
+
+    _cache.Set(
+        key,
+        value!,
+        new MemoryCacheEntryOptions
+        {
+          AbsoluteExpirationRelativeToNow =
+                options?.Expiration ?? DefaultExpiration
+        });
+
+    return value;
   }
 
   public Task RemoveAsync(string key, CancellationToken ct = default)
   {
+    if (string.IsNullOrWhiteSpace(key))
+      throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
+
     _cache.Remove(key);
     return Task.CompletedTask;
   }
 
-  public Task<bool> ExistsAsync(string key, CancellationToken ct = default) =>
-      Task.FromResult(_cache.TryGetValue(key, out _));
+  public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
+      => throw new NotSupportedException(
+          "Tag-based invalidation is not supported by MemoryCacheProvider.");
+
+  private static void ValidateOptions(CacheOptions? options)
+  {
+    if (options is null)
+      return;
+
+    if (options.Expiration != null && options.Expiration.Value <= TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(nameof(options.Expiration));
+
+    if (options.LocalCacheHint is not null)
+      throw new NotSupportedException(
+          "LocalCacheHint is not applicable to memory-only cache providers.");
+
+    if (options.Tags is not null)
+      throw new NotSupportedException(
+          "Tags are not supported by MemoryCacheProvider.");
+  }
 }

@@ -1,53 +1,90 @@
-# Franz.Common.Caching
+﻿# Franz.Common.Caching
 
-A full-featured caching module for the** Franz Framework**.  
-Provides pluggable cache providers(Memory, Distributed, Redis), request caching via Mediator pipelines, settings cache, and built-in observability with Serilog + OpenTelemetry.
-
----
-- **Current Version**: 1.7.6
----
-
-## ? Features
-
-- ?? ** Unified abstractions**: `ICacheProvider`, `ICacheKeyStrategy`, `ISettingsCache`.
-- ?? ** Multiple providers out of the box**:
-  - `MemoryCacheProvider` (fast local)
-  - `DistributedCacheProvider` (SQL Server, NCache, etc.)
-  - `RedisCacheProvider` (scalable distributed caching).
-- ?? ** Flexible key strategies**:
-  - Default(type + serialized payload)
-  - Namespaced(domain separation)
-  - Custom(plug in your own).
-- ?? ** Mediator pipeline**:
-  - Automatic cache HIT/MISS detection
-  - Transparent response caching
-  - Per-request TTL + bypass
-  - Consistent with CQRS(cache queries, skip commands).
-- ?? ** Observability out of the box**:
-  - Enriched Serilog logs(`FranzCorrelationId`, `FranzCacheKey`, etc.)
-  - OpenTelemetry** metrics**: hits, misses, lookup latency
-  - OpenTelemetry** trace tags**: `franz.cache.*`
-- ?? ** Plug-and-play DI extensions**:
-  - `AddFranzMemoryCaching()`
-  - `AddFranzDistributedCaching<T>()`
-  - `AddFranzRedisCaching()` (connection string or DI factory)
-  - `AddFranzMediatorCaching()`.
+A full-featured caching module for the **Franz Framework**.
+Provides **unified cache abstractions**, **hybrid caching (L1 + L2)**, Mediator request caching, settings cache, and **first-class observability** via Serilog and OpenTelemetry.
 
 ---
 
-## ?? Installation
+* **Current Version**: **1.7.7**
+* **Target Framework**: **.NET 10.0**
+
+---
+
+## ✨ Features
+
+* 🧱 **Unified abstractions**
+
+  * `ICacheProvider`
+  * `ICacheKeyStrategy`
+  * `ISettingsCache`
+  * **Single cache options model** (TTL, sliding, priority, tags)
+
+* ⚡ **Hybrid caching support**
+
+  * L1: In-memory (fast, local)
+  * L2: Distributed / Redis (durable, shared)
+  * Read-through + write-through behavior
+  * Optional local cache hinting
+
+* 🧩 **Pluggable providers**
+
+  * `MemoryCacheProvider`
+  * `DistributedCacheProvider`
+  * `RedisCacheProvider`
+
+* 🔑 **Flexible cache key strategies**
+
+  * Default (type + normalized payload)
+  * Namespaced (domain separation)
+  * Custom strategies (drop-in)
+
+* 🔁 **Mediator pipeline integration**
+
+  * Automatic cache HIT / MISS detection
+  * Transparent response caching
+  * Per-request cache options (TTL, sliding, bypass)
+  * CQRS-aware (queries cached, commands skipped)
+  * **Null response caching supported**
+
+* 📈 **Observability out of the box**
+
+  * **Serilog enrichment**
+
+    * `FranzCorrelationId`
+    * `FranzCacheKey`
+    * `FranzCacheHit`
+  * **OpenTelemetry metrics**
+
+    * cache hits / misses
+    * lookup latency
+  * **OpenTelemetry trace tags**
+
+    * `franz.cache.*`
+
+* 🔌 **Plug-and-play DI extensions**
+
+  * `AddFranzMemoryCaching()`
+  * `AddFranzDistributedCaching<T>()`
+  * `AddFranzRedisCaching()`
+  * `AddFranzHybridCaching()`
+  * `AddFranzMediatorCaching()`
+
+---
+
+## 📦 Installation
 
 ```bash
 dotnet add package Franz.Common.Caching
-````
+```
 
 ---
 
-## ? Quickstart
+## 🚀 Quickstart
 
 ```csharp
 // Program.cs
-builder.Services.AddFranzCaching(); // defaults to in-memory
+builder.Services.AddFranzHybridCaching();
+
 builder.Services.AddFranzMediatorCaching(opts =>
 {
     opts.DefaultTtl = TimeSpan.FromMinutes(10);
@@ -55,34 +92,53 @@ builder.Services.AddFranzMediatorCaching(opts =>
 });
 ```
 
-### Example Mediator Query
+---
+
+## 🧠 Cache Options (Unified)
+
+```csharp
+public sealed class CacheOptions
+{
+    public TimeSpan? Expiration { get; init; }
+    public TimeSpan? LocalCacheHint { get; init; }
+    public bool Sliding { get; init; }
+    public CachePriority Priority { get; init; } = CachePriority.Normal;
+    public string[]? Tags { get; init; }
+}
+```
+
+✔ Same options model used across **memory, distributed, redis, and mediator pipeline**
+✔ Providers adapt internally — no provider-specific leakage
+
+---
+
+## 🧪 Example Mediator Query
 
 ```csharp
 public record GetUserByIdQuery(int Id) : IQuery<User>;
 ```
 
-*First execution ? MISS ? fetch + cache
-* Subsequent executions with same input ? HIT ? return cached response
-
-Logs and telemetry are produced automatically.
+* First execution → **MISS** → handler executes → cached
+* Subsequent executions → **HIT** → cached response returned
+* Logs + metrics + traces emitted automatically
 
 ---
 
-## ?? Providers
+## 🧰 Providers
 
-### In-memory
+### In-memory (L1)
 
 ```csharp
 services.AddFranzMemoryCaching();
 ```
 
-### Distributed (SQL Server, NCache, etc.)
+### Distributed (L2 – SQL Server, NCache, etc.)
 
 ```csharp
 services.AddFranzDistributedCaching<SqlServerCache>();
 ```
 
-### Redis
+### Redis (L2)
 
 ```csharp
 // Simple
@@ -91,16 +147,28 @@ services.AddFranzRedisCaching("localhost:6379");
 // Advanced (DI-driven)
 services.AddFranzRedisCaching(sp =>
 {
-  var cfg = sp.GetRequiredService<IConfiguration>();
-  return ConnectionMultiplexer.Connect(cfg.GetConnectionString("Redis"));
+    var cfg = sp.GetRequiredService<IConfiguration>();
+    return ConnectionMultiplexer.Connect(
+        cfg.GetConnectionString("Redis")
+    );
 });
 ```
 
+### Hybrid (Recommended)
+
+```csharp
+services.AddFranzHybridCaching();
+```
+
+* Memory → Redis / Distributed
+* Local cache warming
+* Consistent invalidation flow
+
 ---
 
-## ?? Observability
+## 📊 Observability
 
-### Serilog Logs
+### Serilog (example)
 
 ```json
 {
@@ -126,21 +194,34 @@ services.AddFranzRedisCaching(sp =>
 
 ---
 
-## ?? Roadmap
+## 🧭 Roadmap
 
-* Support for **hashed cache keys** (short keys for Redis).
-* More built-in strategies (e.g., sliding expiration).
-* Deeper integration with `Franz.Common.Settings`.
+* Hashed / compact cache keys (Redis-friendly)
+* Tag-based invalidation
+* Deeper integration with `Franz.Common.Settings`
+* Optional async background refresh
 
 ---
 
-# Franz.Common.Caching is production-ready:
+## 📝 Changelog
 
-? Cache providers + Mediator integration + observability, all out of the box.
+### **1.7.7**
 
-### Version 1.7.3
-- Implemented Lazy infra loading to avoid Redis connection issues during startup.
-- Implemented null response caching support in Mediator pipeline.
+* Unified cache options across all providers
+* Hybrid cache provider stabilized (L1 + L2)
+* Removed legacy entry options
+* Provider internals aligned with Mediator pipeline
+* Improved null caching semantics
+* Documentation refresh (this file)
 
-### Version 1.6.20
-- Updated to **.NET 10.0**
+### **1.7.6**
+
+* Lazy infrastructure loading
+* Redis startup stability improvements
+
+### **1.6.20**
+
+* Upgraded to **.NET 10.0**
+
+---
+
