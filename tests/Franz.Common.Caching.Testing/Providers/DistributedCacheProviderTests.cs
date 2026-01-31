@@ -66,9 +66,9 @@ public sealed class DistributedCacheProviderTests
 
     var result = await provider.GetOrSetAsync(
         key,
-        _ => Task.FromResult("new"));
+        _ => Task.FromResult("value"));
 
-    result.Should().Be("new");
+    result.Should().Be("value");
   }
 
   [Fact]
