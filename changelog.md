@@ -1108,3 +1108,32 @@ Perfect — since both **Franz.Common.OpenTelemetry** and **Franz.Common.Logging
 * Turned the Franz Core stack into a **plug-and-play, production-grade telemetry artillery**.
 
 ---
+Perfect — we can make a **clear, structured list** that reflects all the cache modernization work for both **README** and **CHANGELOG**. I’ll separate them since the README is **marketing + user-oriented**, and CHANGELOG is **versioned + developer-oriented**.
+
+---
+
+## v1.7.7
+
+### Added
+
+* `CacheOptions` class to standardize TTL, sliding/local hints, and tags
+* `GetOrSetAsync` on all cache providers (`Memory`, `Redis`, `Distributed`, `Hybrid`)
+* Hybrid cache support for tag-based invalidation
+* Default expiration and local cache hints for HybridCacheProvider
+
+### Changed
+
+* Updated `ICacheProvider` interface to reflect new unified contract
+* Refactored all providers to adopt `CacheOptions`
+* Standardized async factory usage for Hybrid and Redis caches
+* Removed legacy Get/Set/Exists API patterns
+* Unit tests rewritten to match new contract and provider behavior
+* Validation logic added to prevent zero/negative TTLs and unsupported options
+
+### Fixed
+
+* HybridCache async adaptation now correctly handles cancellation and factory delegation
+* DistributedCacheProvider respects CacheOptions and unified GetOrSetAsync pattern
+* RedisCacheProvider aligned with unified options and validation rules
+
+

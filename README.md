@@ -309,60 +309,31 @@ dotnet test --filter Category=Integration
 ```
 
 ---
+### 🔹 What’s new in caching (v1.7.7)
 
-Below is a **clean, drop-in replacement** for the **Version 1.7.4** section *plus the updated badges at the top*, fully aligned with the Franz tone and formatting.
+* **Unified cache configuration** via `CacheOptions`:
 
-Everything is provided as **ready-to-paste Markdown**.
+  * `Expiration` (absolute TTL)
+  * `LocalCacheHint` (for hybrid/local cache hinting)
+  * `Tags` (supported in HybridCacheProvider for tag-based invalidation)
+* **Enhanced `ICacheProvider` interface** with `GetOrSetAsync` as primary API
+* **All providers updated** to adopt CacheOptions semantics:
 
----
+  * `MemoryCacheProvider`
+  * `DistributedCacheProvider`
+  * `RedisCacheProvider`
+  * `HybridCacheProvider`
+* **Consistent validation and defaults** across providers:
 
-## **Franz Framework Core Updates — v1.7.6**
+  * Default TTLs enforced
+  * Expiration > 0
+  * Hybrid cache respects local cache hints
+* **Async factory handling standardized** for HybridCache and Redis/Distributed caches
+* **Deprecated legacy Get/Set/Exists patterns**, replaced with modern contract-based API
+* **Improved observability**: logs, telemetry, and caching pipelines now respect unified options
+* **Unit tests fully updated** to reflect new provider behavior and CacheOptions contract
 
-**Release Highlights:**
-
-* **Franz.Common.OpenTelemetry**
-
-  * Fully **self-contained OpenTelemetry configuration** — no need for manual `AddOpenTelemetry()` in APIs.
-  * **OTLP exporter** with **fail-fast enforcement** in production.
-  * Automatic instrumentation for **Mediator pipelines**, HTTP calls, and custom ActivitySources.
-  * **Enriched span tags** out-of-the-box (`franz.correlation_id`, `franz.user_id`, `franz.tenant_id`, `franz.environment`, `franz.metadata.*`).
-  * Updated **README & usage** to reflect production-ready defaults.
-
-* **Franz.Common.Logging**
-
-  * **Dual production logging**:
-
-    * `prod-sre-.json` → structured JSON, SRE-consumable.
-    * `prod-dev-.log` → human-readable, verbose, Dev-friendly.
-  * UTF-8 safe, rolling files with 30-day retention.
-  * Console logs preserved for live monitoring.
-  * Noise suppression consistently applied across all logs.
-  * Fully compatible with **Franz.Common.OpenTelemetry** for automatic log-trace correlation.
-
-* **General Improvements**
-
-  * Production-grade defaults for tracing & logging.
-  * Simplified configuration for Dev/Prod environments.
-  * Ready for seamless integration in APIs, background services, and enterprise pipelines.
-  * Backward compatible with existing `UseLog()`, `UseHybridLog()`, and `AddMediatorOpenTelemetry()` usage.
-
----
-
-**Tag / Commit:** `[Patch] v1.7.6`
-
-This version makes the **Franz Core stack fully plug-and-play** for tracing and logging, turning it into a **production-ready telemetry artillery**.
-
----
-
-If you want, I can also draft a **one-paragraph “release note” style summary** for the README front page, so anyone glancing at the repo sees **at a glance that logging & telemetry are now fully automated and production-grade**.
-
-Do you want me to do that?
-
-
----
-
-**No breaking changes.**
-This is a **stability, correctness, and infrastructure-hardening release** preparing for the upcoming 1.8.x feature wave.
+> These changes make caching more robust, predictable, and scalable, while avoiding anti-patterns like SQL-based caching.
 
 ---
 

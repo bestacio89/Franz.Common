@@ -25,7 +25,7 @@ They operate transport-agnostically and integrate seamlessly with:
 
 ---
 
-## 🔖 **Current Version: 1.7.6**
+## 🔖 **Current Version: 1.7.7**
 
 ---
 
