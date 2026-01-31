@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Extensions;
 using Franz.Common.Caching.Testing.Models;
 using Microsoft.Extensions.Caching.Distributed;

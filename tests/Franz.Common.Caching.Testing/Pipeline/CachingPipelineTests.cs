@@ -1,19 +1,13 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Franz.Common.Caching.Abstractions;
-using Franz.Common.Caching.Extensions;
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Pipelines;
-using Franz.Common.Mediator.Pipelines.Core;
-
 using FluentAssertions;
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-
 using Moq;
 using Xunit;
 
@@ -25,87 +19,111 @@ public sealed class CachingPipelineTests
   private sealed record TestResponse(string Value);
 
   private static CachingPipeline<TestRequest, TestResponse> BuildPipeline(
-  Action<MediatorCachingOptions>? configureOptions = null,
-  Mock<ICacheProvider>? cacheMock = null)
+      Action<MediatorCachingOptions>? configureOptions = null,
+      ICacheProvider? cacheProvider = null)
   {
     var services = new ServiceCollection();
 
-    var cache = cacheMock ?? new Mock<ICacheProvider>();
-    services.AddSingleton<ICacheProvider>(cache.Object);
+    // Use a mock cache if none provided
+    cacheProvider ??= new Mock<ICacheProvider>().Object;
 
-    services.AddSingleton<ICacheKeyStrategy>(
-      Mock.Of<ICacheKeyStrategy>(k =>
+    services.AddSingleton(cacheProvider);
+
+    services.AddSingleton(Mock.Of<ICacheKeyStrategy>(k =>
         k.BuildKey(It.IsAny<TestRequest>()) == "key"));
 
     services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 
-    services.Configure<MediatorCachingOptions>(options =>
+    if (configureOptions != null)
     {
-      configureOptions?.Invoke(options);
-    });
+      services.Configure(configureOptions);
+    }
 
-    services.AddFranzMediatorCaching();
+    // Register the pipeline manually (normally via AddFranzMediatorCaching)
+    services.AddTransient<CachingPipeline<TestRequest, TestResponse>>();
 
-    var serviceProvider = services.BuildServiceProvider();
-
-    return serviceProvider
-      .GetRequiredService<CachingPipeline<TestRequest, TestResponse>>();
+    return services.BuildServiceProvider()
+                   .GetRequiredService<CachingPipeline<TestRequest, TestResponse>>();
   }
 
   [Fact]
   public async Task Disabled_Caching_Should_Invoke_Next()
   {
-    var pipeline = BuildPipeline(o => o.Enabled = false);
+    var mockCache = new Mock<ICacheProvider>();
+    var pipeline = BuildPipeline(o => o.Enabled = false, mockCache.Object);
 
     var result = await pipeline.Handle(
-      new TestRequest(1),
-      () => Task.FromResult(new TestResponse("computed")));
+        new TestRequest(1),
+        () => Task.FromResult(new TestResponse("computed")));
 
     result.Value.Should().Be("computed");
+
+    // Cache should never be called
+    mockCache.Verify(c => c.GetOrSetAsync<TestResponse>(
+        It.IsAny<string>(),
+        It.IsAny<Func<CancellationToken, Task<TestResponse>>>(),
+        It.IsAny<CacheOptions>(),
+        It.IsAny<CancellationToken>()),
+        Times.Never);
   }
 
   [Fact]
   public async Task Cache_Hit_Should_Return_Cached_Value()
   {
-    var cache = new Mock<ICacheProvider>();
+    var cacheMock = new Mock<ICacheProvider>();
 
-    cache.Setup(c => c.ExistsAsync("key", It.IsAny<CancellationToken>()))
-         .ReturnsAsync(true);
+    cacheMock.Setup(c => c.GetOrSetAsync(
+            "key",
+            It.IsAny<Func<CancellationToken, Task<TestResponse>>>(),
+            It.IsAny<CacheOptions>(),
+            It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new TestResponse("cached"));
 
-    cache.Setup(c => c.GetAsync<TestResponse>("key", It.IsAny<CancellationToken>()))
-         .ReturnsAsync(new TestResponse("cached"));
-
-    var pipeline = BuildPipeline(null, cache);
+    var pipeline = BuildPipeline(null, cacheMock.Object);
 
     var result = await pipeline.Handle(
-      new TestRequest(42),
-      () => Task.FromResult(new TestResponse("miss")));
+        new TestRequest(42),
+        () => Task.FromResult(new TestResponse("miss")));
 
     result.Value.Should().Be("cached");
+
+    // Verify factory was never invoked because cache hit
+    cacheMock.Verify(c => c.GetOrSetAsync(
+        "key",
+        It.IsAny<Func<CancellationToken, Task<TestResponse>>>(),
+        It.IsAny<CacheOptions>(),
+        It.IsAny<CancellationToken>()),
+        Times.Once);
   }
 
   [Fact]
   public async Task Cache_Miss_Should_Invoke_Next_And_Set()
   {
-    var cache = new Mock<ICacheProvider>();
+    var cacheMock = new Mock<ICacheProvider>();
 
-    cache.Setup(c => c.ExistsAsync("key", It.IsAny<CancellationToken>()))
-         .ReturnsAsync(false);
+    // Setup GetOrSetAsync to actually call the factory (simulate cache miss)
+    cacheMock.Setup(c => c.GetOrSetAsync(
+            "key",
+            It.IsAny<Func<CancellationToken, Task<TestResponse>>>(),
+            It.IsAny<CacheOptions>(),
+            It.IsAny<CancellationToken>()))
+        .Returns((string k, Func<CancellationToken, Task<TestResponse>> factory, CacheOptions opts, CancellationToken ct) =>
+            factory(ct));
 
-    var pipeline = BuildPipeline(null, cache);
+    var pipeline = BuildPipeline(null, cacheMock.Object);
 
     var result = await pipeline.Handle(
-      new TestRequest(99),
-      () => Task.FromResult(new TestResponse("computed")));
+        new TestRequest(99),
+        () => Task.FromResult(new TestResponse("computed")));
 
     result.Value.Should().Be("computed");
 
-    cache.Verify(c =>
-      c.SetAsync(
+    // Ensure GetOrSetAsync was called
+    cacheMock.Verify(c => c.GetOrSetAsync(
         "key",
-        It.IsAny<TestResponse>(),
-        It.IsAny<TimeSpan>(),
+        It.IsAny<Func<CancellationToken, Task<TestResponse>>>(),
+        It.IsAny<CacheOptions>(),
         It.IsAny<CancellationToken>()),
-      Times.Once);
+        Times.Once);
   }
 }

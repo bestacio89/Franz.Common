@@ -2,6 +2,7 @@
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Extensions;
 using Franz.Common.Caching.Providers;
+using Franz.Common.Caching.Redis;
 using Franz.Common.Caching.Testing.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;

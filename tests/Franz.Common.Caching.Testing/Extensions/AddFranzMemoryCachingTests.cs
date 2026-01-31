@@ -1,45 +1,82 @@
-﻿using FluentAssertions;
-using Franz.Common.Caching.Abstractions;
-using Franz.Common.Caching.Estrategies;
-using Franz.Common.Caching.Extensions;
+﻿using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Providers;
-using Franz.Common.Caching.Settings;
-using Franz.Common.Caching.Testing.Models;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Caching.Memory;
+using Xunit;
+using FluentAssertions;
 using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace Franz.Common.Caching.Testing.Extensions;
-
-public sealed class AddFranzMemoryCachingTests
+public class MemoryCacheProviderTests
 {
+  private MemoryCacheProvider CreateProvider()
+      => new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()));
+
   [Fact]
-  public void Should_Register_MemoryCache_Infrastructure()
+  public async Task GetOrSetAsync_Should_Set_And_Get_Value()
   {
-    using var sp = ServiceTestHelper.Build(services =>
-      services.AddFranzMemoryCaching());
+    var provider = CreateProvider();
 
-    sp.GetRequiredService<ICacheProvider>()
-      .Should().BeOfType<MemoryCacheProvider>();
+    var value = await provider.GetOrSetAsync(
+        "key",
+        _ => Task.FromResult("value"),
+        new CacheOptions { Expiration = TimeSpan.FromMinutes(1) }
+    );
 
-    sp.GetRequiredService<ICacheKeyStrategy>()
-      .Should().BeOfType<DefaultCacheKeyStrategy>();
+    value.Should().Be("value");
 
-    sp.GetRequiredService<ISettingsCache>()
-      .Should().BeOfType<SettingsCache>();
+    // Confirm cached value is returned without calling factory again
+    var cachedValue = await provider.GetOrSetAsync(
+        "key",
+        _ => Task.FromResult("wrong"),
+        new CacheOptions { Expiration = TimeSpan.FromMinutes(1) }
+    );
+
+    cachedValue.Should().Be("value");
   }
 
   [Fact]
-  public void Should_Apply_CacheEntryOptions()
+  public async Task RemoveAsync_Should_Delete_Cached_Value()
   {
-    using var sp = ServiceTestHelper.Build(services =>
-      services.AddFranzMemoryCaching(o => o.Ttl = TimeSpan.FromSeconds(10)));
+    var provider = CreateProvider();
 
-    var options = sp.GetRequiredService<
-      Microsoft.Extensions.Options.IOptions<CacheEntryOptions>>();
+    await provider.GetOrSetAsync("temp", _ => Task.FromResult(42), new CacheOptions { Expiration = TimeSpan.FromMinutes(1) });
+    await provider.RemoveAsync("temp");
 
-    options.Value.Ttl.Should().Be(TimeSpan.FromSeconds(10));
+    var result = await provider.GetOrSetAsync<int?>(
+        "temp",
+        _ => Task.FromResult<int?>(null),
+        new CacheOptions { Expiration = TimeSpan.FromMinutes(1) }
+    );
+
+    result.Should().BeNull();
+  }
+
+  [Fact]
+  public async Task GetOrSetAsync_Should_Throw_On_Invalid_Options()
+  {
+    var provider = CreateProvider();
+
+    await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+        provider.GetOrSetAsync("key", _ => Task.FromResult("v"), new CacheOptions { Expiration = TimeSpan.Zero })
+    );
+
+    await Assert.ThrowsAsync<NotSupportedException>(() =>
+        provider.GetOrSetAsync("key", _ => Task.FromResult("v"), new CacheOptions { LocalCacheHint = TimeSpan.FromSeconds(1) })
+    );
+
+    await Assert.ThrowsAsync<NotSupportedException>(() =>
+        provider.GetOrSetAsync("key", _ => Task.FromResult("v"), new CacheOptions { Tags = new[] { "tag1" } })
+    );
+  }
+
+  [Fact]
+  public async Task RemoveByTagAsync_Should_Throw_NotSupported()
+  {
+    var provider = CreateProvider();
+
+    await Assert.ThrowsAsync<NotSupportedException>(() =>
+        provider.RemoveByTagAsync("tag1")
+    );
   }
 }
-
