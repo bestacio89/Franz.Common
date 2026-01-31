@@ -1,31 +1,45 @@
-﻿using Franz.Common.Caching.Providers;
+﻿using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Providers;
 using Microsoft.Extensions.Caching.Memory;
-using Xunit;
 using FluentAssertions;
+using Xunit;
 
 public class MemoryCacheProviderTests
 {
   [Fact]
-  public async Task Should_Set_And_Get_Value()
+  public async Task GetOrSetAsync_Should_Return_Cached_Value()
   {
     var provider = new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()));
 
-    await provider.SetAsync("key", "value", TimeSpan.FromMinutes(1));
+    // First call: factory executes
+    var first = await provider.GetOrSetAsync("user:1", _ => Task.FromResult("Alice"));
+    first.Should().Be("Alice");
 
-    var result = await provider.GetAsync<string>("key");
-
-    result.Should().Be("value");
+    // Second call: returns cached value
+    var second = await provider.GetOrSetAsync("user:1", _ => Task.FromResult("Bob"));
+    second.Should().Be("Alice"); // still "Alice" because cached
   }
 
   [Fact]
-  public async Task ExistsAsync_Should_Return_True_When_Key_Present()
+  public async Task RemoveAsync_Should_Delete_Entry()
   {
-    var cache = new MemoryCache(new MemoryCacheOptions());
-    var provider = new MemoryCacheProvider(cache);
+    var provider = new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()));
 
-    await provider.SetAsync("exists", 123, TimeSpan.FromMinutes(1));
+    await provider.GetOrSetAsync("temp", _ => Task.FromResult(42));
+    await provider.RemoveAsync("temp");
 
-    var exists = await provider.ExistsAsync("exists");
-    exists.Should().BeTrue();
+    // Now factory executes again because cache was removed
+    var result = await provider.GetOrSetAsync("temp", _ => Task.FromResult(99));
+    result.Should().Be(99);
+  }
+
+  [Fact]
+  public async Task GetOrSetAsync_Should_Throw_On_Invalid_Key()
+  {
+    var provider = new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()));
+
+    await FluentActions
+        .Invoking(() => provider.GetOrSetAsync<string>("", _ => Task.FromResult("x")))
+        .Should().ThrowAsync<ArgumentException>();
   }
 }

@@ -1,8 +1,10 @@
 ﻿using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Estrategies;
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Pipelines;
 using Franz.Common.Caching.Providers;
+using Franz.Common.Caching.Redis;
 using Franz.Common.Caching.Settings;
 using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.Caching.Distributed;
@@ -19,7 +21,7 @@ namespace Franz.Common.Caching.Extensions
     /// </summary>
     public static IServiceCollection AddFranzMemoryCaching(
        this IServiceCollection services,
-       Action<CacheEntryOptions>? configure = null)
+       Action<CacheOptions>? configure = null)
     {
       services.AddMemoryCache();
       services.TryAddSingleton<ICacheProvider, MemoryCacheProvider>();
@@ -34,7 +36,7 @@ namespace Franz.Common.Caching.Extensions
     /// </summary>
     public static IServiceCollection AddFranzDistributedCaching<TDistributedCache>(
       this IServiceCollection services,
-      Action<CacheEntryOptions>? configure = null)
+      Action<CacheOptions>? configure = null)
       where TDistributedCache : class, IDistributedCache
     {
       services.AddSingleton<IDistributedCache, TDistributedCache>();
@@ -52,7 +54,7 @@ namespace Franz.Common.Caching.Extensions
     this IServiceCollection services,
     string connectionString,
     int database = 0,
-    Action<CacheEntryOptions>? configure = null)
+    Action<CacheOptions>? configure = null)
     {
       services.AddSingleton<IConnectionMultiplexer>(_ =>
         ConnectionMultiplexer.Connect(
@@ -79,7 +81,7 @@ namespace Franz.Common.Caching.Extensions
     public static IServiceCollection AddFranzRedisCaching(
       this IServiceCollection services,
       Func<IServiceProvider, IConnectionMultiplexer> multiplexerFactory,
-      Action<CacheEntryOptions>? configure = null)
+      Action<CacheOptions>? configure = null)
     {
       services.AddSingleton<IConnectionMultiplexer>(multiplexerFactory);
 
@@ -99,7 +101,7 @@ namespace Franz.Common.Caching.Extensions
     /// </summary>
     public static IServiceCollection AddFranzCaching(
         this IServiceCollection services,
-        Action<CacheEntryOptions>? configure = null)
+        Action<CacheOptions>? configure = null)
         => services.AddFranzMemoryCaching(configure);
 
     public static IServiceCollection AddFranzMediatorCaching(

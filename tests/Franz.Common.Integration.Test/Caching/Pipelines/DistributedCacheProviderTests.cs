@@ -1,38 +1,37 @@
 ﻿using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Distributed;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
+using System;
+using System.Threading.Tasks;
 using Xunit;
 using FluentAssertions;
-using System.Text.Json;
-using Microsoft.Extensions.Options;
 
 public class DistributedCacheProviderTests
 {
   private static IDistributedCache CreateMemoryDistributedCache() =>
       new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
 
+  private sealed record User(string Name);
+
   [Fact]
-  public async Task Should_Set_And_Get_Value()
+  public async Task GetOrSetAsync_Should_Set_And_Get_Value()
   {
     var cache = CreateMemoryDistributedCache();
     var provider = new DistributedCacheProvider(cache);
 
-    await provider.SetAsync("user:1", new { Name = "John" }, TimeSpan.FromMinutes(1));
-    var result = await provider.GetAsync<JsonElement>("user:1");
+    var key = "user:1";
 
-    result.GetProperty("Name").GetString().Should().Be("John");
-  }
+    var value = await provider.GetOrSetAsync(key, _ => Task.FromResult(new User("John")),
+        new CacheOptions { Expiration = TimeSpan.FromMinutes(1) });
 
-  [Fact]
-  public async Task ExistsAsync_Should_Return_True_When_Value_Present()
-  {
-    var cache = CreateMemoryDistributedCache();
-    var provider = new DistributedCacheProvider(cache);
+    value.Should().NotBeNull();
+    ((User)value).Name.Should().Be("John");
 
-    await provider.SetAsync("exists", "ok", TimeSpan.FromMinutes(1));
-    var exists = await provider.ExistsAsync("exists");
-
-    exists.Should().BeTrue();
+    // Fetch again to hit cache
+    var cached = await provider.GetOrSetAsync(key, _ => Task.FromResult(new User("Jane")));
+    ((User)cached).Name.Should().Be("John"); // should return cached value
   }
 
   [Fact]
@@ -41,10 +40,22 @@ public class DistributedCacheProviderTests
     var cache = CreateMemoryDistributedCache();
     var provider = new DistributedCacheProvider(cache);
 
-    await provider.SetAsync("temp", 42, TimeSpan.FromMinutes(1));
-    await provider.RemoveAsync("temp");
+    var key = "temp";
+    await provider.GetOrSetAsync(key, _ => Task.FromResult(42), new CacheOptions { Expiration = TimeSpan.FromMinutes(1) });
 
-    var result = await provider.GetAsync<int?>("temp");
-    result.Should().BeNull();
+    await provider.RemoveAsync(key);
+
+    var result = await provider.GetOrSetAsync<int?>(key, _ => Task.FromResult<int?>(0));
+    result.Should().Be(0); // factory value returned after removal
+  }
+
+  [Fact]
+  public async Task GetOrSetAsync_Should_Throw_On_Null_Key()
+  {
+    var cache = CreateMemoryDistributedCache();
+    var provider = new DistributedCacheProvider(cache);
+
+    await Assert.ThrowsAsync<ArgumentException>(() =>
+        provider.GetOrSetAsync<int?>(null!, _ => Task.FromResult<int?>(1)));
   }
 }

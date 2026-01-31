@@ -1,26 +1,71 @@
-﻿using Franz.Common.Caching.Abstractions;
+﻿using FluentAssertions;
+using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Pipelines;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using System.Collections.Concurrent;
 using Xunit;
-using FluentAssertions;
 
 public class CachingPipelineTests
 {
-  private sealed class DummyCache : ICacheProvider
+  public sealed class DummyCache : ICacheProvider
   {
-    public int Hits, Misses;
-    private readonly Dictionary<string, object> _store = new();
+    private readonly ConcurrentDictionary<string, object> _store = new();
+    private readonly ConcurrentDictionary<string, string[]> _tags = new();
 
-    public Task<T?> GetAsync<T>(string key, CancellationToken ct = default)
-        => Task.FromResult(_store.TryGetValue(key, out var v) ? (T)v : default);
-    public Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct = default)
-    { _store[key] = value!; return Task.CompletedTask; }
+    public int Hits, Misses;
+
+    public Task<T?> GetOrSetAsync<T>(
+        string key,
+        Func<CancellationToken, Task<T>> factory,
+        CacheOptions? options = null,
+        CancellationToken ct = default)
+    {
+      if (string.IsNullOrWhiteSpace(key))
+        throw new ArgumentException("Key cannot be null or empty", nameof(key));
+      if (factory is null)
+        throw new ArgumentNullException(nameof(factory));
+
+      if (_store.TryGetValue(key, out var cached))
+      {
+        Hits++;
+        return Task.FromResult((T?)cached);
+      }
+
+      Misses++;
+
+      return factory(ct).ContinueWith(t =>
+      {
+        var value = t.Result!;
+        _store[key] = value;
+
+        if (options?.Tags != null)
+          _tags[key] = options.Tags;
+
+        return (T?)value;
+      }, ct);
+    }
+
     public Task RemoveAsync(string key, CancellationToken ct = default)
-    { _store.Remove(key); return Task.CompletedTask; }
-    public Task<bool> ExistsAsync(string key, CancellationToken ct = default)
-        => Task.FromResult(_store.ContainsKey(key));
+    {
+      _store.TryRemove(key, out _);
+      _tags.TryRemove(key, out _);
+      return Task.CompletedTask;
+    }
+
+    public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
+    {
+      foreach (var kvp in _tags)
+      {
+        if (kvp.Value != null && Array.Exists(kvp.Value, t => t == tag))
+        {
+          _store.TryRemove(kvp.Key, out _);
+          _tags.TryRemove(kvp.Key, out _);
+        }
+      }
+      return Task.CompletedTask;
+    }
   }
 
   private record TestRequest(string Payload);
