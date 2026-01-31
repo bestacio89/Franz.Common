@@ -1,4 +1,4 @@
-﻿using Franz.Common.Caching.Abstractions;
+﻿namespace Franz.Common.Caching.Abstractions;
 
 public sealed class CacheOptions
 {
