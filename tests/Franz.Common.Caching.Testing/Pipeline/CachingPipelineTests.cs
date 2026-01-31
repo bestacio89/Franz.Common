@@ -26,20 +26,19 @@ public sealed class CachingPipelineTests
 
     // Use a mock cache if none provided
     cacheProvider ??= new Mock<ICacheProvider>().Object;
-
     services.AddSingleton(cacheProvider);
 
+    // Simple cache key strategy mock
     services.AddSingleton(Mock.Of<ICacheKeyStrategy>(k =>
         k.BuildKey(It.IsAny<TestRequest>()) == "key"));
 
+    // Null logger
     services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 
-    if (configureOptions != null)
-    {
-      services.Configure(configureOptions);
-    }
+    // Always configure options to ensure IOptions<MediatorCachingOptions> is registered
+    services.Configure(configureOptions ?? (_ => { }));
 
-    // Register the pipeline manually (normally via AddFranzMediatorCaching)
+    // Register the pipeline
     services.AddTransient<CachingPipeline<TestRequest, TestResponse>>();
 
     return services.BuildServiceProvider()
