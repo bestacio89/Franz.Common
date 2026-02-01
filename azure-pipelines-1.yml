@@ -68,18 +68,15 @@ steps:
   displayName: 'Publish packages to Azure Artifacts'
   condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
 
-# 🔁 Mirror main + develop branches to GitHub
 - script: |
     set -euo pipefail
 
+    # Make sure GitHub variables exist in Bash
+    export GITHUB_USER=$(GITHUB_USER)
+    export GITHUB_TOKEN=$(GITHUB_TOKEN)
+
     git config user.name "Azure DevOps"
     git config user.email "build@azure.devops"
-
-    # Validate GitHub user
-    if [ -z "$GITHUB_USER" ]; then
-      echo "ERROR: GITHUB_USER is empty!"
-      exit 1
-    fi
 
     git remote remove github || true
     git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/Franz.Common.git"
