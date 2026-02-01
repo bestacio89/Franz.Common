@@ -72,29 +72,22 @@ steps:
 - script: |
     set -euo pipefail
 
-    # Git identity
     git config user.name "Azure DevOps"
     git config user.email "build@azure.devops"
 
-    # Remove and re-add remote
+    # Validate GitHub user
+    if [ -z "$GITHUB_USER" ]; then
+      echo "ERROR: GITHUB_USER is empty!"
+      exit 1
+    fi
+
     git remote remove github || true
-    git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
+    git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/Franz.Common.git"
 
-    # List of branches to mirror
-    BRANCHES=("main" "develop")
-
-    for BRANCH in "${BRANCHES[@]}"; do
-        echo "Mirroring branch $BRANCH to GitHub"
-
-        # Fetch and checkout local branch
-        git fetch origin $BRANCH || true
-        git checkout $BRANCH
-
-        # Force push to GitHub
-        git push -f github HEAD:refs/heads/$BRANCH
-    done
-  displayName: 'Mirror main + develop to GitHub'
-  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+    echo "Mirroring branch $(Build.SourceBranchName) to GitHub"
+    git fetch github main || true
+    git push -f github HEAD:refs/heads/$(Build.SourceBranchName)
+  displayName: 'Mirror branch to GitHub'
 
 
 
