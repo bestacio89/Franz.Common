@@ -39,15 +39,27 @@ steps:
 
 # Promote Develop → main
 - script: |
+    set -euo pipefail
+
     echo "Promoting Develop → main"
 
+    # Git identity
     git config user.name "Azure DevOps"
     git config user.email "build@azuredevops"
 
+    # Fetch latest from origin
     git fetch origin
 
+    # Checkout main (create if missing)
     git checkout main || git checkout -b main origin/main
-    git merge origin/Develop --no-ff -m "Promote Develop → main [CI]"
+
+    # Get the latest commit message from Develop
+    COMMIT_MSG=$(git log origin/Develop -1 --pretty=%B)
+
+    # Merge Develop into main using that commit message
+    git merge origin/Develop --no-ff -m "$COMMIT_MSG"
+
+    # Push main
     git push origin main
-  displayName: 'Promote Develop → Main'
+  displayName: 'Promote Develop → Main (with commit message)'
   condition: succeeded()
