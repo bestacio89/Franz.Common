@@ -8,9 +8,12 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
-# ----------------------------------------
-# 🔧 Install .NET 10 SDK
-# ----------------------------------------
+# Checkout with full history + credentials
+- checkout: self
+  persistCredentials: 'true'
+  fetchDepth: '0'
+
+# Install .NET 10 SDK
 - task: UseDotNet@2
   displayName: 'Install .NET 10 SDK'
   inputs:
@@ -18,56 +21,33 @@ steps:
     version: '10.0.x'
     includePreviewVersions: true
 
-# ----------------------------------------
-# 🔐 Authenticate to Azure Artifacts
-# ----------------------------------------
+# Authenticate to Azure Artifacts
 - task: NuGetAuthenticate@1
   displayName: 'Authenticate to Azure Artifacts'
 
-# ----------------------------------------
-# 📥 Restore (dotnet, no Mono)
-# ----------------------------------------
-- script: |
-    dotnet restore
+# Restore
+- script: dotnet restore
   displayName: 'Restore NuGet packages'
 
-# ----------------------------------------
-# 🏗️ Build
-# ----------------------------------------
-- script: |
-    dotnet build --configuration $(buildConfiguration) --no-restore
+# Build
+- script: dotnet build --configuration $(buildConfiguration) --no-restore
   displayName: 'Build solution'
 
-# ----------------------------------------
-# 🧪 Test (Testcontainers included)
-# ----------------------------------------
-- script: |
-    dotnet test --configuration $(buildConfiguration) --no-build --verbosity normal
+# Test
+- script: dotnet test --configuration $(buildConfiguration) --no-build --verbosity normal
   displayName: 'Run tests'
 
-# ----------------------------------------
-# 🔁 Promote Develop → Main (only if tests passed)
-# ----------------------------------------
+# Promote Develop → main
 - script: |
-    echo "Promoting Develop branch into Main..."
+    echo "Promoting Develop → main"
 
-    # Configure Git
     git config user.name "Azure DevOps"
-    git config user.email "build@azure.devops"
+    git config user.email "build@azuredevops"
 
-    # Fetch main branch
-    git fetch origin main
+    git fetch origin
 
-    # Checkout main branch
-    git checkout main
-
-    # Merge Develop into main (no fast-forward to keep history)
-    git merge --no-ff $(Build.SourceBranchName) -m "Automated promotion from Develop after passing tests"
-
-    # Push main back to origin
+    git checkout main || git checkout -b main origin/main
+    git merge origin/Develop --no-ff -m "Promote Develop → main [CI]"
     git push origin main
   displayName: 'Promote Develop → Main'
-  condition: succeeded()   # only run if all previous steps succeeded
-  env:
-    GIT_TERMINAL_PROMPT: 0
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+  condition: succeeded()
