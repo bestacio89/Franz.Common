@@ -72,48 +72,34 @@ steps:
 - script: |
     set -euo pipefail
 
-    echo "🔐 Validating required variables"
-    : "${GITHUB_USER:?GITHUB_USER is not set}"
-    : "${GITHUB_TOKEN:?GITHUB_TOKEN is not set}"
+    # Validate required variables
+    if [ -z "${GITHUB_USER:-}" ] || [ -z "${GITHUB_TOKEN:-}" ]; then
+        echo "🔐 Required GitHub variables not set!"
+        exit 1
+    fi
 
-    echo "👤 Configuring Git identity"
+    echo "Mirroring main + develop branches to GitHub"
+
     git config user.name "Azure DevOps"
-    git config user.email "build@azuredevops"
+    git config user.email "build@azure.devops"
 
-    echo "🔗 Resetting GitHub remote"
     git remote remove github || true
     git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git"
 
-    echo "📥 Fetching full state from Azure DevOps"
-    git fetch origin --prune
-
-    BRANCHES=("main" "Develop")
+    BRANCHES=("main" "develop")
 
     for BRANCH in "${BRANCHES[@]}"; do
-      echo "========================================"
-      echo "🔁 Syncing branch: $BRANCH"
-
-      # Recreate local branch from Azure source of truth
-      git checkout -B "$BRANCH" "origin/$BRANCH"
-
-      # Force-update GitHub branch (never delete)
-      git push --force github "$BRANCH:$BRANCH"
-
-      echo "✅ $BRANCH synced to GitHub"
+        echo "=== Mirroring $BRANCH ==="
+        git fetch origin $BRANCH || echo "Branch $BRANCH does not exist locally yet"
+        git checkout $BRANCH || git checkout -b $BRANCH origin/$BRANCH
+        git push --force github $BRANCH:$BRANCH
+        echo "=== Done $BRANCH ==="
     done
-
-    echo "🏷️ Syncing tags"
-    git push --force github --tags
-
-    echo "🎉 GitHub mirror completed successfully"
-  displayName: 'Mirror main + Develop to GitHub'
+  displayName: 'Mirror main + develop to GitHub'
   condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
-
-
-
-
-
-
+  env:
+    GITHUB_USER: $(GITHUB_USER)
+    GITHUB_TOKEN: $(GITHUB_TOKEN)
 
 # 🦊 Mirror to GitLab
 - script: |
