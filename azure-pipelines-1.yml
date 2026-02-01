@@ -62,13 +62,13 @@ steps:
 - script: |
     echo "Publishing packages to Azure Artifacts feed..."
     dotnet nuget push "$(outputDir)/*.nupkg" \
-      --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/v2/index.json" \
+      --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/V3/index.json" \
       --api-key $(System.AccessToken) \
       --skip-duplicate
   displayName: 'Publish packages to Azure Artifacts'
   condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
 
-# 🔁 Mirror to GitHub
+# 🔁 Mirror main + develop branches to GitHub
 - script: |
     set -euo pipefail
 
@@ -80,14 +80,22 @@ steps:
     git remote remove github || true
     git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
 
-    # Fetch remote for safety (optional)
-    git fetch github main || true
+    # List of branches to mirror
+    BRANCHES=("main" "develop")
 
-    echo "Mirroring branch $(Build.SourceBranchName) to GitHub (force push if needed)"
-    # Force push ensures Azure DevOps is source-of-truth
-    git push -f github HEAD:refs/heads/$(Build.SourceBranchName)
-  displayName: 'Mirror branch to GitHub'
+    for BRANCH in "${BRANCHES[@]}"; do
+        echo "Mirroring branch $BRANCH to GitHub"
+
+        # Fetch and checkout local branch
+        git fetch origin $BRANCH || true
+        git checkout $BRANCH
+
+        # Force push to GitHub
+        git push -f github HEAD:refs/heads/$BRANCH
+    done
+  displayName: 'Mirror main + develop to GitHub'
   condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+
 
 
 # 🦊 Mirror to GitLab
