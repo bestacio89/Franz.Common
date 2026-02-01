@@ -39,8 +39,35 @@ steps:
   displayName: 'Build solution'
 
 # ----------------------------------------
-# 🧪 Test (Kafka / Testcontainers included)
+# 🧪 Test (Testcontainers included)
 # ----------------------------------------
 - script: |
     dotnet test --configuration $(buildConfiguration) --no-build --verbosity normal
   displayName: 'Run tests'
+
+# ----------------------------------------
+# 🔁 Promote Develop → Main (only if tests passed)
+# ----------------------------------------
+- script: |
+    echo "Promoting Develop branch into Main..."
+
+    # Configure Git
+    git config user.name "Azure DevOps"
+    git config user.email "build@azure.devops"
+
+    # Fetch main branch
+    git fetch origin main
+
+    # Checkout main branch
+    git checkout main
+
+    # Merge Develop into main (no fast-forward to keep history)
+    git merge --no-ff $(Build.SourceBranchName) -m "Automated promotion from Develop after passing tests"
+
+    # Push main back to origin
+    git push origin main
+  displayName: 'Promote Develop → Main'
+  condition: succeeded()   # only run if all previous steps succeeded
+  env:
+    GIT_TERMINAL_PROMPT: 0
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)

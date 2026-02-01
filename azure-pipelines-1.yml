@@ -4,31 +4,45 @@ trigger:
       - main
 
 pool:
-  vmImage: 'ubuntu-latest'   # ✅ Ubuntu 24.04 compatible
+  vmImage: 'ubuntu-latest'
 
 variables:
 - group: 'Secrets and variables'
+
 - name: buildConfiguration
   value: 'Release'
+
 - name: projectName
   value: 'Franz.Common'
+
 - name: outputDir
   value: '$(Build.ArtifactStagingDirectory)/packages'
 
+# Azure Artifacts
+- name: azureOrg
+  value: 'AjnaTellus'
+
+- name: feedName
+  value: 'AjnaTellus'
+
 steps:
-# 🧾 Checkout code
+
+# 🧾 Checkout
 - checkout: self
   persistCredentials: true
 
+# 🔐 Authenticate to Azure Artifacts
+- task: NuGetAuthenticate@1
+  displayName: 'Authenticate to Azure Artifacts'
+
 # ⚙️ Install .NET SDK
 - task: UseDotNet@2
-  displayName: 'Use .NET SDK (latest stable)'
+  displayName: 'Use .NET SDK 10.x'
   inputs:
     packageType: 'sdk'
     version: '10.x'
-    installationPath: $(Agent.ToolsDirectory)/dotnet
 
-# 🔧 Restore dependencies
+# 🔧 Restore
 - script: dotnet restore
   displayName: 'Restore dependencies'
 
@@ -36,89 +50,65 @@ steps:
 - script: dotnet build --configuration $(buildConfiguration) --no-restore
   displayName: 'Build solution'
 
-# 🧪 Run unit tests
+# 🧪 Test
 - script: dotnet test --configuration $(buildConfiguration) --no-build --logger trx
   displayName: 'Run unit tests'
 
-# 📦 Pack NuGet packages
+# 📦 Pack
 - script: dotnet pack --configuration $(buildConfiguration) --no-build --output $(outputDir)
   displayName: 'Pack NuGet packages'
 
-# 🚀 Publish to FranzPlatform feed (only on main)
+# 🚀 Publish to Azure Artifacts (main only)
 - script: |
-    echo "Pushing packages to FranzPlatform feed..."
+    echo "Publishing packages to Azure Artifacts feed..."
     dotnet nuget push "$(outputDir)/*.nupkg" \
+      --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/v3/index.json" \
       --api-key $(System.AccessToken) \
-      --source "https://pkgs.dev.azure.com/$(System.CollectionId)/_packaging/$(feedName)/nuget/v3/index.json" \
       --skip-duplicate
-  displayName: 'Publish packages to FranzPlatform feed'
+  displayName: 'Publish packages to Azure Artifacts'
   condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
-  env:
-    NUGET_CREDENTIALPROVIDER_SESSIONTOKENCACHE_ENABLED: true
-    VSS_NUGET_EXTERNAL_FEED_ENDPOINTS: >
-      {"endpointCredentials":[
-        {"endpoint":"https://pkgs.dev.azure.com/$(System.CollectionId)/_packaging/$(feedName)/nuget/v3/index.json",
-         "username":"AzureDevOps","password":"$(System.AccessToken)"}
-      ]}
 
 # 🔁 Mirror to GitHub
 - script: |
-    echo "##[group]Configure Git"
+    set -e
+
     git config user.name "Azure DevOps"
     git config user.email "build@azure.devops"
-    echo "##[endgroup]"
 
-    echo "##[group]Setup GitHub remote"
     git remote remove github || true
     git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
-    git remote -v
-    echo "##[endgroup]"
 
-    CURRENT_BRANCH=$(echo "$(Build.SourceBranchName)" | tr '[:upper:]' '[:lower:]')
-    echo "Normalized branch: $CURRENT_BRANCH"
-
-    echo "##[group]Push branch to GitHub"
-    git push github HEAD:refs/heads/$CURRENT_BRANCH
-    echo "##[endgroup]"
+    echo "Pushing branch $(Build.SourceBranchName) to GitHub"
+    git push github HEAD:refs/heads/$(Build.SourceBranchName)
   displayName: 'Mirror branch to GitHub'
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
 
 # 🦊 Mirror to GitLab
 - script: |
-    echo "##[group]Setup GitLab remote"
+    set -e
+
     git remote remove gitlab || true
     git remote add gitlab "https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git"
-    git remote -v
-    echo "##[endgroup]"
 
-    CURRENT_BRANCH=$(echo "$(Build.SourceBranchName)" | tr '[:upper:]' '[:lower:]')
-    echo "Normalized branch: $CURRENT_BRANCH"
-
-    echo "##[group]Push branch to GitLab"
-    git push gitlab HEAD:refs/heads/$CURRENT_BRANCH
-    echo "##[endgroup]"
+    echo "Pushing branch $(Build.SourceBranchName) to GitLab"
+    git push gitlab HEAD:refs/heads/$(Build.SourceBranchName)
   displayName: 'Mirror branch to GitLab'
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
 
-# 🏷️ Propagate Git tags (only on main)
+# 🏷️ Propagate tags (main only)
 - script: |
-    echo "##[group]Tag propagation setup"
-    git fetch --tags
-    echo "##[endgroup]"
+    set -e
 
-    echo "##[group]Find latest tag"
-    LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
-    echo "Detected tag: $LATEST_TAG"
-    echo "##[endgroup]"
+    git fetch --tags
+
+    LATEST_TAG=$(git describe --tags --abbrev=0 || true)
 
     if [ -n "$LATEST_TAG" ]; then
-      echo "##[group]Propagating tag to GitHub"
+      echo "Propagating tag $LATEST_TAG"
       git push github $LATEST_TAG
-      echo "##[endgroup]"
-
-      echo "##[group]Propagating tag to GitLab"
       git push gitlab $LATEST_TAG
-      echo "##[endgroup]"
     else
-      echo "⚠️ No tags found to propagate."
+      echo "No tags to propagate"
     fi
-  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
   displayName: 'Propagate tags to GitHub & GitLab'
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
