@@ -68,30 +68,48 @@ steps:
   displayName: 'Publish packages to Azure Artifacts'
   condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
 
-# 🔁 Mirror main + develop branches to GitHub
+# 🔁 Mirror main + Develop branches to GitHub (Azure = source of truth)
 - script: |
     set -euo pipefail
 
-    export GITHUB_USER=$(GITHUB_USER)
-    export GITHUB_TOKEN=$(GITHUB_TOKEN)
+    echo "🔐 Validating required variables"
+    : "${GITHUB_USER:?GITHUB_USER is not set}"
+    : "${GITHUB_TOKEN:?GITHUB_TOKEN is not set}"
 
+    echo "👤 Configuring Git identity"
     git config user.name "Azure DevOps"
-    git config user.email "build@azure.devops"
+    git config user.email "build@azuredevops"
 
-    # Ensure full history
-    git fetch --unshallow || true
-    git fetch --all --tags
-
-    # Recreate GitHub remote cleanly
+    echo "🔗 Resetting GitHub remote"
     git remote remove github || true
     git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git"
 
-    echo "🔁 Mirroring repository to GitHub (branches + tags)"
+    echo "📥 Fetching full state from Azure DevOps"
+    git fetch origin --prune
 
-    # TRUE mirror push (includes all objects)
-    git push --mirror github
-  displayName: 'Mirror repository to GitHub'
+    BRANCHES=("main" "Develop")
+
+    for BRANCH in "${BRANCHES[@]}"; do
+      echo "========================================"
+      echo "🔁 Syncing branch: $BRANCH"
+
+      # Recreate local branch from Azure source of truth
+      git checkout -B "$BRANCH" "origin/$BRANCH"
+
+      # Force-update GitHub branch (never delete)
+      git push --force github "$BRANCH:$BRANCH"
+
+      echo "✅ $BRANCH synced to GitHub"
+    done
+
+    echo "🏷️ Syncing tags"
+    git push --force github --tags
+
+    echo "🎉 GitHub mirror completed successfully"
+  displayName: 'Mirror main + Develop to GitHub'
   condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+
+
 
 
 
