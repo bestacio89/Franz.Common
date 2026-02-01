@@ -71,47 +71,28 @@ steps:
 # 🔁 Mirror main + develop branches to GitHub
 - script: |
     set -euo pipefail
-    # Make sure GitHub variables exist in Bash
+
     export GITHUB_USER=$(GITHUB_USER)
     export GITHUB_TOKEN=$(GITHUB_TOKEN)
-    
-    # Git identity
+
     git config user.name "Azure DevOps"
     git config user.email "build@azure.devops"
 
-    # Remove and re-add remote
+    # Ensure full history
+    git fetch --unshallow || true
+    git fetch --all --tags
+
+    # Recreate GitHub remote cleanly
     git remote remove github || true
-    git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
+    git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git"
 
-    # Branches to mirror
-    BRANCHES=("main" "develop")
+    echo "🔁 Mirroring repository to GitHub (branches + tags)"
 
-    for BRANCH in "${BRANCHES[@]}"; do
-        echo "=== Mirroring branch $BRANCH ==="
-
-        # Fetch the branch from origin
-        git fetch origin $BRANCH || echo "Branch $BRANCH does not exist locally yet"
-
-        # Check if branch exists locally, create tracking if missing
-        if git show-ref --verify --quiet refs/heads/$BRANCH; then
-            git checkout $BRANCH
-        else
-            git checkout -b $BRANCH origin/$BRANCH
-        fi
-
-        # Force push to GitHub safely
-        git push --force github $BRANCH:$BRANCH || {
-            echo "Failed to push $BRANCH to GitHub, attempting recreate"
-            git push --force github +$BRANCH:$BRANCH
-        }
-
-        echo "=== Done mirroring $BRANCH ==="
-    done
-
-    # Optional: mirror tags (uncomment if needed)
-    # git push --tags github --force
-  displayName: 'Mirror main + develop to GitHub'
+    # TRUE mirror push (includes all objects)
+    git push --mirror github
+  displayName: 'Mirror repository to GitHub'
   condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+
 
 
 
