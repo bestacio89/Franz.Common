@@ -8,142 +8,106 @@ pool:
 
 variables:
 - group: 'Secrets and variables'
-
 - name: buildConfiguration
   value: 'Release'
-
 - name: projectName
   value: 'Franz.Common'
-
 - name: outputDir
   value: '$(Build.ArtifactStagingDirectory)/packages'
-
-# Azure Artifacts
 - name: azureOrg
   value: 'AjnaTellus'
-
 - name: feedName
   value: 'AjnaTellus'
 
 steps:
 
-# 🧾 Checkout
+# 🧾 Checkout with full history for 34k LOC integrity
 - checkout: self
   persistCredentials: true
+  fetchDepth: 0 
 
-# 🔐 Authenticate to Azure Artifacts
+# 🔐 Auth & Environment Setup
 - task: NuGetAuthenticate@1
-  displayName: 'Authenticate to Azure Artifacts'
+  displayName: 'Authenticate Azure Artifacts'
 
-# ⚙️ Install .NET SDK
 - task: UseDotNet@2
   displayName: 'Use .NET SDK 10.x'
   inputs:
     packageType: 'sdk'
     version: '10.x'
 
-# 🔧 Restore
+# 🏗️ Standard Build/Test/Pack Chain
 - script: dotnet restore
-  displayName: 'Restore dependencies'
+  displayName: 'Restore'
 
-# 🏗️ Build
 - script: dotnet build --configuration $(buildConfiguration) --no-restore
-  displayName: 'Build solution'
+  displayName: 'Build'
 
-# 🧪 Test
 - script: dotnet test --configuration $(buildConfiguration) --no-build --logger trx
-  displayName: 'Run unit tests'
+  displayName: 'Test'
 
-# 📦 Pack
 - script: dotnet pack --configuration $(buildConfiguration) --no-build --output $(outputDir)
-  displayName: 'Pack NuGet packages'
+  displayName: 'Pack'
 
-# 🚀 Publish to Azure Artifacts (main only)
+# 🚀 1. Publish to Internal Azure Artifacts (Main Only)
 - script: |
-    echo "Publishing packages to Azure Artifacts feed..."
     dotnet nuget push "$(outputDir)/*.nupkg" \
       --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/V3/index.json" \
       --api-key $(System.AccessToken) \
       --skip-duplicate
-  displayName: 'Publish packages to Azure Artifacts'
-  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+  displayName: 'Publish to Azure Feed'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
 
-# 🔁 Mirror main + Develop branches to GitHub (Azure = source of truth)
+# ----------------------------------------------------------------
+# 2. 🚀 GITHUB DEVELOP SYNC
+# ----------------------------------------------------------------
 - script: |
     set -euo pipefail
-    
-    echo "Starting Atomic Mirror to GitHub..."
+    git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || git remote set-url github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
+    git push --force github origin/Develop:refs/heads/develop
+  displayName: 'Sync GitHub: Develop'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/Develop'))
+  env: { GITHUB_USER: $(GITHUB_USER), GITHUB_TOKEN: $(GITHUB_TOKEN) }
 
-    # Configure Auth
-    git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git" || \
-    git remote set-url github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git"
-
-    # 1. Fetch ALL refs from Azure (Source of Truth) to ensure we have every object
-    git fetch origin --prune --unshallow || git fetch origin --prune
-
-    # 2. Push specific branches directly without checking them out
-    # This avoids "unpack failed" errors caused by local HEAD states
-    echo "Pushing main..."
-    git push --force github origin/main:refs/heads/main
-    
-    echo "Pushing develop..."
-    git push --force github origin/Develop:refs/heads/Develop
-
-    echo "✅ Mirroring Complete"
-  displayName: 'Mirror to GitHub (Atomic)'
-  env:
-    GITHUB_USER: $(GITHUB_USER)
-    GITHUB_TOKEN: $(GITHUB_TOKEN)
-
-# 🦊 Mirror to GitLab (Final Redundancy Gate)
+# ----------------------------------------------------------------
+# 3. 🦊 GITLAB DEVELOP SYNC
+# ----------------------------------------------------------------
 - script: |
     set -euo pipefail
-
-    echo "Initialising GitLab Remote..."
-    # Using 'set-url' or 'add' ensures we don't fail if the remote exists
-    git remote add gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git" || \
-    git remote set-url gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git"
-
-    # Ensure we have the full object tree for the 63 projects
-    echo "Fetching object deltas..."
-    git fetch origin --prune --unshallow || git fetch origin --prune
-
-    echo "Mirroring Main and Develop to GitLab..."
-    # Directly map the verified Azure refs to GitLab refs
-    git push --force gitlab origin/main:refs/heads/main
+    git remote add gitlab "https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git" || git remote set-url gitlab "https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git"
     git push --force gitlab origin/Develop:refs/heads/develop
+  displayName: 'Sync GitLab: Develop'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/Develop'))
+  env: { GITLAB_USER: $(GITLAB_USER), GITLAB_TOKEN: $(GITLAB_TOKEN) }
 
-    echo "✅ Mission Accomplished: GitLab is in sync."
-  displayName: 'Mirror to GitLab'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  env:
-    GITLAB_USER: $(GITLAB_USER)
-    GITLAB_TOKEN: $(GITLAB_TOKEN)
-
-# 🏷️ Propagate tags (High-Reliability Sync)
+# ----------------------------------------------------------------
+# 4. 🚀 GITHUB MAIN & TAGS SYNC
+# ----------------------------------------------------------------
 - script: |
     set -euo pipefail
-
-    echo "Fetching all tags from Azure DevOps (Source of Truth)..."
+    git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || git remote set-url github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
+    git push --force github origin/main:refs/heads/main
     git fetch --tags --force
-
-    # Identify the latest tag on the current verified commit
     LATEST_TAG=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 || true)
-
     if [ -n "$LATEST_TAG" ]; then
-      echo "Verified Tag Found: $LATEST_TAG"
-      
-      # Push specifically to GitHub
-      echo "Pushing $LATEST_TAG to GitHub..."
       git push github "$LATEST_TAG"
-
-      # Push specifically to GitLab
-      echo "Pushing $LATEST_TAG to GitLab..."
-      git push gitlab "$LATEST_TAG"
-      
-      echo "✅ Tag propagation complete."
-    else
-      echo "ℹ️ No tag found on the current commit to propagate."
     fi
-  displayName: 'Propagate tags to GitHub & GitLab'
+  displayName: 'Sync GitHub: Main + Tags'
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  env: { GITHUB_USER: $(GITHUB_USER), GITHUB_TOKEN: $(GITHUB_TOKEN) }
+
+# ----------------------------------------------------------------
+# 5. 🦊 GITLAB MAIN & TAGS SYNC
+# ----------------------------------------------------------------
+- script: |
+    set -euo pipefail
+    git remote add gitlab "https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git" || git remote set-url gitlab "https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git"
+    git push --force gitlab origin/main:refs/heads/main
+    git fetch --tags --force
+    LATEST_TAG=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 || true)
+    if [ -n "$LATEST_TAG" ]; then
+      git push gitlab "$LATEST_TAG"
+    fi
+  displayName: 'Sync GitLab: Main + Tags'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  env: { GITLAB_USER: $(GITLAB_USER), GITLAB_TOKEN: $(GITLAB_TOKEN) }
