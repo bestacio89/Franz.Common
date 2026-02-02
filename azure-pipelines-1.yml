@@ -66,7 +66,6 @@ steps:
     git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || git remote set-url github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
     git push --force github origin/Develop:refs/heads/develop
   displayName: 'Sync GitHub: Develop'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/Develop'))
   env: { GITHUB_USER: $(GITHUB_USER), GITHUB_TOKEN: $(GITHUB_TOKEN) }
 
 # ----------------------------------------------------------------
@@ -74,11 +73,13 @@ steps:
 # ----------------------------------------------------------------
 - script: |
     set -euo pipefail
-    git remote add gitlab "https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git" || git remote set-url gitlab "https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git"
-    git push --force gitlab origin/Develop:refs/heads/develop
+    git remote remove gitlab || true
+    git remote add gitlab "https://gitlab.com/bernardo.estacio89/franz.common.git"
+    AUTH=$(echo -n "oauth2:$(GITLAB_TOKEN)" | base64 | tr -d '\n')
+    echo "Pushing Develop to GitLab..."
+    git -c http.extraheader="Authorization: Basic ${AUTH}" push --force gitlab origin/Develop:refs/heads/develop
   displayName: 'Sync GitLab: Develop'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/Develop'))
-  env: { GITLAB_USER: $(GITLAB_USER), GITLAB_TOKEN: $(GITLAB_TOKEN) }
+  env: { GITLAB_TOKEN: $(GITLAB_TOKEN) }
 
 # ----------------------------------------------------------------
 # 4. 🚀 GITHUB MAIN & TAGS SYNC
@@ -101,13 +102,14 @@ steps:
 # ----------------------------------------------------------------
 - script: |
     set -euo pipefail
-    git remote add gitlab "https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git" || git remote set-url gitlab "https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git"
-    git push --force gitlab origin/main:refs/heads/main
+    git remote remove gitlab || true
+    git remote add gitlab "https://gitlab.com/bernardo.estacio89/franz.common.git"
+    AUTH=$(echo -n "oauth2:$(GITLAB_TOKEN)" | base64 | tr -d '\n')
+    echo "Pushing Main and Tags to GitLab..."
+    git -c http.extraheader="Authorization: Basic ${AUTH}" push --force gitlab origin/main:refs/heads/main
     git fetch --tags --force
     LATEST_TAG=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 || true)
-    if [ -n "$LATEST_TAG" ]; then
-      git push gitlab "$LATEST_TAG"
-    fi
+    [ -z "$LATEST_TAG" ] || git -c http.extraheader="Authorization: Basic ${AUTH}" push gitlab "$LATEST_TAG"
   displayName: 'Sync GitLab: Main + Tags'
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  env: { GITLAB_USER: $(GITLAB_USER), GITLAB_TOKEN: $(GITLAB_TOKEN) }
+  env: { GITLAB_TOKEN: $(GITLAB_TOKEN) }
