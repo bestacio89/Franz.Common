@@ -7,7 +7,7 @@
 	<Import Project="..\..\common.targets" />
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.1" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.2" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.WsFederation" Version="10.0.1" />
 		<PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.3.9" />
 		<PackageReference Include="Sustainsys.Saml2" Version="2.11.0" />
