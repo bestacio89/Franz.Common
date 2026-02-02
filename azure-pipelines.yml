@@ -41,24 +41,34 @@ steps:
 - script: |
     set -euo pipefail
 
-    # Setup Remotes
-    git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git" || git remote set-url github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git"
-    git remote add gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git" || git remote set-url gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git"
+    # 1. Smart Fetch (Silences the 'complete repository' warning)
+    if [ -f .git/shallow ]; then
+      echo "Unshallowing repo for full history..."
+      git fetch origin --prune --unshallow
+    else
+      echo "Repo is already complete, skipping unshallow."
+      git fetch origin --prune
+    fi
 
-    # Clean the agent cache
-    git fetch origin --prune --unshallow || git fetch origin --prune
+    # 2. Configure Auth Header (More reliable than URL embedding)
+    # This prevents the "Invalid username or token" error caused by URL parsing
+    git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+    git config --global url."https://oauth2:${GITLAB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
 
-    echo "🚀 Syncing verified Develop branch to Mirrors..."
-    # The Prune One-Liner: Syncs Develop and removes stale feature-branch artifacts
-    git push --force --prune github origin/Develop:refs/heads/develop
-    git push --force --prune gitlab origin/Develop:refs/heads/develop
+    # 3. Setup Remotes (Standard URLs)
+    git remote add github "https://github.com/bestacio89/Franz.Common.git" || git remote set-url github "https://github.com/bestacio89/Franz.Common.git"
+    git remote add gitlab "https://gitlab.com/bernardo.estacio89/franz.common.git" || git remote set-url gitlab "https://gitlab.com/bernardo.estacio89/franz.common.git"
 
-  displayName: 'Sync Develop Mirror'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/Develop'))
+    echo "🚀 Syncing verified $(Build.SourceBranchName) branch to Mirrors..."
+    
+    # We use the refspec to ensure exact matching
+    git push --force github origin/$(Build.SourceBranchName):refs/heads/$(Build.SourceBranchName)
+    git push --force gitlab origin/$(Build.SourceBranchName):refs/heads/$(Build.SourceBranchName)
+
+  displayName: 'Sync Develop Mirror (Auth Fixed)'
+  condition: succeeded()
   env:
-    GITHUB_USER: $(GITHUB_USER)
     GITHUB_TOKEN: $(GITHUB_TOKEN)
-    GITLAB_USER: $(GITLAB_USER)
     GITLAB_TOKEN: $(GITLAB_TOKEN)
 
 # Promote Develop → main
