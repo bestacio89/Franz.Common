@@ -37,6 +37,30 @@ steps:
 - script: dotnet test --configuration $(buildConfiguration) --no-build --verbosity normal
   displayName: 'Run tests'
 
+  # 🧪 Mirror Develop to GitHub & GitLab
+- script: |
+    set -euo pipefail
+
+    # Setup Remotes
+    git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git" || git remote set-url github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git"
+    git remote add gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git" || git remote set-url gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git"
+
+    # Clean the agent cache
+    git fetch origin --prune --unshallow || git fetch origin --prune
+
+    echo "🚀 Syncing verified Develop branch to Mirrors..."
+    # The Prune One-Liner: Syncs Develop and removes stale feature-branch artifacts
+    git push --force --prune github origin/Develop:refs/heads/develop
+    git push --force --prune gitlab origin/Develop:refs/heads/develop
+
+  displayName: 'Sync Develop Mirror'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/Develop'))
+  env:
+    GITHUB_USER: $(GITHUB_USER)
+    GITHUB_TOKEN: $(GITHUB_TOKEN)
+    GITLAB_USER: $(GITLAB_USER)
+    GITLAB_TOKEN: $(GITLAB_TOKEN)
+
 # Promote Develop → main
 - script: |
     set -euo pipefail

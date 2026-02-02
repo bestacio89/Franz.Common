@@ -68,55 +68,43 @@ steps:
   displayName: 'Publish packages to Azure Artifacts'
   condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
 
-# 🔁 Mirror main + Develop branches to GitHub (Azure = source of truth)
+# 🔁 Mirror main + Develop branches to GitHub and Gitlab (Azure = source of truth)
 - script: |
     set -euo pipefail
+
+    # 1. Setup Remotes
+    git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git" || git remote set-url github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git"
+    git remote add gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git" || git remote set-url gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git"
+
+    # 2. Smart Fetch (Finance/Military: No redundant operations)
+    if [ -f .git/shallow ]; then
+      echo "Low-depth clone detected. Unshallowing for full history..."
+      git fetch origin --prune --unshallow
+    else
+      echo "Repository already complete. Pruning stale refs..."
+      git fetch origin --prune
+    fi
+
+    # 3. Mirroring with Error Handling (Med-Tech: Fail-Safe)
+    echo "🚀 Syncing verified $(Build.SourceBranchName) branch to Mirrors..."
     
-    echo "Starting Atomic Mirror to GitHub..."
-
-    # Configure Auth
-    git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git" || \
-    git remote set-url github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git"
-
-    # 1. Fetch ALL refs from Azure (Source of Truth) to ensure we have every object
-    git fetch origin --prune --unshallow || git fetch origin --prune
-
-    # 2. Push specific branches directly without checking them out
-    # This avoids "unpack failed" errors caused by local HEAD states
-    echo "Pushing main..."
-    git push --force github origin/main:refs/heads/main
+    # We use a standard push first. If GitLab rejects the 'force', it identifies a 'Protected Branch' issue.
+    git push --force github origin/$(Build.SourceBranchName):refs/heads/$(Build.SourceBranchName)
     
-    echo "Pushing develop..."
-    git push --force github origin/Develop:refs/heads/Develop
+    echo "Pushing to GitLab..."
+    git push --force gitlab origin/$(Build.SourceBranchName):refs/heads/$(Build.SourceBranchName)
 
-    echo "✅ Mirroring Complete"
-  displayName: 'Mirror to GitHub (Atomic)'
+    # 4. Tag Sync
+    if [ "$(Build.SourceBranchName)" == "main" ]; then
+      git fetch --tags --force
+      git push github --tags
+      git push gitlab --tags
+    fi
+
+  displayName: 'Atomic Mirror (Surgical Fix)'
   env:
     GITHUB_USER: $(GITHUB_USER)
     GITHUB_TOKEN: $(GITHUB_TOKEN)
-
-# 🦊 Mirror to GitLab (Final Redundancy Gate)
-- script: |
-    set -euo pipefail
-
-    echo "Initialising GitLab Remote..."
-    # Using 'set-url' or 'add' ensures we don't fail if the remote exists
-    git remote add gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git" || \
-    git remote set-url gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git"
-
-    # Ensure we have the full object tree for the 63 projects
-    echo "Fetching object deltas..."
-    git fetch origin --prune --unshallow || git fetch origin --prune
-
-    echo "Mirroring Main and Develop to GitLab..."
-    # Directly map the verified Azure refs to GitLab refs
-    git push --force gitlab origin/main:refs/heads/main
-    git push --force gitlab origin/Develop:refs/heads/develop
-
-    echo "✅ Mission Accomplished: GitLab is in sync."
-  displayName: 'Mirror to GitLab'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  env:
     GITLAB_USER: $(GITLAB_USER)
     GITLAB_TOKEN: $(GITLAB_TOKEN)
 
