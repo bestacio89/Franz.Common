@@ -71,32 +71,26 @@ steps:
 # 🔁 Mirror main + Develop branches to GitHub (Azure = source of truth)
 - script: |
     set -euo pipefail
+    
+    echo "Starting Atomic Mirror to GitHub..."
 
-    # Validate required variables
-    if [ -z "${GITHUB_USER:-}" ] || [ -z "${GITHUB_TOKEN:-}" ]; then
-        echo "🔐 Required GitHub variables not set!"
-        exit 1
-    fi
+    # Configure Auth
+    git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git" || \
+    git remote set-url github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git"
 
-    echo "Mirroring main + develop branches to GitHub"
+    # 1. Fetch ALL refs from Azure (Source of Truth) to ensure we have every object
+    git fetch origin --prune --unshallow || git fetch origin --prune
 
-    git config user.name "Azure DevOps"
-    git config user.email "build@azure.devops"
+    # 2. Push specific branches directly without checking them out
+    # This avoids "unpack failed" errors caused by local HEAD states
+    echo "Pushing main..."
+    git push --force github origin/main:refs/heads/main
+    
+    echo "Pushing develop..."
+    git push --force github origin/Develop:refs/heads/Develop
 
-    git remote remove github || true
-    git remote add github "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/bestacio89/Franz.Common.git"
-
-    BRANCHES=("main" "develop")
-
-    for BRANCH in "${BRANCHES[@]}"; do
-        echo "=== Mirroring $BRANCH ==="
-        git fetch origin $BRANCH || echo "Branch $BRANCH does not exist locally yet"
-        git checkout $BRANCH || git checkout -b $BRANCH origin/$BRANCH
-        git push --force github $BRANCH:$BRANCH
-        echo "=== Done $BRANCH ==="
-    done
-  displayName: 'Mirror main + develop to GitHub'
-  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+    echo "✅ Mirroring Complete"
+  displayName: 'Mirror to GitHub (Atomic)'
   env:
     GITHUB_USER: $(GITHUB_USER)
     GITHUB_TOKEN: $(GITHUB_TOKEN)
