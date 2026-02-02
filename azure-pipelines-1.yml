@@ -95,32 +95,55 @@ steps:
     GITHUB_USER: $(GITHUB_USER)
     GITHUB_TOKEN: $(GITHUB_TOKEN)
 
-# 🦊 Mirror to GitLab
+# 🦊 Mirror to GitLab (Final Redundancy Gate)
 - script: |
-    set -e
+    set -euo pipefail
 
-    git remote remove gitlab || true
-    git remote add gitlab "https://$(GITLAB_USER):$(GITLAB_TOKEN)@gitlab.com/bernardo.estacio89/franz.common.git"
+    echo "Initialising GitLab Remote..."
+    # Using 'set-url' or 'add' ensures we don't fail if the remote exists
+    git remote add gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git" || \
+    git remote set-url gitlab "https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/bernardo.estacio89/franz.common.git"
 
-    echo "Pushing branch $(Build.SourceBranchName) to GitLab"
-    git push gitlab HEAD:refs/heads/$(Build.SourceBranchName)
-  displayName: 'Mirror branch to GitLab'
-  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+    # Ensure we have the full object tree for the 63 projects
+    echo "Fetching object deltas..."
+    git fetch origin --prune --unshallow || git fetch origin --prune
 
-# 🏷️ Propagate tags (main only)
+    echo "Mirroring Main and Develop to GitLab..."
+    # Directly map the verified Azure refs to GitLab refs
+    git push --force gitlab origin/main:refs/heads/main
+    git push --force gitlab origin/Develop:refs/heads/develop
+
+    echo "✅ Mission Accomplished: GitLab is in sync."
+  displayName: 'Mirror to GitLab'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  env:
+    GITLAB_USER: $(GITLAB_USER)
+    GITLAB_TOKEN: $(GITLAB_TOKEN)
+
+# 🏷️ Propagate tags (High-Reliability Sync)
 - script: |
-    set -e
+    set -euo pipefail
 
-    git fetch --tags
+    echo "Fetching all tags from Azure DevOps (Source of Truth)..."
+    git fetch --tags --force
 
-    LATEST_TAG=$(git describe --tags --abbrev=0 || true)
+    # Identify the latest tag on the current verified commit
+    LATEST_TAG=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 || true)
 
     if [ -n "$LATEST_TAG" ]; then
-      echo "Propagating tag $LATEST_TAG"
-      git push github $LATEST_TAG
-      git push gitlab $LATEST_TAG
+      echo "Verified Tag Found: $LATEST_TAG"
+      
+      # Push specifically to GitHub
+      echo "Pushing $LATEST_TAG to GitHub..."
+      git push github "$LATEST_TAG"
+
+      # Push specifically to GitLab
+      echo "Pushing $LATEST_TAG to GitLab..."
+      git push gitlab "$LATEST_TAG"
+      
+      echo "✅ Tag propagation complete."
     else
-      echo "No tags to propagate"
+      echo "ℹ️ No tag found on the current commit to propagate."
     fi
   displayName: 'Propagate tags to GitHub & GitLab'
-  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
