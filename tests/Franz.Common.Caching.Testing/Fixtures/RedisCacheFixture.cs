@@ -29,14 +29,19 @@ public sealed class RedisCacheFixture : IAsyncLifetime
   {
     await _container.StartAsync();
 
-    // Build shared DI container
+    // Optional warm-up: ensure Redis is ready
+    await Task.Delay(500);
+
     var services = new ServiceCollection();
 
+    // Observers must be singletons to track hits/removals
+    services.AddSingleton<MetricsCacheObserver>();
+    services.AddSingleton<LoggingMetricsObserver>();
+
+    // Cache registration
     services.AddFranzRedisCaching(ConnectionString)
             .AddLogging()
-            .AddMetricsCacheObserver()       // Register observers BEFORE decorator
-            .AddLoggingMetricsCacheObserver()
-            .AddObservableCaching();         // Decorator last
+            .AddObservableCaching(); // Decorator last
 
     ServiceProvider = services.BuildServiceProvider();
   }
