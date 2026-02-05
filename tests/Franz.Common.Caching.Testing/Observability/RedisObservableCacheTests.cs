@@ -8,6 +8,7 @@ namespace Franz.Common.Caching.Testing.Tests
 {
   [Collection("RedisCacheTests")]
   public class RedisObservableCacheTests
+     : IClassFixture<RedisCacheFixture>
   {
     private readonly RedisCacheFixture _fixture;
 
