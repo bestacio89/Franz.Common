@@ -1,4 +1,5 @@
 ﻿using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Extensions;
 using Franz.Common.Caching.Observability;
 using Franz.Common.Caching.Observability.Observers;
 using Franz.Common.Caching.Providers;
@@ -30,19 +31,16 @@ namespace Franz.Common.Caching.Testing.Tests
       var services = new ServiceCollection();
       services.AddLogging();
 
-      // Redis cache provider
-      services.AddSingleton<ICacheProvider>(sp =>
-          new RedisCacheProvider(multiplexer));
+      // Step 1: Add base Redis cache
+      services.AddFranzRedisCaching(_ => multiplexer);
 
-      // Observers
-      services.AddSingleton<MetricsCacheObserver>();
-      services.AddSingleton<LoggingCacheObserver>();
-      services.AddSingleton<LoggingMetricsObserver>();
+      // Step 2: Add observers
+      services.AddMetricsCacheObserver();
+      services.AddLoggingMetricsCacheObserver();
+      services.AddLoggingCacheObserver();
 
-      // Register as ICacheObserver via concrete type (correct way)
-      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, MetricsCacheObserver>());
-      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, LoggingCacheObserver>());
-      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, LoggingMetricsObserver>());
+      // Step 3: Decorate Redis provider with ObservableCacheProvider
+      services.AddObservableCaching();
 
       _sp = services.BuildServiceProvider();
     }
