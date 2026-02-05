@@ -1,23 +1,20 @@
 ﻿using Franz.Common.Caching.Observability;
 using Franz.Common.Caching.Metrics;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
+using System.Diagnostics.Metrics;
 
 namespace Franz.Common.Caching.Observability.Observers;
 
-public class MetricsCacheObserver : ICacheObserver
+public sealed class MetricsCacheObserver : ICacheObserver
 {
   private readonly ConcurrentDictionary<string, CacheEntryStats> _stats = new();
-
-  // Keep track of removed tags for testing/inspection
   private readonly ConcurrentBag<string> _removedTags = new();
 
-  // Track operation counts for testing
-  private int _totalSets = 0;
-  private int _totalHits = 0;
-  private int _totalRemovals = 0;
+  public int TotalSets { get; private set; }
+  public int TotalHits { get; private set; }
+  public int TotalRemovals { get; private set; }
+  public IReadOnlyCollection<string> CurrentRemovedTags => _removedTags;
+  public IReadOnlyCollection<string> CurrentKeys => _stats.Keys.ToList();
 
   public void OnCacheSet(CacheEntryDescriptor entry)
   {
@@ -25,18 +22,7 @@ public class MetricsCacheObserver : ICacheObserver
     stat.Sets++;
     stat.EstimatedSizeBytes = entry.EstimatedSizeInBytes;
     stat.LastSet = DateTime.UtcNow;
-
-    // Store tags
-    if (entry.Tags != null)
-    {
-      foreach (var tag in entry.Tags)
-      {
-        stat.Tags.Add(tag);
-      }
-    }
-
-    // Increment total sets counter
-    System.Threading.Interlocked.Increment(ref _totalSets);
+    TotalSets++;
   }
 
   public void OnCacheHit(CacheAccessDescriptor access)
@@ -44,22 +30,18 @@ public class MetricsCacheObserver : ICacheObserver
     var stat = _stats.GetOrAdd(access.Key, _ => new CacheEntryStats());
     stat.Hits++;
     stat.LastAccess = DateTime.UtcNow;
+    TotalHits++;
 
-    // Update OpenTelemetry metric
+    // Update OpenTelemetry metric if needed
     CacheMetrics.Hits.Add(1);
     if (access.LookupLatencyMs.HasValue)
       CacheMetrics.LookupLatencyMs.Record(access.LookupLatencyMs.Value);
-
-    // Increment total hits counter
-    System.Threading.Interlocked.Increment(ref _totalHits);
   }
 
   public void OnCacheRemove(string key)
   {
     _stats.TryRemove(key, out _);
-
-    // Increment total removals counter
-    System.Threading.Interlocked.Increment(ref _totalRemovals);
+    TotalRemovals++;
   }
 
   public void OnCacheRemoveByTag(string tag)
@@ -69,24 +51,8 @@ public class MetricsCacheObserver : ICacheObserver
       if (kvp.Value.Tags.Contains(tag))
         _stats.TryRemove(kvp.Key, out _);
     }
-
-    // Track removed tag for tests
     _removedTags.Add(tag);
-
-    // Increment total removals counter
-    System.Threading.Interlocked.Increment(ref _totalRemovals);
   }
 
   public IReadOnlyDictionary<string, CacheEntryStats> Snapshot() => _stats;
-
-  // Expose current keys for tests
-  public IReadOnlyCollection<string> CurrentKeys => _stats.Keys.ToList();
-
-  // Expose removed tags for test assertions
-  public IReadOnlyCollection<string> CurrentRemovedTags => _removedTags.ToList();
-
-  // Expose operation counts for testing
-  public int TotalSets => _totalSets;
-  public int TotalHits => _totalHits;
-  public int TotalRemovals => _totalRemovals;
 }
