@@ -4,6 +4,7 @@
   </PropertyGroup>
   <Import Project="..\..\common.targets" />
   <ItemGroup>
+    <PackageReference Include="EPPlus" Version="8.4.2" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.1" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.1" />
     <PackageReference Include="StackExchange.Redis" Version="2.10.1" />

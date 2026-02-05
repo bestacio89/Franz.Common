@@ -1,11 +1,15 @@
-﻿# Franz.Common.Caching
-
-A full-featured caching module for the **Franz Framework**.
-Provides **unified cache abstractions**, **hybrid caching (L1 + L2)**, Mediator request caching, settings cache, and **first-class observability** via Serilog and OpenTelemetry.
+﻿Here’s an updated **README** for version **1.7.8**, including all the **observability improvements, metrics observer, logging + metrics observer, and Excel/export-ready observer** you’ve just implemented:
 
 ---
 
-* **Current Version**: **1.7.7**
+# Franz.Common.Caching
+
+A full-featured caching module for the **Franz Framework**.
+Provides **unified cache abstractions**, **hybrid caching (L1 + L2)**, Mediator request caching, settings cache, and **first-class observability** via Serilog, OpenTelemetry, and custom metrics/log observers.
+
+---
+
+* **Current Version**: **1.7.8**
 * **Target Framework**: **.NET 10.0**
 
 ---
@@ -53,28 +57,45 @@ Provides **unified cache abstractions**, **hybrid caching (L1 + L2)**, Mediator 
     * `FranzCorrelationId`
     * `FranzCacheKey`
     * `FranzCacheHit`
+
   * **OpenTelemetry metrics**
 
     * cache hits / misses
     * lookup latency
+
   * **OpenTelemetry trace tags**
 
     * `franz.cache.*`
 
-* 🔌 **Plug-and-play DI extensions**
+  * **Observers**
 
-  * `AddFranzMemoryCaching()`
-  * `AddFranzDistributedCaching<T>()`
-  * `AddFranzRedisCaching()`
-  * `AddFranzHybridCaching()`
-  * `AddFranzMediatorCaching()`
+    * `MetricsCacheObserver` – in-memory metrics, hits, sets, total cache weight
+    * `LoggingMetricsObserver` – combines Serilog logging + metrics
+    * `ExcelCacheObserver` – export cache statistics (hits, misses, size) to Excel
+
+---
+
+## 🔌 Plug-and-play DI extensions
+
+* `AddFranzMemoryCaching()`
+* `AddFranzDistributedCaching<T>()`
+* `AddFranzRedisCaching()`
+* `AddFranzHybridCaching()`
+* `AddFranzMediatorCaching()`
+* `AddObservableCaching()` – **enables any combination of observers**
+* `AddLoggingCacheObserver()`
+* `AddMetricsCacheObserver()`
+* `AddLoggingMetricsObserver()`
+* `AddExcelCacheObserver()` – opt-in for Excel exports
+
+> Observers are **opt-in**. You can register any combination depending on telemetry/logging needs.
 
 ---
 
 ## 📦 Installation
 
 ```bash
-dotnet add package Franz.Common.Caching
+dotnet add package Franz.Common.Caching --version 1.7.8
 ```
 
 ---
@@ -85,90 +106,42 @@ dotnet add package Franz.Common.Caching
 // Program.cs
 builder.Services.AddFranzHybridCaching();
 
+// Mediator caching
 builder.Services.AddFranzMediatorCaching(opts =>
 {
     opts.DefaultTtl = TimeSpan.FromMinutes(10);
     opts.ShouldCache = req => !req.GetType().Name.EndsWith("Command");
 });
+
+// Observers
+builder.Services.AddObservableCaching()
+    .AddLoggingCacheObserver()
+    .AddMetricsCacheObserver()
+    .AddLoggingMetricsObserver()
+    .AddExcelCacheObserver(); // optional Excel export
 ```
 
 ---
 
-## 🧠 Cache Options (Unified)
+## 📊 Observability Examples
+
+### Metrics Observer
+
+Tracks per-key stats:
+
+* Hits / Misses
+* Last access / set time
+* Estimated size in bytes
+* Total cache weight
 
 ```csharp
-public sealed class CacheOptions
-{
-    public TimeSpan? Expiration { get; init; }
-    public TimeSpan? LocalCacheHint { get; init; }
-    public bool Sliding { get; init; }
-    public CachePriority Priority { get; init; } = CachePriority.Normal;
-    public string[]? Tags { get; init; }
-}
+var snapshot = metricsObserver.Snapshot();
+var totalWeight = snapshot.Values.Sum(x => x.EstimatedSizeBytes);
 ```
 
-✔ Same options model used across **memory, distributed, redis, and mediator pipeline**
-✔ Providers adapt internally — no provider-specific leakage
+### Logging + Metrics Observer
 
----
-
-## 🧪 Example Mediator Query
-
-```csharp
-public record GetUserByIdQuery(int Id) : IQuery<User>;
-```
-
-* First execution → **MISS** → handler executes → cached
-* Subsequent executions → **HIT** → cached response returned
-* Logs + metrics + traces emitted automatically
-
----
-
-## 🧰 Providers
-
-### In-memory (L1)
-
-```csharp
-services.AddFranzMemoryCaching();
-```
-
-### Distributed (L2 – SQL Server, NCache, etc.)
-
-```csharp
-services.AddFranzDistributedCaching<SqlServerCache>();
-```
-
-### Redis (L2)
-
-```csharp
-// Simple
-services.AddFranzRedisCaching("localhost:6379");
-
-// Advanced (DI-driven)
-services.AddFranzRedisCaching(sp =>
-{
-    var cfg = sp.GetRequiredService<IConfiguration>();
-    return ConnectionMultiplexer.Connect(
-        cfg.GetConnectionString("Redis")
-    );
-});
-```
-
-### Hybrid (Recommended)
-
-```csharp
-services.AddFranzHybridCaching();
-```
-
-* Memory → Redis / Distributed
-* Local cache warming
-* Consistent invalidation flow
-
----
-
-## 📊 Observability
-
-### Serilog (example)
+Combines Serilog logs + OpenTelemetry metrics:
 
 ```json
 {
@@ -180,30 +153,23 @@ services.AddFranzHybridCaching();
 }
 ```
 
-### OpenTelemetry Metrics
+### Excel Observer
 
-* `franz_cache_hits`
-* `franz_cache_misses`
-* `franz_cache_lookup_latency_ms`
-
-### OpenTelemetry Trace Tags
-
-* `franz.cache.key`
-* `franz.cache.hit`
-* `franz.cache.ttl_seconds`
-
----
-
-## 🧭 Roadmap
-
-* Hashed / compact cache keys (Redis-friendly)
-* Tag-based invalidation
-* Deeper integration with `Franz.Common.Settings`
-* Optional async background refresh
+Exports relevant stats only (hits/misses/size) to Excel for **offline analysis**.
 
 ---
 
 ## 📝 Changelog
+
+### **1.7.8**
+
+* Added **MetricsCacheObserver** – in-memory hit/miss, per-key stats, total cache weight
+* Added **LoggingMetricsObserver** – combines Serilog + metrics, tracks hits, sets, latency
+* Added **ExcelCacheObserver** – export relevant cache stats to Excel
+* Updated DI extensions – opt-in observer registration methods
+* Exposed **CurrentKeys** property on observers for testability
+* Observers integrated with **Redis, Distributed, Memory** caches
+* Internal improvements for latency tracking in `CacheAccessDescriptor`
 
 ### **1.7.7**
 
@@ -212,7 +178,7 @@ services.AddFranzHybridCaching();
 * Removed legacy entry options
 * Provider internals aligned with Mediator pipeline
 * Improved null caching semantics
-* Documentation refresh (this file)
+* Documentation refresh
 
 ### **1.7.6**
 
@@ -224,4 +190,42 @@ services.AddFranzHybridCaching();
 * Upgraded to **.NET 10.0**
 
 ---
+
+Perfect — we can make a **small ASCII/flow diagram** for the README that’s simple, readable, and shows the **cache → observers → outputs** flow. Here’s a suggestion you can drop right under the Observability section:
+
+```
+Cache Operation Flow
+-------------------
+
+        ┌───────────────┐
+        │ ICacheProvider│
+        └───────┬───────┘
+                │ OnCacheSet / OnCacheHit / OnCacheRemove
+                ▼
+        ┌────────────────────┐
+        │ ObservableCacheProvider │
+        └───────┬────────────┘
+                │
+      ┌─────────┼─────────┐
+      ▼         ▼         ▼
+┌───────────┐ ┌──────────────┐ ┌───────────────┐
+│ Logging   │ │ Metrics      │ │ Excel Export  │
+│ Observer  │ │ Observer     │ │ Observer      │
+└───────────┘ └──────────────┘ └───────────────┘
+
+```
+
+
+* `ICacheProvider` → executes cache operations (set, get, remove).
+* `ObservableCacheProvider` → wraps the cache provider and broadcasts to **all registered observers**.
+* Observers can be:
+
+  * **LoggingCacheObserver** → Serilog / log enrichment
+  * **MetricsCacheObserver** → in-memory stats, hits, misses, cache weight
+  * **LoggingMetricsObserver** → combined logs + metrics
+  * **ExcelCacheObserver** → exports relevant stats to Excel
+
+This makes it **instantly clear** how any cache action flows through the system and where the data ends up.
+
+If you want, I can **also make a slightly fancier Markdown/mermaid diagram** that will render nicely on GitHub and looks professional in the README. Do you want me to do that too?
 
