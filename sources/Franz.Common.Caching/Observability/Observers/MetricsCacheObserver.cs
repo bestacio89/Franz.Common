@@ -13,8 +13,8 @@ public sealed class MetricsCacheObserver : ICacheObserver
   public int TotalSets { get; private set; }
   public int TotalHits { get; private set; }
   public int TotalRemovals { get; private set; }
-  public IReadOnlyCollection<string> CurrentRemovedTags => _removedTags;
-  public IReadOnlyCollection<string> CurrentKeys => _stats.Keys.ToList();
+  public List<string> CurrentRemovedTags => _removedTags.ToList();
+  public List<string> CurrentKeys => _stats.Keys.ToList();
 
   public void OnCacheSet(CacheEntryDescriptor entry)
   {
