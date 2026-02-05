@@ -26,6 +26,15 @@ public class MetricsCacheObserver : ICacheObserver
     stat.EstimatedSizeBytes = entry.EstimatedSizeInBytes;
     stat.LastSet = DateTime.UtcNow;
 
+    // Store tags
+    if (entry.Tags != null)
+    {
+      foreach (var tag in entry.Tags)
+      {
+        stat.Tags.Add(tag);
+      }
+    }
+
     // Increment total sets counter
     System.Threading.Interlocked.Increment(ref _totalSets);
   }

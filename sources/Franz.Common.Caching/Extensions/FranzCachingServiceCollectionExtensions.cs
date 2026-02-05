@@ -128,7 +128,43 @@ namespace Franz.Common.Caching.Extensions
     /// </summary>
     public static IServiceCollection AddObservableCaching(this IServiceCollection services)
     {
-      services.Decorate<ICacheProvider, ObservableCacheProvider>();
+      // Remove the existing ICacheProvider registration
+      var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ICacheProvider));
+      if (descriptor != null)
+      {
+        services.Remove(descriptor);
+
+        // Re-register the original implementation with a different service type
+        services.Add(new ServiceDescriptor(
+          typeof(ICacheProvider),
+          sp =>
+          {
+            // Resolve the inner provider
+            ICacheProvider innerProvider;
+            if (descriptor.ImplementationType != null)
+            {
+              innerProvider = (ICacheProvider)ActivatorUtilities.CreateInstance(sp, descriptor.ImplementationType);
+            }
+            else if (descriptor.ImplementationFactory != null)
+            {
+              innerProvider = (ICacheProvider)descriptor.ImplementationFactory(sp);
+            }
+            else if (descriptor.ImplementationInstance != null)
+            {
+              innerProvider = (ICacheProvider)descriptor.ImplementationInstance;
+            }
+            else
+            {
+              throw new InvalidOperationException("Unable to resolve inner cache provider");
+            }
+
+            // Wrap with observable decorator
+            var observers = sp.GetServices<ICacheObserver>();
+            return new ObservableCacheProvider(innerProvider, observers);
+          },
+          descriptor.Lifetime));
+      }
+
       return services;
     }
 
