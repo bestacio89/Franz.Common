@@ -138,17 +138,16 @@ namespace Franz.Common.Caching.Extensions
     /// </summary>
     public static IServiceCollection AddMetricsCacheObserver(this IServiceCollection services)
     {
-      services.TryAddSingleton<MetricsCacheObserver>();
-      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver>(sp => sp.GetRequiredService<MetricsCacheObserver>()));
+      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, MetricsCacheObserver>());
       return services;
     }
+
     /// <summary>
     /// Registers the logging-only cache observer.
     /// </summary>
     public static IServiceCollection AddLoggingCacheObserver(this IServiceCollection services)
     {
-      services.TryAddSingleton<LoggingCacheObserver>();
-      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver>(sp => sp.GetRequiredService<LoggingCacheObserver>()));
+      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, LoggingCacheObserver>());
       return services;
     }
 
@@ -157,16 +156,16 @@ namespace Franz.Common.Caching.Extensions
     /// </summary>
     public static IServiceCollection AddLoggingMetricsCacheObserver(this IServiceCollection services)
     {
-      services.TryAddSingleton<LoggingMetricsObserver>();
-      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver>(sp => sp.GetRequiredService<LoggingMetricsObserver>()));
+      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, LoggingMetricsObserver>());
       return services;
     }
+
     public static IServiceCollection AddExcelMetricsCacheObserver(this IServiceCollection services)
     {
-      services.TryAddSingleton<ExcelCacheObserver>();
-      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver>(sp => sp.GetRequiredService<ExcelCacheObserver>()));
+      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, ExcelCacheObserver>());
       return services;
     }
+
     /// <summary>
     /// Registers a composite observer that calls all ICacheObservers.
     /// </summary>
@@ -186,9 +185,6 @@ namespace Franz.Common.Caching.Extensions
 
   #region Composite Observer
 
-  /// <summary>
-  /// Calls all registered observers for each cache event.
-  /// </summary>
   public class CompositeCacheObserver : ICacheObserver
   {
     private readonly ICacheObserver[] _observers;

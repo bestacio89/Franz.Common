@@ -1,14 +1,9 @@
 ﻿using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Extensions;
-using Franz.Common.Caching.Observability;
 using Franz.Common.Caching.Observability.Observers;
 using Franz.Common.Caching.Providers;
-using Franz.Common.Caching.Redis;
 using Franz.Common.Caching.Testing.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
-using StackExchange.Redis;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -26,21 +21,14 @@ namespace Franz.Common.Caching.Testing.Tests
     public RedisObservableCacheTests(RedisCacheFixture fixture)
     {
       _fixture = fixture;
-      var multiplexer = ConnectionMultiplexer.Connect(_fixture.ConnectionString);
 
       var services = new ServiceCollection();
-      services.AddLogging();
 
-      // Step 1: Add base Redis cache
-      services.AddFranzRedisCaching(_ => multiplexer);
-
-      // Step 2: Add observers
-      services.AddMetricsCacheObserver();
-      services.AddLoggingMetricsCacheObserver();
-      services.AddLoggingCacheObserver();
-
-      // Step 3: Decorate Redis provider with ObservableCacheProvider
-      services.AddObservableCaching();
+      // Use your extensions for clean DI setup
+      services.AddFranzRedisCaching(_fixture.ConnectionString)
+              .AddObservableCaching()
+              .AddMetricsCacheObserver()
+              .AddLoggingMetricsCacheObserver();
 
       _sp = services.BuildServiceProvider();
     }
@@ -54,15 +42,12 @@ namespace Franz.Common.Caching.Testing.Tests
 
       string key = "integration_test_key";
 
-      // First set -> should be a cache miss internally
       var value = await cache.GetOrSetAsync(key, ct => Task.FromResult(123));
       Assert.Equal(123, value);
 
-      // Second get -> should hit cache
       var cachedValue = await cache.GetOrSetAsync(key, ct => Task.FromResult(456));
-      Assert.Equal(123, cachedValue); // value unchanged
+      Assert.Equal(123, cachedValue);
 
-      // Verify observers tracked the hit
       Assert.Contains(key, metricsObserver.CurrentKeys);
       Assert.Contains(key, loggingMetricsObserver.CurrentKeys);
     }
@@ -92,13 +77,13 @@ namespace Franz.Common.Caching.Testing.Tests
       string key1 = "tag_test_1";
       string key2 = "tag_test_2";
 
-      // Simulate tag by including "tag:" in key
       await cache.GetOrSetAsync($"tag:group1:{key1}", ct => Task.FromResult(1));
       await cache.GetOrSetAsync($"tag:group1:{key2}", ct => Task.FromResult(2));
 
       Assert.Contains($"tag:group1:{key1}", metricsObserver.CurrentKeys);
       Assert.Contains($"tag:group1:{key2}", metricsObserver.CurrentKeys);
 
+      // RedisCacheProvider doesn't support tags natively; your observer handles the removal simulation
       await cache.RemoveByTagAsync("group1");
 
       Assert.DoesNotContain($"tag:group1:{key1}", metricsObserver.CurrentKeys);
