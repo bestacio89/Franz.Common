@@ -1,13 +1,15 @@
 ﻿using Franz.Common.Caching.Abstractions;
 using Microsoft.Extensions.Caching.Distributed;
+using System;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Franz.Common.Caching.Distributed;
 
 public sealed class DistributedCacheProvider : ICacheProvider
 {
   private readonly IDistributedCache _cache;
-
   private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(30);
 
   public DistributedCacheProvider(IDistributedCache cache)
@@ -23,7 +25,6 @@ public sealed class DistributedCacheProvider : ICacheProvider
   {
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
-
     if (factory is null)
       throw new ArgumentNullException(nameof(factory));
 
@@ -36,16 +37,12 @@ public sealed class DistributedCacheProvider : ICacheProvider
     // ⚠ No stampede protection here by design
     // This provider is NOT hybrid, NOT concurrent-safe
     var value = await factory(ct);
-
     var json = JsonSerializer.Serialize(value);
+
     await _cache.SetStringAsync(
         key,
         json,
-        new DistributedCacheEntryOptions
-        {
-          AbsoluteExpirationRelativeToNow =
-                options?.Expiration ?? DefaultExpiration
-        },
+        CreateDistributedCacheOptions(options),
         ct);
 
     return value;
@@ -55,7 +52,6 @@ public sealed class DistributedCacheProvider : ICacheProvider
   {
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
-
     return _cache.RemoveAsync(key, ct);
   }
 
@@ -63,14 +59,56 @@ public sealed class DistributedCacheProvider : ICacheProvider
       => throw new NotSupportedException(
           "Tag-based invalidation is not supported by DistributedCacheProvider.");
 
+  private static DistributedCacheEntryOptions CreateDistributedCacheOptions(CacheOptions? options)
+  {
+    var distributedOptions = new DistributedCacheEntryOptions();
+
+    if (options is null)
+    {
+      distributedOptions.AbsoluteExpirationRelativeToNow = DefaultExpiration;
+      return distributedOptions;
+    }
+
+    // Priority order: AbsoluteExpirationRelativeToNow > AbsoluteExpiration > SlidingExpiration > Default
+    if (options.AbsoluteExpirationRelativeToNow.HasValue)
+    {
+      distributedOptions.AbsoluteExpirationRelativeToNow = options.AbsoluteExpirationRelativeToNow.Value;
+    }
+    else if (options.AbsoluteExpiration.HasValue)
+    {
+      distributedOptions.AbsoluteExpiration = options.AbsoluteExpiration.Value;
+    }
+    else if (options.SlidingExpiration.HasValue)
+    {
+      distributedOptions.SlidingExpiration = options.SlidingExpiration.Value;
+    }
+    else
+    {
+      distributedOptions.AbsoluteExpirationRelativeToNow = DefaultExpiration;
+    }
+
+    return distributedOptions;
+  }
+
   private static void ValidateOptions(CacheOptions? options)
   {
     if (options is null)
       return;
 
+    // Check AbsoluteExpirationRelativeToNow
+    if (options.AbsoluteExpirationRelativeToNow.HasValue &&
+        options.AbsoluteExpirationRelativeToNow.Value <= TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpirationRelativeToNow));
 
-    if (options.Expiration != null && options.Expiration.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(nameof(options.Expiration));
+    // Check SlidingExpiration
+    if (options.SlidingExpiration.HasValue &&
+        options.SlidingExpiration.Value <= TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(nameof(options.SlidingExpiration));
+
+    // Check AbsoluteExpiration
+    if (options.AbsoluteExpiration.HasValue &&
+        options.AbsoluteExpiration.Value <= DateTimeOffset.UtcNow)
+      throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpiration));
 
     if (options.LocalCacheHint is not null)
       throw new NotSupportedException(

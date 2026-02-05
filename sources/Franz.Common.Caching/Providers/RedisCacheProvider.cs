@@ -1,7 +1,12 @@
 ﻿using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Observability;
 using StackExchange.Redis;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Franz.Common.Caching.Redis;
 
@@ -43,9 +48,11 @@ public sealed class RedisCacheProvider : ICacheProvider
     // Cache miss -> compute
     var computed = await factory(ct);
     var serialized = JsonSerializer.Serialize(computed);
-    await _db.StringSetAsync(key, serialized, options?.Expiration ?? DefaultExpiration);
+    var expiration = GetExpiration(options);
 
-    NotifySet(key, computed, options?.Expiration ?? DefaultExpiration);
+    await _db.StringSetAsync(key, serialized, expiration);
+
+    NotifySet(key, computed, options);
 
     // Handle tags
     if (options?.Tags != null)
@@ -83,9 +90,9 @@ public sealed class RedisCacheProvider : ICacheProvider
 
     if (keys.Length > 0)
     {
-      await _db.KeyDeleteAsync(keys.Select(k => (RedisKey)(string)k).ToArray());
+      await _db.KeyDeleteAsync(keys.Select(k => (RedisKey)(string)k!).ToArray());
       foreach (var k in keys)
-        NotifyRemove(k);
+        NotifyRemove(k!);
     }
 
     await _db.KeyDeleteAsync(tagSetKey);
@@ -96,11 +103,37 @@ public sealed class RedisCacheProvider : ICacheProvider
   {
     if (options is null) return;
 
-    if (options.Expiration.HasValue && options.Expiration.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(nameof(options.Expiration));
+    // Check AbsoluteExpirationRelativeToNow
+    if (options.AbsoluteExpirationRelativeToNow.HasValue &&
+        options.AbsoluteExpirationRelativeToNow.Value <= TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpirationRelativeToNow));
+
+    // Check SlidingExpiration
+    if (options.SlidingExpiration.HasValue &&
+        options.SlidingExpiration.Value <= TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(nameof(options.SlidingExpiration));
+
+    // Check AbsoluteExpiration
+    if (options.AbsoluteExpiration.HasValue &&
+        options.AbsoluteExpiration.Value <= DateTimeOffset.UtcNow)
+      throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpiration));
 
     if (options.LocalCacheHint is not null)
       throw new NotSupportedException("LocalCacheHint is not applicable to RedisCacheProvider.");
+  }
+
+  private TimeSpan GetExpiration(CacheOptions? options)
+  {
+    if (options?.AbsoluteExpirationRelativeToNow.HasValue == true)
+      return options.AbsoluteExpirationRelativeToNow.Value;
+
+    if (options?.AbsoluteExpiration.HasValue == true)
+      return options.AbsoluteExpiration.Value - DateTimeOffset.UtcNow;
+
+    if (options?.SlidingExpiration.HasValue == true)
+      return options.SlidingExpiration.Value;
+
+    return DefaultExpiration;
   }
 
   private IServer GetServer()
@@ -111,13 +144,14 @@ public sealed class RedisCacheProvider : ICacheProvider
 
   #region Observer notifications
 
-  private void NotifySet<T>(string key, T value, TimeSpan expiration)
+  private void NotifySet<T>(string key, T value, CacheOptions? options)
   {
     var entry = new CacheEntryDescriptor
     {
       Key = key,
-      EstimatedSizeInBytes = value?.ToString()?.Length ?? 0,
-      Ttl = expiration
+      EstimatedSizeInBytes = options?.EstimatedSizeInBytes ?? value?.ToString()?.Length ?? 0,
+      Ttl = options?.Ttl ?? GetExpiration(options),
+      Tags = options?.Tags ?? Array.Empty<string>()
     };
 
     foreach (var obs in _observers)

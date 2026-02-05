@@ -4,11 +4,34 @@ using System.Text;
 
 namespace Franz.Common.Caching.Observability;
 
-public sealed record CacheEntryDescriptor
+/// <summary>
+/// Describes a cache entry that was set.
+/// </summary>
+public sealed class CacheEntryDescriptor
 {
-  public string Key { get; init; }
+  /// <summary>
+  /// The cache key.
+  /// </summary>
+  public required string Key { get; init; }
+
+  /// <summary>
+  /// Estimated size of the cached value in bytes.
+  /// </summary>
   public long EstimatedSizeInBytes { get; init; }
-  public DateTimeOffset CreatedAt { get; init; }
+
+  /// <summary>
+  /// Time-to-live for this cache entry.
+  /// </summary>
   public TimeSpan? Ttl { get; init; }
-  public string CacheRegion { get; init; }
+
+  /// <summary>
+  /// Tags associated with this cache entry.
+  /// </summary>
+  public string[] Tags { get; init; } = Array.Empty<string>();
+
+  /// <summary>
+  /// When this entry was set.
+  /// </summary>
+  public DateTimeOffset SetAt { get; init; } = DateTimeOffset.UtcNow;
 }
+
