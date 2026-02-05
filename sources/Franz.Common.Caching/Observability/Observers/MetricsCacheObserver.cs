@@ -5,10 +5,13 @@ using System.Diagnostics.Metrics;
 
 namespace Franz.Common.Caching.Observability.Observers;
 
-public sealed class MetricsCacheObserver : ICacheObserver
+public  class MetricsCacheObserver : ICacheObserver
 {
   private readonly ConcurrentDictionary<string, CacheEntryStats> _stats
       = new();
+
+  // Keep track of removed tags for testing/inspection
+  private readonly ConcurrentBag<string> _removedTags = new();
 
   public void OnCacheSet(CacheEntryDescriptor entry)
   {
@@ -42,10 +45,16 @@ public sealed class MetricsCacheObserver : ICacheObserver
       if (kvp.Value.Tags.Contains(tag))
         _stats.TryRemove(kvp.Key, out _);
     }
+
+    // Track removed tag for tests
+    _removedTags.Add(tag);
   }
 
   public IReadOnlyDictionary<string, CacheEntryStats> Snapshot() => _stats;
 
-  // <-- Add this for test inspection
+  // Expose current keys for tests
   public IReadOnlyCollection<string> CurrentKeys => (IReadOnlyCollection<string>)_stats.Keys;
+
+  // Expose removed tags for test assertions
+  public IReadOnlyCollection<string> CurrentRemovedTags => _removedTags;
 }

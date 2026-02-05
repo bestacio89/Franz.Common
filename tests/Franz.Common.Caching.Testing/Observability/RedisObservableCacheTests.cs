@@ -24,7 +24,7 @@ namespace Franz.Common.Caching.Testing.Tests
 
       var services = new ServiceCollection();
 
-      // Use your extensions for clean DI setup
+      // Clean DI setup
       services.AddFranzRedisCaching(_fixture.ConnectionString)
               .AddObservableCaching()
               .AddMetricsCacheObserver()
@@ -48,6 +48,7 @@ namespace Franz.Common.Caching.Testing.Tests
       var cachedValue = await cache.GetOrSetAsync(key, ct => Task.FromResult(456));
       Assert.Equal(123, cachedValue);
 
+      // Observers should have recorded the set and hit
       Assert.Contains(key, metricsObserver.CurrentKeys);
       Assert.Contains(key, loggingMetricsObserver.CurrentKeys);
     }
@@ -65,6 +66,7 @@ namespace Franz.Common.Caching.Testing.Tests
 
       await cache.RemoveAsync(key);
 
+      // Key should be removed in observer
       Assert.DoesNotContain(key, metricsObserver.CurrentKeys);
     }
 
@@ -76,18 +78,24 @@ namespace Franz.Common.Caching.Testing.Tests
 
       string key1 = "tag_test_1";
       string key2 = "tag_test_2";
+      string tag = "group1";
 
-      await cache.GetOrSetAsync($"tag:group1:{key1}", ct => Task.FromResult(1));
-      await cache.GetOrSetAsync($"tag:group1:{key2}", ct => Task.FromResult(2));
+      // Use native tag support in CacheOptions
+      await cache.GetOrSetAsync(key1, ct => Task.FromResult(1), new CacheOptions { Tags = new[] { tag } });
+      await cache.GetOrSetAsync(key2, ct => Task.FromResult(2), new CacheOptions { Tags = new[] { tag } });
 
-      Assert.Contains($"tag:group1:{key1}", metricsObserver.CurrentKeys);
-      Assert.Contains($"tag:group1:{key2}", metricsObserver.CurrentKeys);
+      Assert.Contains(key1, metricsObserver.CurrentKeys);
+      Assert.Contains(key2, metricsObserver.CurrentKeys);
 
-      // RedisCacheProvider doesn't support tags natively; your observer handles the removal simulation
-      await cache.RemoveByTagAsync("group1");
+      // Remove by tag
+      await cache.RemoveByTagAsync(tag);
 
-      Assert.DoesNotContain($"tag:group1:{key1}", metricsObserver.CurrentKeys);
-      Assert.DoesNotContain($"tag:group1:{key2}", metricsObserver.CurrentKeys);
+      // Keys should be removed
+      Assert.DoesNotContain(key1, metricsObserver.CurrentKeys);
+      Assert.DoesNotContain(key2, metricsObserver.CurrentKeys);
+
+      // Observer should have registered tag removal
+      Assert.Contains(tag, metricsObserver.CurrentRemovedTags);
     }
   }
 }
