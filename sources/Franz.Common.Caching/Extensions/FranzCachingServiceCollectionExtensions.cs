@@ -69,10 +69,7 @@ namespace Franz.Common.Caching.Extensions
                 DefaultDatabase = database
               }));
 
-      services.AddSingleton<ICacheProvider>(sp =>
-          new RedisCacheProvider(
-              sp.GetRequiredService<IConnectionMultiplexer>(),
-              sp.GetServices<ICacheObserver>()));
+      services.TryAddSingleton<ICacheProvider, RedisCacheProvider>();
 
       services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
       services.TryAddSingleton<ISettingsCache, SettingsCache>();
@@ -90,10 +87,7 @@ namespace Franz.Common.Caching.Extensions
     {
       services.AddSingleton<IConnectionMultiplexer>(multiplexerFactory);
 
-      services.AddSingleton<ICacheProvider>(sp =>
-          new RedisCacheProvider(
-              sp.GetRequiredService<IConnectionMultiplexer>(),
-              sp.GetServices<ICacheObserver>()));
+      services.TryAddSingleton<ICacheProvider, RedisCacheProvider>();
 
       services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
       services.TryAddSingleton<ISettingsCache, SettingsCache>();

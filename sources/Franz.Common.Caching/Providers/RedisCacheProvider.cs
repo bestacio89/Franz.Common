@@ -15,13 +15,11 @@ public sealed class RedisCacheProvider : ICacheProvider
   private readonly IDatabase _db;
   private readonly IConnectionMultiplexer _multiplexer;
   private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(30);
-  private readonly ICacheObserver[] _observers;
 
-  public RedisCacheProvider(IConnectionMultiplexer connection, IEnumerable<ICacheObserver>? observers = null)
+  public RedisCacheProvider(IConnectionMultiplexer connection)
   {
     _multiplexer = connection ?? throw new ArgumentNullException(nameof(connection));
     _db = _multiplexer.GetDatabase();
-    _observers = observers?.ToArray() ?? Array.Empty<ICacheObserver>();
   }
 
   public async Task<T?> GetOrSetAsync<T>(
@@ -41,7 +39,6 @@ public sealed class RedisCacheProvider : ICacheProvider
     var value = await _db.StringGetAsync(key);
     if (value.HasValue)
     {
-      NotifyHit(key);
       return JsonSerializer.Deserialize<T>((string)value!, new JsonSerializerOptions());
     }
 
@@ -51,8 +48,6 @@ public sealed class RedisCacheProvider : ICacheProvider
     var expiration = GetExpiration(options);
 
     await _db.StringSetAsync(key, serialized, expiration);
-
-    NotifySet(key, computed, options);
 
     // Handle tags
     if (options?.Tags != null)
@@ -73,7 +68,6 @@ public sealed class RedisCacheProvider : ICacheProvider
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
 
     await _db.KeyDeleteAsync(key);
-    NotifyRemove(key);
 
     // Remove from all tag sets
     var server = GetServer();
@@ -91,12 +85,9 @@ public sealed class RedisCacheProvider : ICacheProvider
     if (keys.Length > 0)
     {
       await _db.KeyDeleteAsync(keys.Select(k => (RedisKey)(string)k!).ToArray());
-      foreach (var k in keys)
-        NotifyRemove(k!);
     }
 
     await _db.KeyDeleteAsync(tagSetKey);
-    NotifyRemoveByTag(tag);
   }
 
   private void ValidateOptions(CacheOptions? options)
@@ -141,46 +132,4 @@ public sealed class RedisCacheProvider : ICacheProvider
     var endpoints = _multiplexer.GetEndPoints();
     return _multiplexer.GetServer(endpoints.First());
   }
-
-  #region Observer notifications
-
-  private void NotifySet<T>(string key, T value, CacheOptions? options)
-  {
-    var entry = new CacheEntryDescriptor
-    {
-      Key = key,
-      EstimatedSizeInBytes = options?.EstimatedSizeInBytes ?? value?.ToString()?.Length ?? 0,
-      Ttl = options?.Ttl ?? GetExpiration(options),
-      Tags = options?.Tags ?? Array.Empty<string>()
-    };
-
-    foreach (var obs in _observers)
-      obs.OnCacheSet(entry);
-  }
-
-  private void NotifyHit(string key)
-  {
-    var access = new CacheAccessDescriptor
-    {
-      Key = key,
-      AccessedAt = DateTime.UtcNow
-    };
-
-    foreach (var obs in _observers)
-      obs.OnCacheHit(access);
-  }
-
-  private void NotifyRemove(string key)
-  {
-    foreach (var obs in _observers)
-      obs.OnCacheRemove(key);
-  }
-
-  private void NotifyRemoveByTag(string tag)
-  {
-    foreach (var obs in _observers)
-      obs.OnCacheRemoveByTag(tag);
-  }
-
-  #endregion
 }
