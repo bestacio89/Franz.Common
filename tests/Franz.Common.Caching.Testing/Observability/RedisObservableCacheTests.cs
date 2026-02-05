@@ -26,6 +26,7 @@ namespace Franz.Common.Caching.Testing.Tests
 
       // Clean DI setup
       services.AddFranzRedisCaching(_fixture.ConnectionString)
+              .AddLogging()
               .AddObservableCaching()
               .AddMetricsCacheObserver()
               .AddLoggingMetricsCacheObserver();
