@@ -8,7 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
-using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -27,6 +26,7 @@ namespace Franz.Common.Caching.Testing.Tests
     {
       _fixture = fixture;
       var multiplexer = ConnectionMultiplexer.Connect(_fixture.ConnectionString);
+
       var services = new ServiceCollection();
       services.AddLogging();
 
@@ -39,15 +39,10 @@ namespace Franz.Common.Caching.Testing.Tests
       services.AddSingleton<LoggingCacheObserver>();
       services.AddSingleton<LoggingMetricsObserver>();
 
-      services.TryAddEnumerable(
-          ServiceDescriptor.Singleton<ICacheObserver>(sp => sp.GetRequiredService<MetricsCacheObserver>())
-      );
-      services.TryAddEnumerable(
-          ServiceDescriptor.Singleton<ICacheObserver>(sp => sp.GetRequiredService<LoggingCacheObserver>())
-      );
-      services.TryAddEnumerable(
-          ServiceDescriptor.Singleton<ICacheObserver>(sp => sp.GetRequiredService<LoggingMetricsObserver>())
-      );
+      // Register as ICacheObserver via concrete type (correct way)
+      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, MetricsCacheObserver>());
+      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, LoggingCacheObserver>());
+      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, LoggingMetricsObserver>());
 
       _sp = services.BuildServiceProvider();
     }
