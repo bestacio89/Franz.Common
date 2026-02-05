@@ -26,12 +26,12 @@ public class DistributedCacheProviderTests
     var value = await provider.GetOrSetAsync(key, _ => Task.FromResult(new User("John")),
         new CacheOptions { Expiration = TimeSpan.FromMinutes(1) });
 
-    value.Should().NotBeNull();
-    ((User)value).Name.Should().Be("John");
+    value.Value.Should().NotBeNull();
+    value.Value!.Name.Should().Be("John");
 
     // Fetch again to hit cache
     var cached = await provider.GetOrSetAsync(key, _ => Task.FromResult(new User("Jane")));
-    ((User)cached).Name.Should().Be("John"); // should return cached value
+    cached.Value!.Name.Should().Be("John"); // should return cached value
   }
 
   [Fact]
@@ -41,12 +41,13 @@ public class DistributedCacheProviderTests
     var provider = new DistributedCacheProvider(cache);
 
     var key = "temp";
-    await provider.GetOrSetAsync(key, _ => Task.FromResult(42), new CacheOptions { Expiration = TimeSpan.FromMinutes(1) });
+    await provider.GetOrSetAsync(key, _ => Task.FromResult(42),
+        new CacheOptions { Expiration = TimeSpan.FromMinutes(1) });
 
     await provider.RemoveAsync(key);
 
     var result = await provider.GetOrSetAsync<int?>(key, _ => Task.FromResult<int?>(0));
-    result.Should().Be(0); // factory value returned after removal
+    result.Value.Should().Be(0); // factory value returned after removal
   }
 
   [Fact]

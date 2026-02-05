@@ -16,7 +16,7 @@ public sealed class MemoryCacheProvider : ICacheProvider
     _cache = cache ?? throw new ArgumentNullException(nameof(cache));
   }
 
-  public async Task<T?> GetOrSetAsync<T>(
+  public async Task<CacheResult<T>> GetOrSetAsync<T>(
       string key,
       Func<CancellationToken, Task<T>> factory,
       CacheOptions? options = null,
@@ -24,15 +24,19 @@ public sealed class MemoryCacheProvider : ICacheProvider
   {
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
+
     if (factory is null)
       throw new ArgumentNullException(nameof(factory));
 
     ValidateOptions(options);
 
+    // 🔹 1. Try cache
     if (_cache.TryGetValue(key, out var existing))
-      return (T?)existing;
+    {
+      return new CacheResult<T>((T)existing!, IsHit: true);
+    }
 
-    // ⚠ No stampede protection by design
+    // 🔹 2. Cache miss → compute
     var value = await factory(ct);
 
     _cache.Set(
@@ -40,20 +44,25 @@ public sealed class MemoryCacheProvider : ICacheProvider
         value!,
         CreateMemoryCacheOptions(options));
 
-    return value;
+    return new CacheResult<T>(value, IsHit: false);
   }
 
   public Task RemoveAsync(string key, CancellationToken ct = default)
   {
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
+
     _cache.Remove(key);
     return Task.CompletedTask;
   }
 
   public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
-      => throw new NotSupportedException(
-          "Tag-based invalidation is not supported by MemoryCacheProvider.");
+    => throw new NotSupportedException(
+        "Tag-based invalidation is not supported by MemoryCacheProvider.");
+
+  // ============================
+  // Helpers
+  // ============================
 
   private static MemoryCacheEntryOptions CreateMemoryCacheOptions(CacheOptions? options)
   {
@@ -65,10 +74,12 @@ public sealed class MemoryCacheProvider : ICacheProvider
       return memoryOptions;
     }
 
-    // Priority order: AbsoluteExpirationRelativeToNow > AbsoluteExpiration > SlidingExpiration > Default
+    // Priority order:
+    // AbsoluteExpirationRelativeToNow > AbsoluteExpiration > SlidingExpiration > Default
     if (options.AbsoluteExpirationRelativeToNow.HasValue)
     {
-      memoryOptions.AbsoluteExpirationRelativeToNow = options.AbsoluteExpirationRelativeToNow.Value;
+      memoryOptions.AbsoluteExpirationRelativeToNow =
+          options.AbsoluteExpirationRelativeToNow.Value;
     }
     else if (options.AbsoluteExpiration.HasValue)
     {
@@ -88,15 +99,24 @@ public sealed class MemoryCacheProvider : ICacheProvider
     {
       memoryOptions.Priority = options.Priority.Value switch
       {
-        CacheItemPriority.Low => Microsoft.Extensions.Caching.Memory.CacheItemPriority.Low,
-        CacheItemPriority.Normal => Microsoft.Extensions.Caching.Memory.CacheItemPriority.Normal,
-        CacheItemPriority.High => Microsoft.Extensions.Caching.Memory.CacheItemPriority.High,
-        CacheItemPriority.NeverRemove => Microsoft.Extensions.Caching.Memory.CacheItemPriority.NeverRemove,
-        _ => Microsoft.Extensions.Caching.Memory.CacheItemPriority.Normal
+        CacheItemPriority.Low =>
+          Microsoft.Extensions.Caching.Memory.CacheItemPriority.Low,
+
+        CacheItemPriority.Normal =>
+          Microsoft.Extensions.Caching.Memory.CacheItemPriority.Normal,
+
+        CacheItemPriority.High =>
+          Microsoft.Extensions.Caching.Memory.CacheItemPriority.High,
+
+        CacheItemPriority.NeverRemove =>
+          Microsoft.Extensions.Caching.Memory.CacheItemPriority.NeverRemove,
+
+        _ =>
+          Microsoft.Extensions.Caching.Memory.CacheItemPriority.Normal
       };
     }
 
-    // Set size if specified (for memory cache size limit enforcement)
+    // Set size if specified (for size-limited caches)
     if (options.EstimatedSizeInBytes.HasValue)
     {
       memoryOptions.Size = options.EstimatedSizeInBytes.Value;
@@ -110,20 +130,20 @@ public sealed class MemoryCacheProvider : ICacheProvider
     if (options is null)
       return;
 
-    // Check AbsoluteExpirationRelativeToNow
     if (options.AbsoluteExpirationRelativeToNow.HasValue &&
         options.AbsoluteExpirationRelativeToNow.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpirationRelativeToNow));
+      throw new ArgumentOutOfRangeException(
+          nameof(options.AbsoluteExpirationRelativeToNow));
 
-    // Check SlidingExpiration
     if (options.SlidingExpiration.HasValue &&
         options.SlidingExpiration.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(nameof(options.SlidingExpiration));
+      throw new ArgumentOutOfRangeException(
+          nameof(options.SlidingExpiration));
 
-    // Check AbsoluteExpiration
     if (options.AbsoluteExpiration.HasValue &&
         options.AbsoluteExpiration.Value <= DateTimeOffset.UtcNow)
-      throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpiration));
+      throw new ArgumentOutOfRangeException(
+          nameof(options.AbsoluteExpiration));
 
     if (options.LocalCacheHint is not null)
       throw new NotSupportedException(

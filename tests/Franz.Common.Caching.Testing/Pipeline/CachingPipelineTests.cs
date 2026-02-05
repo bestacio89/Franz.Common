@@ -76,7 +76,8 @@ public sealed class CachingPipelineTests
             It.IsAny<Func<CancellationToken, Task<TestResponse>>>(),
             It.IsAny<CacheOptions>(),
             It.IsAny<CancellationToken>()))
-        .ReturnsAsync(new TestResponse("cached"));
+        .Returns((string k, Func<CancellationToken, Task<TestResponse>> factory, CacheOptions? opts, CancellationToken ct) =>
+            Task.FromResult(new CacheResult<TestResponse>(new TestResponse("cached"), IsHit: true)));
 
     var pipeline = BuildPipeline(null, cacheMock.Object);
 
@@ -86,7 +87,6 @@ public sealed class CachingPipelineTests
 
     result.Value.Should().Be("cached");
 
-    // Verify factory was never invoked because cache hit
     cacheMock.Verify(c => c.GetOrSetAsync(
         "key",
         It.IsAny<Func<CancellationToken, Task<TestResponse>>>(),

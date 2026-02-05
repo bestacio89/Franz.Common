@@ -1,6 +1,6 @@
 ﻿using FluentAssertions;
 using Franz.Common.Caching.Abstractions;
-using Franz.Common.Caching.Redis;
+using Franz.Common.Caching.Providers;
 using Franz.Common.Caching.Testing.Fixtures;
 using StackExchange.Redis;
 using System;

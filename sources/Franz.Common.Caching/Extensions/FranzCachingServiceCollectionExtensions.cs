@@ -6,7 +6,6 @@ using Franz.Common.Caching.Observability.Observers;
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Pipelines;
 using Franz.Common.Caching.Providers;
-using Franz.Common.Caching.Redis;
 using Franz.Common.Caching.Settings;
 using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.Caching.Distributed;

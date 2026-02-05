@@ -5,10 +5,13 @@ using Franz.Common.Caching.Pipelines;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 public class CachingPipelineTests
 {
+  // ✅ DummyCache adapted to GetOrSetAsync with CacheResult<T>
   public sealed class DummyCache : ICacheProvider
   {
     private readonly ConcurrentDictionary<string, object> _store = new();
@@ -16,7 +19,7 @@ public class CachingPipelineTests
 
     public int Hits, Misses;
 
-    public Task<T?> GetOrSetAsync<T>(
+    public Task<CacheResult<T>> GetOrSetAsync<T>(
         string key,
         Func<CancellationToken, Task<T>> factory,
         CacheOptions? options = null,
@@ -30,7 +33,7 @@ public class CachingPipelineTests
       if (_store.TryGetValue(key, out var cached))
       {
         Hits++;
-        return Task.FromResult((T?)cached);
+        return Task.FromResult(new CacheResult<T>((T)cached!, IsHit: true));
       }
 
       Misses++;
@@ -43,7 +46,7 @@ public class CachingPipelineTests
         if (options?.Tags != null)
           _tags[key] = options.Tags;
 
-        return (T?)value;
+        return new CacheResult<T>(value, IsHit: false);
       }, ct);
     }
 
@@ -82,11 +85,23 @@ public class CachingPipelineTests
     var pipeline = new CachingPipeline<TestRequest, TestResponse>(cache, opts, strategy, logger);
 
     // First call → MISS
-    var resp1 = await pipeline.Handle(new TestRequest("A"), () => Task.FromResult(new TestResponse("FromSource")));
-    // Second call → HIT
-    var resp2 = await pipeline.Handle(new TestRequest("A"), () => Task.FromResult(new TestResponse("Ignored")));
+    var resp1 = await pipeline.Handle(
+        new TestRequest("A"),
+        () => Task.FromResult(new TestResponse("FromSource"))
+    );
 
+    // Second call → HIT
+    var resp2 = await pipeline.Handle(
+        new TestRequest("A"),
+        () => Task.FromResult(new TestResponse("Ignored"))
+    );
+
+    // ✅ Assertions
     resp1.Result.Should().Be("FromSource");
     resp2.Result.Should().Be("FromSource");
+
+    // ✅ Optional: verify hit/miss counters
+    cache.Hits.Should().Be(1);
+    cache.Misses.Should().Be(1);
   }
 }

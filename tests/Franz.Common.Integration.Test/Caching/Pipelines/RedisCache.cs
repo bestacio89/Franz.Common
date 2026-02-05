@@ -2,7 +2,7 @@
 using StackExchange.Redis;
 using Xunit;
 using FluentAssertions;
-using Franz.Common.Caching.Redis;
+using Franz.Common.Caching.Providers;
 using System;
 using System.Threading.Tasks;
 
@@ -24,12 +24,12 @@ public class RedisCacheProviderTests
     var value = await provider.GetOrSetAsync(key, _ => Task.FromResult(new User("John")),
         new CacheOptions { Expiration = TimeSpan.FromMinutes(1) });
 
-    value.Should().NotBeNull();
-    ((User)value).Name.Should().Be("John");
+    value.Value.Should().NotBeNull();
+    value.Value!.Name.Should().Be("John");
 
     // Second call: HIT, factory ignored
     var cached = await provider.GetOrSetAsync(key, _ => Task.FromResult(new User("Jane")));
-    ((User)cached).Name.Should().Be("John"); // still cached
+    cached.Value!.Name.Should().Be("John"); // still cached
   }
 
   [Fact(Skip = "Requires local Redis instance (localhost:6379)")]
@@ -39,12 +39,13 @@ public class RedisCacheProviderTests
     var provider = new RedisCacheProvider(muxer);
 
     var key = "temp";
-    await provider.GetOrSetAsync(key, _ => Task.FromResult(42), new CacheOptions { Expiration = TimeSpan.FromMinutes(1) });
+    await provider.GetOrSetAsync(key, _ => Task.FromResult(42),
+        new CacheOptions { Expiration = TimeSpan.FromMinutes(1) });
 
     await provider.RemoveAsync(key);
 
     var result = await provider.GetOrSetAsync<int?>(key, _ => Task.FromResult<int?>(0));
-    result.Should().Be(0); // factory runs again
+    result.Value.Should().Be(0); // factory runs again
   }
 
   [Fact(Skip = "Requires local Redis instance (localhost:6379)")]

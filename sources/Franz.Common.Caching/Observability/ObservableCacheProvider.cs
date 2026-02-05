@@ -1,16 +1,16 @@
-﻿using Franz.Common.Caching.Abstractions;
-using Franz.Common.Caching.Observability.Observers;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Franz.Common.Caching.Abstractions;
 
 namespace Franz.Common.Caching.Observability;
 
 /// <summary>
 /// Decorator that wraps an ICacheProvider and notifies observers of cache operations.
+/// Updated to support CacheResult<T>.
 /// </summary>
 public sealed class ObservableCacheProvider : ICacheProvider
 {
@@ -24,15 +24,10 @@ public sealed class ObservableCacheProvider : ICacheProvider
     _inner = inner ?? throw new ArgumentNullException(nameof(inner));
     _observers = observers?.ToArray() ?? Array.Empty<ICacheObserver>();
 
-    // Debug: Log observer count (will be compiled out in release)
-    System.Diagnostics.Debug.WriteLine($"ObservableCacheProvider created with {_observers.Length} observers");
-    foreach (var obs in _observers)
-    {
-      System.Diagnostics.Debug.WriteLine($"  - {obs.GetType().Name}");
-    }
+    Debug.WriteLine($"ObservableCacheProvider created with {_observers.Length} observers");
   }
 
-  public async Task<T?> GetOrSetAsync<T>(
+  public async Task<CacheResult<T>> GetOrSetAsync<T>(
       string key,
       Func<CancellationToken, Task<T>> factory,
       CacheOptions? options = null,
@@ -40,29 +35,17 @@ public sealed class ObservableCacheProvider : ICacheProvider
   {
     var stopwatch = Stopwatch.StartNew();
 
-    // Wrap the factory to detect if it was called (cache miss)
-    bool factoryWasCalled = false;
-    T? result = default;
-
-    async Task<T> WrappedFactory(CancellationToken token)
-    {
-      factoryWasCalled = true;
-      var value = await factory(token);
-
-      // Notify observers of cache SET (miss + set)
-      NotifySet(key, value, options);
-
-      return value;
-    }
-
-    result = await _inner.GetOrSetAsync(key, WrappedFactory, options, ct);
+    var result = await _inner.GetOrSetAsync(key, factory, options, ct);
 
     stopwatch.Stop();
 
-    // If factory wasn't called, it was a cache HIT
-    if (!factoryWasCalled)
+    if (result.IsHit)
     {
       NotifyHit(key, stopwatch.Elapsed.TotalMilliseconds);
+    }
+    else
+    {
+      NotifySet(key, result.Value, options);
     }
 
     return result;
@@ -104,7 +87,7 @@ public sealed class ObservableCacheProvider : ICacheProvider
       }
       catch
       {
-        // Swallow observer exceptions to prevent cache operations from failing
+        // Swallow observer exceptions
       }
     }
   }
@@ -126,10 +109,7 @@ public sealed class ObservableCacheProvider : ICacheProvider
       {
         observer.OnCacheHit(access);
       }
-      catch
-      {
-        // Swallow observer exceptions
-      }
+      catch { }
     }
   }
 
@@ -143,10 +123,7 @@ public sealed class ObservableCacheProvider : ICacheProvider
       {
         observer.OnCacheRemove(key);
       }
-      catch
-      {
-        // Swallow observer exceptions
-      }
+      catch { }
     }
   }
 
@@ -160,10 +137,7 @@ public sealed class ObservableCacheProvider : ICacheProvider
       {
         observer.OnCacheRemoveByTag(tag);
       }
-      catch
-      {
-        // Swallow observer exceptions
-      }
+      catch { }
     }
   }
 
@@ -178,14 +152,12 @@ public sealed class ObservableCacheProvider : ICacheProvider
     if (options?.SlidingExpiration.HasValue == true)
       return options.SlidingExpiration.Value;
 
-    return TimeSpan.FromMinutes(30); // Default
+    return TimeSpan.FromMinutes(30);
   }
 
   private static long EstimateSize<T>(T value)
   {
     if (value == null) return 0;
-
-    // Simple estimation - in production you might want more sophisticated sizing
     var str = value.ToString();
     return str?.Length ?? 0;
   }

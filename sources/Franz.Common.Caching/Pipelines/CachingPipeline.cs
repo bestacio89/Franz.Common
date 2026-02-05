@@ -44,15 +44,11 @@ public sealed class CachingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
     var key = _keyStrategy.BuildKey(request);
     var sw = Stopwatch.StartNew();
 
-    // Use GetOrSetAsync to avoid race condition
-    var response = await _cache.GetOrSetAsync(
+    // 🔹 Use GetOrSetAsync directly
+    var result = await _cache.GetOrSetAsync(
         key,
-        async ct =>
-        {
-          var resp = await next();
-          return resp;
-        },
-        new Franz.Common.Caching.Abstractions.CacheOptions
+        async ct => await next(),
+        new CacheOptions
         {
           Expiration = _options.TtlSelector?.Invoke(request) ?? _options.DefaultTtl
         },
@@ -61,28 +57,29 @@ public sealed class CachingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
 
     sw.Stop();
 
-    var isHit = response is not null; // if cache was already populated, factory not invoked
-    if (isHit)
+    // 🔹 Metrics
+    if (result.IsHit)
       CacheMetrics.Hits.Add(1);
     else
       CacheMetrics.Misses.Add(1);
 
     CacheMetrics.LookupLatencyMs.Record(sw.Elapsed.TotalMilliseconds);
 
+    // 🔹 Logging
     using (LogContext.PushProperty("FranzCorrelationId", MediatorContext.Current?.CorrelationId))
     using (LogContext.PushProperty("FranzPipeline", nameof(CachingPipeline<TRequest, TResponse>)))
     using (LogContext.PushProperty("FranzCacheKey", key))
-    using (LogContext.PushProperty("FranzCacheHit", isHit))
+    using (LogContext.PushProperty("FranzCacheHit", result.IsHit))
     {
       _logger.Log(
-          isHit ? _options.LogHitLevel : _options.LogMissLevel,
+          result.IsHit ? _options.LogHitLevel : _options.LogMissLevel,
           "Cache {HitOrMiss} for {RequestType} in {Elapsed}ms",
-          isHit ? "HIT" : "MISS",
+          result.IsHit ? "HIT" : "MISS",
           typeof(TRequest).Name,
           sw.Elapsed.TotalMilliseconds
       );
     }
 
-    return response!;
+    return result.Value!;
   }
 }

@@ -1,5 +1,8 @@
 ﻿using Franz.Common.Caching.Abstractions;
 using Microsoft.Extensions.Caching.Hybrid;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Franz.Common.Caching.Hybrid;
 
@@ -16,7 +19,7 @@ public sealed class HybridCacheProvider : ICacheProvider
     _cache = cache ?? throw new ArgumentNullException(nameof(cache));
   }
 
-  public async Task<T?> GetOrSetAsync<T>(
+  public async Task<CacheResult<T>> GetOrSetAsync<T>(
       string key,
       Func<CancellationToken, Task<T>> factory,
       CacheOptions? options = null,
@@ -24,21 +27,27 @@ public sealed class HybridCacheProvider : ICacheProvider
   {
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
-
     if (factory is null)
       throw new ArgumentNullException(nameof(factory));
 
     ValidateOptions(options);
 
-    // Explicitly specify type arguments and adapt factory to ValueTask<T>
-    return await _cache.GetOrCreateAsync<Func<CancellationToken, Task<T>>, T>(
+    // Use HybridCache's GetOrCreateAsync, wrap result in CacheResult<T>
+    var isHit = true;
+    var value = await _cache.GetOrCreateAsync<Func<CancellationToken, Task<T>>, T>(
         key,
         factory,
-        static async (f, cancellationToken) => await f(cancellationToken),
+        async (f, cancellationToken) =>
+        {
+          isHit = false; // factory invoked → MISS
+          return await f(cancellationToken);
+        },
         CreateEntryOptions(options),
         tags: options?.Tags,
         cancellationToken: ct
     );
+
+    return new CacheResult<T>(value, isHit);
   }
 
   public Task RemoveAsync(string key, CancellationToken ct = default)

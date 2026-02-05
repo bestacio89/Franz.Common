@@ -17,7 +17,7 @@ public sealed class DistributedCacheProvider : ICacheProvider
     _cache = cache ?? throw new ArgumentNullException(nameof(cache));
   }
 
-  public async Task<T?> GetOrSetAsync<T>(
+  public async Task<CacheResult<T>> GetOrSetAsync<T>(
       string key,
       Func<CancellationToken, Task<T>> factory,
       CacheOptions? options = null,
@@ -25,17 +25,22 @@ public sealed class DistributedCacheProvider : ICacheProvider
   {
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
+
     if (factory is null)
       throw new ArgumentNullException(nameof(factory));
 
     ValidateOptions(options);
 
+    // 🔹 1. Try cache
     var cached = await _cache.GetStringAsync(key, ct);
     if (cached is not null)
-      return JsonSerializer.Deserialize<T>(cached);
+    {
+      var deserialized = JsonSerializer.Deserialize<T>(cached)!;
+      return new CacheResult<T>(deserialized, IsHit: true);
+    }
 
-    // ⚠ No stampede protection here by design
-    // This provider is NOT hybrid, NOT concurrent-safe
+    // 🔹 2. Cache miss → compute
+    // ⚠ No stampede protection by design
     var value = await factory(ct);
     var json = JsonSerializer.Serialize(value);
 
@@ -45,21 +50,27 @@ public sealed class DistributedCacheProvider : ICacheProvider
         CreateDistributedCacheOptions(options),
         ct);
 
-    return value;
+    return new CacheResult<T>(value, IsHit: false);
   }
 
   public Task RemoveAsync(string key, CancellationToken ct = default)
   {
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
+
     return _cache.RemoveAsync(key, ct);
   }
 
   public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
-      => throw new NotSupportedException(
-          "Tag-based invalidation is not supported by DistributedCacheProvider.");
+    => throw new NotSupportedException(
+        "Tag-based invalidation is not supported by DistributedCacheProvider.");
 
-  private static DistributedCacheEntryOptions CreateDistributedCacheOptions(CacheOptions? options)
+  // ============================
+  // Helpers
+  // ============================
+
+  private static DistributedCacheEntryOptions CreateDistributedCacheOptions(
+      CacheOptions? options)
   {
     var distributedOptions = new DistributedCacheEntryOptions();
 
@@ -69,18 +80,22 @@ public sealed class DistributedCacheProvider : ICacheProvider
       return distributedOptions;
     }
 
-    // Priority order: AbsoluteExpirationRelativeToNow > AbsoluteExpiration > SlidingExpiration > Default
+    // Priority order:
+    // AbsoluteExpirationRelativeToNow > AbsoluteExpiration > SlidingExpiration > Default
     if (options.AbsoluteExpirationRelativeToNow.HasValue)
     {
-      distributedOptions.AbsoluteExpirationRelativeToNow = options.AbsoluteExpirationRelativeToNow.Value;
+      distributedOptions.AbsoluteExpirationRelativeToNow =
+          options.AbsoluteExpirationRelativeToNow.Value;
     }
     else if (options.AbsoluteExpiration.HasValue)
     {
-      distributedOptions.AbsoluteExpiration = options.AbsoluteExpiration.Value;
+      distributedOptions.AbsoluteExpiration =
+          options.AbsoluteExpiration.Value;
     }
     else if (options.SlidingExpiration.HasValue)
     {
-      distributedOptions.SlidingExpiration = options.SlidingExpiration.Value;
+      distributedOptions.SlidingExpiration =
+          options.SlidingExpiration.Value;
     }
     else
     {
@@ -95,20 +110,20 @@ public sealed class DistributedCacheProvider : ICacheProvider
     if (options is null)
       return;
 
-    // Check AbsoluteExpirationRelativeToNow
     if (options.AbsoluteExpirationRelativeToNow.HasValue &&
         options.AbsoluteExpirationRelativeToNow.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpirationRelativeToNow));
+      throw new ArgumentOutOfRangeException(
+          nameof(options.AbsoluteExpirationRelativeToNow));
 
-    // Check SlidingExpiration
     if (options.SlidingExpiration.HasValue &&
         options.SlidingExpiration.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(nameof(options.SlidingExpiration));
+      throw new ArgumentOutOfRangeException(
+          nameof(options.SlidingExpiration));
 
-    // Check AbsoluteExpiration
     if (options.AbsoluteExpiration.HasValue &&
         options.AbsoluteExpiration.Value <= DateTimeOffset.UtcNow)
-      throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpiration));
+      throw new ArgumentOutOfRangeException(
+          nameof(options.AbsoluteExpiration));
 
     if (options.LocalCacheHint is not null)
       throw new NotSupportedException(

@@ -1,14 +1,7 @@
 ﻿using Franz.Common.Caching.Abstractions;
-using Franz.Common.Caching.Observability;
 using StackExchange.Redis;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace Franz.Common.Caching.Redis;
+namespace Franz.Common.Caching.Providers;
 
 public sealed class RedisCacheProvider : ICacheProvider
 {
@@ -22,11 +15,11 @@ public sealed class RedisCacheProvider : ICacheProvider
     _db = _multiplexer.GetDatabase();
   }
 
-  public async Task<T?> GetOrSetAsync<T>(
-      string key,
-      Func<CancellationToken, Task<T>> factory,
-      CacheOptions? options = null,
-      CancellationToken ct = default)
+  public async Task<CacheResult<T>> GetOrSetAsync<T>(
+    string key,
+    Func<CancellationToken, Task<T>> factory,
+    CacheOptions? options = null,
+    CancellationToken ct = default)
   {
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
@@ -35,31 +28,31 @@ public sealed class RedisCacheProvider : ICacheProvider
 
     ValidateOptions(options);
 
-    // Try get from Redis
+    // 🔹 1. Try cache
     var value = await _db.StringGetAsync(key);
     if (value.HasValue)
     {
-      return JsonSerializer.Deserialize<T>((string)value!, new JsonSerializerOptions());
+      var deserialized = JsonSerializer.Deserialize<T>((string)value!)!;
+      return new CacheResult<T>(deserialized, IsHit: true);
     }
 
-    // Cache miss -> compute
+    // 🔹 2. Cache miss → compute
     var computed = await factory(ct);
     var serialized = JsonSerializer.Serialize(computed);
     var expiration = GetExpiration(options);
 
     await _db.StringSetAsync(key, serialized, expiration);
 
-    // Handle tags
+    // 🔹 3. Handle tags
     if (options?.Tags != null)
     {
       foreach (var tag in options.Tags)
       {
-        var tagSetKey = $"tag:{tag}";
-        await _db.SetAddAsync(tagSetKey, key);
+        await _db.SetAddAsync($"tag:{tag}", key);
       }
     }
 
-    return computed;
+    return new CacheResult<T>(computed, IsHit: false);
   }
 
   public async Task RemoveAsync(string key, CancellationToken ct = default)
@@ -69,7 +62,6 @@ public sealed class RedisCacheProvider : ICacheProvider
 
     await _db.KeyDeleteAsync(key);
 
-    // Remove from all tag sets
     var server = GetServer();
     foreach (var tagKey in server.Keys(pattern: "tag:*"))
     {
@@ -94,17 +86,14 @@ public sealed class RedisCacheProvider : ICacheProvider
   {
     if (options is null) return;
 
-    // Check AbsoluteExpirationRelativeToNow
     if (options.AbsoluteExpirationRelativeToNow.HasValue &&
         options.AbsoluteExpirationRelativeToNow.Value <= TimeSpan.Zero)
       throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpirationRelativeToNow));
 
-    // Check SlidingExpiration
     if (options.SlidingExpiration.HasValue &&
         options.SlidingExpiration.Value <= TimeSpan.Zero)
       throw new ArgumentOutOfRangeException(nameof(options.SlidingExpiration));
 
-    // Check AbsoluteExpiration
     if (options.AbsoluteExpiration.HasValue &&
         options.AbsoluteExpiration.Value <= DateTimeOffset.UtcNow)
       throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpiration));
