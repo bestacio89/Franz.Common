@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StackExchange.Redis;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Franz.Common.Caching.Extensions
@@ -69,7 +70,9 @@ namespace Franz.Common.Caching.Extensions
               }));
 
       services.AddSingleton<ICacheProvider>(sp =>
-          new RedisCacheProvider(sp.GetRequiredService<IConnectionMultiplexer>()));
+          new RedisCacheProvider(
+              sp.GetRequiredService<IConnectionMultiplexer>(),
+              sp.GetServices<ICacheObserver>()));
 
       services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
       services.TryAddSingleton<ISettingsCache, SettingsCache>();
@@ -88,7 +91,9 @@ namespace Franz.Common.Caching.Extensions
       services.AddSingleton<IConnectionMultiplexer>(multiplexerFactory);
 
       services.AddSingleton<ICacheProvider>(sp =>
-          new RedisCacheProvider(sp.GetRequiredService<IConnectionMultiplexer>()));
+          new RedisCacheProvider(
+              sp.GetRequiredService<IConnectionMultiplexer>(),
+              sp.GetServices<ICacheObserver>()));
 
       services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
       services.TryAddSingleton<ISettingsCache, SettingsCache>();
@@ -138,6 +143,7 @@ namespace Franz.Common.Caching.Extensions
     /// </summary>
     public static IServiceCollection AddMetricsCacheObserver(this IServiceCollection services)
     {
+      services.TryAddSingleton<MetricsCacheObserver>();
       services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, MetricsCacheObserver>());
       return services;
     }
@@ -147,6 +153,7 @@ namespace Franz.Common.Caching.Extensions
     /// </summary>
     public static IServiceCollection AddLoggingCacheObserver(this IServiceCollection services)
     {
+      services.TryAddSingleton<LoggingCacheObserver>();
       services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, LoggingCacheObserver>());
       return services;
     }
@@ -156,12 +163,14 @@ namespace Franz.Common.Caching.Extensions
     /// </summary>
     public static IServiceCollection AddLoggingMetricsCacheObserver(this IServiceCollection services)
     {
+      services.TryAddSingleton<LoggingMetricsObserver>();
       services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, LoggingMetricsObserver>());
       return services;
     }
 
     public static IServiceCollection AddExcelMetricsCacheObserver(this IServiceCollection services)
     {
+      services.TryAddSingleton<ExcelCacheObserver>();
       services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, ExcelCacheObserver>());
       return services;
     }
