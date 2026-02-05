@@ -19,8 +19,8 @@ namespace Franz.Common.Caching.Testing.Tests
 
       services.AddFranzMemoryCaching()
               .AddLogging()
-              .AddObservableCaching()
-              .AddMetricsCacheObserver();
+              .AddMetricsCacheObserver()
+              .AddObservableCaching();
 
       var sp = services.BuildServiceProvider();
 

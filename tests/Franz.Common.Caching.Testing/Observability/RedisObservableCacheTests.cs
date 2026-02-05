@@ -19,6 +19,11 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>
   public RedisObservableCacheTests(RedisCacheFixture fixture)
   {
     _fixture = fixture;
+
+    // Reset the singleton observers before every test runs
+    // This ensures a clean state (0 sets, 0 hits) for every [Fact]
+    MetricsObserver.Reset();
+    LoggingObserver.Reset();
   }
 
   private ICacheProvider Cache => _fixture.ServiceProvider.GetRequiredService<ICacheProvider>();
@@ -30,16 +35,17 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>
   {
     string key = $"integration_test_{Guid.NewGuid()}";
 
-    var value = await Cache.GetOrSetAsync(key, ct => Task.FromResult(123));
-    Assert.Equal(123, value);
+    // First call: Set (Miss)
+    await Cache.GetOrSetAsync(key, ct => Task.FromResult(123));
+    Assert.Equal(1, MetricsObserver.TotalSets);
 
+    // Second call: Hit
     var cachedValue = await Cache.GetOrSetAsync(key, ct => Task.FromResult(456));
     Assert.Equal(123, cachedValue);
 
     Assert.Contains(key, MetricsObserver.CurrentKeys);
-    Assert.Contains(key, LoggingObserver.CurrentKeys);
-    Assert.True(MetricsObserver.TotalHits > 0);
-    Assert.True(LoggingObserver.TotalHits > 0);
+    Assert.Equal(1, MetricsObserver.TotalHits);
+    Assert.Equal(1, LoggingObserver.TotalHits);
 
     await Cache.RemoveAsync(key);
   }
@@ -53,8 +59,9 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>
     Assert.Contains(key, MetricsObserver.CurrentKeys);
 
     await Cache.RemoveAsync(key);
+
     Assert.DoesNotContain(key, MetricsObserver.CurrentKeys);
-    Assert.True(MetricsObserver.TotalRemovals > 0);
+    Assert.Equal(1, MetricsObserver.TotalRemovals);
   }
 
   [Fact]
@@ -67,8 +74,7 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>
     await Cache.GetOrSetAsync(key1, ct => Task.FromResult(1), new CacheOptions { Tags = new[] { tag } });
     await Cache.GetOrSetAsync(key2, ct => Task.FromResult(2), new CacheOptions { Tags = new[] { tag } });
 
-    Assert.Contains(key1, MetricsObserver.CurrentKeys);
-    Assert.Contains(key2, MetricsObserver.CurrentKeys);
+    Assert.Equal(2, MetricsObserver.TotalSets);
 
     await Cache.RemoveByTagAsync(tag);
 
@@ -82,16 +88,10 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>
   {
     string key = $"multi_observer_{Guid.NewGuid()}";
 
-    int initialMetricsSets = MetricsObserver.TotalSets;
-    int initialLoggingSets = LoggingObserver.TotalSets;
-
     await Cache.GetOrSetAsync(key, ct => Task.FromResult("test_value"));
 
-    Assert.Equal(initialMetricsSets + 1, MetricsObserver.TotalSets);
-    Assert.Equal(initialLoggingSets + 1, LoggingObserver.TotalSets);
-
-    Assert.Contains(key, MetricsObserver.CurrentKeys);
-    Assert.Contains(key, LoggingObserver.CurrentKeys);
+    Assert.Equal(1, MetricsObserver.TotalSets);
+    Assert.Equal(1, LoggingObserver.TotalSets);
 
     await Cache.RemoveAsync(key);
   }
@@ -102,23 +102,23 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>
     string keyPrefix = $"workflow_{Guid.NewGuid()}";
     string tag = $"workflow_tag_{Guid.NewGuid()}";
 
+    // 3 Sets
     await Cache.GetOrSetAsync($"{keyPrefix}_1", ct => Task.FromResult(1), new CacheOptions { Tags = new[] { tag } });
     await Cache.GetOrSetAsync($"{keyPrefix}_2", ct => Task.FromResult(2), new CacheOptions { Tags = new[] { tag } });
     await Cache.GetOrSetAsync($"{keyPrefix}_3", ct => Task.FromResult(3));
 
+    // 2 Hits
     await Cache.GetOrSetAsync($"{keyPrefix}_1", ct => Task.FromResult(999));
     await Cache.GetOrSetAsync($"{keyPrefix}_2", ct => Task.FromResult(999));
 
+    // 1 Removal by key, 1 Removal by tag
     await Cache.RemoveAsync($"{keyPrefix}_3");
     await Cache.RemoveByTagAsync(tag);
 
-    Assert.True(MetricsObserver.TotalSets >= 3);
-    Assert.True(MetricsObserver.TotalHits >= 2);
-    Assert.True(MetricsObserver.TotalRemovals >= 1);
+    Assert.Equal(3, MetricsObserver.TotalSets);
+    Assert.Equal(2, MetricsObserver.TotalHits);
+    Assert.Equal(1, MetricsObserver.TotalRemovals);
     Assert.Contains(tag, MetricsObserver.CurrentRemovedTags);
-
-    Assert.DoesNotContain($"{keyPrefix}_1", MetricsObserver.CurrentKeys);
-    Assert.DoesNotContain($"{keyPrefix}_2", MetricsObserver.CurrentKeys);
-    Assert.DoesNotContain($"{keyPrefix}_3", MetricsObserver.CurrentKeys);
+    Assert.Empty(MetricsObserver.CurrentKeys);
   }
 }

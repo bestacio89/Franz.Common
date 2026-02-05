@@ -53,6 +53,14 @@ public sealed class MetricsCacheObserver : ICacheObserver
     }
     _removedTags.Add(tag);
   }
-
+  public void Reset()
+  {
+    // If you are running tests in parallel, use lock() or Interlocked
+    TotalSets = 0;
+    TotalHits = 0;
+    TotalRemovals = 0;
+    CurrentKeys.Clear();
+    CurrentRemovedTags.Clear();
+  }
   public IReadOnlyDictionary<string, CacheEntryStats> Snapshot() => _stats;
 }

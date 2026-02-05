@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace Franz.Common.Caching.Observability.Observers
 {
@@ -14,7 +15,7 @@ namespace Franz.Common.Caching.Observability.Observers
     private readonly ConcurrentDictionary<string, bool> _keys = new();
     private readonly ConcurrentBag<string> _removedTags = new();
 
-    // Track operation counts for testing
+    // Track operation counts for testing using volatile fields for Interlocked
     private int _totalSets = 0;
     private int _totalHits = 0;
     private int _totalRemovals = 0;
@@ -42,8 +43,7 @@ namespace Franz.Common.Caching.Observability.Observers
       if (access.LookupLatencyMs.HasValue)
         CacheMetrics.LookupLatencyMs.Record(access.LookupLatencyMs.Value);
 
-      // Increment total hits counter
-      System.Threading.Interlocked.Increment(ref _totalHits);
+      Interlocked.Increment(ref _totalHits);
     }
 
     public void OnCacheSet(CacheEntryDescriptor entry)
@@ -60,10 +60,9 @@ namespace Franz.Common.Caching.Observability.Observers
       }
 
       // Metrics
-      CacheMetrics.Misses.Add(1); // setting usually corresponds to a miss
+      CacheMetrics.Misses.Add(1);
 
-      // Increment total sets counter
-      System.Threading.Interlocked.Increment(ref _totalSets);
+      Interlocked.Increment(ref _totalSets);
     }
 
     public void OnCacheRemove(string key)
@@ -72,46 +71,58 @@ namespace Franz.Common.Caching.Observability.Observers
 
       if (_logger.IsEnabled(LogLevel.Information))
       {
-        _logger.LogInformation(
-            "Cache REMOVE | Key={Key}",
-            key);
+        _logger.LogInformation("Cache REMOVE | Key={Key}", key);
       }
 
-      // Increment total removals counter
-      System.Threading.Interlocked.Increment(ref _totalRemovals);
+      Interlocked.Increment(ref _totalRemovals);
     }
 
     public void OnCacheRemoveByTag(string tag)
     {
       foreach (var k in _keys.Keys.ToList())
       {
+        // Logic usually assumes keys contain the tag or are associated via metadata
         if (k.Contains(tag))
           _keys.TryRemove(k, out _);
       }
 
       if (_logger.IsEnabled(LogLevel.Information))
       {
-        _logger.LogInformation(
-            "Cache REMOVE BY TAG | Tag={Tag}",
-            tag);
+        _logger.LogInformation("Cache REMOVE BY TAG | Tag={Tag}", tag);
       }
 
-      // Track removed tag for tests
       _removedTags.Add(tag);
-
-      // Increment total removals counter
-      System.Threading.Interlocked.Increment(ref _totalRemovals);
+      Interlocked.Increment(ref _totalRemovals);
     }
+
+    public void Reset()
+    {
+      // Atomically reset counters to 0
+      Interlocked.Exchange(ref _totalSets, 0);
+      Interlocked.Exchange(ref _totalHits, 0);
+      Interlocked.Exchange(ref _totalRemovals, 0);
+
+      // Clear collections
+      _keys.Clear();
+
+      // ConcurrentBag doesn't have .Clear() in older .NET versions, 
+      // but in modern .NET it does. Otherwise, we re-initialize.
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+      _removedTags.Clear();
+#else
+            while (_removedTags.TryTake(out _)) { }
+#endif
+    }
+
+    // Expose operation counts for testing
+    public int TotalSets => _totalSets;
+    public int TotalHits => _totalHits;
+    public int TotalRemovals => _totalRemovals;
 
     // Expose keys for testing
     public IReadOnlyCollection<string> CurrentKeys => _keys.Keys.ToList();
 
     // Expose removed tags for test assertions
     public IReadOnlyCollection<string> CurrentRemovedTags => _removedTags.ToList();
-
-    // Expose operation counts for testing
-    public int TotalSets => _totalSets;
-    public int TotalHits => _totalHits;
-    public int TotalRemovals => _totalRemovals;
   }
 }
