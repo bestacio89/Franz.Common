@@ -23,6 +23,13 @@ public sealed class ObservableCacheProvider : ICacheProvider
   {
     _inner = inner ?? throw new ArgumentNullException(nameof(inner));
     _observers = observers?.ToArray() ?? Array.Empty<ICacheObserver>();
+
+    // Debug: Log observer count (will be compiled out in release)
+    System.Diagnostics.Debug.WriteLine($"ObservableCacheProvider created with {_observers.Length} observers");
+    foreach (var obs in _observers)
+    {
+      System.Diagnostics.Debug.WriteLine($"  - {obs.GetType().Name}");
+    }
   }
 
   public async Task<T?> GetOrSetAsync<T>(

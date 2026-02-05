@@ -128,42 +128,54 @@ namespace Franz.Common.Caching.Extensions
     /// </summary>
     public static IServiceCollection AddObservableCaching(this IServiceCollection services)
     {
-      // Remove the existing ICacheProvider registration
+      // Find the existing ICacheProvider registration
       var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ICacheProvider));
-      if (descriptor != null)
+      if (descriptor == null)
       {
-        services.Remove(descriptor);
-
-        // Re-register the original implementation with a different service type
-        services.Add(new ServiceDescriptor(
-          typeof(ICacheProvider),
-          sp =>
-          {
-            // Resolve the inner provider
-            ICacheProvider innerProvider;
-            if (descriptor.ImplementationType != null)
-            {
-              innerProvider = (ICacheProvider)ActivatorUtilities.CreateInstance(sp, descriptor.ImplementationType);
-            }
-            else if (descriptor.ImplementationFactory != null)
-            {
-              innerProvider = (ICacheProvider)descriptor.ImplementationFactory(sp);
-            }
-            else if (descriptor.ImplementationInstance != null)
-            {
-              innerProvider = (ICacheProvider)descriptor.ImplementationInstance;
-            }
-            else
-            {
-              throw new InvalidOperationException("Unable to resolve inner cache provider");
-            }
-
-            // Wrap with observable decorator
-            var observers = sp.GetServices<ICacheObserver>();
-            return new ObservableCacheProvider(innerProvider, observers);
-          },
-          descriptor.Lifetime));
+        throw new InvalidOperationException(
+          "ICacheProvider must be registered before calling AddObservableCaching(). " +
+          "Call AddFranzMemoryCaching(), AddFranzRedisCaching(), or AddFranzDistributedCaching() first.");
       }
+
+      // Remove the original registration
+      services.Remove(descriptor);
+
+      // Create a new registration that resolves the inner provider and wraps it
+      services.Add(new ServiceDescriptor(
+        typeof(ICacheProvider),
+        sp =>
+        {
+          // Resolve the inner provider based on the original registration type
+          ICacheProvider innerProvider;
+
+          if (descriptor.ImplementationInstance != null)
+          {
+            // Use the existing instance
+            innerProvider = (ICacheProvider)descriptor.ImplementationInstance;
+          }
+          else if (descriptor.ImplementationFactory != null)
+          {
+            // Call the factory to create the instance
+            innerProvider = (ICacheProvider)descriptor.ImplementationFactory(sp);
+          }
+          else if (descriptor.ImplementationType != null)
+          {
+            // Create instance using ActivatorUtilities to resolve dependencies
+            innerProvider = (ICacheProvider)ActivatorUtilities.CreateInstance(
+              sp,
+              descriptor.ImplementationType);
+          }
+          else
+          {
+            throw new InvalidOperationException(
+              "Unable to resolve inner cache provider - unknown registration type.");
+          }
+
+          // Get all registered observers and wrap the provider
+          var observers = sp.GetServices<ICacheObserver>();
+          return new ObservableCacheProvider(innerProvider, observers);
+        },
+        descriptor.Lifetime));
 
       return services;
     }

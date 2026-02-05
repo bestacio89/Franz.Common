@@ -23,12 +23,12 @@ namespace Franz.Common.Caching.Testing.Tests
       _fixture = fixture;
       var services = new ServiceCollection();
 
-      // Setup DI with proper observer registration
+      // CRITICAL: Register observers BEFORE AddObservableCaching()
       services.AddFranzRedisCaching(_fixture.ConnectionString)
               .AddLogging()
-              .AddObservableCaching()
-              .AddMetricsCacheObserver()
-              .AddLoggingMetricsCacheObserver();
+              .AddMetricsCacheObserver()           // ← Observers first
+              .AddLoggingMetricsCacheObserver()    // ← Observers first
+              .AddObservableCaching();              // ← Decoration last
 
       _sp = services.BuildServiceProvider();
     }
