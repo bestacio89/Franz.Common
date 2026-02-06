@@ -28,6 +28,7 @@ public sealed class RedisCacheFixture : IAsyncLifetime
     services.AddFranzRedisCaching(ConnectionString)
             .AddMetricsCacheObserver()
             .AddLoggingMetricsCacheObserver()
+            .AddLogging()
             .AddObservableCaching();
 
     ServiceProvider = services.BuildServiceProvider();
