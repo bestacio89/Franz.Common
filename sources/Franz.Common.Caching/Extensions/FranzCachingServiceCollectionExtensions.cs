@@ -80,12 +80,18 @@ namespace Franz.Common.Caching.Extensions
 
     private static void RegisterCacheProvider(IServiceCollection services, Type providerType, Action<CacheOptions>? configure)
     {
-      services.TryAddSingleton(typeof(ICacheProvider), providerType);
+      // Register concrete type
+      services.TryAddSingleton(providerType);
+
+      // Register interface to same singleton
+      services.TryAddSingleton<ICacheProvider>(sp => (ICacheProvider)sp.GetRequiredService(providerType));
+
       services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
       services.TryAddSingleton<ISettingsCache, SettingsCache>();
       if (configure != null)
         services.Configure(configure);
     }
+
 
     #endregion
 
@@ -113,25 +119,27 @@ namespace Franz.Common.Caching.Extensions
         throw new InvalidOperationException(
             "ICacheProvider must be registered before calling AddObservableCaching().");
 
+      // Remove the existing registration
       services.Remove(descriptor);
 
-      services.Add(new ServiceDescriptor(
-          typeof(ICacheProvider),
-          sp =>
-          {
-            var inner = descriptor.ImplementationInstance != null
-                      ? (ICacheProvider)descriptor.ImplementationInstance
-                      : descriptor.ImplementationFactory != null
-                          ? (ICacheProvider)descriptor.ImplementationFactory(sp)
-                          : (ICacheProvider)ActivatorUtilities.CreateInstance(sp, descriptor.ImplementationType!);
+      // Wrap whatever ICacheProvider is registered
+      services.AddSingleton<ICacheProvider>(sp =>
+      {
+        // Resolve the concrete provider
+        var inner = descriptor.ImplementationInstance != null
+                    ? (ICacheProvider)descriptor.ImplementationInstance
+                    : descriptor.ImplementationFactory != null
+                        ? (ICacheProvider)descriptor.ImplementationFactory(sp)
+                        : (ICacheProvider)sp.GetRequiredService(descriptor.ImplementationType!);
 
-            var observers = sp.GetServices<ICacheObserver>();
-            return new ObservableCacheProvider(inner, observers);
-          },
-          descriptor.Lifetime));
+        var observers = sp.GetServices<ICacheObserver>();
+        return new ObservableCacheProvider(inner, observers);
+      });
 
       return services;
     }
+
+
 
     public static IServiceCollection AddMetricsCacheObserver(this IServiceCollection services)
         => AddObserver<MetricsCacheObserver>(services);

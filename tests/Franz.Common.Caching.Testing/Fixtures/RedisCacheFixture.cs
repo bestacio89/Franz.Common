@@ -25,11 +25,11 @@ public sealed class RedisCacheFixture : IAsyncLifetime
     var services = new ServiceCollection();
 
     // Register cache + observers in correct order
-    services.AddFranzRedisCaching(ConnectionString)
-            .AddMetricsCacheObserver()
-            .AddLoggingMetricsCacheObserver()
-            .AddLogging()
-            .AddObservableCaching();
+    services.AddLogging();
+    services.AddMetricsCacheObserver();
+    services.AddLoggingMetricsCacheObserver();
+    services.AddFranzRedisCaching(ConnectionString);
+    services.AddObservableCaching();
 
     ServiceProvider = services.BuildServiceProvider();
   }

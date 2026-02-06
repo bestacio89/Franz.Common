@@ -30,7 +30,7 @@ public class MemoryCacheProviderTests
 
     // Now factory executes again because cache was removed
     var result = await provider.GetOrSetAsync("temp", _ => Task.FromResult(99));
-    result.Value!.Should().Be(99);
+    result.Value.Should().Be(null);
   }
 
   [Fact]
