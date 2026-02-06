@@ -11,13 +11,13 @@ public class MemoryCacheProviderTests
   {
     var provider = new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()));
 
-    // First call: factory executes
+    // First call: factory executes → MISS
     var first = await provider.GetOrSetAsync("user:1", _ => Task.FromResult("Alice"));
-    first.Should().Be("Alice");
+    first.Value!.Should().Be("Alice");
 
-    // Second call: returns cached value
+    // Second call: returns cached value → HIT
     var second = await provider.GetOrSetAsync("user:1", _ => Task.FromResult("Bob"));
-    second.Should().Be("Alice"); // still "Alice" because cached
+    second.Value!.Should().Be("Alice"); // still "Alice" because cached
   }
 
   [Fact]
@@ -30,7 +30,7 @@ public class MemoryCacheProviderTests
 
     // Now factory executes again because cache was removed
     var result = await provider.GetOrSetAsync("temp", _ => Task.FromResult(99));
-    result.Should().Be(99);
+    result.Value!.Should().Be(99);
   }
 
   [Fact]
@@ -41,5 +41,15 @@ public class MemoryCacheProviderTests
     await FluentActions
         .Invoking(() => provider.GetOrSetAsync<string>("", _ => Task.FromResult("x")))
         .Should().ThrowAsync<ArgumentException>();
+  }
+
+  [Fact]
+  public async Task GetOrSetAsync_Should_Throw_On_Null_Factory()
+  {
+    var provider = new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()));
+
+    await FluentActions
+        .Invoking(() => provider.GetOrSetAsync<string>("key", null!))
+        .Should().ThrowAsync<ArgumentNullException>();
   }
 }
