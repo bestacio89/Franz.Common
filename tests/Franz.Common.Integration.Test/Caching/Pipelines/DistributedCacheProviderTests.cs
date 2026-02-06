@@ -1,4 +1,5 @@
-﻿using Franz.Common.Caching.Abstractions;
+﻿using FluentAssertions;
+using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Distributed;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
@@ -6,7 +7,6 @@ using Microsoft.Extensions.Options;
 using System;
 using System.Threading.Tasks;
 using Xunit;
-using FluentAssertions;
 
 public class DistributedCacheProviderTests
 {
@@ -58,5 +58,25 @@ public class DistributedCacheProviderTests
 
     await Assert.ThrowsAsync<ArgumentException>(() =>
         provider.GetOrSetAsync<int?>(null!, _ => Task.FromResult<int?>(1)));
+  }
+
+  [Fact]
+  public async Task GetOrSetAsync_Should_Throw_On_Empty_Key()
+  {
+    var cache = CreateMemoryDistributedCache();
+    var provider = new DistributedCacheProvider(cache);
+
+    await Assert.ThrowsAsync<ArgumentException>(() =>
+        provider.GetOrSetAsync<int>("", _ => Task.FromResult(1)));
+  }
+
+  [Fact]
+  public async Task GetOrSetAsync_Should_Throw_On_Null_Factory()
+  {
+    var cache = CreateMemoryDistributedCache();
+    var provider = new DistributedCacheProvider(cache);
+
+    await Assert.ThrowsAsync<ArgumentNullException>(() =>
+        provider.GetOrSetAsync<int>("key", null!));
   }
 }

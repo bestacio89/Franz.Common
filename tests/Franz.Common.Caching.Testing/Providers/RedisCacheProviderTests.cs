@@ -29,7 +29,7 @@ public sealed class RedisCacheProviderTests
         "redis:test:basic",
         _ => Task.FromResult(42));
 
-    result.Should().Be(42);
+    result.Value.Should().Be(42);
   }
 
   [Fact]
@@ -45,8 +45,8 @@ public sealed class RedisCacheProviderTests
 
     var key = "redis:test:cached";
 
-    var first = await _provider.GetOrSetAsync(key, factory);
-    var second = await _provider.GetOrSetAsync(key, factory);
+    var first = (await _provider.GetOrSetAsync(key, factory)).Value;
+    var second = (await _provider.GetOrSetAsync(key, factory)).Value;
 
     first.Should().Be(99);
     second.Should().Be(99);
@@ -68,9 +68,9 @@ public sealed class RedisCacheProviderTests
 
     await Task.Delay(300);
 
-    var result = await _provider.GetOrSetAsync(
+    var result = (await _provider.GetOrSetAsync(
         key,
-        _ => Task.FromResult("new"));
+        _ => Task.FromResult("new"))).Value;
 
     result.Should().Be("new");
   }
@@ -83,9 +83,9 @@ public sealed class RedisCacheProviderTests
     await _provider.GetOrSetAsync(key, _ => Task.FromResult(123));
     await _provider.RemoveAsync(key);
 
-    var value = await _provider.GetOrSetAsync(
+    var value = (await _provider.GetOrSetAsync(
         key,
-        _ => Task.FromResult(456));
+        _ => Task.FromResult(456))).Value;
 
     value.Should().Be(456);
   }
@@ -149,8 +149,8 @@ public sealed class RedisCacheProviderTests
     await _provider.RemoveByTagAsync(tag);
 
     // After removal, getting keys again should call factory
-    var val1 = await _provider.GetOrSetAsync(key1, _ => Task.FromResult(10));
-    var val2 = await _provider.GetOrSetAsync(key2, _ => Task.FromResult(20));
+    var val1 = (await _provider.GetOrSetAsync(key1, _ => Task.FromResult(10))).Value;
+    var val2 = (await _provider.GetOrSetAsync(key2, _ => Task.FromResult(20))).Value;
 
     val1.Should().Be(10);
     val2.Should().Be(20);

@@ -4,6 +4,7 @@ using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Pipelines;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
@@ -85,23 +86,58 @@ public class CachingPipelineTests
     var pipeline = new CachingPipeline<TestRequest, TestResponse>(cache, opts, strategy, logger);
 
     // First call → MISS
-    var resp1 = await pipeline.Handle(
+    var resp1Result = await pipeline.Handle(
         new TestRequest("A"),
         () => Task.FromResult(new TestResponse("FromSource"))
     );
 
     // Second call → HIT
-    var resp2 = await pipeline.Handle(
+    var resp2Result = await pipeline.Handle(
         new TestRequest("A"),
         () => Task.FromResult(new TestResponse("Ignored"))
     );
 
     // ✅ Assertions
-    resp1.Result.Should().Be("FromSource");
-    resp2.Result.Should().Be("FromSource");
+    resp1Result.Should().Be("FromSource");
+    resp2Result.Should().Be("FromSource");
 
     // ✅ Optional: verify hit/miss counters
     cache.Hits.Should().Be(1);
     cache.Misses.Should().Be(1);
+  }
+
+  [Fact]
+  public async Task Should_Respect_Removal()
+  {
+    var cache = new DummyCache();
+    var opts = Options.Create(new MediatorCachingOptions());
+    var strategy = new Franz.Common.Caching.Estrategies.DefaultCacheKeyStrategy();
+    var logger = NullLogger<CachingPipeline<TestRequest, TestResponse>>.Instance;
+
+    var pipeline = new CachingPipeline<TestRequest, TestResponse>(cache, opts, strategy, logger);
+
+    var key = new TestRequest("B");
+
+    var first = await pipeline.Handle(key, () => Task.FromResult(new TestResponse("Original")));
+    first.Should().Be("Original");
+
+    await cache.RemoveAsync(strategy.GetKey(key));
+
+    var second = await pipeline.Handle(key, () => Task.FromResult(new TestResponse("AfterRemove")));
+    second.Should().Be("AfterRemove");
+  }
+
+  [Fact]
+  public async Task Should_Throw_On_Null_Factory()
+  {
+    var cache = new DummyCache();
+    var opts = Options.Create(new MediatorCachingOptions());
+    var strategy = new Franz.Common.Caching.Estrategies.DefaultCacheKeyStrategy();
+    var logger = NullLogger<CachingPipeline<TestRequest, TestResponse>>.Instance;
+
+    var pipeline = new CachingPipeline<TestRequest, TestResponse>(cache, opts, strategy, logger);
+
+    await Assert.ThrowsAsync<ArgumentNullException>(() =>
+        pipeline.Handle(new TestRequest("C"), null!));
   }
 }

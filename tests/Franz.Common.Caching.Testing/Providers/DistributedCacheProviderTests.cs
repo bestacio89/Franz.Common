@@ -2,6 +2,9 @@
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Testing.Fakes;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Franz.Common.Caching.Testing.Providers;
@@ -20,7 +23,8 @@ public sealed class DistributedCacheProviderTests
         "dist:test:basic",
         _ => Task.FromResult(new TestPayload(1, "franz")));
 
-    result.Should().Be(new TestPayload(1, "franz"));
+    // Extract the value
+    result.Value.Should().Be(new TestPayload(1, "franz"));
   }
 
   [Fact]
@@ -39,8 +43,8 @@ public sealed class DistributedCacheProviderTests
 
     var key = "dist:test:cached";
 
-    var first = await provider.GetOrSetAsync(key, factory);
-    var second = await provider.GetOrSetAsync(key, factory);
+    var first = (await provider.GetOrSetAsync(key, factory)).Value;
+    var second = (await provider.GetOrSetAsync(key, factory)).Value;
 
     first.Should().Be(second);
     calls.Should().Be(1);
@@ -57,16 +61,13 @@ public sealed class DistributedCacheProviderTests
     await provider.GetOrSetAsync(
         key,
         _ => Task.FromResult("value"),
-        new CacheOptions
-        {
-          Expiration = TimeSpan.FromMilliseconds(200)
-        });
+        new CacheOptions { Expiration = TimeSpan.FromMilliseconds(200) });
 
     await Task.Delay(300);
 
-    var result = await provider.GetOrSetAsync(
+    var result = (await provider.GetOrSetAsync(
         key,
-        _ => Task.FromResult("value"));
+        _ => Task.FromResult("value"))).Value;
 
     result.Should().Be("value");
   }
@@ -82,9 +83,9 @@ public sealed class DistributedCacheProviderTests
     await provider.GetOrSetAsync(key, _ => Task.FromResult(123));
     await provider.RemoveAsync(key);
 
-    var result = await provider.GetOrSetAsync(
+    var result = (await provider.GetOrSetAsync(
         key,
-        _ => Task.FromResult(456));
+        _ => Task.FromResult(456))).Value;
 
     result.Should().Be(456);
   }
@@ -119,10 +120,7 @@ public sealed class DistributedCacheProviderTests
         provider.GetOrSetAsync(
             "dist:test:local",
             _ => Task.FromResult(1),
-            new CacheOptions
-            {
-              LocalCacheHint = TimeSpan.FromSeconds(1)
-            }));
+            new CacheOptions { LocalCacheHint = TimeSpan.FromSeconds(1) }));
   }
 
   [Fact]
@@ -135,10 +133,7 @@ public sealed class DistributedCacheProviderTests
         provider.GetOrSetAsync(
             "dist:test:tags",
             _ => Task.FromResult(1),
-            new CacheOptions
-            {
-              Tags = new[] { "orders" }
-            }));
+            new CacheOptions { Tags = new[] { "orders" } }));
   }
 
   [Fact]
