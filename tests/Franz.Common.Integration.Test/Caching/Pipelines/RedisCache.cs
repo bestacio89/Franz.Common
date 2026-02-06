@@ -6,6 +6,8 @@ using Franz.Common.Caching.Providers;
 using System;
 using System.Threading.Tasks;
 
+namespace Franz.Common.Integration.Test.Caching.Pipelines;
+
 public class RedisCacheProviderTests
 {
   private static readonly string RedisConn = "localhost:6379";

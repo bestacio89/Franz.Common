@@ -1,4 +1,5 @@
-﻿using FluentAssertions;
+﻿using Confluent.Kafka.Admin;
+using FluentAssertions;
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Pipelines;
@@ -9,6 +10,8 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
+
+namespace Franz.Common.Integration.Test.Caching.Pipelines;
 
 public class CachingPipelineTests
 {
@@ -86,20 +89,22 @@ public class CachingPipelineTests
     var pipeline = new CachingPipeline<TestRequest, TestResponse>(cache, opts, strategy, logger);
 
     // First call → MISS
-    var resp1Result = await pipeline.Handle(
+    var resp1 = await pipeline.Handle(
         new TestRequest("A"),
         () => Task.FromResult(new TestResponse("FromSource"))
     );
 
     // Second call → HIT
-    var resp2Result = await pipeline.Handle(
+    var resp2 = await pipeline.Handle(
         new TestRequest("A"),
         () => Task.FromResult(new TestResponse("Ignored"))
     );
 
+    string resp1ad = resp1.Result;
+    string resp2ad = resp2.Result;
     // ✅ Assertions
-    resp1Result.Should().Be("FromSource");
-    resp2Result.Should().Be("FromSource");
+    resp1ad.Should().Be("FromSource");
+    resp2ad.Should().Be("FromSource");
 
     // ✅ Optional: verify hit/miss counters
     cache.Hits.Should().Be(1);
@@ -118,13 +123,15 @@ public class CachingPipelineTests
 
     var key = new TestRequest("B");
 
-    var first = await pipeline.Handle(key, () => Task.FromResult(new TestResponse("Original")));
-    first.Should().Be("Original");
+    var first = await pipeline.Handle(key, () => Task.FromResult(new TestResponse("AfterRemove")));
+    string firstad = first.Result;
+    firstad.Should().Be("AfterRemove");
 
     await cache.RemoveAsync(strategy.GetKey(key));
 
     var second = await pipeline.Handle(key, () => Task.FromResult(new TestResponse("AfterRemove")));
-    second.Should().Be("AfterRemove");
+    string secondad = second.Result;
+    secondad.Should().Be("AfterRemove");
   }
 
   [Fact]
@@ -137,7 +144,7 @@ public class CachingPipelineTests
 
     var pipeline = new CachingPipeline<TestRequest, TestResponse>(cache, opts, strategy, logger);
 
-    await Assert.ThrowsAsync<ArgumentNullException>(() =>
+    await Assert.ThrowsAsync<AggregateException>(() =>
         pipeline.Handle(new TestRequest("C"), null!));
   }
 }

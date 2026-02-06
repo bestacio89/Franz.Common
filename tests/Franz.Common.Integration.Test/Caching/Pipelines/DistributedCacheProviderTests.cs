@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using System;
 using System.Threading.Tasks;
 using Xunit;
+namespace Franz.Common.Integration.Test.Caching.Pipelines;
 
 public class DistributedCacheProviderTests
 {
