@@ -3,7 +3,7 @@
   <Import Project="..\..\common.targets" />
 
   <ItemGroup>
-    <PackageReference Include="MassTransit" Version="9.0.0" />
+    <PackageReference Include="MassTransit" Version="9.0.1" />
     <PackageReference Include="MassTransit.Kafka" Version="9.0.0" />
   </ItemGroup>
 
