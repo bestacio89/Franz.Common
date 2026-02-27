@@ -377,19 +377,19 @@ namespace Franz.Common.Mediator.Dispatchers
 
     // -------------------- OBSERVER NOTIFICATIONS --------------------
 
-    private async Task NotifyRequestStarted(object request, string correlationId, CancellationToken cancellationToken)
+    private async Task NotifyRequestStarted(object request, Guid correlationId, CancellationToken cancellationToken)
     {
       foreach (var observer in _serviceProvider.GetServices<IMediatorObserver>())
         await observer.OnRequestStarted(request, correlationId, cancellationToken);
     }
 
-    private async Task NotifyRequestCompleted(object request, object? response, string correlationId, TimeSpan duration, CancellationToken cancellationToken)
+    private async Task NotifyRequestCompleted(object request, object? response, Guid correlationId, TimeSpan duration, CancellationToken cancellationToken)
     {
       foreach (var observer in _serviceProvider.GetServices<IMediatorObserver>())
         await observer.OnRequestCompleted(request, response, correlationId, duration, cancellationToken);
     }
 
-    private async Task NotifyRequestFailed(object request, Exception exception, string correlationId, TimeSpan duration, CancellationToken cancellationToken)
+    private async Task NotifyRequestFailed(object request, Exception exception, Guid correlationId, TimeSpan duration, CancellationToken cancellationToken)
     {
       foreach (var observer in _serviceProvider.GetServices<IMediatorObserver>())
         await observer.OnRequestFailed(request, exception, correlationId, duration, cancellationToken);
@@ -398,7 +398,7 @@ namespace Franz.Common.Mediator.Dispatchers
     private static async Task NotifyNotificationHandlerStarted(
       object notification,
       Type handlerType,
-      string correlationId,
+      Guid correlationId,
       IList<IMediatorObserver> observers,
       CancellationToken cancellationToken)
     {
@@ -409,7 +409,7 @@ namespace Franz.Common.Mediator.Dispatchers
     private static async Task NotifyNotificationHandlerCompleted(
       object notification,
       Type handlerType,
-      string correlationId,
+      Guid correlationId,
       TimeSpan duration,
       IList<IMediatorObserver> observers,
       CancellationToken cancellationToken)
@@ -421,7 +421,7 @@ namespace Franz.Common.Mediator.Dispatchers
     private static async Task NotifyNotificationHandlerFailed(
       object notification,
       Type handlerType,
-      string correlationId,
+      Guid correlationId,
       Exception exception,
       TimeSpan duration,
       IList<IMediatorObserver> observers,
