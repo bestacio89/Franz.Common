@@ -15,7 +15,7 @@ A utility library within the **Franz Framework** designed to streamline the inte
 
 ## **Version Information**
 
-- **Current Version**: 1.7.7
+- **Current Version**: 1.7.8
 - Part of the private **Franz Framework** ecosystem.
 
 ---

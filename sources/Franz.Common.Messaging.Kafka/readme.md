@@ -222,7 +222,7 @@ Kafka is treated as a **transport**, not an execution model.
 
 ## 🧾 Versioning & Changelog
 
-### **Current Version**: 1.7.7
+### **Current Version**: 1.7.8
 
 ### **Version 1.7.01**
 
