@@ -1,23 +1,44 @@
-namespace Franz.Common.EntityFramework.Configuration;
-public class DatabaseOptions
+using System;
+
+namespace Franz.Common.EntityFramework.Configuration
 {
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public string? ServerName { get; set; }
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  public class DatabaseOptions
+  {
+    private string _databaseName = default!;
 
-  public string DatabaseName { get; set; } = default!;
+    public string? ServerName { get; set; }
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public string? UserName { get; set; }
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+    public string DatabaseName
+    {
+      get => _databaseName;
+      set
+      {
+        if (string.IsNullOrWhiteSpace(value))
+          throw new ArgumentException("DatabaseName cannot be null or empty", nameof(DatabaseName));
+        _databaseName = value;
+      }
+    }
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public string? Password { get; set; }
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+    public string? UserName { get; set; }
 
-  public uint? Port { get; set; }
+    public string? Password { get; set; }
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public string? SslMode { get; set; }
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+    public uint? Port { get; set; }
+
+    public string? SslMode { get; set; }
+
+    /// <summary>
+    /// Optional method to validate minimal required properties for connecting
+    /// </summary>
+    public void ValidateConnectionSettings()
+    {
+      if (string.IsNullOrWhiteSpace(DatabaseName))
+        throw new InvalidOperationException("DatabaseName must be specified.");
+
+      if (string.IsNullOrWhiteSpace(ServerName))
+        throw new InvalidOperationException("ServerName should be provided.");
+
+      // Optional: enforce username/password if needed
+    }
+  }
 }
