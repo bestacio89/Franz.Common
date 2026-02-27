@@ -24,8 +24,13 @@ namespace Franz.Common.Mediator.AspNetCore
         MediatorContext.Reset();
 
         // Always generate a new correlation ID if missing
-        MediatorContext.Current.CorrelationId =
-            httpContext.TraceIdentifier ?? Guid.NewGuid().ToString();
+
+
+        var rawId = httpContext.TraceIdentifier;
+
+        MediatorContext.Current.CorrelationId = Guid.TryParse(rawId, out var parsedGuid)
+            ? parsedGuid
+            : Guid.CreateVersion7();
 
         // Capture authenticated user ID (if any)
         if (httpContext.User?.Identity?.IsAuthenticated == true)
