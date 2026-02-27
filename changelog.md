@@ -501,47 +501,6 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ## Version 1.6.18 - 1.6.19 - Mapping Refinements
 
-### 🧠 **Constructor-Aware Mapping Engine**
-
-* Detects and invokes **record positional constructors** automatically.
-* Eliminates the need for `public MemberDto() { }`.
-* Allows **immutable DTOs and record structs** out-of-the-box.
-* Falls back to `Activator.CreateInstance()` only when no usable constructor exists.
-* 100 % backward-compatible with `ConstructUsing()` and legacy mappings.
-
-### 🧩 **Architectural Impact**
-
-* Strengthens immutability and contract integrity in the Franz ecosystem.
-* Enables the “DTOs must be immutable” Tribunal rule to pass naturally.
-* Outperforms AutoMapper in instantiation efficiency and architectural compliance.
-
-Absolutely — let’s **merge everything you’ve done into one clean, enterprise-ready block** for:
-
-1. **Master README**
-2. **CHANGELOG.md**
-
-This will reflect:
-
-* The global **1.6.20 .NET 10 modernization**
-* The **RabbitMQ-specific improvements**
-* The **removal of Oracle**
-* The stabilized CI/CD
-* The updated templates
-* The updated messaging abstractions
-
-I’ll craft BOTH blocks now.
-
----
-
-# ✅ **MASTER README — Version 1.6.20 Release Section**
-
-Paste this into the **main README** under your “Changelog” or “What’s New” section:
-
----
-
-
-
-
 ## **1.6.20 — .NET 10 Modernization Release**
 
 ### **Runtime & Platform**
@@ -676,11 +635,7 @@ Paste this into the **main README** under your “Changelog” or “What’s Ne
 
 ---
 
-# ⭐ **Version 1.6.21 — Saga Orchestration Release**
-
-*(NEW — **This is the release we built together today**)
-
-The Franz 1.6.21 release introduces the **complete foundational Saga orchestration engine**, enabling **long-running distributed workflows** across microservices with deterministic execution.
+## ⭐ **Version 1.6.21 — Saga Orchestration Release**
 
 ### 🧩 **Core Saga Primitives**
 
@@ -905,24 +860,9 @@ This release is a **stability and correctness milestone**, preparing the Franz m
 
 ---
 
-# 📦 Franz.Common.Messaging.RabbitMQ — v1.7.2
+## 📦 Franz.Common.Messaging.RabbitMQ — v1.7.2
 
-## 🚀 Overview
-
-Version **1.7.2** focuses on **correctness, determinism, and production-grade reliability** of the RabbitMQ transport layer.
-
-This release completes the RabbitMQ stack by:
-
-* fixing async channel creation issues introduced by RabbitMQ.Client 7.x,
-* closing the DI graph for hosted listeners and publishers,
-* aligning RabbitMQ behavior with Kafka semantics already present in Franz,
-* and validating everything against **real infrastructure** using Testcontainers (RabbitMQ + MongoDB).
-
-No breaking architectural changes — only **hardening, correctness, and full infrastructure wiring**.
-
----
-
-## ✅ Added
+### ✅ Added
 
 ### 🧱 Full RabbitMQ Infrastructure Wiring
 
@@ -955,7 +895,7 @@ No breaking architectural changes — only **hardening, correctness, and full in
 
 ---
 
-## 🔧 Fixed
+### 🔧 Fixed
 
 ### 🐇 RabbitMQ 7.x Async Channel Creation
 
@@ -988,7 +928,7 @@ No breaking architectural changes — only **hardening, correctness, and full in
 
 ---
 
-## 🧪 Tests
+### 🧪 Tests
 
 * RabbitMQ messaging now has **100% passing integration tests**.
 * Tests cover:
@@ -1002,7 +942,7 @@ No breaking architectural changes — only **hardening, correctness, and full in
 
 ---
 
-## 🧠 Architectural Notes
+### 🧠 Architectural Notes
 
 * No breaking changes to public APIs.
 * No behavioral divergence between Kafka and RabbitMQ transports.
@@ -1012,8 +952,6 @@ No breaking architectural changes — only **hardening, correctness, and full in
   * database-agnostic
   * deterministic
 * RabbitMQ is now a **first-class citizen** in the Franz messaging ecosystem.
-
----
 
 ## Version 1.7.3 – 2025-12-22
 
@@ -1037,7 +975,7 @@ No breaking architectural changes — only **hardening, correctness, and full in
 
 ---
 
-Version 1.7.5 – CosmosDB Provider & Saga Persistence 🚀
+## Version 1.7.5 – CosmosDB Provider & Saga Persistence 🚀
 ────────────────────────────────────────────────────────
 
 ✨ Added
@@ -1077,7 +1015,7 @@ Perfect — since both **Franz.Common.OpenTelemetry** and **Franz.Common.Logging
 
 ---
 
-### **v1.7.6 — [Patch]**
+## **v1.7.6 — [Patch]**
 
 **Summary:** Production-ready telemetry & logging improvements for the Franz Framework.
 
