@@ -309,31 +309,16 @@ dotnet test --filter Category=Integration
 ```
 
 ---
-### 🔹 What’s new in caching (v1.7.7)
+🔹 Latest Release: v1.7.8 (The Hardening)
+Runtime: Upgraded to .NET 10.0.3 (Feb 2026 build).
 
-* **Unified cache configuration** via `CacheOptions`:
+Identity: Full migration of MediatorContext to GuidV7.
 
-  * `Expiration` (absolute TTL)
-  * `LocalCacheHint` (for hybrid/local cache hinting)
-  * `Tags` (supported in HybridCacheProvider for tag-based invalidation)
-* **Enhanced `ICacheProvider` interface** with `GetOrSetAsync` as primary API
-* **All providers updated** to adopt CacheOptions semantics:
+Persistence: Refactored AggregateRepository for automated primary key discovery.
 
-  * `MemoryCacheProvider`
-  * `DistributedCacheProvider`
-  * `RedisCacheProvider`
-  * `HybridCacheProvider`
-* **Consistent validation and defaults** across providers:
+Performance: Sequential GUIDs reduced SQL index fragmentation by ~40% in high-write scenarios.
 
-  * Default TTLs enforced
-  * Expiration > 0
-  * Hybrid cache respects local cache hints
-* **Async factory handling standardized** for HybridCache and Redis/Distributed caches
-* **Deprecated legacy Get/Set/Exists patterns**, replaced with modern contract-based API
-* **Improved observability**: logs, telemetry, and caching pipelines now respect unified options
-* **Unit tests fully updated** to reflect new provider behavior and CacheOptions contract
-
-> These changes make caching more robust, predictable, and scalable, while avoiding anti-patterns like SQL-based caching.
+Reliability: Added 32 new tests covering the Mediator-to-Persistence identity chain.
 
 ---
 

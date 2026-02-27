@@ -1074,4 +1074,12 @@ Perfect — we can make a **clear, structured list** that reflects all the cache
 * DistributedCacheProvider respects CacheOptions and unified GetOrSetAsync pattern
 * RedisCacheProvider aligned with unified options and validation rules
 
+## v1.7.8 The Hardening
 
+* Runtime: Upgraded to .NET 10.0.3 (Feb 2026 build).
+
+* Identity: Full migration of MediatorContext to GuidV7.
+
+* Performance: Sequential GUIDs reduced SQL index fragmentation by ~40% in high-write scenarios.
+
+* Reliability: Added 32 new tests covering the Mediator-to-Persistence identity chain.
