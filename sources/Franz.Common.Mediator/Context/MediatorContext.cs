@@ -30,7 +30,7 @@ namespace Franz.Common.Mediator.Context
     /// <summary>
     /// Unique correlation identifier for tracing.
     /// </summary>
-    public string CorrelationId { get; set; } = Guid.NewGuid().ToString();
+    public Guid CorrelationId { get; set; } = Guid.CreateVersion7();
 
     /// <summary>
     /// Current user id (optional, for auth/audit).
