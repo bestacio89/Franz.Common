@@ -4,7 +4,7 @@ I’ve rewritten only what needed updating, preserved your structure, and aligne
 
 ---
 
-# **Franz.Common.AzureCosmosDB (v1.7.5)**
+# **Franz.Common.AzureCosmosDB (v1.7.7)**
 
 A specialized persistence library within the **Franz Framework**, providing seamless integration with **Azure Cosmos DB**.
 
