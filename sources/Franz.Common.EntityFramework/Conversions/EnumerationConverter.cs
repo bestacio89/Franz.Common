@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Franz.Common.Business.Domain;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -9,9 +10,17 @@ public class EnumerationConverter<TEnumeration, TId> : ValueConverter<TEnumerati
 {
   public EnumerationConverter()
       : base(
-          v => v.Id,
-          v => Enumeration<TId>.FromValue<TEnumeration>(v)
+          v => v == null ? ThrowToProvider() : v.Id,
+          v => v == null ? ThrowFromProvider() : Enumeration<TId>.FromValue<TEnumeration>(v)
       )
   {
   }
+
+  // Matches the Return Type of the 'ToProvider' Expression (TId)
+  private static TId ThrowToProvider() =>
+      throw new ArgumentNullException("v", "Enumeration cannot be null");
+
+  // Matches the Return Type of the 'FromProvider' Expression (TEnumeration)
+  private static TEnumeration ThrowFromProvider() =>
+      throw new ArgumentNullException("v", "Id value cannot be null");
 }
