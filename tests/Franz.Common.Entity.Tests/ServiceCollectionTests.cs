@@ -9,7 +9,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
-namespace Franz.Common.Integration.Tests.EntityFramework;
+namespace Franz.Common.EntityFramework.Tests;
+
 public class ServiceCollectionExtensions_EfRegistrationTests
 {
   private sealed class SimpleEntity : Entity<int>

@@ -11,7 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Franz.Common.Integration.Tests.EntityFramework;
+namespace Franz.Common.EntityFramework.Tests;
 public class QueryFilterTests
 {
   private sealed class Item : Entity<int>
