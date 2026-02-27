@@ -140,7 +140,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.Host
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.Hosting.RabbitMQ.Tests", "tests\Franz.Common.Messaging.Hosting.RabbitMQ.Tests\Franz.Common.Messaging.Hosting.RabbitMQ.Tests.csproj", "{0AD09AF3-BA8B-1AB5-8149-B763FB71FE42}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Caching.Testing", "tests\Franz.Common.Caching.Testing\Franz.Common.Caching.Testing.csproj", "{0DA7F2A0-087E-4056-9C18-DFDA235CD0BB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Caching.Tests", "tests\Franz.Common.Caching.Testing\Franz.Common.Caching.Tests.csproj", "{0DA7F2A0-087E-4056-9C18-DFDA235CD0BB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.EntityFramework.Tests", "tests\Franz.Common.Entity.Tests\Franz.Common.EntityFramework.Tests.csproj", "{BD26D33E-0FF6-4B0A-9D5B-7F81D243C7E4}"
 EndProject
