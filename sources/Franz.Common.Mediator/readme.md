@@ -373,3 +373,8 @@ Patch release aligning **commands, queries, and events** with proper semantics:
 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
+
+### Version 1.7.8
+- Improved Overvability with GuidV7 correlation id instead of string
+- Added metrics observer, logging + metrics observer,
+- Updated to .NET 10.0.3 SDK.
