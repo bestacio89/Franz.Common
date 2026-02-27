@@ -70,7 +70,7 @@ namespace Franz.Common.MongoDB.Repositories.Implementations
         AggregateType = ev.AggregateType,
         EventType = ev.GetType().AssemblyQualifiedName!,
         OccurredOn = ev.OccurredOn,
-        CorrelationId = ev.CorrelationId!,
+        CorrelationId = (Guid)ev.CorrelationId!,
         Payload = JsonSerializer.Serialize(ev)
       }).ToList();
 

@@ -7,9 +7,9 @@ namespace Franz.Common.Business.Tests.Domain.AggregateRootTests;
 
 internal sealed record TestEvent(string Name) : IDomainEvent
 {
-  public Guid EventId { get; } = Guid.NewGuid();
+  public Guid EventId { get; } = Guid.CreateVersion7();
   public DateTimeOffset OccurredOn { get; } = DateTimeOffset.UtcNow;
-  public string? CorrelationId => null;
+  public Guid? CorrelationId => null;
   public Guid? AggregateId => null;
   public string AggregateType => "Test";
   public string EventType => nameof(TestEvent);

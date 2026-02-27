@@ -8,11 +8,11 @@ namespace Franz.Common.Integration.Tests.Mediator.Domain.Events;
 [DebuggerDisplay("OrderPlaced (Aggregate={AggregateId}, Total={Total})")]
 public sealed class OrderPlacedEvent : IDomainEvent
 {
-  public OrderPlacedEvent(Guid aggregateId, Guid customerId, List<OrderLineDto> lines, decimal total, string? correlationId = null)
+  public OrderPlacedEvent(Guid aggregateId, Guid customerId, List<OrderLineDto> lines, decimal total, Guid? correlationId = null)
   {
-    EventId = Guid.NewGuid();
+    EventId = Guid.CreateVersion7();
     OccurredOn = DateTimeOffset.UtcNow;
-    CorrelationId = correlationId ?? Guid.NewGuid().ToString();
+    CorrelationId = correlationId ?? Guid.CreateVersion7();
     AggregateId = aggregateId;
     AggregateType = nameof(OrderAggregate);
     CustomerId = customerId;
@@ -33,7 +33,7 @@ public sealed class OrderPlacedEvent : IDomainEvent
   /// <summary>
   /// Correlation/trace identifier (for distributed tracing).
   /// </summary>
-  public string? CorrelationId { get; }
+  public Guid? CorrelationId { get; }
 
   /// <summary>
   /// Aggregate root identifier that raised this event.

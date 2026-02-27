@@ -5,11 +5,11 @@ using System.Diagnostics;
 [DebuggerDisplay("OrderCancelled (Aggregate={AggregateId}, Reason={Reason})")]
 public sealed class OrderCancelledEvent : IDomainEvent
 {
-  public OrderCancelledEvent(Guid aggregateId, string? reason = null, string? correlationId = null)
+  public OrderCancelledEvent(Guid aggregateId, string? reason = null, Guid? correlationId = null)
   {
     EventId = Guid.NewGuid();
     OccurredOn = DateTimeOffset.UtcNow;
-    CorrelationId = correlationId ?? Guid.NewGuid().ToString();
+    CorrelationId = correlationId ?? Guid.CreateVersion7();
     AggregateId = aggregateId;
     AggregateType = nameof(OrderAggregate);
     Reason = reason;
@@ -17,7 +17,7 @@ public sealed class OrderCancelledEvent : IDomainEvent
 
   public Guid EventId { get; }
   public DateTimeOffset OccurredOn { get; }
-  public string? CorrelationId { get; }
+  public Guid? CorrelationId { get; }
   public Guid? AggregateId { get; }
   public string AggregateType { get; }
   public string EventType => GetType().Name;

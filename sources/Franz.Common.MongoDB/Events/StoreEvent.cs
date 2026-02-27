@@ -14,7 +14,7 @@ namespace Franz.Common.MongoDB.Events
     public string AggregateType { get; set; } = string.Empty;
     public string EventType { get; set; } = string.Empty;
     public DateTimeOffset OccurredOn { get; set; }
-    public string CorrelationId { get; set; } = string.Empty;
+    public Guid CorrelationId { get; set; } = Guid.Empty;
 
     /// <summary>
     /// JSON payload containing the actual event data.

@@ -33,7 +33,7 @@ namespace Franz.Common.MongoDB.Events
         AggregateType = ev.AggregateType,
         EventType = ev.GetType().AssemblyQualifiedName!,
         OccurredOn = ev.OccurredOn,
-        CorrelationId = ev.CorrelationId!,
+        CorrelationId = (Guid)ev.CorrelationId!,
         Payload = JsonSerializer.Serialize(ev)!
       }).ToList();
 
