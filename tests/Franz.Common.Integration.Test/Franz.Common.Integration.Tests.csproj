@@ -52,12 +52,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="EntityFramework\Auditing\" />
-    <Folder Include="EntityFramework\Behaviors\" />
-    <Folder Include="EntityFramework\Configurations\" />
-    <Folder Include="EntityFramework\Conversions\" />
-    <Folder Include="EntityFramework\Extensions\" />
-    <Folder Include="EntityFramework\Repositories\" />
+    <Folder Include="EntityFramework\" />
   </ItemGroup>
 
 
