@@ -1,17 +1,14 @@
-﻿using Franz.Common.Mediator.Messages;
+﻿#nullable enable
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Logging;
 using Serilog.Context;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Franz.Common.Mediator.Pipelines.Events.Preprocessing;
+
 /// <summary>
-/// Serilog-powered pre-processor for auditing events before they are handled.
-/// Mirrors SerilogAuditPreProcessor for requests but applies to events.
+/// Hardened Serilog audit pre-processor for events.
+/// Uses native Guid v7 to ensure the audit trail starts with a sortable, chronological anchor.
 /// </summary>
 public sealed class SerilogEventAuditPreProcessor<TEvent> : IEventPreProcessor<TEvent>
     where TEvent : IEvent

@@ -1,6 +1,6 @@
-﻿using Franz.Common.Mediator.Pipelines.Core;
+﻿#nullable enable
+using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Logging;
-using Franz.Common.Mediator.Polly.Context;
 using Franz.Common.Mediator.Polly.Observers;
 using Franz.Common.Mediator.Polly.Options;
 using Microsoft.Extensions.Logging;

@@ -1,18 +1,15 @@
-﻿using Franz.Common.Mediator.Messages;
+﻿#nullable enable
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Events.PostProcessing;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Logging;
 using Serilog.Context;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Franz.Common.Mediator.Pipelines.Events.Logging;
+
 /// <summary>
-/// Serilog-powered post-processor for logging event outcomes.
-/// Mirrors SerilogLoggingPostProcessor for requests but applies to events.
+/// Hardened Serilog post-processor for logging event outcomes.
+/// Completes the audit trail using native Guid v7 correlation.
 /// </summary>
 public sealed class SerilogEventLoggingPostProcessor<TEvent> : IEventPostProcessor<TEvent>
     where TEvent : IEvent

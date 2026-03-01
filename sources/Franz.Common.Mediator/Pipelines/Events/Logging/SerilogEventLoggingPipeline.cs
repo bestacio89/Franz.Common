@@ -1,19 +1,15 @@
-﻿using Franz.Common.Mediator.Messages;
+﻿#nullable enable
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Mediator.Validation.Events;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Franz.Common.Mediator.Pipelines.Events.Logging;
+
 /// <summary>
-/// Event logging pipeline — logs lifecycle of event handling with correlation ID and duration.
-/// Mirrors LoggingPipeline<TRequest,TResponse> but for events.
+/// Event logging pipeline — logs lifecycle of event handling with hardened Guid v7 correlation and duration.
 /// </summary>
 public sealed class SerilogEventLoggingPipeline<TEvent> : IEventPipeline<TEvent>
     where TEvent : IEvent

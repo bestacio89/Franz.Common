@@ -1,18 +1,15 @@
-﻿using Franz.Common.Mediator.Messages;
+﻿#nullable enable
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Events.Preprocessing;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Logging;
 using Serilog.Context;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Franz.Common.Mediator.Pipelines.Events.Logging;
+
 /// <summary>
-/// Serilog-powered pre-processor for logging events before handling begins.
-/// Mirrors SerilogLoggingPreProcessor for requests but applies to events.
+/// Hardened Serilog pre-processor for events.
+/// Establishes the native Guid v7 correlation context before handling begins.
 /// </summary>
 public sealed class SerilogEventLoggingPreProcessor<TEvent> : IEventPreProcessor<TEvent>
     where TEvent : IEvent
