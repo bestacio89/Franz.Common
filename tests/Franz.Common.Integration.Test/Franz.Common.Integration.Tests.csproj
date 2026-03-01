@@ -7,6 +7,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.Business\Franz.Common.Business.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Caching\Franz.Common.Caching.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework.MariaDB\Franz.Common.EntityFramework.MariaDB.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework.PostGres\Franz.Common.EntityFramework.PostGres.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework.SQLServer\Franz.Common.EntityFramework.SQLServer.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Errors\Franz.Common.Errors.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.Kafka\Franz.Common.Messaging.Hosting.Kafka.csproj" />
@@ -32,14 +35,21 @@
     <ProjectReference Include="..\..\sources\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Reflection\Franz.Common.Reflection.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Serialization\Franz.Common.Serialization.csproj" />
+    <ProjectReference Include="..\Franz.Common.Entity.Tests\Franz.Common.EntityFramework.Tests.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="8.8.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="Ocelot" Version="24.1.0" />
+    <PackageReference Include="Testcontainers" Version="4.10.0" />
+    <PackageReference Include="Testcontainers.MariaDb" Version="4.10.0" />
+    <PackageReference Include="Testcontainers.MsSql" Version="4.10.0" />
+    <PackageReference Include="Testcontainers.MySql" Version="4.10.0" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.10.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <PrivateAssets>all</PrivateAssets>
