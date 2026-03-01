@@ -43,16 +43,22 @@ public class MemoryCacheProviderTests
   {
     var provider = CreateProvider();
 
+    // Set value
     await provider.GetOrSetAsync("temp", _ => Task.FromResult(42), new CacheOptions { Expiration = TimeSpan.FromMinutes(1) });
+
+    // Remove it
     await provider.RemoveAsync("temp");
 
+    // Retrieve again
     var result = await provider.GetOrSetAsync<int?>(
         "temp",
         _ => Task.FromResult<int?>(null),
         new CacheOptions { Expiration = TimeSpan.FromMinutes(1) }
     );
 
-    result.Should().BeNull();
+    // The value should be null (not the CacheResult itself)
+    result.Value.Should().BeNull();
+    result.IsHit.Should().BeFalse();
   }
 
   [Fact]
