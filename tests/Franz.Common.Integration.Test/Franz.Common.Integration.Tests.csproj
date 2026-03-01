@@ -7,7 +7,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.Business\Franz.Common.Business.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Caching\Franz.Common.Caching.csproj" />
-    <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework.MariaDB\Franz.Common.EntityFramework.MariaDB.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework.PostGres\Franz.Common.EntityFramework.PostGres.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework.SQLServer\Franz.Common.EntityFramework.SQLServer.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />

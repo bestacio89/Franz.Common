@@ -18,13 +18,15 @@ public class PostgresIntegrationTests : DatabaseIntegrationTestBase, IClassFixtu
   protected override string GetConnectionString(DbContext context)
       => context.Database.GetDbConnection().ConnectionString;
 
-  protected override IConfiguration BuildConfiguration(string dbName) => new ConfigurationBuilder()
-      .AddInMemoryCollection(new Dictionary<string, string?>
-      {
-        ["Database:ServerName"] = _fixture.Container.Hostname,
-        ["Database:Port"] = _fixture.Container.GetMappedPublicPort(5432).ToString(),
-        ["Database:DatabaseName"] = dbName,
-        ["Database:UserName"] = "postgres",
-        ["Database:Password"] = "password"
-      }).Build();
+  protected override IConfiguration BuildConfiguration(string dbName)
+     => new ConfigurationBuilder()
+         .AddInMemoryCollection(new Dictionary<string, string?>
+         {
+           ["Database:ServerName"] = _fixture.Container.Hostname,
+           ["Database:Port"] = _fixture.Container.GetMappedPublicPort(5432).ToString(),
+           ["Database:DatabaseName"] = dbName,
+           ["Database:UserName"] = "postgres",
+           ["Database:Password"] = "password",
+           ["Database:SslMode"] = "Disable" // 👈 critical
+         }).Build();
 }

@@ -13,6 +13,8 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Franz.Common.EntityFramework.SQLServer.Enums;
+using System.Net.Security;
+using Microsoft.Data.SqlClient;
 
 namespace Franz.Common.EntityFramework.SQLServer.Extensions;
 
@@ -45,7 +47,10 @@ public static class ServiceCollectionExtensions
             InitialCatalog = databaseOptions.Value.DatabaseName ?? DatabaseNamePattern,
             UserID = databaseOptions.Value.UserName ?? DefaultUserName,
             Password = databaseOptions.Value.Password ?? DefaultPassword,
-            Encrypt = GetMap(Enum.Parse<SslEnforcement>(databaseOptions.Value.SslMode ?? SslDefaultMode, true))
+            Encrypt = GetMap(Enum.Parse<SslEnforcement>(databaseOptions.Value.SslMode ?? SslDefaultMode,
+            true)),
+            TrustServerCertificate = true
+
           };
 
           var connectionString = sqlConnectionStringBuilder.ConnectionString;
