@@ -1,92 +1,74 @@
-﻿using Franz.Common.Business.Domain;
-using Franz.Common.Mediator.Messages; // 🔹 For INotification
-using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
+﻿#nullable enable
 
-namespace Franz.Common.Business.Domain
+using Franz.Common.Mediator.Messages;
+using System;
+using System.Collections.Generic;
+
+namespace Franz.Common.Business.Domain;
+
+public abstract class AggregateRoot<TEvent> : Entity<Guid>, IAggregateRoot<TEvent>
+    where TEvent : IEvent
 {
-  /// <summary>
-  /// Base class for all aggregate roots in DDD.
-  /// Supports event sourcing by tracking uncommitted domain events,
-  /// applying events through registered handlers, and replaying history.
-  /// </summary>
-  public abstract class AggregateRoot<TEvent> : Entity<Guid>, IAggregateRoot<TEvent>
-      where TEvent : IEvent // 🔹 enforce publishable events
+  private readonly List<TEvent> _changes = new();
+  private readonly Dictionary<Type, Action<TEvent>> _handlers = new();
+
+  public int Version { get; private set; } = -1;
+
+  protected AggregateRoot()
   {
-    private readonly List<TEvent> _changes = new();
-    private readonly Dictionary<Type, Action<TEvent>> _handlers = new();
+    // Hardening: Initialize with Guid v7 for sequential DB inserts
+    Id = Guid.CreateVersion7();
+  }
 
-    /// <summary>
-    /// Version of the aggregate (incremented for every applied event).
-    /// </summary>
-    public int Version { get; private set; } = -1;
+  protected AggregateRoot(Guid id) : base()
+  {
+    // Respect the provided ID, but fallback to v7 if it's empty
+    Id = id == Guid.Empty ? Guid.CreateVersion7() : id;
+  }
 
-    protected AggregateRoot() { }
+  public IReadOnlyCollection<TEvent> GetUncommittedChanges() => _changes.AsReadOnly();
 
-    protected AggregateRoot(Guid id) : base()
+  public void MarkChangesAsCommitted() => _changes.Clear();
+
+  protected void Register<T>(Action<T> handler) where T : TEvent
+  {
+    if (_handlers.ContainsKey(typeof(T)))
+      throw new InvalidOperationException($"Handler already registered for {typeof(T).Name}");
+
+    _handlers[typeof(T)] = e => handler((T)e);
+  }
+
+  protected void RaiseEvent(TEvent @event)
+  {
+    // We apply the change first to update internal state
+    ApplyChange(@event, true);
+  }
+
+  public void ReplayEvents(IEnumerable<TEvent> events)
+  {
+    foreach (var @event in events)
     {
-      Id = id;
+      ApplyChange(@event, false);
     }
+  }
 
-    /// <summary>
-    /// Get uncommitted changes (events raised since last commit).
-    /// </summary>
-    public IReadOnlyCollection<TEvent> GetUncommittedChanges() => _changes.AsReadOnly();
+  public void Rehydrate(Guid id, IEnumerable<TEvent> events)
+  {
+    Id = id;
+    ReplayEvents(events);
+    MarkChangesAsCommitted();
+  }
 
-    /// <summary>
-    /// Clear tracked changes after persistence.
-    /// </summary>
-    public void MarkChangesAsCommitted() => _changes.Clear();
+  private void ApplyChange(TEvent @event, bool isNew)
+  {
+    var eventType = @event.GetType();
+    if (!_handlers.TryGetValue(eventType, out var handler))
+      throw new InvalidOperationException($"Apply handler not found for {eventType.Name}");
 
-    /// <summary>
-    /// Register a handler for a specific event type.
-    /// Example: Register&lt;OrderPlaced&gt;(Apply);
-    /// </summary>
-    protected void Register<T>(Action<T> handler) where T : TEvent
-    {
-      if (_handlers.ContainsKey(typeof(T)))
-        throw new InvalidOperationException($"Handler already registered for {typeof(T).Name}");
+    handler(@event);
+    Version++;
 
-      _handlers[typeof(T)] = e => handler((T)e);
-    }
-
-    /// <summary>
-    /// Raise a new domain event, apply it, and track it as uncommitted.
-    /// </summary>
-    protected void RaiseEvent(TEvent @event)
-    {
-      ApplyChange(@event, true);
-    }
-
-    /// <summary>
-    /// Replay a set of historical events (e.g., from an event store).
-    /// These are applied to rebuild state but not tracked as new changes.
-    /// </summary>
-    public void ReplayEvents(IEnumerable<TEvent> events)
-    {
-      foreach (var @event in events)
-      {
-        ApplyChange(@event, false);
-      }
-    }
-
-    public void Rehydrate(Guid id, IEnumerable<TEvent> events)
-    {
-      Id = id;
-      ReplayEvents(events);
-      MarkChangesAsCommitted(); // after replay, no new changes
-    }
-
-    private void ApplyChange(TEvent @event, bool isNew)
-    {
-      if (!_handlers.TryGetValue(@event.GetType(), out var handler))
-        throw new InvalidOperationException($"Apply handler not found for {@event.GetType().Name}");
-
-      handler(@event);
-      Version++;
-
-      if (isNew)
-        _changes.Add(@event);
-    }
+    if (isNew)
+      _changes.Add(@event);
   }
 }

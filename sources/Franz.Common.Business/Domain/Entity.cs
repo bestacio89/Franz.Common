@@ -8,7 +8,7 @@ public abstract class Entity<TId> : IEntity
 
 
   public TId Id { get; protected set; } = default!;
-  public Guid PersistentId { get; private set; } = Guid.NewGuid();
+  public Guid PersistentId { get; private set; } = Guid.CreateVersion7();
 
   // Audit
   public DateTime DateCreated { get; private set; }
