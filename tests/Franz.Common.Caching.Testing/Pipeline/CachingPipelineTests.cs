@@ -94,35 +94,42 @@ public sealed class CachingPipelineTests
         It.IsAny<CancellationToken>()),
         Times.Once);
   }
-
   [Fact]
   public async Task Cache_Miss_Should_Invoke_Next_And_Set()
   {
+    // Arrange
     var cacheMock = new Mock<ICacheProvider>();
 
-    // Setup GetOrSetAsync to actually call the factory (simulate cache miss)
+    // Setup GetOrSetAsync to simulate cache miss by wrapping factory result in CacheResult<T>
     cacheMock.Setup(c => c.GetOrSetAsync(
             "key",
             It.IsAny<Func<CancellationToken, Task<TestResponse>>>(),
             It.IsAny<CacheOptions>(),
             It.IsAny<CancellationToken>()))
-        .Returns((string k, Func<CancellationToken, Task<TestResponse>> factory, CacheOptions opts, CancellationToken ct) =>
-            factory(ct));
+        .Returns(async (string k, Func<CancellationToken, Task<TestResponse>> factory, CacheOptions opts, CancellationToken ct) =>
+        {
+          var value = await factory(ct);                    // call the original factory
+          return new CacheResult<TestResponse>(value, false); // wrap in CacheResult, isHit = false
+        });
 
     var pipeline = BuildPipeline(null, cacheMock.Object);
 
+    // Act
     var result = await pipeline.Handle(
         new TestRequest(99),
-        () => Task.FromResult(new TestResponse("computed")));
+        () => Task.FromResult(new TestResponse("computed"))
+    );
 
+    // Assert
     result.Value.Should().Be("computed");
 
-    // Ensure GetOrSetAsync was called
+    // Ensure GetOrSetAsync was called exactly once
     cacheMock.Verify(c => c.GetOrSetAsync(
         "key",
         It.IsAny<Func<CancellationToken, Task<TestResponse>>>(),
         It.IsAny<CacheOptions>(),
         It.IsAny<CancellationToken>()),
-        Times.Once);
+        Times.Once
+    );
   }
 }

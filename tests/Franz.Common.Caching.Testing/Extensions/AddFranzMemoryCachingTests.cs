@@ -17,22 +17,25 @@ public class MemoryCacheProviderTests
   {
     var provider = CreateProvider();
 
-    var value = await provider.GetOrSetAsync(
+    // First call → set
+    var result = await provider.GetOrSetAsync(
         "key",
         _ => Task.FromResult("value"),
         new CacheOptions { Expiration = TimeSpan.FromMinutes(1) }
     );
 
-    value.Should().Be("value");
+    result.Value.Should().Be("value");
+    result.IsHit.Should().BeFalse();
 
-    // Confirm cached value is returned without calling factory again
-    var cachedValue = await provider.GetOrSetAsync(
+    // Second call → get from cache
+    var cachedResult = await provider.GetOrSetAsync(
         "key",
         _ => Task.FromResult("wrong"),
         new CacheOptions { Expiration = TimeSpan.FromMinutes(1) }
     );
 
-    cachedValue.Should().Be("value");
+    cachedResult.Value.Should().Be("value"); // cached value
+    cachedResult.IsHit.Should().BeTrue();
   }
 
   [Fact]
