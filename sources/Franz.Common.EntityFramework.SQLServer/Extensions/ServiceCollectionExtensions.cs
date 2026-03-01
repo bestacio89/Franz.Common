@@ -1,20 +1,11 @@
 using Franz.Common.EntityFramework.Configuration;
-using Franz.Common.EntityFramework;
+using Franz.Common.EntityFramework.SQLServer.Enums;
 using Franz.Common.MultiTenancy;
-using Microsoft.EntityFrameworkCore.SqlServer;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
-using Franz.Common.EntityFramework.SQLServer.Enums;
-using System.Net.Security;
-using Microsoft.Data.SqlClient;
 
 namespace Franz.Common.EntityFramework.SQLServer.Extensions;
 

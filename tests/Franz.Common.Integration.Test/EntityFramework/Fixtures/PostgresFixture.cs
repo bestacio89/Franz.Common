@@ -16,7 +16,6 @@ public class PostgresFixture : IAsyncLifetime
           .WithPassword("password")
           .WithWaitStrategy(
               Wait.ForUnixContainer()
-                  .UntilInternalTcpPortIsAvailable(5432)
                   .UntilMessageIsLogged("database system is ready to accept connections"))
           .Build();
   public async Task InitializeAsync() => await Container.StartAsync();
