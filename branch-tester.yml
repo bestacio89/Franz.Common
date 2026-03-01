@@ -1,40 +1,37 @@
-trigger: none  # we will manually run this pipeline on any branch
-
-pr: none  # optional: disable automatic PR triggers
+trigger:
 
 pool:
-  vmImage: 'windows-latest'
+  vmImage: 'ubuntu-latest'
 
 variables:
   buildConfiguration: 'Release'
 
-jobs:
-- job: Test_All
-  displayName: 'Restore, Build and Run All Tests on Branch'
-  container: mcr.microsoft.com/dotnet/sdk:10.0
-  steps:
+steps:
+# Checkout with full history + credentials
+- checkout: self
+  persistCredentials: 'true'
+  fetchDepth: '0'
 
-  - task: UseDotNet@2
-    displayName: 'Install .NET SDK'
-    inputs:
-      packageType: 'sdk'
-      version: '10.0.x'
+# Install .NET 10 SDK
+- task: UseDotNet@2
+  displayName: 'Install .NET 10 SDK'
+  inputs:
+    packageType: 'sdk'
+    version: '10.0.x'
+    includePreviewVersions: true
 
-  - script: |
-      echo "Restoring all projects..."
-      dotnet restore Franz.Common.sln
-    displayName: 'Dotnet Restore'
+# Authenticate to Azure Artifacts
+- task: NuGetAuthenticate@1
+  displayName: 'Authenticate to Azure Artifacts'
 
-  - script: |
-      echo "Building solution..."
-      dotnet build Franz.Common.sln --configuration $(buildConfiguration)
-    displayName: 'Dotnet Build'
+# Restore
+- script: dotnet restore
+  displayName: 'Restore NuGet packages'
 
-  - script: |
-      echo "Running all tests..."
-      dotnet test Franz.Common.sln \
-        --configuration $(buildConfiguration) \
-        --no-build \
-        --logger "trx" \
-        --results-directory $(Build.ArtifactStagingDirectory)/TestResults
-    displayName: 'Dotnet Test All'
+# Build
+- script: dotnet build --configuration $(buildConfiguration) --no-restore
+  displayName: 'Build solution'
+
+# Test
+- script: dotnet test --configuration $(buildConfiguration) --no-build --verbosity normal
+  displayName: 'Run tests'
