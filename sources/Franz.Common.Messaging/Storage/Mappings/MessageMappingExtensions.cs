@@ -1,83 +1,65 @@
-﻿using Franz.Common.Messaging.Headers;
+﻿#nullable enable
+using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Messages;
 using Microsoft.Extensions.Primitives;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
-namespace Franz.Common.Messaging.Storage
+namespace Franz.Common.Messaging.Storage;
+
+public static class MessageMappingExtensions
 {
-  public static class MessageMappingExtensions
+  public static StoredMessage ToStored(this Message message)
   {
-    public static StoredMessage ToStored(this Message message)
+    if (message is null)
+      throw new ArgumentNullException(nameof(message));
+
+    if (message.Body is null)
+      throw new ArgumentNullException(nameof(message.Body));
+
+    return new StoredMessage
     {
-      if (message is null)
-        throw new ArgumentNullException(nameof(message));
+      Id = message.Id, // Native Guid v7 assignment
+      Body = message.Body,
+      CorrelationId = message.CorrelationId, // Native Guid assignment
+      MessageType = message.MessageType,
 
-      if (message.Body is null)
-        throw new ArgumentNullException(nameof(message.Body));
-
-      if (message.Properties is null)
-        throw new ArgumentNullException(nameof(message.Properties));
-
-      return new StoredMessage
-      {
-        Body = message.Body,
-
-        // Franz MessageHeaders -> Storage-safe headers
-        Headers = (IDictionary<string, string[]>)message.Headers.ToDictionary(
-          kv => kv.Key,
-          kv => (IReadOnlyCollection<string>)kv.Value
-            .Where(v => !string.IsNullOrWhiteSpace(v))
-            .ToArray()
+      // Fix: Create a new Dictionary instead of casting ToDictionary
+      Headers = message.Headers.ToDictionary(
+        kv => kv.Key,
+        kv => kv.Value
+        .Where(v => !string.IsNullOrWhiteSpace(v))
+        .Select(v => v!) 
+        .ToArray(),
+        StringComparer.OrdinalIgnoreCase
         ),
 
-        Properties = new Dictionary<string, object>(message.Properties),
+      Properties = new Dictionary<string, object>(message.Properties, StringComparer.OrdinalIgnoreCase),
+      CreatedOn = DateTime.UtcNow
+    };
+  }
 
-        CorrelationId = message.Headers.TryGetValue("correlation-id", out var cid)
-          ? string.Join(",", cid.Where(v => !string.IsNullOrWhiteSpace(v)))
-          : null,
+  public static Message ToMessage(this StoredMessage stored)
+  {
+    if (stored is null)
+      throw new ArgumentNullException(nameof(stored));
 
-        MessageType = message.Properties.TryGetValue("message-type", out var mt)
-          ? mt?.ToString()
-          : null
-      };
-    }
-
-    public static Message ToMessage(this StoredMessage stored)
+    // Use the Message constructor that handles body initialization
+    var message = new Message(stored.Body)
     {
-      if (stored is null)
-        throw new ArgumentNullException(nameof(stored));
+      Id = stored.Id,
+      CorrelationId = stored.CorrelationId,
+      MessageType = stored.MessageType,
+      Properties = new Dictionary<string, object>(stored.Properties ?? new Dictionary<string, object>(), StringComparer.OrdinalIgnoreCase)
+    };
 
-      if (stored.Properties is null)
-        throw new ArgumentNullException(nameof(stored.Properties));
-
-      var message = new Message(
-        stored.Body,
-        (MessageHeaders)stored.Headers.Select(h =>
-          new KeyValuePair<string, StringValues>(
-            h.Key,
-            new StringValues(h.Value?.ToArray() ?? Array.Empty<string>())
-          )
-        )
-      )
+    // Restore Headers into MessageHeaders (StringValues)
+    if (stored.Headers != null)
+    {
+      foreach (var header in stored.Headers)
       {
-        Properties = stored.Properties
-      };
-
-      // Restore Franz invariants if present
-      if (!string.IsNullOrWhiteSpace(stored.CorrelationId))
-      {
-        message.Headers["correlation-id"] =
-          new StringValues(stored.CorrelationId);
+        message.Headers[header.Key] = new StringValues(header.Value);
       }
-
-      if (!string.IsNullOrWhiteSpace(stored.MessageType))
-      {
-        message.Properties["message-type"] = stored.MessageType;
-      }
-
-      return message;
     }
+
+    return message;
   }
 }

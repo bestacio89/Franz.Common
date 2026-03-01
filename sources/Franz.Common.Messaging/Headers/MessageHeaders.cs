@@ -1,3 +1,4 @@
+#nullable enable
 using Franz.Common.Errors;
 using Franz.Common.Headers;
 using Microsoft.Extensions.Primitives;
@@ -6,7 +7,7 @@ namespace Franz.Common.Messaging.Headers;
 
 public class MessageHeaders : Dictionary<string, StringValues>
 {
-  public MessageHeaders(StringComparer ordinalIgnoreCase) { }
+  public MessageHeaders(StringComparer ordinalIgnoreCase) : base(ordinalIgnoreCase) { }
 
   public MessageHeaders(IEnumerable<KeyValuePair<string, StringValues>> values)
   {
@@ -14,29 +15,24 @@ public class MessageHeaders : Dictionary<string, StringValues>
       Add(value.Key, value.Value);
   }
 
-  public MessageHeaders()
-  {
-  }
-
-  // ----------------------------
-  // Core access helpers
-  // ----------------------------
+  public MessageHeaders() { }
 
   public bool TryGetString(string key, out string value)
   {
     value = default!;
-
     if (!TryGetValue(key, out var values))
       return false;
 
-    value = values.FirstOrDefault()!;
-    return value != null;
+    var first = values.FirstOrDefault();
+    if (first == null) return false;
+
+    value = first;
+    return true;
   }
 
   public bool TryGetGuid(string key, out Guid value)
   {
     value = default;
-
     if (!TryGetValue(key, out var values))
       return false;
 
@@ -51,64 +47,34 @@ public class MessageHeaders : Dictionary<string, StringValues>
       return false;
     }
 
-    values = stringValues.Where(v => !string.IsNullOrWhiteSpace(v));
+    // Fix: Explicitly filter nulls and cast to non-nullable string to satisfy Target Type
+    values = stringValues
+        .Where(v => !string.IsNullOrWhiteSpace(v))
+        .Select(v => v!);
+
     return true;
   }
 
-  // ----------------------------
-  // Identity helpers
-  // ----------------------------
+  // ... (Identity helpers and Setters remain the same logic) ...
 
-  public bool TryGetIdentityId(out Guid userId) =>
-    TryGetGuid(HeaderConstants.UserId, out userId);
-
-  public bool TryGetIdentityEmail(out string email) =>
-    TryGetString(HeaderConstants.UserEmail, out email);
-
-  public bool TryGetIdentityFullName(out string fullName) =>
-    TryGetString(HeaderConstants.UserFullName, out fullName);
-
-  public bool TryGetIdentityRoles(out IEnumerable<string> roles) =>
-    TryGetStringEnumerable(HeaderConstants.UserRoles, out roles);
-
-  public bool TryGetTenantId(out Guid tenantId) =>
-    TryGetGuid(HeaderConstants.TenantId, out tenantId);
-
-  public bool TryGetDomainId(out Guid domainId) =>
-    TryGetGuid(HeaderConstants.DomainId, out domainId);
-
-  // ----------------------------
-  // Mandatory getters
-  // ----------------------------
+  public bool TryGetIdentityId(out Guid userId) => TryGetGuid(HeaderConstants.UserId, out userId);
+  public bool TryGetIdentityEmail(out string email) => TryGetString(HeaderConstants.UserEmail, out email);
+  public bool TryGetIdentityFullName(out string fullName) => TryGetString(HeaderConstants.UserFullName, out fullName);
+  public bool TryGetIdentityRoles(out IEnumerable<string> roles) => TryGetStringEnumerable(HeaderConstants.UserRoles, out roles);
+  public bool TryGetTenantId(out Guid tenantId) => TryGetGuid(HeaderConstants.TenantId, out tenantId);
+  public bool TryGetDomainId(out Guid domainId) => TryGetGuid(HeaderConstants.DomainId, out domainId);
 
   public string GetRequiredString(string key)
   {
     if (!TryGetString(key, out var value))
-      throw new TechnicalException(
-        $"Required header '{key}' was not found");
-
+      throw new TechnicalException($"Required header '{key}' was not found");
     return value;
   }
 
-  // ----------------------------
-  // Setters (invariants)
-  // ----------------------------
-
-  public void SetTenantId(Guid tenantId) =>
-    this[HeaderConstants.TenantId] = tenantId.ToString();
-
-  public void SetDomainId(Guid domainId) =>
-    this[HeaderConstants.DomainId] = domainId.ToString();
-
-  public void SetIdentityId(Guid userId) =>
-    this[HeaderConstants.UserId] = userId.ToString();
-
-  public void SetIdentityEmail(string email) =>
-    this[HeaderConstants.UserEmail] = email;
-
-  public void SetIdentityFullName(string fullName) =>
-    this[HeaderConstants.UserFullName] = fullName;
-
-  public void SetIdentityRoles(IEnumerable<string> roles) =>
-    this[HeaderConstants.UserRoles] = new StringValues(roles.ToArray());
+  public void SetTenantId(Guid tenantId) => this[HeaderConstants.TenantId] = tenantId.ToString();
+  public void SetDomainId(Guid domainId) => this[HeaderConstants.DomainId] = domainId.ToString();
+  public void SetIdentityId(Guid userId) => this[HeaderConstants.UserId] = userId.ToString();
+  public void SetIdentityEmail(string email) => this[HeaderConstants.UserEmail] = email;
+  public void SetIdentityFullName(string fullName) => this[HeaderConstants.UserFullName] = fullName;
+  public void SetIdentityRoles(IEnumerable<string> roles) => this[HeaderConstants.UserRoles] = new StringValues(roles.ToArray());
 }

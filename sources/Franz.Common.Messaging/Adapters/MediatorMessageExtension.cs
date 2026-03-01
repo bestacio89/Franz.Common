@@ -14,7 +14,7 @@ public static class MediatorMessageExtensions
   {
     var msg = new Message(JsonSerializer.Serialize(command));
     msg.MessageType = command.GetType().FullName;
-    msg.CorrelationId = Guid.NewGuid().ToString();
+    msg.CorrelationId = Guid.CreateVersion7();
     msg.SetProperty("CommandType", command.GetType().Name);
     return msg;
   }
@@ -23,7 +23,7 @@ public static class MediatorMessageExtensions
   {
     var msg = new Message(JsonSerializer.Serialize(@event));
     msg.MessageType = @event.GetType().FullName;
-    msg.CorrelationId = Guid.NewGuid().ToString();
+    msg.CorrelationId = Guid.CreateVersion7();
     msg.SetProperty("EventType", @event.GetType().Name);
     return msg;
   }

@@ -43,10 +43,7 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
   public static IServiceCollection AddMessagingOptions(this IServiceCollection services, IConfiguration? configuration)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
   {
     var configurationSection = configuration?.GetSection("Messaging");
     var hasMessagingConnectionOptions = services.Any(service => service.ServiceType == typeof(IConfigureOptions<MessagingOptions>));
@@ -54,8 +51,8 @@ public static class ServiceCollectionExtensions
     if (configurationSection?.Exists() == true && !hasMessagingConnectionOptions)
     {
       services
-        .AddOptions()
-        .Configure<MessagingOptions>(configurationSection);
+          .AddOptions()
+          .Configure<MessagingOptions>(configurationSection);
     }
     else if (!hasMessagingConnectionOptions)
     {

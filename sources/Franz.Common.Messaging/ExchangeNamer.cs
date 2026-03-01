@@ -1,7 +1,7 @@
 using Franz.Common.Reflection;
 using System.Reflection;
 
-namespace Franz.Common.Messaging.Kafka;
+namespace Franz.Common.Messaging;
 
 public static class ExchangeNamer
 {

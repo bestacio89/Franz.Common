@@ -1,4 +1,5 @@
-﻿using Franz.Common.Mediator.Messages;
+﻿#nullable enable
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Messaging.Messages;
 using System.Reflection;
@@ -17,13 +18,16 @@ public static class MessageDeserializerExtensions
   public static ICommand? ToCommand(this Message message)
   {
     var type = ResolveType(message.MessageType, typeof(ICommand));
-    if (type is null) return null;
+    if (type is null || string.IsNullOrWhiteSpace(message.Body)) return null;
 
-    var command = (ICommand?)JsonSerializer.Deserialize(message.Body is not null, type, _jsonOptions);
+    // FIX: Passing message.Body (string) instead of a boolean check
+    var command = (ICommand?)JsonSerializer.Deserialize(message.Body, type, _jsonOptions);
 
     if (command != null)
     {
+      // Seed the ambient context with the native Guid v7
       CorrelationId.Current = message.CorrelationId;
+      // Map the Guid to the command property if it exists
       TrySetCorrelationProperty(command, message.CorrelationId);
     }
 
@@ -33,9 +37,10 @@ public static class MessageDeserializerExtensions
   public static IEvent? ToEvent(this Message message)
   {
     var type = ResolveType(message.MessageType, typeof(IEvent));
-    if (type is null) return null;
+    if (type is null || string.IsNullOrWhiteSpace(message.Body)) return null;
 
-    var @event = (IEvent?)JsonSerializer.Deserialize(message.Body is not null, type, _jsonOptions);
+    // FIX: Passing message.Body (string) instead of a boolean check
+    var @event = (IEvent?)JsonSerializer.Deserialize(message.Body, type, _jsonOptions);
 
     if (@event != null)
     {
@@ -50,11 +55,9 @@ public static class MessageDeserializerExtensions
   {
     if (string.IsNullOrWhiteSpace(typeName)) return null;
 
-    // Try fully qualified name first
     var type = Type.GetType(typeName, throwOnError: false);
     if (type != null && expectedBase.IsAssignableFrom(type)) return type;
 
-    // Fallback: scan all loaded assemblies
     foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
     {
       type = asm.GetType(typeName, throwOnError: false);
@@ -64,12 +67,14 @@ public static class MessageDeserializerExtensions
     return null;
   }
 
-  private static void TrySetCorrelationProperty(object target, string? correlationId)
+  private static void TrySetCorrelationProperty(object target, Guid correlationId)
   {
-    if (string.IsNullOrEmpty(correlationId)) return;
-
+    // No more string checks or Guid.Empty checks needed here 
+    // because the Message.CorrelationId property already guarantees a valid v7.
     var prop = target.GetType().GetProperty("CorrelationId", BindingFlags.Public | BindingFlags.Instance);
-    if (prop?.CanWrite == true && prop.PropertyType == typeof(string))
+
+    // HARDENING: Check for Guid type, not string
+    if (prop?.CanWrite == true && prop.PropertyType == typeof(Guid))
     {
       prop.SetValue(target, correlationId);
     }
