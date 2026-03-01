@@ -62,36 +62,6 @@ public sealed class KafkaHostedMessagingTests
   }
 
 
-  [Fact(Skip = "Kafka continuation timing is not deterministic unless all infra and ops variables are contained and controlled")]
-  public async Task Kafka_pipeline_continues_after_handler_failure()
-  {
-    FaultToleranceProbe.Reset();
-    MultiHandlerProbe.Reset();
-
-    using var scope = _fixture.Services.CreateScope();
-    var publisher = scope.ServiceProvider.GetRequiredService<IMessagingPublisher>();
-
-    // 1️⃣ publish message that causes a handler failure
-    await publisher.Publish(new FaultToleranceTestEvent());
-
-    // Wait until the failure was *handled*
-    await FaultToleranceProbe.WaitAsync(TimeSpan.FromSeconds(10));
-
-    // 2️⃣ publish a second message
-    await publisher.Publish(new FanoutTestEvent2("still-alive"));
-
-    // Wait until the second message is *processed*
-    await MultiHandlerProbe.WaitAsync(TimeSpan.FromSeconds(10));
-
-    // Assert semantic outcome
-    MultiHandlerProbe.Count.Should().BeGreaterThanOrEqualTo(2);
-  }
-
-
-
-
-
-
   [Fact]
   public async Task Kafka_hosted_listener_dispatches_event_through_mediator()
   {

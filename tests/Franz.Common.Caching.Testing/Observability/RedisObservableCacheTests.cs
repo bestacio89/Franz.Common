@@ -89,7 +89,7 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
     await Cache.RemoveByTagAsync(tag);
 
     // Wait for observers to process removals
-    await WaitForObserversAsync(keysRemoved: new[] { key1, key2 }, timeoutMs: 1000);
+    await WaitForObserversAsync(keysRemoved: new[] { key1, key2 });
 
     // Assertions after observers have processed
     Assert.DoesNotContain(key1, MetricsObserver.CurrentKeys);
@@ -123,10 +123,8 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
 
     // Wait for observer updates
     await WaitForObserversAsync(
-        keysRemoved: new[] { $"{keyPrefix}_1", $"{keyPrefix}_2", $"{keyPrefix}_3" },
-        timeoutMs: 1000
-    );
-
+     keysRemoved: new[] { $"{keyPrefix}_1", $"{keyPrefix}_2", $"{keyPrefix}_3" }
+ );
     Assert.Equal(3, MetricsObserver.TotalSets);
     Assert.Equal(3, LoggingObserver.TotalSets);
     Assert.Equal(2, MetricsObserver.TotalHits);
@@ -139,20 +137,19 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
     Assert.Empty(LoggingObserver.CurrentKeys);
   }
 
-  private async Task WaitForObserversAsync(string[] keysRemoved, int timeoutMs = 1000)
+  private async Task WaitForObserversAsync(string[] keysRemoved, int maxRetries = 20, int delayMs = 50)
   {
-    var sw = Stopwatch.StartNew();
-    while (sw.ElapsedMilliseconds < timeoutMs)
+    for (int i = 0; i < maxRetries; i++)
     {
       if (keysRemoved.All(k => !MetricsObserver.CurrentKeys.Contains(k) &&
                                 !LoggingObserver.CurrentKeys.Contains(k)))
       {
-        return;
+        return; // all keys removed, observers processed
       }
-      await Task.Delay(10);
+      await Task.Delay(delayMs); // give async observers time
     }
 
-    // Timeout: still not processed, throw for better debugging
+    // Timeout: still not processed, throw for debug
     throw new TimeoutException($"Observers did not process key removals: {string.Join(", ", keysRemoved)}");
   }
 }
