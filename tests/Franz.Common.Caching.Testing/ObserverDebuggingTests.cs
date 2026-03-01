@@ -7,24 +7,25 @@ using System;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Franz.Common.Caching.Tests.Tests
+namespace Franz.Common.Caching.Tests
 {
   public class ObserverDebuggingTests
   {
     [Fact]
-    public async Task VerifyObserversAreRegistered()
+    public void VerifyObserversAreRegistered()
     {
       // Arrange
       var services = new ServiceCollection();
 
-      services.AddFranzMemoryCaching()
-              .AddLogging()
-              .AddMetricsCacheObserver()
-              .AddObservableCaching();
+      // Ensure the memory cache provider is registered first
+      services.AddFranzMemoryCaching(); // registers ICacheProvider -> MemoryCacheProvider
+      services.AddLogging();
+      services.AddMetricsCacheObserver();
+      services.AddObservableCaching(); // now it can resolve the MemoryCacheProvider
 
       var sp = services.BuildServiceProvider();
 
-      // Act - Get all registrations
+      // Act
       var cacheProvider = sp.GetRequiredService<ICacheProvider>();
       var metricsObserver = sp.GetRequiredService<MetricsCacheObserver>();
       var allObservers = sp.GetServices<Franz.Common.Caching.Observability.ICacheObserver>();
@@ -35,7 +36,7 @@ namespace Franz.Common.Caching.Tests.Tests
       Assert.NotEmpty(allObservers);
 
       Console.WriteLine($"Cache Provider Type: {cacheProvider.GetType().Name}");
-      Console.WriteLine($"Observers Count: {System.Linq.Enumerable.Count(allObservers)}");
+      Console.WriteLine($"Observers Count: {allObservers.Count()}");
       foreach (var obs in allObservers)
       {
         Console.WriteLine($"  - Observer: {obs.GetType().Name}");

@@ -2,16 +2,13 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Franz.Common.Caching.Abstractions;
 
 namespace Franz.Common.Caching.Observability;
 
-/// <summary>
-/// Decorator that wraps an ICacheProvider and notifies observers of cache operations.
-/// Updated to support CacheResult<T>.
-/// </summary>
 public sealed class ObservableCacheProvider : ICacheProvider
 {
   private readonly ICacheProvider _inner;
@@ -83,7 +80,8 @@ public sealed class ObservableCacheProvider : ICacheProvider
     {
       try
       {
-        observer.OnCacheSet(entry);
+        // Make notifications thread-safe by wrapping in a Task.Run
+        Task.Run(() => observer.OnCacheSet(entry)).Wait();
       }
       catch
       {
@@ -107,7 +105,7 @@ public sealed class ObservableCacheProvider : ICacheProvider
     {
       try
       {
-        observer.OnCacheHit(access);
+        Task.Run(() => observer.OnCacheHit(access)).Wait();
       }
       catch { }
     }
@@ -121,7 +119,7 @@ public sealed class ObservableCacheProvider : ICacheProvider
     {
       try
       {
-        observer.OnCacheRemove(key);
+        Task.Run(() => observer.OnCacheRemove(key)).Wait();
       }
       catch { }
     }
@@ -135,7 +133,7 @@ public sealed class ObservableCacheProvider : ICacheProvider
     {
       try
       {
-        observer.OnCacheRemoveByTag(tag);
+        Task.Run(() => observer.OnCacheRemoveByTag(tag)).Wait();
       }
       catch { }
     }
@@ -158,8 +156,16 @@ public sealed class ObservableCacheProvider : ICacheProvider
   private static long EstimateSize<T>(T value)
   {
     if (value == null) return 0;
-    var str = value.ToString();
-    return str?.Length ?? 0;
+
+    try
+    {
+      var json = JsonSerializer.Serialize(value);
+      return System.Text.Encoding.UTF8.GetByteCount(json);
+    }
+    catch
+    {
+      return 0;
+    }
   }
 
   #endregion

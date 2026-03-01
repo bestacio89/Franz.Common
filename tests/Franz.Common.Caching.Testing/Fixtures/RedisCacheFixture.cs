@@ -1,8 +1,11 @@
 ﻿using Franz.Common.Caching.Extensions;
+using Franz.Common.Caching.Observability;
+using Franz.Common.Caching.Observability.Observers;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.Redis;
 
 namespace Franz.Common.Caching.Tests.Fixtures;
+
 public sealed class RedisCacheFixture : IAsyncLifetime
 {
   private readonly RedisContainer _container;
@@ -24,14 +27,26 @@ public sealed class RedisCacheFixture : IAsyncLifetime
 
     var services = new ServiceCollection();
 
-    // Register cache + observers in correct order
+    // Register logging first
     services.AddLogging();
-    services.AddMetricsCacheObserver();
-    services.AddLoggingMetricsCacheObserver();
+
+    // Register observers as singletons BEFORE cache
+    services.AddSingleton<MetricsCacheObserver>();
+    services.AddSingleton<LoggingMetricsObserver>();
+    services.AddSingleton<ICacheObserver>(sp => sp.GetRequiredService<MetricsCacheObserver>());
+    services.AddSingleton<ICacheObserver>(sp => sp.GetRequiredService<LoggingMetricsObserver>());
+
+    // Register Redis caching and make sure it uses observers
     services.AddFranzRedisCaching(ConnectionString);
+
+    // Add observable caching (hooks up observers to cache)
     services.AddObservableCaching();
 
     ServiceProvider = services.BuildServiceProvider();
+
+    // Ensure cache provider is initialized and ready
+    var cache = ServiceProvider.GetRequiredService<ICacheProvider>();
+    
   }
 
   public async Task DisposeAsync()

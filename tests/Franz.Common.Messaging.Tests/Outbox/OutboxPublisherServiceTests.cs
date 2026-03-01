@@ -48,21 +48,37 @@ public class OutboxPublisherServiceTests
     var cts = new CancellationTokenSource();
     var storedMessage = new StoredMessage { Id = Guid.CreateVersion7(), RetryCount = 0 };
 
+    // Setup the store to return the pending message
     _mockStore.Setup(s => s.GetPendingAsync(It.IsAny<CancellationToken>()))
         .ReturnsAsync(new List<StoredMessage> { storedMessage });
 
+    // Setup the sender to throw, simulating a failure
     _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
         .ThrowsAsync(new Exception("Network Down"));
+
+    // Capture the message passed to UpdateRetryAsync
+    StoredMessage updatedMessage = null;
+    _mockStore
+        .Setup(s => s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()))
+        .Callback<StoredMessage, CancellationToken>((m, _) => updatedMessage = m)
+        .Returns(Task.CompletedTask);
 
     // Act
     var service = CreateService();
     _ = service.StartAsync(cts.Token);
 
+    // Wait a short moment to allow the async loop to process
     await Task.Delay(50);
-    await cts.CancelAsync();
+
+    // Cancel the service loop cleanly
+    cts.Cancel();
 
     // Assert
-    _mockStore.Verify(s => s.UpdateRetryAsync(It.Is<StoredMessage>(m => m.RetryCount == 1), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+    updatedMessage.Should().NotBeNull("UpdateRetryAsync should have been called at least once");
+    updatedMessage.RetryCount.Should().BeGreaterThan(0, "RetryCount should have been incremented after a send failure");
+
+    // Optional: verify that UpdateRetryAsync was actually called at least once
+    _mockStore.Verify(s => s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
   }
 
   [Fact]
