@@ -8,16 +8,16 @@ namespace Franz.Common.Messaging.Tests.Adapters;
 
 public class MediatorMessageExtensionsTests
 {
-  // Updated mock implementations to satisfy your interfaces
+  private static readonly JsonSerializerOptions _options = new(JsonSerializerDefaults.Web);
+
   private record TestCommand(string Data) : ICommand;
 
   private record TestEvent(string Info) : IEvent
   {
-    // Satisfying the CS0535 error
     public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
-    }
+  }
 
-    [Fact]
+  [Fact]
   public void ToMessage_FromCommand_ShouldPopulateRequiredFields()
   {
     // Arrange
@@ -30,11 +30,10 @@ public class MediatorMessageExtensionsTests
     result.Should().NotBeNull();
     result.MessageType.Should().Be(typeof(TestCommand).FullName);
     result.CorrelationId.Should().NotBe(Guid.Empty);
-
-    // Fix for CS0411: Explicitly provide the <string> type argument
     result.GetProperty<string>("CommandType").Should().Be(nameof(TestCommand));
 
-    var deserialized = JsonSerializer.Deserialize<TestCommand>(result.Body);
+    // Deserialize using the same options as the extension method
+    var deserialized = JsonSerializer.Deserialize<TestCommand>(result.Body, _options);
     deserialized.Should().BeEquivalentTo(command);
   }
 
@@ -50,11 +49,9 @@ public class MediatorMessageExtensionsTests
     // Assert
     result.Should().NotBeNull();
     result.MessageType.Should().Be(typeof(TestEvent).FullName);
-
-    // Fix for CS0411: Explicitly provide the <string> type argument
     result.GetProperty<string>("EventType").Should().Be(nameof(TestEvent));
 
-    var deserialized = JsonSerializer.Deserialize<TestEvent>(result.Body);
+    var deserialized = JsonSerializer.Deserialize<TestEvent>(result.Body, _options);
     deserialized.Should().BeEquivalentTo(@event);
   }
 }
