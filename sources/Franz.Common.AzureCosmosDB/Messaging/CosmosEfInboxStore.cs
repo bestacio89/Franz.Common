@@ -1,4 +1,5 @@
-﻿using Franz.Common.Messaging;
+﻿#nullable enable
+using Franz.Common.Messaging;
 using Franz.Common.Messaging.Storage;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,23 +14,26 @@ public class CosmosEfInboxStore : IInboxStore
     _dbContext = dbContext;
   }
 
-  public async Task<bool> HasProcessedAsync(string messageId, CancellationToken ct = default)
+  // 🛠️ FIX: Parameter changed from string to Guid to match IInboxStore
+  public async Task<bool> HasProcessedAsync(Guid messageId, CancellationToken ct = default)
   {
     return await _dbContext.InboxRecords
-      .AsNoTracking()
-      .AnyAsync(r => r.MessageId == messageId, ct);
+        .AsNoTracking()
+        .AnyAsync(r => r.MessageId == messageId, ct);
   }
 
-  public async Task MarkProcessedAsync(string messageId, CancellationToken ct = default)
+  // 🛠️ FIX: Parameter changed from string to Guid to match IInboxStore
+  public async Task MarkProcessedAsync(Guid messageId, CancellationToken ct = default)
   {
-    // Idempotent insert (Cosmos will throw on duplicate key; we can ignore if needed)
+    // 🚀 BAZOOKA REFACTOR: Direct lookup using Guid v7
     var exists = await _dbContext.InboxRecords
-      .AnyAsync(r => r.MessageId == messageId, ct);
+        .AnyAsync(r => r.MessageId == messageId, ct);
 
     if (!exists)
     {
       await _dbContext.InboxRecords.AddAsync(new InboxRecord
       {
+        // Assigning native Guid
         MessageId = messageId,
         ProcessedOn = DateTime.UtcNow
       }, ct);

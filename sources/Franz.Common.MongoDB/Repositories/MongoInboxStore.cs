@@ -1,12 +1,9 @@
-﻿using Franz.Common.Messaging.Storage;
+﻿#nullable enable
+using Franz.Common.Messaging.Storage;
 using MongoDB.Driver;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Franz.Common.MongoDB.Repositories;
+
 public class MongoInboxStore : IInboxStore
 {
   private readonly IMongoCollection<ProcessedMessage> _collection;
@@ -15,17 +12,21 @@ public class MongoInboxStore : IInboxStore
   {
     _collection = db.GetCollection<ProcessedMessage>("ProcessedMessages");
 
-    // unique index on MessageId
+    // ✅ UNIQUE INDEX: Using Guid v7 here is elite.
+    // It ensures no two messages with the same ID are processed,
+    // while keeping the index inserts sequential and fast.
     _collection.Indexes.CreateOne(
         new CreateIndexModel<ProcessedMessage>(
             Builders<ProcessedMessage>.IndexKeys.Ascending(x => x.MessageId),
             new CreateIndexOptions { Unique = true }));
   }
 
-  public async Task<bool> HasProcessedAsync(string messageId, CancellationToken ct = default)
+  // 🛠️ FIX: Changed parameter from string to Guid
+  public async Task<bool> HasProcessedAsync(Guid messageId, CancellationToken ct = default)
       => await _collection.Find(x => x.MessageId == messageId).AnyAsync(ct);
 
-  public async Task MarkProcessedAsync(string messageId, CancellationToken ct = default)
+  // 🛠️ FIX: Changed parameter from string to Guid
+  public async Task MarkProcessedAsync(Guid messageId, CancellationToken ct = default)
   {
     var processed = new ProcessedMessage
     {
@@ -33,12 +34,15 @@ public class MongoInboxStore : IInboxStore
       ProcessedOn = DateTime.UtcNow
     };
 
+    // If a duplicate arrives, the unique index will throw a MongoWriteException,
+    // which is exactly what we want to prevent double-processing.
     await _collection.InsertOneAsync(processed, cancellationToken: ct);
   }
 }
 
 public class ProcessedMessage
 {
-  public string MessageId { get; set; } = default!;
+  // 🛠️ FIX: MessageId is now a native Guid
+  public Guid MessageId { get; set; }
   public DateTime ProcessedOn { get; set; }
 }

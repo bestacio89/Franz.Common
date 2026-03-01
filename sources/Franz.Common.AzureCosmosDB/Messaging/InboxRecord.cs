@@ -5,6 +5,6 @@
 /// </summary>
 public class InboxRecord
 {
-  public string MessageId { get; set; } = default!;
+  public Guid MessageId { get; set; } = default!;
   public DateTime ProcessedOn { get; set; } = DateTime.UtcNow;
 }
