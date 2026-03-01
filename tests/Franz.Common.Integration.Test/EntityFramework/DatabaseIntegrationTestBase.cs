@@ -3,16 +3,18 @@ using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Moq;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using Xunit;
 using Franz.Common.Mediator.Dispatchers;
+
 namespace Franz.Common.Integration.Tests.EntityFramework;
 
 public abstract class DatabaseIntegrationTestBase
 {
+  protected ILogger Logger { get; private set; }  // Add protected logger
+
   protected abstract void ConfigureDatabase(IServiceCollection services, IConfiguration configuration);
   protected abstract string GetConnectionString(DbContext context);
 
@@ -23,6 +25,17 @@ public abstract class DatabaseIntegrationTestBase
     services.AddSingleton(mockDispatcher.Object);
   }
 
+  private IServiceProvider BuildServiceProviderWithLogger(IServiceCollection services)
+  {
+    // Add logging services
+    services.AddLogging(config => config.AddConsole());
+    var provider = services.BuildServiceProvider();
+
+    // Create a logger for use in the tests
+    Logger = provider.GetRequiredService<ILogger<DatabaseIntegrationTestBase>>();
+    return provider;
+  }
+
   [Fact]
   public async Task Database_ShouldConnectAndIdentifyCorrectSchema()
   {
@@ -30,11 +43,10 @@ public abstract class DatabaseIntegrationTestBase
     var services = new ServiceCollection();
     var configuration = BuildConfiguration();
 
-    services.AddLogging();
     AddCommonMocks(services);
     ConfigureDatabase(services, configuration);
 
-    var provider = services.BuildServiceProvider();
+    var provider = BuildServiceProviderWithLogger(services);
 
     // Act
     using var scope = provider.CreateScope();
@@ -58,12 +70,10 @@ public abstract class DatabaseIntegrationTestBase
     mockAccessor.Setup(x => x.GetCurrentDomainId()).Returns(tenantId);
     services.AddSingleton(mockAccessor.Object);
 
-    AddCommonMocks(services);
-    // We use the pattern "{dbName}" which your extension replaces
     var configuration = BuildConfiguration("{dbName}");
     ConfigureDatabase(services, configuration);
 
-    var provider = services.BuildServiceProvider();
+    var provider = BuildServiceProviderWithLogger(services);
 
     // Act
     using var scope = provider.CreateScope();
@@ -71,7 +81,6 @@ public abstract class DatabaseIntegrationTestBase
     var connectionString = GetConnectionString(context);
 
     // Assert
-    // Explicitly convert to string to ensure we are comparing strings to strings
     Assert.Contains(tenantId.ToString(), connectionString);
   }
 
