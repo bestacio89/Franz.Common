@@ -48,5 +48,6 @@ namespace Franz.Common.Caching.Tests
       }
     }
 
-   
+
+  }
 }
