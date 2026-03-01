@@ -8,13 +8,20 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Xunit;
-
+using Franz.Common.Mediator.Dispatchers;
 namespace Franz.Common.Integration.Tests.EntityFramework;
 
 public abstract class DatabaseIntegrationTestBase
 {
   protected abstract void ConfigureDatabase(IServiceCollection services, IConfiguration configuration);
   protected abstract string GetConnectionString(DbContext context);
+
+  private void AddCommonMocks(IServiceCollection services)
+  {
+    // Franz 1.7.8 Hardening: DbContext now requires a dispatcher for Outbox/Domain Events
+    var mockDispatcher = new Mock<IDispatcher>();
+    services.AddSingleton(mockDispatcher.Object);
+  }
 
   [Fact]
   public async Task Database_ShouldConnectAndIdentifyCorrectSchema()
@@ -24,6 +31,7 @@ public abstract class DatabaseIntegrationTestBase
     var configuration = BuildConfiguration();
 
     services.AddLogging();
+    AddCommonMocks(services);
     ConfigureDatabase(services, configuration);
 
     var provider = services.BuildServiceProvider();
@@ -42,12 +50,15 @@ public abstract class DatabaseIntegrationTestBase
   {
     // Arrange
     var services = new ServiceCollection();
+
+    AddCommonMocks(services);
     var tenantId = Guid.CreateVersion7(); // This is a Guid object
 
     var mockAccessor = new Mock<IDomainContextAccessor>();
     mockAccessor.Setup(x => x.GetCurrentDomainId()).Returns(tenantId);
     services.AddSingleton(mockAccessor.Object);
 
+    AddCommonMocks(services);
     // We use the pattern "{dbName}" which your extension replaces
     var configuration = BuildConfiguration("{dbName}");
     ConfigureDatabase(services, configuration);
