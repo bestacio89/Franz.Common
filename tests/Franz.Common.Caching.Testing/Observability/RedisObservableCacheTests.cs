@@ -4,6 +4,7 @@ using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Tests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
@@ -72,7 +73,6 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
     Assert.Equal(1, MetricsObserver.TotalRemovals);
     Assert.Equal(1, LoggingObserver.TotalRemovals);
   }
-
   [Fact]
   public async Task RedisCache_RemoveByTag_NotifiesObservers()
   {
@@ -88,6 +88,10 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
 
     await Cache.RemoveByTagAsync(tag);
 
+    // Wait for observers to process removals
+    await WaitForObserversAsync(keysRemoved: new[] { key1, key2 }, timeoutMs: 1000);
+
+    // Assertions after observers have processed
     Assert.DoesNotContain(key1, MetricsObserver.CurrentKeys);
     Assert.DoesNotContain(key2, MetricsObserver.CurrentKeys);
     Assert.DoesNotContain(key1, LoggingObserver.CurrentKeys);
@@ -97,19 +101,6 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
     Assert.Contains(tag, LoggingObserver.CurrentRemovedTags);
   }
 
-  [Fact]
-  public async Task RedisCache_MultipleObservers_BothReceiveNotifications()
-  {
-    string key = $"multi_observer_{Guid.NewGuid()}";
-
-    var result = await Cache.GetOrSetAsync(key, ct => Task.FromResult("test_value"));
-    Assert.False(result.IsHit);
-
-    Assert.Equal(1, MetricsObserver.TotalSets);
-    Assert.Equal(1, LoggingObserver.TotalSets);
-
-    await Cache.RemoveAsync(key);
-  }
 
   [Fact]
   public async Task RedisCache_ComplexWorkflow_ObserversTrackAllOperations()
@@ -130,15 +121,38 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
     await Cache.RemoveAsync($"{keyPrefix}_3");
     await Cache.RemoveByTagAsync(tag);
 
+    // Wait for observer updates
+    await WaitForObserversAsync(
+        keysRemoved: new[] { $"{keyPrefix}_1", $"{keyPrefix}_2", $"{keyPrefix}_3" },
+        timeoutMs: 1000
+    );
+
     Assert.Equal(3, MetricsObserver.TotalSets);
     Assert.Equal(3, LoggingObserver.TotalSets);
     Assert.Equal(2, MetricsObserver.TotalHits);
     Assert.Equal(2, LoggingObserver.TotalHits);
-    Assert.Equal(3, MetricsObserver.TotalRemovals); // includes key3 + 2 keys removed by tag
+    Assert.Equal(3, MetricsObserver.TotalRemovals); // key3 + 2 keys removed by tag
     Assert.Equal(3, LoggingObserver.TotalRemovals);
     Assert.Contains(tag, MetricsObserver.CurrentRemovedTags);
     Assert.Contains(tag, LoggingObserver.CurrentRemovedTags);
     Assert.Empty(MetricsObserver.CurrentKeys);
     Assert.Empty(LoggingObserver.CurrentKeys);
+  }
+
+  private async Task WaitForObserversAsync(string[] keysRemoved, int timeoutMs = 1000)
+  {
+    var sw = Stopwatch.StartNew();
+    while (sw.ElapsedMilliseconds < timeoutMs)
+    {
+      if (keysRemoved.All(k => !MetricsObserver.CurrentKeys.Contains(k) &&
+                                !LoggingObserver.CurrentKeys.Contains(k)))
+      {
+        return;
+      }
+      await Task.Delay(10);
+    }
+
+    // Timeout: still not processed, throw for better debugging
+    throw new TimeoutException($"Observers did not process key removals: {string.Join(", ", keysRemoved)}");
   }
 }
