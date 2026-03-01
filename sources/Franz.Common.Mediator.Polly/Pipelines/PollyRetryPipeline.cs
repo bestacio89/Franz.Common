@@ -11,136 +11,133 @@ using Serilog.Context;
 using System.Diagnostics;
 using PollyContext = Polly.Context;
 
-namespace Franz.Common.Mediator.Polly.Pipelines
+namespace Franz.Common.Mediator.Polly.Pipelines;
+
+/// <summary>
+/// Hardened Retry pipeline.
+/// Uses native Guid v7 correlation to group multiple attempts into a single traceable story.
+/// </summary>
+public sealed class PollyRetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 {
-  /// <summary>
-  /// Retry pipeline with full resilience awareness.
-  /// Logs retry attempts, tracks retry count, and notifies observers.
-  /// Works with both typed and untyped IAsyncPolicy registrations.
-  /// </summary>
-  public sealed class PollyRetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
+  private readonly IAsyncPolicy _policy;
+  private readonly ILogger<TRequest> _logger;
+  private readonly IEnumerable<IResilienceObserver> _observers;
+
+  public PollyRetryPipeline(
+      IReadOnlyPolicyRegistry<string> registry,
+      IOptions<PollyRetryPipelineOptions> options,
+      ILogger<TRequest> logger,
+      IEnumerable<IResilienceObserver> observers)
   {
-    private readonly IAsyncPolicy _policy;
-    private readonly ILogger<TRequest> _logger;
-    private readonly IEnumerable<IResilienceObserver> _observers;
+    _policy = registry.Get<IAsyncPolicy>(options.Value.PolicyName);
+    _logger = logger;
+    _observers = observers;
+  }
 
-    public PollyRetryPipeline(
-        IReadOnlyPolicyRegistry<string> registry,
-        IOptions<PollyRetryPipelineOptions> options,
-        ILogger<TRequest> logger,
-        IEnumerable<IResilienceObserver> observers)
+  public async Task<TResponse> Handle(
+      TRequest request,
+      Func<Task<TResponse>> next,
+      CancellationToken cancellationToken = default)
+  {
+    var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
+
+    // BAZOOKA REFACTOR: Bridge to the native Guid v7 identity.
+    var correlationId = CorrelationId.Ensure();
+    CorrelationId.Current = correlationId;
+
+    var stopwatch = Stopwatch.StartNew();
+    var resilienceContext = new Context.ResilienceContext
     {
-      _policy = registry.Get<IAsyncPolicy>(options.Value.PolicyName);
-      _logger = logger;
-      _observers = observers;
-    }
+      PolicyName = _policy.PolicyKey,
+      RetryCount = 0
+    };
 
-    public async Task<TResponse> Handle(
-        TRequest request,
-        Func<Task<TResponse>> next,
-        CancellationToken cancellationToken = default)
+    using (LogContext.PushProperty("FranzRequest", requestName))
+    using (LogContext.PushProperty("FranzCorrelationId", correlationId))
+    using (LogContext.PushProperty("FranzPipeline", nameof(PollyRetryPipeline<TRequest, TResponse>)))
+    using (LogContext.PushProperty("FranzPolicy", _policy.PolicyKey))
     {
-      var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
-      var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
-      CorrelationId.Current = correlationId;
-
-      var stopwatch = Stopwatch.StartNew();
-      var resilienceContext = new Context.ResilienceContext
-      {
-        PolicyName = _policy.PolicyKey,
-        RetryCount = 0
-      };
-
-      using (LogContext.PushProperty("FranzRequest", requestName))
-      using (LogContext.PushProperty("FranzCorrelationId", correlationId))
-      using (LogContext.PushProperty("FranzPipeline", nameof(PollyRetryPipeline<TRequest, TResponse>)))
-      using (LogContext.PushProperty("FranzPolicy", _policy.PolicyKey))
-      {
-        _logger.LogInformation(
+      _logger.LogInformation(
           "▶️ Executing {Request} [{CorrelationId}] with Retry policy {Policy}",
           requestName, correlationId, _policy.PolicyKey);
 
-        var pollyContext = new PollyContext($"Franz-{correlationId}");
+      // Pass the Guid-based identity into Polly's internal context
+      var pollyContext = new PollyContext($"Franz-{correlationId}");
 
-        try
+      try
+      {
+        TResponse result;
+
+        if (_policy is IAsyncPolicy<TResponse> typedPolicy)
         {
-          TResponse result;
-
-          // ✅ Dual-mode execution (typed/untyped)
-          if (_policy is IAsyncPolicy<TResponse> typedPolicy)
+          result = await typedPolicy.ExecuteAsync(async (ctx, ct) =>
           {
-            result = await typedPolicy.ExecuteAsync(async (ctx, ct) =>
+            try
             {
-              try
-              {
-                return await next();
-              }
-              catch (Exception ex)
-              {
-                resilienceContext.RetryCount++;
-                _logger.LogWarning(
-                  ex,
+              return await next();
+            }
+            catch (Exception ex)
+            {
+              resilienceContext.RetryCount++;
+              _logger.LogWarning(ex,
                   "🔁 {Request} [{CorrelationId}] retry attempt {RetryCount} (policy {Policy})",
                   requestName, correlationId, resilienceContext.RetryCount, _policy.PolicyKey);
-                throw;
-              }
-            },
-            pollyContext,
-            cancellationToken);
-          }
-          else
+              throw;
+            }
+          }, pollyContext, cancellationToken);
+        }
+        else
+        {
+          // Untyped execution
+          await _policy.ExecuteAsync(async (ctx, ct) =>
           {
-            await _policy.ExecuteAsync(async (ctx, ct) =>
+            try
             {
-              try
-              {
-                await next();
-              }
-              catch (Exception ex)
-              {
-                resilienceContext.RetryCount++;
-                _logger.LogWarning(
-                  ex,
+              await next();
+            }
+            catch (Exception ex)
+            {
+              resilienceContext.RetryCount++;
+              _logger.LogWarning(ex,
                   "🔁 {Request} [{CorrelationId}] retry attempt {RetryCount} (policy {Policy})",
                   requestName, correlationId, resilienceContext.RetryCount, _policy.PolicyKey);
-                throw;
-              }
-            },
-            pollyContext,
-            cancellationToken);
+              throw;
+            }
+          }, pollyContext, cancellationToken);
 
-            // Execute once more to produce the typed result
-            result = await next();
-          }
+          // Note: Ensure the handler is called one final time to capture the typed result 
+          // only if the policy didn't throw.
+          result = await next();
+        }
 
-          stopwatch.Stop();
-          resilienceContext.Duration = stopwatch.Elapsed;
+        stopwatch.Stop();
+        resilienceContext.Duration = stopwatch.Elapsed;
 
-          _logger.LogInformation(
+        _logger.LogInformation(
             "✅ {Request} [{CorrelationId}] succeeded after {Elapsed}ms (policy {Policy}, retries={RetryCount})",
             requestName, correlationId, stopwatch.ElapsedMilliseconds, _policy.PolicyKey, resilienceContext.RetryCount);
 
-          foreach (var obs in _observers)
-            obs.OnPolicyExecuted(resilienceContext.PolicyName, resilienceContext);
+        NotifyObservers(resilienceContext);
+        return result;
+      }
+      catch (Exception ex)
+      {
+        stopwatch.Stop();
+        resilienceContext.Duration = stopwatch.Elapsed;
 
-          return result;
-        }
-        catch (Exception ex)
-        {
-          stopwatch.Stop();
-          resilienceContext.Duration = stopwatch.Elapsed;
-
-          _logger.LogError(
-            ex,
+        _logger.LogError(ex,
             "❌ {Request} [{CorrelationId}] failed after {Elapsed}ms (policy {Policy}, retries={RetryCount})",
             requestName, correlationId, stopwatch.ElapsedMilliseconds, _policy.PolicyKey, resilienceContext.RetryCount);
 
-          foreach (var obs in _observers)
-            obs.OnPolicyExecuted(resilienceContext.PolicyName, resilienceContext);
-
-          throw;
-        }
+        NotifyObservers(resilienceContext);
+        throw;
       }
     }
+  }
+
+  private void NotifyObservers(Context.ResilienceContext context)
+  {
+    foreach (var obs in _observers)
+      obs.OnPolicyExecuted(context.PolicyName, context);
   }
 }

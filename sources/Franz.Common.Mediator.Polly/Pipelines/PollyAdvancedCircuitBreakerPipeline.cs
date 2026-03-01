@@ -13,118 +13,117 @@ using Serilog.Context;
 using System.Diagnostics;
 using ResilienceContext = Franz.Common.Mediator.Polly.Context.ResilienceContext;
 
-namespace Franz.Common.Mediator.Polly.Pipelines
+namespace Franz.Common.Mediator.Polly.Pipelines;
+
+/// <summary>
+/// Hardened Advanced Circuit Breaker pipeline.
+/// Enforces high-performance native Guid v7 correlation and accurate execution wrapping.
+/// </summary>
+public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 {
-  /// <summary>
-  /// Advanced Circuit Breaker pipeline with full resilience awareness.
-  /// Works with both typed and untyped IAsyncPolicy registrations.
-  /// Logs circuit state, duration, and integrates with observers for telemetry.
-  /// </summary>
-  public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
+  private readonly IAsyncPolicy _policy;
+  private readonly ILogger<TRequest> _logger;
+  private readonly IEnumerable<IResilienceObserver> _observers;
+
+  public PollyAdvancedCircuitBreakerPipeline(
+      IReadOnlyPolicyRegistry<string> registry,
+      IOptions<PollyCircuitBreakerPipelineOptions> options,
+      ILogger<TRequest> logger,
+      IEnumerable<IResilienceObserver> observers)
   {
-    private readonly IAsyncPolicy _policy;
-    private readonly ILogger<TRequest> _logger;
-    private readonly IEnumerable<IResilienceObserver> _observers;
+    _logger = logger;
+    _observers = observers;
+    _policy = registry.Get<IAsyncPolicy>(options.Value.PolicyName);
+  }
 
-    public PollyAdvancedCircuitBreakerPipeline(
-        IReadOnlyPolicyRegistry<string> registry,
-        IOptions<PollyCircuitBreakerPipelineOptions> options,
-        ILogger<TRequest> logger,
-        IEnumerable<IResilienceObserver> observers)
+  public async Task<TResponse> Handle(
+      TRequest request,
+      Func<Task<TResponse>> next,
+      CancellationToken cancellationToken = default)
+  {
+    var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
+
+    // Ensure native Guid v7 correlation lineage
+    var correlationId = CorrelationId.Ensure();
+
+    var stopwatch = Stopwatch.StartNew();
+    var context = new ResilienceContext
     {
-      _logger = logger;
-      _observers = observers;
-      _policy = registry.Get<IAsyncPolicy>(options.Value.PolicyName);
-    }
+      PolicyName = _policy.PolicyKey
+    };
 
-    public async Task<TResponse> Handle(
-        TRequest request,
-        Func<Task<TResponse>> next,
-        CancellationToken cancellationToken = default)
+    using (LogContext.PushProperty("FranzRequest", requestName))
+    using (LogContext.PushProperty("FranzCorrelationId", correlationId))
+    using (LogContext.PushProperty("FranzPipeline", nameof(PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse>)))
+    using (LogContext.PushProperty("FranzPolicy", _policy.PolicyKey))
     {
-      var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
-      var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
-      CorrelationId.Current = correlationId;
-
-      var stopwatch = Stopwatch.StartNew();
-      var context = new ResilienceContext
-      {
-        PolicyName = _policy.PolicyKey
-      };
-
-      using (LogContext.PushProperty("FranzRequest", requestName))
-      using (LogContext.PushProperty("FranzCorrelationId", correlationId))
-      using (LogContext.PushProperty("FranzPipeline", nameof(PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse>)))
-      using (LogContext.PushProperty("FranzPolicy", _policy.PolicyKey))
-      {
-        _logger.LogInformation(
+      _logger.LogInformation(
           "▶️ Executing {Request} [{CorrelationId}] through AdvancedCircuitBreaker {Policy}",
           requestName, correlationId, _policy.PolicyKey);
 
-        try
+      try
+      {
+        TResponse result;
+
+        if (_policy is IAsyncPolicy<TResponse> typedPolicy)
         {
-          TResponse result;
+          result = await typedPolicy.ExecuteAsync(async _ => await next(), cancellationToken);
+        }
+        else
+        {
+          // FIX: Execute 'next' THROUGH the policy to ensure the Circuit Breaker
+          // tracks the failure/success of this specific call.
+          // Previous version called next() twice or outside the policy's view.
+          result = await _policy.ExecuteAsync(async _ => await next(), cancellationToken);
+        }
 
-          // ✅ Auto-handle both typed and untyped policies
-          if (_policy is IAsyncPolicy<TResponse> typedPolicy)
-          {
-            result = await typedPolicy.ExecuteAsync(async ct => await next(), cancellationToken);
-          }
-          else
-          {
-            // Fallback to untyped policy execution
-            await _policy.ExecuteAsync(async ct => await next(), cancellationToken);
-            // Since untyped policies don't capture return values, call next() directly
-            result = await next();
-          }
+        stopwatch.Stop();
+        context.Duration = stopwatch.Elapsed;
 
-          stopwatch.Stop();
-          context.Duration = stopwatch.Elapsed;
+        if (_policy is AsyncCircuitBreakerPolicy breakerPolicy)
+          context.CircuitOpen = breakerPolicy.CircuitState == CircuitState.Open;
 
-          if (_policy is AsyncCircuitBreakerPolicy breakerPolicy)
-            context.CircuitOpen = breakerPolicy.CircuitState == CircuitState.Open;
-
-          _logger.LogInformation(
+        _logger.LogInformation(
             "✅ {Request} [{CorrelationId}] succeeded in {Elapsed}ms via {Policy}",
             requestName, correlationId, stopwatch.ElapsedMilliseconds, _policy.PolicyKey);
 
-          foreach (var obs in _observers)
-            obs.OnPolicyExecuted(context.PolicyName, context);
+        NotifyObservers(context);
 
-          return result;
-        }
-        catch (BrokenCircuitException bcex)
-        {
-          stopwatch.Stop();
-          context.Duration = stopwatch.Elapsed;
-          context.CircuitOpen = true;
+        return result;
+      }
+      catch (BrokenCircuitException bcex)
+      {
+        stopwatch.Stop();
+        context.Duration = stopwatch.Elapsed;
+        context.CircuitOpen = true;
 
-          _logger.LogWarning(
+        _logger.LogWarning(
             bcex,
             "⚠️ {Request} [{CorrelationId}] blocked — circuit OPEN ({Policy}) after {Elapsed}ms",
             requestName, correlationId, _policy.PolicyKey, stopwatch.ElapsedMilliseconds);
 
-          foreach (var obs in _observers)
-            obs.OnPolicyExecuted(context.PolicyName, context);
+        NotifyObservers(context);
+        throw;
+      }
+      catch (Exception ex)
+      {
+        stopwatch.Stop();
+        context.Duration = stopwatch.Elapsed;
 
-          throw;
-        }
-        catch (Exception ex)
-        {
-          stopwatch.Stop();
-          context.Duration = stopwatch.Elapsed;
-
-          _logger.LogError(
+        _logger.LogError(
             ex,
             "❌ {Request} [{CorrelationId}] failed in {Elapsed}ms under {Policy}",
             requestName, correlationId, stopwatch.ElapsedMilliseconds, _policy.PolicyKey);
 
-          foreach (var obs in _observers)
-            obs.OnPolicyExecuted(context.PolicyName, context);
-
-          throw;
-        }
+        NotifyObservers(context);
+        throw;
       }
     }
+  }
+
+  private void NotifyObservers(ResilienceContext context)
+  {
+    foreach (var obs in _observers)
+      obs.OnPolicyExecuted(context.PolicyName, context);
   }
 }

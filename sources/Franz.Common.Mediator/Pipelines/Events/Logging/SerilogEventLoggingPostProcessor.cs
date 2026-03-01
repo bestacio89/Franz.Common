@@ -17,7 +17,7 @@ public sealed class SerilogEventLoggingPostProcessor<TEvent> : IEventPostProcess
   private readonly ILogger<SerilogEventLoggingPostProcessor<TEvent>> _logger;
 
   public SerilogEventLoggingPostProcessor(
-    ILogger<SerilogEventLoggingPostProcessor<TEvent>> logger)
+      ILogger<SerilogEventLoggingPostProcessor<TEvent>> logger)
   {
     _logger = logger;
   }
@@ -25,13 +25,16 @@ public sealed class SerilogEventLoggingPostProcessor<TEvent> : IEventPostProcess
   public Task ProcessAsync(TEvent @event, CancellationToken cancellationToken = default)
   {
     var eventType = @event?.GetType().Name ?? typeof(TEvent).Name;
-    var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
-    CorrelationId.Current = correlationId;
+
+    
+    // This ensures the "Success" log is bitwise-linked to the "Start" log.
+    var correlationId = CorrelationId.Ensure();
 
     using (LogContext.PushProperty("FranzEvent", eventType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))
     using (LogContext.PushProperty("FranzProcessor", nameof(SerilogEventLoggingPostProcessor<TEvent>)))
     {
+      // Logging the native Guid directly for high-speed indexing in Seq/ELK/SQL.
       _logger.LogInformation("✅ [Event-Post] {Event} [{CorrelationId}] handled successfully: {@Event}",
           eventType, correlationId, @event);
     }

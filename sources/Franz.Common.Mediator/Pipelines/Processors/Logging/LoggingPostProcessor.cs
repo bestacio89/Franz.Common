@@ -1,56 +1,58 @@
-﻿using Franz.Common.Mediator.Pipelines; // 👈 your shared CorrelationId
+﻿#nullable enable
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace Franz.Common.Mediator.Pipelines.Processors.Logging
+namespace Franz.Common.Mediator.Pipelines.Processors.Logging;
+
+/// <summary>
+/// Hardened Post-Processor for logging request outcomes.
+/// Finalizes the lineage using native Guid v7 correlation.
+/// </summary>
+public sealed class LoggingPostProcessor<TRequest, TResponse> : IPostProcessor<TRequest, TResponse>
 {
-  public class LoggingPostProcessor<TRequest, TResponse> : IPostProcessor<TRequest, TResponse>
-  {
-    private readonly ILogger<LoggingPostProcessor<TRequest, TResponse>> _logger;
-    private readonly IHostEnvironment _env;
+  private readonly ILogger<LoggingPostProcessor<TRequest, TResponse>> _logger;
+  private readonly IHostEnvironment _env;
 
-    public LoggingPostProcessor(
+  public LoggingPostProcessor(
       ILogger<LoggingPostProcessor<TRequest, TResponse>> logger,
       IHostEnvironment env)
+  {
+    _logger = logger;
+    _env = env;
+  }
+
+  public Task ProcessAsync(TRequest request, TResponse response, CancellationToken cancellationToken = default)
+  {
+    var requestType = request?.GetType().Name ?? typeof(TRequest).Name;
+
+    string prefix = requestType.EndsWith("Command", StringComparison.OrdinalIgnoreCase)
+        ? "Command"
+        : requestType.EndsWith("Query", StringComparison.OrdinalIgnoreCase)
+            ? "Query"
+            : "Request";
+
+    // BAZOOKA REFACTOR: Fetch the existing Guid v7.
+    // In a Post-Processor, we expect the ID to already exist from the Pre-Processor or Pipeline.
+    var correlationId = CorrelationId.Ensure();
+
+    using (_logger.BeginScope(new { CorrelationId = correlationId }))
     {
-      _logger = logger;
-      _env = env;
-    }
-
-    public Task ProcessAsync(TRequest request, TResponse response, CancellationToken cancellationToken = default)
-    {
-      var requestType = request?.GetType().Name ?? typeof(TRequest).Name;
-      string prefix = requestType.EndsWith("Command", StringComparison.OrdinalIgnoreCase)
-          ? "Command"
-          : requestType.EndsWith("Query", StringComparison.OrdinalIgnoreCase)
-              ? "Query"
-              : "Request";
-
-      // ✅ Pull from shared CorrelationId
-      var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
-      CorrelationId.Current = correlationId;
-
-      using (_logger.BeginScope(new { CorrelationId = correlationId }))
+      if (_env.IsDevelopment())
       {
-        if (_env.IsDevelopment())
-        {
-          _logger.LogInformation(
+        _logger.LogInformation(
             "[Post-{Prefix}] {RequestName} [{CorrelationId}] produced response {@Response}",
             prefix, requestType, correlationId, response);
-        }
-        else
-        {
-          _logger.LogInformation(
+      }
+      else
+      {
+        // Clean production logging with native Guid
+        _logger.LogInformation(
             "[Post-{Prefix}] {RequestName} [{CorrelationId}] completed successfully",
             prefix, requestType, correlationId);
-        }
       }
-
-      return Task.CompletedTask;
     }
+
+    return Task.CompletedTask;
   }
 }

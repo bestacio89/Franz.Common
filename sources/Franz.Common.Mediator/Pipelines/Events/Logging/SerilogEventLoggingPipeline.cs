@@ -18,24 +18,27 @@ public sealed class SerilogEventLoggingPipeline<TEvent> : IEventPipeline<TEvent>
   private readonly IHostEnvironment _env;
 
   public SerilogEventLoggingPipeline(
-    ILogger<SerilogEventLoggingPipeline<TEvent>> logger,
-    IHostEnvironment env)
+      ILogger<SerilogEventLoggingPipeline<TEvent>> logger,
+      IHostEnvironment env)
   {
     _logger = logger;
     _env = env;
   }
 
   public async Task HandleAsync(
-    TEvent @event,
-    Func<Task> next,
-    CancellationToken cancellationToken = default)
+      TEvent @event,
+      Func<Task> next,
+      CancellationToken cancellationToken = default)
   {
     var eventName = @event?.GetType().Name ?? typeof(TEvent).Name;
-    var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
-    CorrelationId.Current = correlationId;
+
+    // Ensure we have a Guid v7 correlation ID. 
+    // If one was set by the messaging adapter, it's preserved; otherwise, a new sequential one is created.
+    var correlationId = CorrelationId.Ensure();
 
     var stopwatch = Stopwatch.StartNew();
 
+    // Logging the Guid directly allows Serilog to handle it as a native UUID/Guid type in sinks like Elastic or SQL
     using (_logger.BeginScope(new { CorrelationId = correlationId }))
     {
       try
@@ -43,32 +46,23 @@ public sealed class SerilogEventLoggingPipeline<TEvent> : IEventPipeline<TEvent>
         if (_env.IsDevelopment())
         {
           _logger.LogInformation(
-            "📢 [Event] {EventName} [{CorrelationId}] started with payload {@Event}",
-            eventName, correlationId, @event);
+              "📢 [Event] {EventName} [{CorrelationId}] started with payload {@Event}",
+              eventName, correlationId, @event);
         }
         else
         {
           _logger.LogInformation(
-            "📢 [Event] {EventName} [{CorrelationId}] started",
-            eventName, correlationId);
+              "📢 [Event] {EventName} [{CorrelationId}] started",
+              eventName, correlationId);
         }
 
         await next();
 
         stopwatch.Stop();
 
-        if (_env.IsDevelopment())
-        {
-          _logger.LogInformation(
+        _logger.LogInformation(
             "✅ [Event] {EventName} [{CorrelationId}] finished in {Elapsed} ms",
             eventName, correlationId, stopwatch.ElapsedMilliseconds);
-        }
-        else
-        {
-          _logger.LogInformation(
-            "✅ [Event] {EventName} [{CorrelationId}] finished in {Elapsed} ms",
-            eventName, correlationId, stopwatch.ElapsedMilliseconds);
-        }
       }
       catch (Exception ex)
       {
@@ -77,14 +71,14 @@ public sealed class SerilogEventLoggingPipeline<TEvent> : IEventPipeline<TEvent>
         if (_env.IsDevelopment())
         {
           _logger.LogError(ex,
-            "❌ [Event] {EventName} [{CorrelationId}] failed after {Elapsed} ms",
-            eventName, correlationId, stopwatch.ElapsedMilliseconds);
+              "❌ [Event] {EventName} [{CorrelationId}] failed after {Elapsed} ms",
+              eventName, correlationId, stopwatch.ElapsedMilliseconds);
         }
         else
         {
           _logger.LogError(
-            "❌ [Event] {EventName} [{CorrelationId}] failed after {Elapsed} ms with {ErrorMessage}",
-            eventName, correlationId, stopwatch.ElapsedMilliseconds, ex.Message);
+              "❌ [Event] {EventName} [{CorrelationId}] failed after {Elapsed} ms with {ErrorMessage}",
+              eventName, correlationId, stopwatch.ElapsedMilliseconds, ex.Message);
         }
 
         throw;

@@ -16,7 +16,7 @@ public sealed class SerilogEventAuditPreProcessor<TEvent> : IEventPreProcessor<T
   private readonly ILogger<SerilogEventAuditPreProcessor<TEvent>> _logger;
 
   public SerilogEventAuditPreProcessor(
-    ILogger<SerilogEventAuditPreProcessor<TEvent>> logger)
+      ILogger<SerilogEventAuditPreProcessor<TEvent>> logger)
   {
     _logger = logger;
   }
@@ -24,13 +24,19 @@ public sealed class SerilogEventAuditPreProcessor<TEvent> : IEventPreProcessor<T
   public Task ProcessAsync(TEvent @event, CancellationToken cancellationToken = default)
   {
     var eventType = @event?.GetType().Name ?? typeof(TEvent).Name;
-    var correlationId = CorrelationId.Current ?? Guid.NewGuid().ToString("N");
+
+    // BAZOOKA REFACTOR: Fetch or establish the native Guid v7 context.
+    // This ensures the audit trail is physically ordered in your log storage.
+    var correlationId = CorrelationId.Ensure();
+
+    // Sync the ambient context so all downstream logic sees this ID.
     CorrelationId.Current = correlationId;
 
     using (LogContext.PushProperty("FranzEvent", eventType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))
     using (LogContext.PushProperty("FranzProcessor", nameof(SerilogEventAuditPreProcessor<TEvent>)))
     {
+      // Log native Guid for optimized UUID indexing in Seq/Elasticsearch
       _logger.LogInformation("🔎 [Audit-Pre] Handling {Event} [{CorrelationId}]",
           eventType, correlationId);
     }
