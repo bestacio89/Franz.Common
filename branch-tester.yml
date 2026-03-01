@@ -1,0 +1,40 @@
+trigger: none  # we will manually run this pipeline on any branch
+
+pr: none  # optional: disable automatic PR triggers
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  buildConfiguration: 'Release'
+
+jobs:
+- job: Test_All
+  displayName: 'Restore, Build and Run All Tests on Branch'
+  container: mcr.microsoft.com/dotnet/sdk:10.0
+  steps:
+
+  - task: UseDotNet@2
+    displayName: 'Install .NET SDK'
+    inputs:
+      packageType: 'sdk'
+      version: '10.0.x'
+
+  - script: |
+      echo "Restoring all projects..."
+      dotnet restore Franz.Common.sln
+    displayName: 'Dotnet Restore'
+
+  - script: |
+      echo "Building solution..."
+      dotnet build Franz.Common.sln --configuration $(buildConfiguration)
+    displayName: 'Dotnet Build'
+
+  - script: |
+      echo "Running all tests..."
+      dotnet test Franz.Common.sln \
+        --configuration $(buildConfiguration) \
+        --no-build \
+        --logger "trx" \
+        --results-directory $(Build.ArtifactStagingDirectory)/TestResults
+    displayName: 'Dotnet Test All'
