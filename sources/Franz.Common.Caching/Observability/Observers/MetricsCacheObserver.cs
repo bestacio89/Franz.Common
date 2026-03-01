@@ -8,11 +8,12 @@ namespace Franz.Common.Caching.Observability.Observers;
 public sealed class MetricsCacheObserver : ICacheObserver
 {
   private readonly ConcurrentDictionary<string, CacheEntryStats> _stats = new();
-  private readonly ConcurrentBag<string> _removedTags = new();
+  private ConcurrentBag<string> _removedTags = new();
 
   public int TotalSets { get; private set; }
   public int TotalHits { get; private set; }
   public int TotalRemovals { get; private set; }
+
   public List<string> CurrentRemovedTags => _removedTags.ToList();
   public List<string> CurrentKeys => _stats.Keys.ToList();
 
@@ -22,6 +23,15 @@ public sealed class MetricsCacheObserver : ICacheObserver
     stat.Sets++;
     stat.EstimatedSizeBytes = entry.EstimatedSizeInBytes;
     stat.LastSet = DateTime.UtcNow;
+
+    // Clear and store tags properly
+    stat.Tags.Clear();
+    if (entry.Tags != null)
+    {
+      foreach (var t in entry.Tags)
+        stat.Tags.Add(t);
+    }
+
     TotalSets++;
   }
 
@@ -32,7 +42,7 @@ public sealed class MetricsCacheObserver : ICacheObserver
     stat.LastAccess = DateTime.UtcNow;
     TotalHits++;
 
-    // Update OpenTelemetry metric if needed
+    // Optional metrics
     CacheMetrics.Hits.Add(1);
     if (access.LookupLatencyMs.HasValue)
       CacheMetrics.LookupLatencyMs.Record(access.LookupLatencyMs.Value);
@@ -46,21 +56,28 @@ public sealed class MetricsCacheObserver : ICacheObserver
 
   public void OnCacheRemoveByTag(string tag)
   {
-    foreach (var kvp in _stats)
+    var keysToRemove = _stats
+        .Where(kvp => kvp.Value.Tags.Contains(tag))
+        .Select(kvp => kvp.Key)
+        .ToList();
+
+    foreach (var key in keysToRemove)
     {
-      if (kvp.Value.Tags.Contains(tag))
-        _stats.TryRemove(kvp.Key, out _);
+      _stats.TryRemove(key, out _);
+      TotalRemovals++;
     }
+
     _removedTags.Add(tag);
   }
+
   public void Reset()
   {
-    // If you are running tests in parallel, use lock() or Interlocked
     TotalSets = 0;
     TotalHits = 0;
     TotalRemovals = 0;
-    CurrentKeys.Clear();
-    CurrentRemovedTags.Clear();
+    _stats.Clear();
+    _removedTags = new ConcurrentBag<string>();
   }
+
   public IReadOnlyDictionary<string, CacheEntryStats> Snapshot() => _stats;
 }

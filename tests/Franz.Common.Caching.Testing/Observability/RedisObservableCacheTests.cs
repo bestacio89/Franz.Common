@@ -1,13 +1,11 @@
-﻿using System;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Franz.Common.Caching.Abstractions;
+﻿using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Observability.Observers;
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Tests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Franz.Common.Caching.Tests;
@@ -29,7 +27,6 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
   private MetricsCacheObserver MetricsObserver => _fixture.ServiceProvider.GetRequiredService<MetricsCacheObserver>();
   private LoggingMetricsObserver LoggingObserver => _fixture.ServiceProvider.GetRequiredService<LoggingMetricsObserver>();
 
-  // Reset observers before each test
   public Task InitializeAsync()
   {
     MetricsObserver.Reset();
@@ -57,7 +54,6 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
     Assert.Equal(1, LoggingObserver.TotalHits);
 
     await Cache.RemoveAsync(key);
-    await WaitForObserversAsync(new[] { key });
   }
 
   [Fact]
@@ -70,7 +66,6 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
     Assert.Contains(key, LoggingObserver.CurrentKeys);
 
     await Cache.RemoveAsync(key);
-    await WaitForObserversAsync(new[] { key });
 
     Assert.DoesNotContain(key, MetricsObserver.CurrentKeys);
     Assert.DoesNotContain(key, LoggingObserver.CurrentKeys);
@@ -92,7 +87,6 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
     Assert.Equal(2, LoggingObserver.TotalSets);
 
     await Cache.RemoveByTagAsync(tag);
-    await WaitForObserversAsync(new[] { key1, key2 });
 
     Assert.DoesNotContain(key1, MetricsObserver.CurrentKeys);
     Assert.DoesNotContain(key2, MetricsObserver.CurrentKeys);
@@ -115,7 +109,6 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
     Assert.Equal(1, LoggingObserver.TotalSets);
 
     await Cache.RemoveAsync(key);
-    await WaitForObserversAsync(new[] { key });
   }
 
   [Fact]
@@ -124,52 +117,28 @@ public class RedisObservableCacheTests : IClassFixture<RedisCacheFixture>, IAsyn
     string keyPrefix = $"workflow_{Guid.NewGuid()}";
     string tag = $"workflow_tag_{Guid.NewGuid()}";
 
-    // 3 Sets
     await Cache.GetOrSetAsync($"{keyPrefix}_1", ct => Task.FromResult(1), new CacheOptions { Tags = new[] { tag } });
     await Cache.GetOrSetAsync($"{keyPrefix}_2", ct => Task.FromResult(2), new CacheOptions { Tags = new[] { tag } });
     await Cache.GetOrSetAsync($"{keyPrefix}_3", ct => Task.FromResult(3));
 
-    // 2 Hits
     var hit1 = await Cache.GetOrSetAsync($"{keyPrefix}_1", ct => Task.FromResult(999));
     var hit2 = await Cache.GetOrSetAsync($"{keyPrefix}_2", ct => Task.FromResult(999));
 
     Assert.True(hit1.IsHit);
     Assert.True(hit2.IsHit);
 
-    // Removals
     await Cache.RemoveAsync($"{keyPrefix}_3");
-    await WaitForObserversAsync(new[] { $"{keyPrefix}_3" });
-
     await Cache.RemoveByTagAsync(tag);
-    await WaitForObserversAsync(new[] { $"{keyPrefix}_1", $"{keyPrefix}_2" });
 
     Assert.Equal(3, MetricsObserver.TotalSets);
     Assert.Equal(3, LoggingObserver.TotalSets);
     Assert.Equal(2, MetricsObserver.TotalHits);
     Assert.Equal(2, LoggingObserver.TotalHits);
-    Assert.Equal(1, MetricsObserver.TotalRemovals);
-    Assert.Equal(1, LoggingObserver.TotalRemovals);
+    Assert.Equal(3, MetricsObserver.TotalRemovals); // includes key3 + 2 keys removed by tag
+    Assert.Equal(3, LoggingObserver.TotalRemovals);
     Assert.Contains(tag, MetricsObserver.CurrentRemovedTags);
     Assert.Contains(tag, LoggingObserver.CurrentRemovedTags);
     Assert.Empty(MetricsObserver.CurrentKeys);
     Assert.Empty(LoggingObserver.CurrentKeys);
-  }
-
-  private async Task WaitForObserversAsync(string[] keysRemoved, int timeoutMs = 500)
-  {
-    var sw = Stopwatch.StartNew();
-    while (sw.ElapsedMilliseconds < timeoutMs)
-    {
-      bool allRemoved = keysRemoved.All(k =>
-          !MetricsObserver.CurrentKeys.Contains(k) &&
-          !LoggingObserver.CurrentKeys.Contains(k)
-      );
-
-      if (allRemoved) return;
-
-      await Task.Delay(10);
-    }
-
-    throw new TimeoutException($"Observers did not process key removals: {string.Join(", ", keysRemoved)}");
   }
 }
