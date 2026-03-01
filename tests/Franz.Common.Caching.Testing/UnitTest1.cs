@@ -7,7 +7,7 @@ using System;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Franz.Common.Caching.Testing.Tests
+namespace Franz.Common.Caching.Tests.Tests
 {
   public class ObserverDebuggingTests
   {
