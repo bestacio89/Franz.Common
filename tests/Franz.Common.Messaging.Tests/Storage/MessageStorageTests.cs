@@ -30,7 +30,7 @@ public class MessageStorageTests
     {
       Id = originalId,
       MessageType = "Franz.TestEvent",
-      CorrelationId = Guid.NewGuid()
+      CorrelationId = Guid.CreateVersion7()
     };
     message.Headers.Add("X-Tenant-Id", "tenant-1");
     message.Headers.Add("X-Empty", "   "); // Should be stripped

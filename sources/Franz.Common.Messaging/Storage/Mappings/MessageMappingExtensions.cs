@@ -9,33 +9,34 @@ public static class MessageMappingExtensions
 {
   public static StoredMessage ToStored(this Message message)
   {
-    if (message is null)
-      throw new ArgumentNullException(nameof(message));
-
-    if (message.Body is null)
-      throw new ArgumentNullException(nameof(message.Body));
+    if (message is null) throw new ArgumentNullException(nameof(message));
+    if (message.Body is null) throw new ArgumentNullException(nameof(message.Body));
 
     return new StoredMessage
     {
-      Id = message.Id, // Native Guid v7 assignment
+      Id = message.Id,
       Body = message.Body,
-      CorrelationId = message.CorrelationId, // Native Guid assignment
+      CorrelationId = message.CorrelationId,
       MessageType = message.MessageType,
 
-      // Fix: Create a new Dictionary instead of casting ToDictionary
-      Headers = message.Headers.ToDictionary(
+      // The Fix: Use StringValues.IsNullOrEmpty and filter the entries
+      Headers = message.Headers
+    .Where(kv => !StringValues.IsNullOrEmpty(kv.Value) &&
+                 kv.Value.Any(v => !string.IsNullOrWhiteSpace(v)))
+    .ToDictionary(
         kv => kv.Key,
         kv => kv.Value
-        .Where(v => !string.IsNullOrWhiteSpace(v))
-        .Select(v => v!) 
-        .ToArray(),
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!) // The "Dammit Operator" to remove nullability from the string
+            .ToArray(),
         StringComparer.OrdinalIgnoreCase
-        ),
+    ),
 
       Properties = new Dictionary<string, object>(message.Properties, StringComparer.OrdinalIgnoreCase),
       CreatedOn = DateTime.UtcNow
     };
   }
+
 
   public static Message ToMessage(this StoredMessage stored)
   {
