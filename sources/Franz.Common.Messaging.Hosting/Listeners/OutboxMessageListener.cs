@@ -40,16 +40,20 @@ public class OutboxMessageListener : IListener
     {
       try
       {
+        // Fetching stored records (StoredMessage.Id should be Guid)
         var pending = await _messageStore.GetPendingAsync(stoppingToken);
 
         foreach (var stored in pending)
         {
+          // Bridge stored data to our native Guid v7 Message
           var message = stored.ToMessage();
 
-          // 👉 Inbox check
+          // 👉 Inbox check (High-performance Guid comparison)
           if (await _inbox.HasProcessedAsync(message.Id, stoppingToken))
           {
             _logger.LogInformation("⏩ Skipping already processed message {MessageId}", message.Id);
+            // Mark as sent in outbox so we don't fetch it again, even if it was a duplicate
+            await _messageStore.MarkAsSentAsync(stored.Id, stoppingToken);
             continue;
           }
 
@@ -58,6 +62,12 @@ public class OutboxMessageListener : IListener
 
           // Deserialize domain object
           object? domainObject = TryDeserializeDomainObject(message);
+
+          using var scope = _logger.BeginScope(new Dictionary<string, object>
+          {
+            ["FranzCorrelationId"] = message.CorrelationId,
+            ["FranzMessageId"] = message.Id
+          });
 
           if (domainObject is IEvent evt)
           {
@@ -71,10 +81,10 @@ public class OutboxMessageListener : IListener
           }
           else
           {
-            _logger.LogWarning("⚠️ Outbox message {Id} is neither ICommand nor IEvent", stored.Id);
+            _logger.LogWarning("⚠️ Outbox message {Id} is neither ICommand nor IEvent", message.Id);
           }
 
-          // 👉 Mark as processed in Inbox and Outbox
+          // 👉 Atomic logical completion
           await _inbox.MarkProcessedAsync(message.Id, stoppingToken);
           await _messageStore.MarkAsSentAsync(stored.Id, stoppingToken);
 
@@ -86,22 +96,21 @@ public class OutboxMessageListener : IListener
         _logger.LogError(ex, "💥 Unexpected error in OutboxMessageListener loop");
       }
 
+      // Consider making this interval configurable
       await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
     }
   }
 
-  public void StopListen()
-  {
-    // No unsubscribe logic required
-  }
+  public void StopListen() { /* No-op */ }
 
   private object? TryDeserializeDomainObject(Message message)
   {
-    if (message.Properties.TryGetValue("MessageType", out var typeName)
-        && !string.IsNullOrWhiteSpace((string?)typeName)
-        && message.Body is string bodyJson)
+    // Use the MessageType property we defined in the Message base class
+    var typeName = message.MessageType;
+
+    if (!string.IsNullOrWhiteSpace(typeName) && message.Body is string bodyJson)
     {
-      var type = ResolveType((string)typeName);
+      var type = ResolveType(typeName);
       if (type != null)
       {
         try
@@ -110,29 +119,23 @@ public class OutboxMessageListener : IListener
         }
         catch (Exception ex)
         {
-          _logger.LogError(ex,
-              "❌ Failed to deserialize message {Id} as {TypeName}",
-              message.Id, typeName);
+          _logger.LogError(ex, "❌ Failed to deserialize message {Id} as {TypeName}", message.Id, typeName);
         }
       }
     }
-
     return null;
   }
 
   private static Type? ResolveType(string typeName)
   {
-    // Fast path
     var type = Type.GetType(typeName);
     if (type != null) return type;
 
-    // Scan assemblies
     foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
     {
       type = asm.GetType(typeName);
       if (type != null) return type;
     }
-
     return null;
   }
 }

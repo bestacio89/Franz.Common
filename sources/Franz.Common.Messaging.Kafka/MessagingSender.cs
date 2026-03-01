@@ -16,9 +16,9 @@ public sealed class MessagingSender : IMessagingSender
   private readonly ILogger<MessagingSender> logger;
 
   public MessagingSender(
-    IProducer<string, byte[]> producer,
-    IAssemblyAccessor assemblyAccessor,
-    ILogger<MessagingSender> logger)
+      IProducer<string, byte[]> producer,
+      IAssemblyAccessor assemblyAccessor,
+      ILogger<MessagingSender> logger)
   {
     this.producer = producer;
     this.assemblyAccessor = assemblyAccessor;
@@ -33,14 +33,16 @@ public sealed class MessagingSender : IMessagingSender
     if (string.IsNullOrWhiteSpace(message.Body))
       throw new TechnicalException("Message body cannot be empty");
 
-    EnsureIdentifiers(message);
+    // ✅ REFACTOR: No need to "Ensure" anymore. 
+    // The Message class constructor already anchored us to Guid v7.
 
     var topic = TopicNamer.GetTopicName(
-      assemblyAccessor.GetEntryAssembly());
+        assemblyAccessor.GetEntryAssembly());
 
     var kafkaMessage = new Confluent.Kafka.Message<string, byte[]>
     {
-      Key = message.CorrelationId,
+      // 🛠️ FIX: Convert Guid to string for the Kafka Key
+      Key = message.CorrelationId.ToString(),
       Value = Encoding.UTF8.GetBytes(message.Body!),
       Headers = MapToKafkaHeaders(message)
     };
@@ -49,15 +51,19 @@ public sealed class MessagingSender : IMessagingSender
     {
       var result = await producer.ProduceAsync(topic, kafkaMessage, cancellationToken);
 
+      // 🛠️ FIX: Guid logs naturally in structured logging
       logger.LogInformation(
-        "📤 Kafka publish succeeded | Topic={Topic} Partition={Partition} Offset={Offset}",
-        result.Topic,
-        result.Partition.Value,
-        result.Offset.Value);
+          "📤 Kafka publish succeeded | ID={MessageId} Corr={CorrelationId} Topic={Topic} Partition={Partition} Offset={Offset}",
+          message.Id,
+          message.CorrelationId,
+          result.Topic,
+          result.Partition.Value,
+          result.Offset.Value);
     }
     catch (ProduceException<string, byte[]> ex)
     {
-      logger.LogError(ex, "🔥 Kafka publish failed for {MessageType}", message.MessageType);
+      logger.LogError(ex, "🔥 Kafka publish failed for {MessageType} [ID: {MessageId}]",
+          message.MessageType, message.Id);
       throw new TechnicalException("Kafka publish failed", ex);
     }
   }
@@ -66,10 +72,11 @@ public sealed class MessagingSender : IMessagingSender
   {
     var kafkaHeaders = new Confluent.Kafka.Headers();
 
-    // Franz invariants
-    kafkaHeaders.Add("message-id", Encoding.UTF8.GetBytes(message.Id));
+    // 🛠️ FIX: Guid -> String -> Bytes
+    // We use the standard GUID string format to ensure cross-platform compatibility
+    kafkaHeaders.Add("message-id", Encoding.UTF8.GetBytes(message.Id.ToString()));
     kafkaHeaders.Add("message-type", Encoding.UTF8.GetBytes(message.MessageType ?? "unknown"));
-    kafkaHeaders.Add("correlation-id", Encoding.UTF8.GetBytes(message.CorrelationId));
+    kafkaHeaders.Add("correlation-id", Encoding.UTF8.GetBytes(message.CorrelationId.ToString()));
 
     // Franz MessageHeaders → Kafka headers
     foreach (var header in message.Headers)
@@ -84,11 +91,5 @@ public sealed class MessagingSender : IMessagingSender
     }
 
     return kafkaHeaders;
-  }
-
-  private static void EnsureIdentifiers(Message message)
-  {
-    if (string.IsNullOrWhiteSpace(message.CorrelationId))
-      message.CorrelationId = Guid.NewGuid().ToString("N");
   }
 }
