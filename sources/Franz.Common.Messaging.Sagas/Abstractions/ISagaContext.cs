@@ -34,12 +34,12 @@ public interface ISagaContext
   /// <summary>
   /// Optional correlation identifier spanning the whole business process.
   /// </summary>
-  string? CorrelationId { get; }
+  Guid? CorrelationId { get; }
 
   /// <summary>
   /// Optional parent message identifier for tracing.
   /// </summary>
-  string? CausationId { get; }
+  Guid? CausationId { get; }
 
   /// <summary>
   /// Cancellation token for the current execution.
