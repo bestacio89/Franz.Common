@@ -2,14 +2,14 @@
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Extensions;
-using Franz.Common.Caching.Testing.Models;
+using Franz.Common.Caching.Tests.Models;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Franz.Common.Caching.Testing.Extensions;
+namespace Franz.Common.Caching.Tests.Extensions;
 
 public sealed class AddFranzDistributedCachingTests
 {

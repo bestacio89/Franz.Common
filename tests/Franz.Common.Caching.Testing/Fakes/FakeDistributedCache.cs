@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Franz.Common.Caching.Testing.Fakes;
+namespace Franz.Common.Caching.Tests.Fakes;
 
 internal sealed class FakeDistributedCache : IDistributedCache
 {

@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
-namespace Franz.Common.Caching.Testing.Pipelines;
+namespace Franz.Common.Caching.Tests.Pipelines;
 
 public sealed class CachingPipelineTests
 {

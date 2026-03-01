@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Franz.Common.Caching.Testing.Abstractions;
+namespace Franz.Common.Caching.Tests.Abstractions;
 
 
 public sealed class ISettingsCacheTests

@@ -1,7 +1,7 @@
 ﻿using FluentAssertions;
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Providers;
-using Franz.Common.Caching.Testing.Fixtures;
+using Franz.Common.Caching.Tests.Fixtures;
 using StackExchange.Redis;
 using System;
 using System.Linq;
@@ -9,7 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Franz.Common.Caching.Testing.Providers;
+namespace Franz.Common.Caching.Tests.Providers;
 
 public sealed class RedisCacheProviderTests
     : IClassFixture<RedisCacheFixture>

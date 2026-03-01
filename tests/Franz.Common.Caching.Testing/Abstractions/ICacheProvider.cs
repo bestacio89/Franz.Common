@@ -3,7 +3,7 @@ using Franz.Common.Caching.Abstractions;
 using System;
 using Xunit;
 
-namespace Franz.Common.Caching.Testing.Abstractions;
+namespace Franz.Common.Caching.Tests.Abstractions;
 
 public sealed class ICacheProviderTests
 {

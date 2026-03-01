@@ -3,11 +3,11 @@ using System.Threading.Tasks;
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Observability.Observers;
-using Franz.Common.Caching.Testing.Fixtures;
+using Franz.Common.Caching.Tests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Franz.Common.Caching.Testing.Tests;
+namespace Franz.Common.Caching.Tests.Tests;
 
 [CollectionDefinition("RedisCacheTests")]
 public class RedisCacheCollection : ICollectionFixture<RedisCacheFixture> { }

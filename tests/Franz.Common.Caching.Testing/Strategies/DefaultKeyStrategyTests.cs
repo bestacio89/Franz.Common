@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Franz.Common.Caching.Testing.Strategies;
+namespace Franz.Common.Caching.Tests.Strategies;
 
 public sealed class DefaultCacheKeyStrategyTests
 {

@@ -2,7 +2,7 @@
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Extensions;
 using Franz.Common.Caching.Providers;
-using Franz.Common.Caching.Testing.Models;
+using Franz.Common.Caching.Tests.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using StackExchange.Redis;
@@ -10,7 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Franz.Common.Caching.Testing.Extensions;
+namespace Franz.Common.Caching.Tests.Extensions;
 
 public sealed class AddFranzRedisCachingTests
 {

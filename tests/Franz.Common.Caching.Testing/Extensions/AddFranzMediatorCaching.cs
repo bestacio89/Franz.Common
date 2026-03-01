@@ -1,12 +1,12 @@
 ﻿using FluentAssertions;
 using Franz.Common.Caching.Extensions;
 using Franz.Common.Caching.Pipelines;
-using Franz.Common.Caching.Testing.Models;
+using Franz.Common.Caching.Tests.Models;
 using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Franz.Common.Caching.Testing.Extensions;
+namespace Franz.Common.Caching.Tests.Extensions;
 
 public sealed class AddFranzMediatorCachingTests
 {

@@ -2,7 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.Redis;
 
-namespace Franz.Common.Caching.Testing.Fixtures;
+namespace Franz.Common.Caching.Tests.Fixtures;
 public sealed class RedisCacheFixture : IAsyncLifetime
 {
   private readonly RedisContainer _container;

@@ -2,7 +2,7 @@
 using Franz.Common.Caching.Abstractions;
 
 
-namespace Franz.Common.Caching.Testing.Abstractions;
+namespace Franz.Common.Caching.Tests.Abstractions;
 
 public sealed class CachePriorityTests
 {

@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System;
 
-namespace Franz.Common.Caching.Testing.Models;
+namespace Franz.Common.Caching.Tests.Models;
 
 internal static class ServiceTestHelper
 {

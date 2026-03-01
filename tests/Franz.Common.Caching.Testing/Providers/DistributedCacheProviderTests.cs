@@ -1,13 +1,13 @@
 ﻿using FluentAssertions;
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Distributed;
-using Franz.Common.Caching.Testing.Fakes;
+using Franz.Common.Caching.Tests.Fakes;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Franz.Common.Caching.Testing.Providers;
+namespace Franz.Common.Caching.Tests.Providers;
 
 public sealed class DistributedCacheProviderTests
 {

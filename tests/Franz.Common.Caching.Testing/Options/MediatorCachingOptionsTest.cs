@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Franz.Common.Caching.Testing.Options;
+namespace Franz.Common.Caching.Tests.Options;
 
 public sealed class MediatorCachingOptionsTests
 {
