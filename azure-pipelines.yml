@@ -1,114 +1,37 @@
-trigger:
-  branches:
-    include:
-      - Develop
+trigger: none
 
-pr:
-  branches:
-    include:
-      - Develop
+pool:
+  vmImage: 'ubuntu-latest'
 
 variables:
   buildConfiguration: 'Release'
-  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
-  DOTNET_CLI_TELEMETRY_OPTOUT: true
-  NUGET_PACKAGES: $(Pipeline.Workspace)/.nuget/packages
 
-stages:
+steps:
+# Checkout with full history + credentials
+- checkout: self
+  persistCredentials: 'true'
+  fetchDepth: '0'
 
-# =========================
-# STAGE 1 - BUILD
-# =========================
-- stage: Build
-  displayName: "Build Stage"
-  jobs:
-  - job: BuildJob
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
+# Install .NET 10 SDK
+- task: UseDotNet@2
+  displayName: 'Install .NET 10 SDK'
+  inputs:
+    packageType: 'sdk'
+    version: '10.0.x'
+    includePreviewVersions: true
 
-    - checkout: self
-      fetchDepth: '0'
+# Authenticate to Azure Artifacts (optional if needed)
+- task: NuGetAuthenticate@1
+  displayName: 'Authenticate to Azure Artifacts'
 
-    - task: Cache@2
-      displayName: 'Cache NuGet packages'
-      inputs:
-        key: 'nuget | "$(Agent.OS)" | **/packages.lock.json'
-        restoreKeys: |
-          nuget | "$(Agent.OS)"
-        path: $(NUGET_PACKAGES)
+# Restore
+- script: dotnet restore
+  displayName: 'Restore NuGet packages'
 
-    - task: UseDotNet@2
-      displayName: 'Install .NET 10 SDK'
-      inputs:
-        packageType: 'sdk'
-        version: '10.0.x'
-        includePreviewVersions: true
+# Build
+- script: dotnet build --configuration $(buildConfiguration) --no-restore
+  displayName: 'Build solution'
 
-    - task: DotNetCoreCLI@2
-      displayName: 'Restore'
-      inputs:
-        command: 'restore'
-        projects: '**/*.sln'
-        feedsToUse: 'select'
-
-    - task: DotNetCoreCLI@2
-      displayName: 'Build'
-      inputs:
-        command: 'build'
-        projects: '**/*.sln'
-        arguments: >
-          --configuration $(buildConfiguration)
-          --no-restore
-          -p:MaxCpuCount=2
-          /p:UseSharedCompilation=false
-
-    - publish: $(Build.ArtifactStagingDirectory)
-      artifact: drop
-
-# =========================
-# STAGE 2 - TESTS (Unit + Integration)
-# =========================
-- stage: Tests
-  displayName: "Run All Tests"
-  dependsOn: Build
-  condition: succeeded()
-  jobs:
-  - job: RunTests
-    timeoutInMinutes: '90'
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-
-    - checkout: self
-
-    - task: UseDotNet@2
-      displayName: 'Install .NET 10 SDK'
-      inputs:
-        packageType: 'sdk'
-        version: '10.0.x'
-        includePreviewVersions: true
-
-    - task: DotNetCoreCLI@2
-      displayName: 'Run Unit Tests'
-      inputs:
-        command: 'test'
-        projects: '**/*.sln'
-        arguments: >
-          --configuration $(buildConfiguration)
-          --no-build
-          --filter "Category!=Integration"
-          --logger trx
-        publishTestResults: true
-
-    - task: DotNetCoreCLI@2
-      displayName: 'Run Integration Tests'
-      inputs:
-        command: 'test'
-        projects: '**/*.sln'
-        arguments: >
-          --configuration $(buildConfiguration)
-          --no-build
-          --filter "Category=Integration"
-          --logger trx
-        publishTestResults: true
+# Run all tests (unit + integration)
+- script: dotnet test --configuration $(buildConfiguration) --no-build --logger trx
+  displayName: 'Run all tests'
