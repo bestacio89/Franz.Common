@@ -25,7 +25,6 @@ stages:
   - job: BuildJob
     pool:
       vmImage: 'ubuntu-latest'
-
     steps:
 
     - checkout: self
@@ -68,21 +67,23 @@ stages:
       artifact: drop
 
 # =========================
-# STAGE 2 - UNIT TESTS
+# STAGE 2 - TESTS (Unit + Integration)
 # =========================
-- stage: UnitTests
-  displayName: "Unit Tests Stage"
+- stage: Tests
+  displayName: "Run All Tests"
   dependsOn: Build
   condition: succeeded()
   jobs:
-  - job: UnitTestsJob
+  - job: RunTests
+    timeoutInMinutes: '90'
     pool:
       vmImage: 'ubuntu-latest'
-
     steps:
+
     - checkout: self
 
     - task: UseDotNet@2
+      displayName: 'Install .NET 10 SDK'
       inputs:
         packageType: 'sdk'
         version: '10.0.x'
@@ -100,28 +101,6 @@ stages:
           --logger trx
         publishTestResults: true
 
-# =========================
-# STAGE 3 - INTEGRATION TESTS
-# =========================
-- stage: IntegrationTests
-  displayName: "Integration Tests Stage"
-  dependsOn: UnitTests
-  condition: succeeded()
-  jobs:
-  - job: IntegrationTestsJob
-    timeoutInMinutes: '60'
-    pool:
-      vmImage: 'ubuntu-latest'
-
-    steps:
-    - checkout: self
-
-    - task: UseDotNet@2
-      inputs:
-        packageType: 'sdk'
-        version: '10.0.x'
-        includePreviewVersions: true
-
     - task: DotNetCoreCLI@2
       displayName: 'Run Integration Tests'
       inputs:
@@ -133,4 +112,3 @@ stages:
           --filter "Category=Integration"
           --logger trx
         publishTestResults: true
-
