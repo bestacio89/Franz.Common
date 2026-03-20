@@ -1,29 +1,36 @@
 ﻿namespace Franz.Common.Hosting.Messaging.Kafka.Tests.Probes;
 
-using System.Collections.Concurrent;
-using System.Threading.Tasks;
-
 public static class MultiHandlerProbe
 {
-  private static readonly ConcurrentBag<string> _received = new();
+  private static int _count;
+  private static int _expected;
   private static TaskCompletionSource<bool> _tcs = new();
 
-  public static void Reset()
+  public static int Count => _count;
+
+  public static void Reset(int expected = 2)
   {
-    _received.Clear();
-    _tcs = new TaskCompletionSource<bool>();
+    _count = 0;
+    _expected = expected;
+    _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
   }
 
-  public static void Hit(string value)
+  public static void MarkHandled()
   {
-    _received.Add(value);
-
-    if (_received.Count >= 2)
+    var current = Interlocked.Increment(ref _count);
+    if (current >= _expected)
+    {
       _tcs.TrySetResult(true);
+    }
   }
 
-  public static Task WaitAsync(TimeSpan timeout)
-    => _tcs.Task.WaitAsync(timeout);
+  // Fix: Ensure the signature matches your test call
+  public static Task WaitAsync(int expectedCount, TimeSpan timeout)
+  {
+    _expected = expectedCount;
+    // If we already reached the count before waiting
+    if (_count >= _expected) return Task.CompletedTask;
 
-  public static int Count => _received.Count;
+    return _tcs.Task.WaitAsync(timeout);
+  }
 }
