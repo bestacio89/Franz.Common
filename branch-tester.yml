@@ -33,5 +33,10 @@ steps:
   displayName: 'Build solution'
 
 # Test
-- script: dotnet test --configuration $(buildConfiguration) --no-build --verbosity normal
+- task: DotNetCoreCLI@2
   displayName: 'Run tests'
+  inputs:
+    command: 'test'
+    projects: '**/*.Tests.csproj'
+    arguments: '--configuration $(buildConfiguration) --no-build --logger "trx;LogFileName=test_results.trx" --verbosity normal'
+    publishTestResults: true
