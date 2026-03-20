@@ -10,7 +10,7 @@ public sealed class FanoutHandlerB : IEventHandler<FanoutTestEvent>
 {
   public Task HandleAsync(FanoutTestEvent evt, CancellationToken ct)
   {
-    MultiHandlerProbe.Hit(evt.Value);
+    MultiHandlerProbe.MarkHandled();
     return Task.CompletedTask;
   }
 }

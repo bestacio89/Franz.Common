@@ -10,7 +10,7 @@ public class FanoutHandlerD : INotificationHandler<FanoutTestEvent2>
 {
   public Task Handle(FanoutTestEvent2 notification, CancellationToken cancellationToken = default)
   {
-    MultiHandlerProbe.Hit(notification.Value);
+    MultiHandlerProbe.MarkHandled();
     return Task.CompletedTask;
   }
 }

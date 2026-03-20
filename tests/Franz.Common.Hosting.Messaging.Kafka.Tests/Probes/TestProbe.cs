@@ -6,19 +6,9 @@ namespace Franz.Common.Hosting.Messaging.Kafka.Tests.Probes;
 
 public sealed class TestProbe : ITestProbe
 {
-  // Allows the test to 'Await' the result
-  private TaskCompletionSource<string> _completionSource = new();
-
-  public Task<string> ReceivedTask => _completionSource.Task;
-
-  public void MarkHandled(string messageValue)
-  {
-    // Thread-safe signaling
-    _completionSource.TrySetResult(messageValue);
-  }
-
-  public void Reset()
-  {
-    _completionSource = new();
-  }
+  private TaskCompletionSource<bool> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+  public Task CompletionTask => _tcs.Task;
+  public bool Handled => _tcs.Task.IsCompletedSuccessfully;
+  public void MarkHandled() => _tcs.TrySetResult(true);
+  public void Reset() => _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
