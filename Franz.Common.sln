@@ -146,6 +146,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.EntityFramewor
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.Tests", "tests\Franz.Common.Messaging.Tests\Franz.Common.Messaging.Tests.csproj", "{6EC37B2F-E6C9-4D52-BB46-88D1DE4BCDD1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Franz.Common.Messaging.Kafka.Tests", "tests\Franz.Common.Messaging.Kafka.Tests\Franz.Common.Messaging.Kafka.Tests.csproj", "{D201D0CA-A561-4E1D-9321-BE4DC97E41E0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -412,6 +414,10 @@ Global
 		{6EC37B2F-E6C9-4D52-BB46-88D1DE4BCDD1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6EC37B2F-E6C9-4D52-BB46-88D1DE4BCDD1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6EC37B2F-E6C9-4D52-BB46-88D1DE4BCDD1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D201D0CA-A561-4E1D-9321-BE4DC97E41E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D201D0CA-A561-4E1D-9321-BE4DC97E41E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D201D0CA-A561-4E1D-9321-BE4DC97E41E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D201D0CA-A561-4E1D-9321-BE4DC97E41E0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -483,6 +489,7 @@ Global
 		{0DA7F2A0-087E-4056-9C18-DFDA235CD0BB} = {99C4C621-B376-4D7A-BB9B-C56DEB0AA0CB}
 		{BD26D33E-0FF6-4B0A-9D5B-7F81D243C7E4} = {99C4C621-B376-4D7A-BB9B-C56DEB0AA0CB}
 		{6EC37B2F-E6C9-4D52-BB46-88D1DE4BCDD1} = {99C4C621-B376-4D7A-BB9B-C56DEB0AA0CB}
+		{D201D0CA-A561-4E1D-9321-BE4DC97E41E0} = {99C4C621-B376-4D7A-BB9B-C56DEB0AA0CB}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {069A32C7-587A-42C8-B9D2-9CF7EE93E2BD}
