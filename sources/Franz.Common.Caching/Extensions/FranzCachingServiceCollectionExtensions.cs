@@ -2,202 +2,203 @@
 using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Estrategies;
 using Franz.Common.Caching.Observability;
-using Franz.Common.Caching.Observability.Observers;
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Pipelines;
 using Franz.Common.Caching.Providers;
 using Franz.Common.Caching.Settings;
+using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
-namespace Franz.Common.Caching.Extensions
+namespace Franz.Common.AzureCosmosDB.Extensions;
+
+public static class FranzCachingServiceCollectionExtensions
 {
-  public static class FranzCachingServiceCollectionExtensions
+  private const string CachingSection = "Franz:Caching";
+  private const string MediatorCachingSection = "Franz:Mediator:Caching";
+
+  /// <summary>
+  /// Configures the core Caching Options with Fail-Fast Validation and IOptionsMonitor support.
+  /// </summary>
+  public static IServiceCollection AddFranzCachingOptions(this IServiceCollection services, IConfiguration configuration)
   {
-    #region Cache Providers
+    services.AddOptions<CacheOptions>()
+        .Bind(configuration.GetSection(CachingSection))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
 
-    public static IServiceCollection AddFranzMemoryCaching(
-        this IServiceCollection services,
-        Action<CacheOptions>? configure = null)
-    {
-      services.AddMemoryCache();
-      services.TryAddSingleton<ICacheProvider, MemoryCacheProvider>();
-      services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
-      services.TryAddSingleton<ISettingsCache, SettingsCache>();
-      if (configure != null)
-        services.Configure(configure);
-      return services;
-    }
-
-    public static IServiceCollection AddFranzDistributedCaching<TDistributedCache>(
-        this IServiceCollection services,
-        Action<CacheOptions>? configure = null)
-        where TDistributedCache : class, IDistributedCache
-    {
-      services.AddSingleton<IDistributedCache, TDistributedCache>();
-      RegisterCacheProvider(services, typeof(DistributedCacheProvider), configure);
-      return services;
-    }
-
-    public static IServiceCollection AddFranzRedisCaching(
-        this IServiceCollection services,
-        string connectionString,
-        int database = 0,
-        Action<CacheOptions>? configure = null)
-    {
-      services.AddSingleton<IConnectionMultiplexer>(_ =>
-          ConnectionMultiplexer.Connect(
-              new StackExchange.Redis.ConfigurationOptions
-              {
-                EndPoints = { connectionString },
-                AbortOnConnectFail = false,
-                DefaultDatabase = database
-              }));
-
-      RegisterCacheProvider(services, typeof(RedisCacheProvider), configure);
-      return services;
-    }
-
-    public static IServiceCollection AddFranzRedisCaching(
-        this IServiceCollection services,
-        Func<IServiceProvider, IConnectionMultiplexer> multiplexerFactory,
-        Action<CacheOptions>? configure = null)
-    {
-      services.AddSingleton(multiplexerFactory);
-      RegisterCacheProvider(services, typeof(RedisCacheProvider), configure);
-      return services;
-    }
-
-    public static IServiceCollection AddFranzCaching(
-        this IServiceCollection services,
-        Action<CacheOptions>? configure = null)
-        => services.AddFranzMemoryCaching(configure);
-
-    private static void RegisterCacheProvider(IServiceCollection services, Type providerType, Action<CacheOptions>? configure)
-    {
-      // Register concrete type
-      services.TryAddSingleton(providerType);
-
-      // Register interface to same singleton
-      services.TryAddSingleton<ICacheProvider>(sp => (ICacheProvider)sp.GetRequiredService(providerType));
-
-      services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
-      services.TryAddSingleton<ISettingsCache, SettingsCache>();
-      if (configure != null)
-        services.Configure(configure);
-    }
-
-
-    #endregion
-
-    #region Mediator Pipeline
-
-    public static IServiceCollection AddFranzMediatorCaching(
-        this IServiceCollection services,
-        Action<MediatorCachingOptions>? configure = null)
-    {
-      if (configure != null)
-        services.Configure(configure);
-
-      services.AddScoped(typeof(CachingPipeline<,>));
-      return services;
-    }
-
-    #endregion
-
-    #region Observability / Observers
-
-    public static IServiceCollection AddObservableCaching(this IServiceCollection services)
-    {
-      var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ICacheProvider));
-      if (descriptor == null)
-        throw new InvalidOperationException(
-            "ICacheProvider must be registered before calling AddObservableCaching().");
-
-      // Remove the existing registration
-      services.Remove(descriptor);
-
-      // Wrap whatever ICacheProvider is registered
-      services.AddSingleton<ICacheProvider>(sp =>
-      {
-        // Resolve the concrete provider
-        var inner = descriptor.ImplementationInstance != null
-                    ? (ICacheProvider)descriptor.ImplementationInstance
-                    : descriptor.ImplementationFactory != null
-                        ? (ICacheProvider)descriptor.ImplementationFactory(sp)
-                        : (ICacheProvider)sp.GetRequiredService(descriptor.ImplementationType!);
-
-        var observers = sp.GetServices<ICacheObserver>();
-        return new ObservableCacheProvider(inner, observers);
-      });
-
-      return services;
-    }
-
-
-
-    public static IServiceCollection AddMetricsCacheObserver(this IServiceCollection services)
-        => AddObserver<MetricsCacheObserver>(services);
-
-    public static IServiceCollection AddLoggingCacheObserver(this IServiceCollection services)
-        => AddObserver<LoggingCacheObserver>(services);
-
-    public static IServiceCollection AddLoggingMetricsCacheObserver(this IServiceCollection services)
-        => AddObserver<LoggingMetricsObserver>(services);
-
-    public static IServiceCollection AddExcelMetricsCacheObserver(this IServiceCollection services)
-        => AddObserver<ExcelCacheObserver>(services);
-
-    public static IServiceCollection AddCompositeCacheObserver(this IServiceCollection services)
-    {
-      services.AddSingleton<ICacheObserver>(sp =>
-      {
-        var observers = sp.GetServices<ICacheObserver>();
-        return new CompositeCacheObserver(observers);
-      });
-
-      return services;
-    }
-
-    private static IServiceCollection AddObserver<T>(IServiceCollection services)
-        where T : class, ICacheObserver
-    {
-      services.TryAddSingleton<T>();
-      services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, T>());
-      return services;
-    }
-
-    #endregion
+    return services;
   }
 
-  #region Composite Observer
+  #region Cache Providers
 
-  public class CompositeCacheObserver : ICacheObserver
+  public static IServiceCollection AddFranzMemoryCaching(
+      this IServiceCollection services,
+      Action<CacheOptions>? configure = null)
   {
-    private readonly ICacheObserver[] _observers;
+    services.AddMemoryCache();
 
-    public CompositeCacheObserver(IEnumerable<ICacheObserver> observers)
+    if (configure != null) services.Configure(configure);
+
+    services.TryAddSingleton<ICacheProvider, MemoryCacheProvider>();
+    return services.AddFranzCachingCore();
+  }
+
+  /// <summary>
+  /// Overload for Fixtures/Tests. Allows configuration via Lambda without IConfiguration.
+  /// Fixes: "Cannot convert lambda expression to type 'IConfiguration'"
+  /// </summary>
+  public static IServiceCollection AddFranzRedisCaching(
+      this IServiceCollection services,
+      Action<CacheOptions> configure)
+  {
+    services.AddOptions<CacheOptions>();
+    services.Configure(configure);
+
+    return services.RegisterRedisInternal();
+  }
+
+  /// <summary>
+  /// Overload for Production. Binds to IConfiguration and allows optional Lambda overrides.
+  /// </summary>
+  public static IServiceCollection AddFranzRedisCaching(
+      this IServiceCollection services,
+      IConfiguration configuration,
+      Action<CacheOptions>? configure = null)
+  {
+    // 1. Bind from appsettings.json
+    services.AddOptions<CacheOptions>()
+        .Bind(configuration.GetSection(CachingSection))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+
+    // 2. Apply optional code-based overrides
+    if (configure != null) services.Configure(configure);
+
+    return services.RegisterRedisInternal(configuration);
+  }
+
+  private static IServiceCollection RegisterRedisInternal(this IServiceCollection services, IConfiguration? configuration = null)
+  {
+    services.TryAddSingleton<IConnectionMultiplexer>(sp =>
     {
-      _observers = observers.ToArray();
-    }
+      var options = sp.GetRequiredService<IOptions<CacheOptions>>().Value;
 
-    public void OnCacheSet(CacheEntryDescriptor entry) =>
-        Array.ForEach(_observers, o => o.OnCacheSet(entry));
+      var connectionString = options.ConnectionString
+          ?? configuration?.GetSection($"{CachingSection}:Redis:ConnectionString").Value
+          ?? throw new InvalidOperationException("Redis ConnectionString is missing.");
 
-    public void OnCacheHit(CacheAccessDescriptor access) =>
-        Array.ForEach(_observers, o => o.OnCacheHit(access));
+      // FIX: Use ConfigurationOptions to enforce better defaults for internal tools
+      var redisOptions = ConfigurationOptions.Parse(connectionString);
 
-    public void OnCacheRemove(string key) =>
-        Array.ForEach(_observers, o => o.OnCacheRemove(key));
+      // Ensure that we don't stall the thread pool during heavy load/reconnects
+      redisOptions.AbortOnConnectFail = false;
+      redisOptions.ConnectTimeout = 5000;
 
-    public void OnCacheRemoveByTag(string tag) =>
-        Array.ForEach(_observers, o => o.OnCacheRemoveByTag(tag));
+      // Still eager, but AbortOnConnectFail = false allows the object to be created 
+      // even if the server is offline. It will reconnect in the background.
+      return ConnectionMultiplexer.Connect(redisOptions);
+    });
+
+    services.TryAddSingleton<ICacheProvider, RedisCacheProvider>();
+    return services.AddFranzCachingCore();
+  }
+  #endregion
+
+  #region Mediator Pipeline
+
+  public static IServiceCollection AddFranzMediatorCaching(
+      this IServiceCollection services,
+      IConfiguration configuration,
+      Action<MediatorCachingOptions>? configure = null)
+  {
+    services.AddOptions<MediatorCachingOptions>()
+        .BindConfiguration(MediatorCachingOptions.SectionName)
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+
+    if (configure != null) services.Configure(configure);
+
+    // MediatR Pipeline Behavior registration
+    services.AddScoped(typeof(IPipeline<,>), typeof(CachingPipeline<,>));
+
+    return services;
   }
 
   #endregion
+
+  #region Observability (Using Scrutor)
+
+  /// <summary>
+  /// Modernized Decorator Pattern using Scrutor. 
+  /// This wraps any registered ICacheProvider with the Observable logic.
+  /// </summary>
+  public static IServiceCollection AddObservableCaching(this IServiceCollection services)
+  {
+    // Scrutor: Decorate the registered ICacheProvider without breaking DI descriptors.
+    services.Decorate<ICacheProvider>((inner, sp) =>
+    {
+      var observers = sp.GetServices<ICacheObserver>();
+      return new ObservableCacheProvider(inner, observers);
+    });
+
+    return services;
+  }
+
+  public static IServiceCollection AddCacheObserver<T>(this IServiceCollection services)
+      where T : class, ICacheObserver
+  {
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, T>());
+    return services;
+  }
+
+  #endregion
+
+  private static IServiceCollection AddFranzCachingCore(this IServiceCollection services)
+  {
+    services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
+    services.TryAddSingleton<ISettingsCache, SettingsCache>();
+    return services;
+  }
+
+  /// <summary>
+  /// Adds a Distributed Cache Provider that wraps any registered IDistributedCache.
+  /// </summary>
+  public static IServiceCollection AddFranzDistributedCaching(
+      this IServiceCollection services,
+      Action<CacheOptions>? configure = null)
+  {
+    // 1. Ensure the Options record is available in the DI container
+    services.AddOptions<CacheOptions>();
+
+    // 2. Apply code-based overrides if provided
+    if (configure != null) services.Configure(configure);
+
+    // 3. Register our Adapter/Provider
+    services.TryAddSingleton<ICacheProvider, DistributedCacheProvider>();
+
+    return services.AddFranzCachingCore();
+  }
+
+  /// <summary>
+  /// Adds a Distributed Cache Provider bound to a specific Configuration section.
+  /// </summary>
+  public static IServiceCollection AddFranzDistributedCaching(
+      this IServiceCollection services,
+      IConfiguration configuration,
+      Action<CacheOptions>? configure = null)
+  {
+    // Bind global options from JSON
+    services.AddFranzCachingOptions(configuration);
+
+    if (configure != null) services.Configure(configure);
+
+    services.TryAddSingleton<ICacheProvider, DistributedCacheProvider>();
+
+    return services.AddFranzCachingCore();
+  }
 }

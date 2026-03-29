@@ -1,136 +1,110 @@
-﻿using Franz.Common.Caching.Abstractions;
+﻿#nullable enable
+using Franz.Common.Caching.Abstractions;
 using Microsoft.Extensions.Caching.Distributed;
-using System;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Collections.Concurrent;
 
 namespace Franz.Common.Caching.Distributed;
 
-public sealed class DistributedCacheProvider : ICacheProvider
+/// <summary>
+/// Thread-safe distributed cache provider with automatic healing on deserialization failure.
+/// </summary>
+public sealed class DistributedCacheProvider(
+    IDistributedCache cache,
+    IOptionsMonitor<CacheOptions> optionsMonitor) : ICacheProvider, IDisposable
 {
-  private readonly IDistributedCache _cache;
-  private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(30);
-
-  public DistributedCacheProvider(IDistributedCache cache)
-  {
-    _cache = cache ?? throw new ArgumentNullException(nameof(cache));
-  }
+  private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
 
   public async Task<CacheResult<T>> GetOrSetAsync<T>(
       string key,
       Func<CancellationToken, Task<T>> factory,
-      CacheOptions? options = null,
+      CacheOptions? requestOptions = null,
       CancellationToken ct = default)
   {
-    if (string.IsNullOrWhiteSpace(key))
-      throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    ArgumentNullException.ThrowIfNull(factory);
 
-    if (factory is null)
-      throw new ArgumentNullException(nameof(factory));
-
-    ValidateOptions(options);
-
-    // 🔹 1. Try cache
-    var cached = await _cache.GetStringAsync(key, ct);
-    if (cached is not null)
+    // 1. Optimistic Fast Path (No Lock)
+    var cached = await cache.GetStringAsync(key, ct);
+    if (TryDeserialize(cached, out T? result))
     {
-      var deserialized = JsonSerializer.Deserialize<T>(cached)!;
-      return new CacheResult<T>(deserialized, IsHit: true);
+      return new CacheResult<T>(result!, IsHit: true);
     }
 
-    // 🔹 2. Cache miss → compute
-    // ⚠ No stampede protection by design
-    var value = await factory(ct);
-    var json = JsonSerializer.Serialize(value);
+    // 2. Cache Miss or Corrupt Data -> Prepare for healing
+    var semaphore = _locks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+    await semaphore.WaitAsync(ct);
 
-    await _cache.SetStringAsync(
-        key,
-        json,
-        CreateDistributedCacheOptions(options),
-        ct);
+    try
+    {
+      // 3. Double-Check Locking (Check cache again after acquiring lock)
+      cached = await cache.GetStringAsync(key, ct);
+      if (TryDeserialize(cached, out result))
+      {
+        return new CacheResult<T>(result!, IsHit: true);
+      }
 
-    return new CacheResult<T>(value, IsHit: false);
+      // 4. Factory Execution (Heal from Source)
+      var value = await factory(ct);
+      var json = JsonSerializer.Serialize(value);
+      var entryOptions = CreateDistributedCacheOptions(requestOptions);
+
+      await cache.SetStringAsync(key, json, entryOptions, ct);
+
+      return new CacheResult<T>(value, IsHit: false);
+    }
+    finally
+    {
+      semaphore.Release();
+      // Optional: Clean up semaphores if memory pressure is a concern
+    }
   }
 
-  public Task RemoveAsync(string key, CancellationToken ct = default)
+  private static bool TryDeserialize<T>(string? cached, out T? result)
   {
-    if (string.IsNullOrWhiteSpace(key))
-      throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
+    result = default;
+    if (string.IsNullOrWhiteSpace(cached)) return false;
 
-    return _cache.RemoveAsync(key, ct);
+    try
+    {
+      result = JsonSerializer.Deserialize<T>(cached);
+      return result is not null;
+    }
+    catch (JsonException)
+    {
+   
+      return false;
+    }
   }
+
+  private DistributedCacheEntryOptions CreateDistributedCacheOptions(CacheOptions? requestOptions)
+  {
+    var globalSettings = optionsMonitor.CurrentValue;
+    var options = requestOptions ?? globalSettings;
+
+    return new DistributedCacheEntryOptions
+    {
+      AbsoluteExpirationRelativeToNow = options.DefaultAbsoluteExpiration > TimeSpan.Zero
+            ? options.DefaultAbsoluteExpiration
+            : null,
+      SlidingExpiration = options.DefaultSlidingExpiration > TimeSpan.Zero
+            ? options.DefaultSlidingExpiration
+            : null
+    };
+  }
+
+  public Task RemoveAsync(string key, CancellationToken ct = default) => cache.RemoveAsync(key, ct);
 
   public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
-    => throw new NotSupportedException(
-        "Tag-based invalidation is not supported by DistributedCacheProvider.");
+      => throw new NotSupportedException("Tag-based invalidation is not supported by DistributedCacheProvider.");
 
-  // ============================
-  // Helpers
-  // ============================
-
-  private static DistributedCacheEntryOptions CreateDistributedCacheOptions(
-      CacheOptions? options)
+  public void Dispose()
   {
-    var distributedOptions = new DistributedCacheEntryOptions();
-
-    if (options is null)
+    foreach (var semaphore in _locks.Values)
     {
-      distributedOptions.AbsoluteExpirationRelativeToNow = DefaultExpiration;
-      return distributedOptions;
+      semaphore.Dispose();
     }
-
-    // Priority order:
-    // AbsoluteExpirationRelativeToNow > AbsoluteExpiration > SlidingExpiration > Default
-    if (options.AbsoluteExpirationRelativeToNow.HasValue)
-    {
-      distributedOptions.AbsoluteExpirationRelativeToNow =
-          options.AbsoluteExpirationRelativeToNow.Value;
-    }
-    else if (options.AbsoluteExpiration.HasValue)
-    {
-      distributedOptions.AbsoluteExpiration =
-          options.AbsoluteExpiration.Value;
-    }
-    else if (options.SlidingExpiration.HasValue)
-    {
-      distributedOptions.SlidingExpiration =
-          options.SlidingExpiration.Value;
-    }
-    else
-    {
-      distributedOptions.AbsoluteExpirationRelativeToNow = DefaultExpiration;
-    }
-
-    return distributedOptions;
-  }
-
-  private static void ValidateOptions(CacheOptions? options)
-  {
-    if (options is null)
-      return;
-
-    if (options.AbsoluteExpirationRelativeToNow.HasValue &&
-        options.AbsoluteExpirationRelativeToNow.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(
-          nameof(options.AbsoluteExpirationRelativeToNow));
-
-    if (options.SlidingExpiration.HasValue &&
-        options.SlidingExpiration.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(
-          nameof(options.SlidingExpiration));
-
-    if (options.AbsoluteExpiration.HasValue &&
-        options.AbsoluteExpiration.Value <= DateTimeOffset.UtcNow)
-      throw new ArgumentOutOfRangeException(
-          nameof(options.AbsoluteExpiration));
-
-    if (options.LocalCacheHint is not null)
-      throw new NotSupportedException(
-          "LocalCacheHint is not applicable to distributed-only cache providers.");
-
-    if (options.Tags is not null)
-      throw new NotSupportedException(
-          "Tags are not supported by DistributedCacheProvider.");
+    _locks.Clear();
   }
 }

@@ -25,4 +25,10 @@ public class OutboxOptions
   /// Default = false.
   /// </summary>
   public bool DeadLetterEnabled { get; set; } = false;
+
+  /// <summary>
+  /// Outbox Batch size for processing multiple messages in a single transaction.
+  /// Default = false.
+  /// </summary>
+  public int BatchSize { get; set; } = 10;
 }

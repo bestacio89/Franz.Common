@@ -2,167 +2,128 @@
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Providers;
 using Franz.Common.Caching.Tests.Fixtures;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Moq;
 using StackExchange.Redis;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Franz.Common.Caching.Tests.Providers;
 
-public sealed class RedisCacheProviderTests
-    : IClassFixture<RedisCacheFixture>
+public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
 {
   private readonly RedisCacheProvider _provider;
+  private readonly IConnectionMultiplexer _muxer;
+  private readonly Mock<IOptionsMonitor<CacheOptions>> _optionsMock;
+  private readonly CacheOptions _globalOptions;
 
   public RedisCacheProviderTests(RedisCacheFixture fixture)
   {
-    var muxer = ConnectionMultiplexer.Connect(fixture.ConnectionString);
-    _provider = new RedisCacheProvider(muxer);
-  }
+    // 🛠️ FIX: Use the multiplexer from the fixture, not a new empty connection
+    _muxer = fixture.ServiceProvider.GetRequiredService<IConnectionMultiplexer>();
 
-  [Fact]
-  public async Task GetOrSet_Should_Store_And_Return_Value()
-  {
-    var result = await _provider.GetOrSetAsync(
-        "redis:test:basic",
-        _ => Task.FromResult(42));
-
-    result.Value.Should().Be(42);
-  }
-
-  [Fact]
-  public async Task GetOrSet_Should_Return_Cached_Value_On_Second_Call()
-  {
-    var calls = 0;
-
-    Func<CancellationToken, Task<int>> factory = _ =>
+    _globalOptions = new CacheOptions
     {
-      calls++;
-      return Task.FromResult(99);
+      KeyPrefix = "test:",
+      DefaultAbsoluteExpiration = TimeSpan.FromSeconds(30),
+      // Ensure the provider knows where to connect if it needs to re-resolve
+      ConnectionString = fixture.ConnectionString
     };
 
-    var key = "redis:test:cached";
+    _optionsMock = new Mock<IOptionsMonitor<CacheOptions>>();
+    _optionsMock.Setup(m => m.CurrentValue).Returns(_globalOptions);
 
-    var first = (await _provider.GetOrSetAsync(key, factory)).Value;
-    var second = (await _provider.GetOrSetAsync(key, factory)).Value;
+    _provider = new RedisCacheProvider(_muxer, _optionsMock.Object);
+  }
 
-    first.Should().Be(99);
-    second.Should().Be(99);
+  [Fact]
+  public async Task GetOrSetAsync_Should_Handle_Cache_Miss_And_Hit()
+  {
+    // Arrange
+    var key = Guid.NewGuid().ToString(); // Use unique keys to avoid test pollution
+    var expectedValue = "franz-data";
+    var calls = 0;
+
+    async Task<string> Factory(CancellationToken ct)
+    {
+      calls++;
+      return await Task.FromResult(expectedValue);
+    }
+
+    // Act - First Call (Miss)
+    var firstResult = await _provider.GetOrSetAsync(key, Factory);
+
+    // Act - Second Call (Hit)
+    var secondResult = await _provider.GetOrSetAsync(key, Factory);
+
+    // Assert
+    firstResult.Value.Should().Be(expectedValue);
+    firstResult.IsHit.Should().BeFalse();
+
+    secondResult.Value.Should().Be(expectedValue);
+    secondResult.IsHit.Should().BeTrue();
+
     calls.Should().Be(1);
   }
 
   [Fact]
-  public async Task Should_Respect_Expiration()
+  public async Task GetOrSetAsync_Should_Respect_Request_Specific_Expiration()
   {
-    var key = "redis:test:ttl";
+    // Arrange
+    var key = Guid.NewGuid().ToString();
+    var shortOptions = new CacheOptions
+    {
+      DefaultAbsoluteExpiration = TimeSpan.FromMilliseconds(500)
+    };
 
-    await _provider.GetOrSetAsync(
-        key,
-        _ => Task.FromResult("value"),
-        new CacheOptions
-        {
-          Expiration = TimeSpan.FromMilliseconds(200)
-        });
+    // Act
+    await _provider.GetOrSetAsync(key, _ => Task.FromResult("val"), shortOptions);
 
-    await Task.Delay(300);
+    // Assert hit immediately
+    var immediate = await _provider.GetOrSetAsync(key, _ => Task.FromResult("val"));
+    immediate.IsHit.Should().BeTrue();
 
-    var result = (await _provider.GetOrSetAsync(
-        key,
-        _ => Task.FromResult("new"))).Value;
+    // Wait for Redis TTL
+    await Task.Delay(1000); // 1s to be safe for Redis internal cleanup
 
-    result.Should().Be("new");
+    // Assert miss after expiration
+    var result = await _provider.GetOrSetAsync(key, _ => Task.FromResult("new-val"));
+    result.IsHit.Should().BeFalse();
+    result.Value.Should().Be("new-val");
   }
 
   [Fact]
-  public async Task Remove_Should_Delete_Key()
+  public async Task RemoveAsync_Should_Delete_Key_With_Prefix()
   {
-    var key = "redis:test:remove";
+    // Arrange
+    var key = Guid.NewGuid().ToString();
+    await _provider.GetOrSetAsync(key, _ => Task.FromResult("data"));
 
-    await _provider.GetOrSetAsync(key, _ => Task.FromResult(123));
+    // Act
     await _provider.RemoveAsync(key);
 
-    var value = (await _provider.GetOrSetAsync(
-        key,
-        _ => Task.FromResult(456))).Value;
+    // Assert
+    var result = await _provider.GetOrSetAsync(key, _ => Task.FromResult("fresh"));
+    result.IsHit.Should().BeFalse();
+  }
 
-    value.Should().Be(456);
+  [Theory]
+  [InlineData("")]
+  [InlineData(" ")]
+  public async Task GetOrSetAsync_Should_Throw_ArgumentException_On_Invalid_Key(string key)
+  {
+    var act = () => _provider.GetOrSetAsync(key, _ => Task.FromResult("1"));
+    await act.Should().ThrowAsync<ArgumentException>();
   }
 
   [Fact]
-  public async Task Should_Throw_When_Key_Is_Invalid()
+  public async Task RemoveByTagAsync_Should_Throw_NotSupportedException()
   {
-    await Assert.ThrowsAsync<ArgumentException>(() =>
-        _provider.GetOrSetAsync<int>("", _ => Task.FromResult(1)));
+    // Act
+    var act = () => _provider.RemoveByTagAsync("any-tag");
+
+    // Assert
+    await act.Should().ThrowAsync<NotSupportedException>()
+        .WithMessage("*performance reasons*");
   }
-
-  [Fact]
-  public async Task Should_Throw_When_Factory_Is_Null()
-  {
-    await Assert.ThrowsAsync<ArgumentNullException>(() =>
-        _provider.GetOrSetAsync<int>("key", null!));
-  }
-
-  [Fact]
-  public async Task Should_Reject_Invalid_Expiration()
-  {
-    await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-        _provider.GetOrSetAsync(
-            "key",
-            _ => Task.FromResult(1),
-            new CacheOptions { Expiration = TimeSpan.Zero }));
-  }
-
-  #region Tags
-
-  [Fact]
-  public async Task GetOrSet_With_Tags_Should_Store_Key_In_Tag_Set()
-  {
-    var key = "redis:test:tagged";
-    var tag = "orders";
-
-    await _provider.GetOrSetAsync(
-        key,
-        _ => Task.FromResult(10),
-        new CacheOptions { Tags = new[] { tag } });
-
-    // Confirm key exists in tag set in Redis
-    var muxer = _provider.GetType()
-                         .GetField("_multiplexer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-                         .GetValue(_provider) as IConnectionMultiplexer;
-    var db = muxer!.GetDatabase();
-    var members = await db.SetMembersAsync($"tag:{tag}");
-    members.Select(m => (string)m).Should().Contain(key);
-  }
-
-  [Fact]
-  public async Task RemoveByTag_Should_Delete_All_Tagged_Keys()
-  {
-    var key1 = "redis:test:tag1";
-    var key2 = "redis:test:tag2";
-    var tag = "batch";
-
-    await _provider.GetOrSetAsync(key1, _ => Task.FromResult(1), new CacheOptions { Tags = new[] { tag } });
-    await _provider.GetOrSetAsync(key2, _ => Task.FromResult(2), new CacheOptions { Tags = new[] { tag } });
-
-    await _provider.RemoveByTagAsync(tag);
-
-    // After removal, getting keys again should call factory
-    var val1 = (await _provider.GetOrSetAsync(key1, _ => Task.FromResult(10))).Value;
-    var val2 = (await _provider.GetOrSetAsync(key2, _ => Task.FromResult(20))).Value;
-
-    val1.Should().Be(10);
-    val2.Should().Be(20);
-
-    // Tag set should be removed
-    var muxer = _provider.GetType()
-                         .GetField("_multiplexer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-                         .GetValue(_provider) as IConnectionMultiplexer;
-    var db = muxer!.GetDatabase();
-    var tagMembers = await db.SetMembersAsync($"tag:{tag}");
-    tagMembers.Should().BeEmpty();
-  }
-
-  #endregion
 }

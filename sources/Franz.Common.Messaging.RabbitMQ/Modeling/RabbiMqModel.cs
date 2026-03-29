@@ -1,4 +1,7 @@
-﻿using System.Text.Json;
+using System;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using RabbitMQ.Client;
 
@@ -9,38 +12,38 @@ public sealed class RabbitMqMessageModel
 {
   private readonly IChannel _channel;
 
-  public RabbitMqMessageModel(IModelProvider modelProvider)
+  public RabbitMqMessageModel(IChannel channel)
   {
-    if (modelProvider is null)
-      throw new ArgumentNullException(nameof(modelProvider));
-
-    _channel = modelProvider.Current;
+    _channel = channel;
   }
 
-  public async Task ProduceAsync<TMessage>(
-      string exchange,
-      string routingKey,
-      TMessage message,
-      CancellationToken cancellationToken = default)
+  public async ValueTask ProduceAsync<TMessage>(
+       string exchange,
+       string routingKey,
+       TMessage message,
+       CancellationToken cancellationToken = default)
   {
-    if (message is null)
-      throw new ArgumentNullException(nameof(message));
+    ArgumentNullException.ThrowIfNull(message);
 
     var envelope = FranzMessageEnvelope<TMessage>.Create(message);
 
-    var bytes = JsonSerializer.SerializeToUtf8Bytes(
-      envelope,
-      new JsonSerializerOptions
-      {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false
-      });
+    var options = new JsonSerializerOptions
+    {
+      PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+      WriteIndented = false,
+      TypeInfoResolver = RabbitMqJsonSerializerContext.Default
+    };
 
-    await _channel.BasicPublishAsync(
-      exchange,
-      routingKey,
-      bytes,
-      cancellationToken);
+    var bytes = JsonSerializer.SerializeToUtf8Bytes(envelope, options);
+
+    // Explicitly provide BasicProperties as the type argument
+    await _channel.BasicPublishAsync<BasicProperties>(
+      exchange: exchange,
+      routingKey: routingKey,
+      mandatory: true,
+      basicProperties: null, // Or pass new BasicProperties() if metadata is required
+      body: bytes,
+      cancellationToken: cancellationToken);
   }
 
   public async ValueTask DisposeAsync()

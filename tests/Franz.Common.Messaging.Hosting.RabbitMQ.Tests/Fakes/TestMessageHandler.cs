@@ -1,29 +1,46 @@
 ﻿#nullable enable
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Messages;
-using System;
 using Microsoft.Extensions.Primitives;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fakes;
 
+/// <summary>
+/// Fake handler for integration testing.
+/// Senior Note: Updated to Task-based ProcessAsync to satisfy the refined IMessageHandler.
+/// </summary>
 public sealed class TestMessageHandler : IMessageHandler
 {
+  // Thread-static or volatile if running highly concurrent integration tests
   public static Message? LastMessage;
 
-  // Use a fixed Guid for testing if you need to assert against a known value
   public static readonly Guid TestCorrelationId = Guid.Parse("018e2f8a-9a91-7b3f-8e1f-4f2a3c4d5e6f");
 
-  public void Process(Message message)
+  public Task ProcessAsync(Message message, CancellationToken ct = default)
   {
-    if (message is null) return;
+    if (message is null)
+      return Task.CompletedTask;
 
-    // ✅ FIX: "X-Test-Handled" is added to the Headers (StringValues)
+    // ✅ Header enrichment using StringValues
     message.Headers["X-Test-Handled"] = new StringValues("true");
 
-    // ✅ FIX: Assignment must be a Guid. 
-    // We use a predefined Guid to ensure the "Spine" remains valid.
+    // ✅ CorrelationId spine maintenance
     message.CorrelationId = TestCorrelationId;
 
+    // Atomic reference assignment
     LastMessage = message;
+
+    return Task.CompletedTask;
+  }
+
+  /// <summary>
+  /// Helper to reset state between test runs
+  /// </summary>
+  public static void Reset()
+  {
+    LastMessage = null;
   }
 }

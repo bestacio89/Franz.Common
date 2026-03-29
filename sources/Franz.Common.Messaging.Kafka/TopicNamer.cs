@@ -2,8 +2,6 @@
 using Franz.Common.Annotations;
 using Franz.Common.Reflection;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Linq;
 using System.Reflection;
 
 namespace Franz.Common.Messaging.Kafka;
@@ -15,17 +13,19 @@ public static class TopicNamer
 
   public static string GetTopicName(IAssembly assembly)
   {
-    if (assembly is null)
-      throw new ArgumentNullException(nameof(assembly));
+    ArgumentNullException.ThrowIfNull(assembly);
 
     var reflectionAssembly = assembly.Assembly;
 
+    // Senior Note: Scan for a controller that explicitly has our attribute first.
+    // This prevents picking up random controllers in shared assemblies or test projects.
     var controllerType = reflectionAssembly
-      .GetTypes()
-      .FirstOrDefault(t =>
-        t.IsClass &&
-        !t.IsAbstract &&
-        typeof(ControllerBase).IsAssignableFrom(t));
+        .GetTypes()
+        .FirstOrDefault(t =>
+            t.IsClass &&
+            !t.IsAbstract &&
+            typeof(ControllerBase).IsAssignableFrom(t) &&
+            t.GetCustomAttribute<RequiredKafkaTopicAttribute>() != null);
 
     if (controllerType is not null)
     {
@@ -45,42 +45,42 @@ public static class TopicNamer
 
     var assemblyName = reflectionAssembly.GetName().Name;
     if (string.IsNullOrWhiteSpace(assemblyName))
-      throw new InvalidOperationException($"Assembly {reflectionAssembly.FullName} has no valid name");
+      throw new InvalidOperationException($"Assembly {reflectionAssembly.FullName} has no valid name.");
 
     return GetServiceName(assemblyName) + TopicSuffixName;
   }
 
   public static string GetDeadLetterTopicName(IAssembly assembly)
   {
-    if (assembly is null)
-      throw new ArgumentNullException(nameof(assembly));
+    ArgumentNullException.ThrowIfNull(assembly);
 
     var reflectionAssembly = assembly.Assembly;
 
-    var controllerType = reflectionAssembly
-      .GetTypes()
-      .FirstOrDefault(t =>
-        t.IsClass &&
-        !t.IsAbstract &&
-        typeof(ControllerBase).IsAssignableFrom(t));
+    // Try to find the attribute for explicit DLT naming
+    var controllerWithAttribute = reflectionAssembly
+        .GetTypes()
+        .FirstOrDefault(t =>
+            t.IsClass &&
+            typeof(ControllerBase).IsAssignableFrom(t) &&
+            t.GetCustomAttribute<RequiredKafkaTopicAttribute>()?.DeadLetterTopic != null);
 
-    if (controllerType is not null)
+    if (controllerWithAttribute is not null)
     {
-      var attribute = controllerType.GetCustomAttribute<RequiredKafkaTopicAttribute>();
-      if (attribute is not null && !string.IsNullOrWhiteSpace(attribute.DeadLetterTopic))
-        return attribute.DeadLetterTopic;
+      var attribute = controllerWithAttribute.GetCustomAttribute<RequiredKafkaTopicAttribute>();
+      return attribute!.DeadLetterTopic!;
     }
 
+    // Fallback to standard convention
     return GetTopicName(assembly) + DeadLetterTopicSuffixName;
   }
 
   private static string GetEntityNameFromController(Type controllerType)
-    => controllerType.Name.Replace("Controller", "", StringComparison.Ordinal);
+      => controllerType.Name.Replace("Controller", "", StringComparison.Ordinal);
 
   private static string GetServiceName(string assemblyName)
   {
-    // Test runner / dynamic host
-    if (assemblyName.Equals("testhost", StringComparison.OrdinalIgnoreCase))
+    if (assemblyName.Contains("testhost", StringComparison.OrdinalIgnoreCase) ||
+        assemblyName.Contains("vsts", StringComparison.OrdinalIgnoreCase))
     {
       return "franz-test";
     }
@@ -91,8 +91,6 @@ public static class TopicNamer
       return parts[1].ToLowerInvariant();
     }
 
-    // Final safety net (never throw in infra naming)
     return assemblyName.ToLowerInvariant();
   }
-
 }

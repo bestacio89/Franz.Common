@@ -1,44 +1,60 @@
+﻿#nullable enable
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using System.Net.Security;
-using System.Reflection;
 using System.Security.Authentication;
 
 namespace Franz.Common.Messaging.RabbitMQ.Connections;
 
 public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
 {
-  private readonly IOptions<MessagingOptions> _messagingOptions;
+  private readonly IOptions<RabbitMQMessagingOptions> _options;
+  private readonly IAssemblyAccessor _assemblyAccessor;
 
-  public ConnectionFactoryProvider(IOptions<MessagingOptions> messagingOptions)
+  public ConnectionFactoryProvider(
+      IOptions<RabbitMQMessagingOptions> options,
+      IAssemblyAccessor assemblyAccessor)
   {
-    _messagingOptions = messagingOptions;
+    _options = options;
+    _assemblyAccessor = assemblyAccessor;
   }
 
   public IConnectionFactory Current => CreateFactory();
 
   private IConnectionFactory CreateFactory()
   {
-    var options = _messagingOptions.Value;
+    var options = _options.Value;
 
+    // ✅ Preferred: URI-based connection (Testcontainers / modern usage)
+    if (!string.IsNullOrWhiteSpace(options.BootStrapServers))
+    {
+      return new ConnectionFactory
+      {
+        Uri = new Uri(options.BootStrapServers),
+        ClientProvidedName = GetClientProvidedName(),
+
+        AutomaticRecoveryEnabled = true,
+        TopologyRecoveryEnabled = true,
+        RequestedHeartbeat = TimeSpan.FromSeconds(30)
+      };
+    }
+
+    // ⚠️ Fallback: legacy host/port configuration
     var factory = new ConnectionFactory
     {
       HostName = options.HostName ?? "localhost",
       UserName = options.UserName ?? "guest",
       Password = options.Password ?? "guest",
-
       Port = options.Port ?? AmqpTcpEndpoint.UseDefaultPort,
       VirtualHost = options.VirtualHost ?? "/",
 
       ClientProvidedName = GetClientProvidedName(),
 
-      // Still valid in RabbitMQ 7.x:
       AutomaticRecoveryEnabled = true,
       TopologyRecoveryEnabled = true,
-      RequestedHeartbeat = TimeSpan.FromSeconds(30),
-
-      // NOTE: DispatchConsumersAsync REMOVED IN RABBITMQ 7.x
+      RequestedHeartbeat = TimeSpan.FromSeconds(30)
     };
 
     if (options.SslEnabled == true)
@@ -61,11 +77,11 @@ public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
     return factory;
   }
 
-  private static string? GetClientProvidedName()
+  private string? GetClientProvidedName()
   {
-    var name = Assembly.GetEntryAssembly()?.GetName().Name;
+    var name = _assemblyAccessor.GetEntryAssembly()?.Name;
 
-    if (!string.IsNullOrEmpty(Environment.MachineName))
+    if (!string.IsNullOrWhiteSpace(Environment.MachineName))
       name = $"{name} ({Environment.MachineName})";
 
     return name;

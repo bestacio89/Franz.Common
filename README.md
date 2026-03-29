@@ -309,17 +309,11 @@ dotnet test --filter Category=Integration
 ```
 
 ---
-🔹 Latest Release: v1.7.8 (The Hardening)
-Runtime: Upgraded to .NET 10.0.3 (Feb 2026 build).
+🔹 Latest Release:  v2.0.1 – Internal Modernization
 
-Identity: Full migration of MediatorContext to GuidV7.
-
-Persistence: Refactored AggregateRepository for automated primary key discovery.
-
-Performance: Sequential GUIDs reduced SQL index fragmentation by ~40% in high-write scenarios.
-
-Reliability: Added 32 new tests covering the Mediator-to-Persistence identity chain.
-
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
 ---
 
 # 🛣️ Roadmap

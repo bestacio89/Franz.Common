@@ -1,50 +1,70 @@
+#nullable enable
 using Franz.Common.Headers;
 using Franz.Common.Serialization;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Primitives;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Franz.Common.Http.Headers;
 
-public class HeaderContextAccessor : IHeaderContextAccessor
+/// <summary>
+/// Provides access to headers within the current HTTP context.
+/// Senior Note: Bridges ASP.NET Core StringValues to our serializable string[] contract.
+/// </summary>
+public sealed class HeaderContextAccessor(
+    IHttpContextAccessor httpContextAccessor,
+    IJsonSerializer jsonSerializer) : IHeaderContextAccessor
 {
-  private readonly IHttpContextAccessor httpContextAccessor;
-  private readonly IJsonSerializer jsonSerializer;
+  private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+  private readonly IJsonSerializer _jsonSerializer = jsonSerializer;
 
-  public HeaderContextAccessor(IHttpContextAccessor httpContextAccessor, IJsonSerializer jsonSerializer)
+  public IDictionary<string, string[]> ListAll()
   {
-    this.httpContextAccessor = httpContextAccessor;
-    this.jsonSerializer = jsonSerializer;
+    var headers = _httpContextAccessor.HttpContext?.Request?.Headers;
+    if (headers == null)
+      return new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+
+    return headers.ToDictionary(
+        kvp => kvp.Key,
+        kvp => kvp.Value.ToArray()!,
+        StringComparer.OrdinalIgnoreCase
+    );
   }
 
-  public IEnumerable<KeyValuePair<string, StringValues>> ListAll()
-  {
-    IEnumerable<KeyValuePair<string, StringValues>> result = new List<KeyValuePair<string, StringValues>>();
-    var headers = httpContextAccessor.HttpContext?.Request?.Headers;
-
-    if (headers != null)
-      result = headers;
-
-    return result;
-  }
-
-  public bool TryGetValue(string key, out StringValues value)
+  public bool TryGetValue(string key, [NotNullWhen(true)] out string[]? value)
   {
     value = default;
 
-    var result = httpContextAccessor.HttpContext?.Request?.Headers.TryGetValue(key, out value);
+    // FIX: Replaced .Current?.HttpContext with .HttpContext
+    var headers = _httpContextAccessor.HttpContext?.Request?.Headers;
 
-    return result.HasValue && result.Value;
+    if (headers != null && headers.TryGetValue(key, out var stringValues))
+    {
+      value = stringValues.ToArray()!;
+      return true;
+    }
+
+    return false;
   }
 
-  public bool TryGetValue<T>(string key, [MaybeNull] out T value)
+  public bool TryGetValue<T>(string key, [MaybeNullWhen(false)] out T value)
   {
-    StringValues stringValue = default;
+    value = default;
 
-    var result = httpContextAccessor.HttpContext?.Request?.Headers.TryGetValue(key, out stringValue) == true;
+    if (!TryGetValue(key, out var values) || values.Length == 0)
+      return false;
 
-    value = jsonSerializer.Deserialize<T>(stringValue);
+    var raw = values[0];
+    if (string.IsNullOrWhiteSpace(raw))
+      return false;
 
-    return result;
+    if (typeof(T) == typeof(string))
+    {
+      value = (T)(object)raw;
+      return true;
+    }
+
+    // Senior Note: Deserializing from the first header value found
+    value = _jsonSerializer.Deserialize<T>(raw);
+    return value is not null;
   }
 }

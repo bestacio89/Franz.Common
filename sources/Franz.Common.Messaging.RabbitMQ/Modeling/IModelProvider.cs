@@ -1,8 +1,12 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using RabbitMQ.Client;
 
 namespace Franz.Common.Messaging.RabbitMQ.Modeling;
 
-public interface IModelProvider
+public interface IModelProvider : IAsyncDisposable
 {
-    IChannel Current { get; }
+    ValueTask<IChannel> GetChannelAsync(CancellationToken cancellationToken = default);
 }
+

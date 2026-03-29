@@ -1,7 +1,8 @@
-﻿using Confluent.Kafka;
+﻿#nullable enable
+using Confluent.Kafka;
 using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.Serialization;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
 namespace Franz.Common.Messaging.Hosting.Kafka.HostedServices;
 
@@ -9,33 +10,35 @@ public sealed class KafkaMessageListener : IListener
 {
   private readonly IConsumer<string, string> _consumer;
   private readonly ILogger<KafkaMessageListener> _logger;
+  private readonly IMessageSerializer _serializer;
   private readonly string[] _topics;
 
   public KafkaMessageListener(
-    IConsumer<string, string> consumer,
-    IEnumerable<string> topics,
-    ILogger<KafkaMessageListener> logger)
+      IConsumer<string, string> consumer,
+      IEnumerable<string> topics,
+      IMessageSerializer serializer,
+      ILogger<KafkaMessageListener> logger)
   {
     _consumer = consumer;
     _topics = topics.ToArray();
+    _serializer = serializer;
     _logger = logger;
   }
 
-  public event EventHandler<MessageEventArgs>? Received;
+  public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
 
   public async Task Listen(CancellationToken stoppingToken = default)
   {
     _consumer.Subscribe(_topics);
     _logger.LogInformation(
-      "🎧 Kafka listener subscribed to {Topics}",
-      string.Join(",", _topics));
+        "🎧 Kafka listener subscribed to {Topics}",
+        string.Join(", ", _topics));
 
     try
     {
       while (!stoppingToken.IsCancellationRequested)
       {
         ConsumeResult<string, string>? result = null;
-
         try
         {
           result = _consumer.Consume(stoppingToken);
@@ -60,15 +63,17 @@ public sealed class KafkaMessageListener : IListener
         Message? transport;
         try
         {
-          transport = JsonSerializer.Deserialize<Message>(result.Message.Value);
+          // ✅ Delegate to IMessageSerializer abstraction — JsonSerializer
+          // is no longer a direct dependency of this class. The concrete
+          // implementation is resolved from DI via AddDefaultMessageSerializer().
+          transport = _serializer.Deserialize<Message>(result.Message.Value);
         }
         catch (Exception ex)
         {
           _logger.LogWarning(
-            ex,
-            "⚠️ Failed to deserialize Kafka message on topic {Topic}",
-            result.Topic);
-
+              ex,
+              "⚠️ Failed to deserialize Kafka message on topic {Topic}",
+              result.Topic);
           _consumer.Commit(result);
           continue;
         }
@@ -79,34 +84,25 @@ public sealed class KafkaMessageListener : IListener
           continue;
         }
 
-        if (Received is not null)
+        if (OnMessageReceivedAsync is not null)
         {
-          var handlers = Received
-            .GetInvocationList()
-            .Cast<EventHandler<MessageEventArgs>>()
-            .ToArray();
-
-          foreach (var handler in handlers)
+          try
           {
-            try
-            {
-              // IMPORTANT:
-              // Do NOT offload with Task.Run + stoppingToken.
-              // This must execute deterministically in tests.
-              handler(this, new MessageEventArgs(transport));
-            }
-            catch (Exception ex)
-            {
-              _logger.LogError(
+            // Awaiting ensures the handler (including scope disposal) completes
+            // before moving to the next message — at-least-once guarantee.
+            await OnMessageReceivedAsync(new MessageEventArgs(transport));
+          }
+          catch (Exception ex)
+          {
+            _logger.LogError(
                 ex,
                 "🔥 Kafka handler failed for message {MessageId} on topic {Topic}",
                 transport.Id,
                 result.Topic);
-            }
           }
         }
 
-        // ✅ Commit after dispatch (at-least-once)
+        // ✅ Commit ONLY after the handler has finished — never before.
         _consumer.Commit(result);
       }
     }
@@ -117,5 +113,20 @@ public sealed class KafkaMessageListener : IListener
     }
   }
 
-  public void StopListen() => _consumer.Unsubscribe();
+  public Task StopListenAsync(CancellationToken cancellationToken = default)
+  {
+    try
+    {
+      _logger.LogInformation("📤 Kafka consumer unsubscribing...");
+      _consumer.Unsubscribe();
+      _logger.LogInformation("✅ Kafka consumer unsubscribed.");
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "❌ Error during Kafka unsubscribe.");
+      return Task.FromException(ex);
+    }
+
+    return Task.CompletedTask;
+  }
 }

@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Franz.Common.Caching.Abstractions;
@@ -20,8 +17,6 @@ public sealed class ObservableCacheProvider : ICacheProvider
   {
     _inner = inner ?? throw new ArgumentNullException(nameof(inner));
     _observers = observers?.ToArray() ?? Array.Empty<ICacheObserver>();
-
-    Debug.WriteLine($"ObservableCacheProvider created with {_observers.Length} observers");
   }
 
   public async Task<CacheResult<T>> GetOrSetAsync<T>(
@@ -30,15 +25,16 @@ public sealed class ObservableCacheProvider : ICacheProvider
       CacheOptions? options = null,
       CancellationToken ct = default)
   {
-    var stopwatch = Stopwatch.StartNew();
+    // Use ValueStopwatch or a simple long-based timestamp for sub-ms precision if needed
+    var timestamp = Stopwatch.GetTimestamp();
 
     var result = await _inner.GetOrSetAsync(key, factory, options, ct);
 
-    stopwatch.Stop();
+    var elapsedMs = Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds;
 
     if (result.IsHit)
     {
-      NotifyHit(key, stopwatch.Elapsed.TotalMilliseconds);
+      NotifyHit(key, elapsedMs);
     }
     else
     {
@@ -54,10 +50,11 @@ public sealed class ObservableCacheProvider : ICacheProvider
     NotifyRemove(key);
   }
 
-  public async Task RemoveByTagAsync(string tag, CancellationToken ct = default)
+  [Obsolete("Tag-based invalidation is disabled in Franz.Common. Use key-based removal.")]
+  public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
   {
-    await _inner.RemoveByTagAsync(tag, ct);
-    NotifyRemoveByTag(tag);
+    // Fail fast to prevent hidden performance degradation
+    throw new NotSupportedException("Tag-based observability is deprecated.");
   }
 
   #region Observer Notifications
@@ -66,28 +63,24 @@ public sealed class ObservableCacheProvider : ICacheProvider
   {
     if (_observers.Length == 0) return;
 
-    var expiration = GetExpiration(options);
-
     var entry = new CacheEntryDescriptor
     {
       Key = key,
-      EstimatedSizeInBytes = options?.EstimatedSizeInBytes ?? EstimateSize(value),
-      Ttl = expiration,
-      Tags = options?.Tags ?? Array.Empty<string>()
+      // Leverage the new 'DefaultEstimatedSizeInBytes' from your CacheOptions
+      EstimatedSizeInBytes = options?.DefaultEstimatedSizeInBytes ?? 1024,
+      Ttl = options?.DefaultAbsoluteExpiration ?? TimeSpan.FromMinutes(30)
+      // Tags removed: Clean Cereal approach.
     };
 
-    foreach (var observer in _observers)
+    // Fire-and-forget to avoid blocking the request thread. 
+    // In a real Principal-level system, we would use a Channel<T> for background processing.
+    _ = Task.Run(() =>
     {
-      try
+      foreach (var observer in _observers)
       {
-        // Make notifications thread-safe by wrapping in a Task.Run
-        Task.Run(() => observer.OnCacheSet(entry)).Wait();
+        try { observer.OnCacheSet(entry); } catch { /* Swallow to protect pipeline */ }
       }
-      catch
-      {
-        // Swallow observer exceptions
-      }
-    }
+    });
   }
 
   private void NotifyHit(string key, double latencyMs)
@@ -101,71 +94,26 @@ public sealed class ObservableCacheProvider : ICacheProvider
       LookupLatencyMs = latencyMs
     };
 
-    foreach (var observer in _observers)
+    _ = Task.Run(() =>
     {
-      try
+      foreach (var observer in _observers)
       {
-        Task.Run(() => observer.OnCacheHit(access)).Wait();
+        try { observer.OnCacheHit(access); } catch { }
       }
-      catch { }
-    }
+    });
   }
 
   private void NotifyRemove(string key)
   {
     if (_observers.Length == 0) return;
 
-    foreach (var observer in _observers)
+    _ = Task.Run(() =>
     {
-      try
+      foreach (var observer in _observers)
       {
-        Task.Run(() => observer.OnCacheRemove(key)).Wait();
+        try { observer.OnCacheRemove(key); } catch { }
       }
-      catch { }
-    }
-  }
-
-  private void NotifyRemoveByTag(string tag)
-  {
-    if (_observers.Length == 0) return;
-
-    foreach (var observer in _observers)
-    {
-      try
-      {
-        Task.Run(() => observer.OnCacheRemoveByTag(tag)).Wait();
-      }
-      catch { }
-    }
-  }
-
-  private static TimeSpan GetExpiration(CacheOptions? options)
-  {
-    if (options?.AbsoluteExpirationRelativeToNow.HasValue == true)
-      return options.AbsoluteExpirationRelativeToNow.Value;
-
-    if (options?.AbsoluteExpiration.HasValue == true)
-      return options.AbsoluteExpiration.Value - DateTimeOffset.UtcNow;
-
-    if (options?.SlidingExpiration.HasValue == true)
-      return options.SlidingExpiration.Value;
-
-    return TimeSpan.FromMinutes(30);
-  }
-
-  private static long EstimateSize<T>(T value)
-  {
-    if (value == null) return 0;
-
-    try
-    {
-      var json = JsonSerializer.Serialize(value);
-      return System.Text.Encoding.UTF8.GetByteCount(json);
-    }
-    catch
-    {
-      return 0;
-    }
+    });
   }
 
   #endregion

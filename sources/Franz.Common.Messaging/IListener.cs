@@ -1,8 +1,14 @@
+using System.Threading.Tasks;
+
 namespace Franz.Common.Messaging.Hosting;
 
 public interface IListener
 {
-  event EventHandler<MessageEventArgs> Received;
+  /// <summary>
+  /// Async delegate for message processing. 
+  /// Ensures the listener can await the entire downstream pipeline.
+  /// </summary>
+  Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
 
   /// <summary>
   /// Start listening asynchronously.
@@ -10,7 +16,7 @@ public interface IListener
   Task Listen(CancellationToken stoppingToken = default);
 
   /// <summary>
-  /// Stop listening and clean up resources.
+  /// Stop listening and clean up resources asynchronously.
   /// </summary>
-  void StopListen();
+  Task StopListenAsync(CancellationToken cancellationToken = default);
 }

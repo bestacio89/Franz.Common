@@ -1,24 +1,35 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Logging;
 
-namespace Franz.Common.Caching.Options
+namespace Franz.Common.Caching.Options;
+
+public sealed record MediatorCachingOptions
 {
-  public class MediatorCachingOptions
-  {
-    public bool Enabled { get; set; } = true;
+  public const string SectionName = "Franz:Mediator:Caching";
 
-    /// <summary>Default TTL used when no per-request override is specified.</summary>
-    public TimeSpan DefaultTtl { get; set; } = TimeSpan.FromMinutes(5);
+  [SetsRequiredMembers]
+  public MediatorCachingOptions() { }
 
-    /// <summary>Optional predicate to decide if a specific request should be cached.</summary>
-    public Func<object, bool>? ShouldCache { get; set; }
+  public bool Enabled { get; init; } = true;
 
-    /// <summary>Optional TTL selector per request (overrides DefaultTtl).</summary>
-    public Func<object, TimeSpan?>? TtlSelector { get; set; }
+  /// <summary>
+  /// Global toggle to bypass caching for all requests.
+  /// </summary>
+  public bool BypassAll { get; init; } = false;
 
-    /// <summary>Log level for cache HIT entries.</summary>
-    public LogLevel LogHitLevel { get; set; } = LogLevel.Debug;
+  /// <summary>
+  /// Default Absolute TTL for mediator requests.
+  /// </summary>
+  [Required]
+  public required TimeSpan DefaultTtl { get; init; } = TimeSpan.FromMinutes(5);
 
-    /// <summary>Log level for cache MISS entries.</summary>
-    public LogLevel LogMissLevel { get; set; } = LogLevel.Information;
-  }
+  /// <summary>
+  /// Default Sliding TTL for mediator requests.
+  /// </summary>
+  [Required]
+  public required TimeSpan DefaultSlidingExpiration { get; init; } = TimeSpan.FromMinutes(2);
+
+  public LogLevel LogHitLevel { get; init; } = LogLevel.Debug;
+  public LogLevel LogMissLevel { get; init; } = LogLevel.Information;
 }

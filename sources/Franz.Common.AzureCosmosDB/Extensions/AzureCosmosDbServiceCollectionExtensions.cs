@@ -2,105 +2,100 @@
 using Franz.Common.AzureCosmosDB.Messaging;
 using Franz.Common.AzureCosmosDB.Options;
 using Franz.Common.Messaging.Storage;
-using Microsoft.Azure.Cosmos;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Cosmos.Storage.Internal;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.AzureCosmosDB.Extensions;
 
 public static class CosmosServiceCollectionExtensions
 {
-  /// <summary>
-  /// Registers CosmosOptions and the EF Core Cosmos DbContext.
-  /// </summary>
+  private const string DefaultSection = "Cosmos";
+
   public static IServiceCollection AddFranzCosmosDbContext<TContext>(
       this IServiceCollection services,
       IConfiguration configuration)
       where TContext : CosmosDbContextBase
   {
-    // Bind CosmosOptions from "Cosmos" section
-    services.Configure<CosmosOptions>(configuration.GetSection("Cosmos"));
-    var cosmos = configuration.GetSection("Cosmos").Get<CosmosOptions>()
-                 ?? throw new InvalidOperationException("Cosmos configuration missing.");
+    services.ConfigureCosmosOptions(configuration);
 
-    if (!cosmos.Enabled)
-      return services;
-
-    // Register EF Core Cosmos DbContext
-    services.AddDbContext<TContext>(options =>
+    services.AddDbContext<TContext>((sp, options) =>
     {
+      var cosmos = sp.GetRequiredService<IOptions<CosmosOptions>>().Value;
+      if (!cosmos.Enabled) return;
+
+      // .NET 10 optimized connection
       options.UseCosmos(
           cosmos.AccountEndpoint,
           cosmos.AccountKey,
           cosmos.DatabaseName,
-          cosmosOptions =>
-          {
-            if (!string.IsNullOrWhiteSpace(cosmos.ApplicationName))
-            {
-              cosmosOptions.HttpClientFactory(() =>
-              {
-                var client = new HttpClient();
-                client.DefaultRequestHeaders.Add("User-Agent", cosmos.ApplicationName);
-                return client;
-              });
-            }
-
-            if (cosmos.DatabaseThroughput.HasValue)
-              cosmosOptions.LimitToEndpoint(cosmos.DatabaseThroughput.Value);
-          }
+          cosmosBuilder => ConfigureCosmosProvider(cosmosBuilder, cosmos)
       );
     });
 
     return services;
   }
 
-  /// <summary>
-  /// Registers the EF Core Cosmos DbContext for messaging (Outbox + Inbox),
-  /// and the EF-based MessageStore + InboxStore.
-  /// </summary>
   public static IServiceCollection AddFranzCosmosMessaging(
       this IServiceCollection services,
       IConfiguration configuration)
   {
-    // 1️⃣ Bind CosmosOptions
-    services.Configure<CosmosOptions>(configuration.GetSection("Cosmos"));
+    services.ConfigureCosmosOptions(configuration);
 
-    var cosmos = configuration.GetSection("Cosmos").Get<CosmosOptions>()
-                 ?? throw new InvalidOperationException("Cosmos configuration missing.");
-
-    if (!cosmos.Enabled)
-      return services;
-
-    // 2️⃣ Register the CosmosMessagingDbContext
-    services.AddDbContext<CosmosMessagingDbContext>(options =>
+    services.AddDbContext<CosmosMessagingDbContext>((sp, options) =>
     {
+      var cosmos = sp.GetRequiredService<IOptions<CosmosOptions>>().Value;
+      if (!cosmos.Enabled) return;
+
       options.UseCosmos(
           cosmos.AccountEndpoint,
           cosmos.AccountKey,
           cosmos.DatabaseName,
-          cosmosOptions =>
+          cosmosBuilder =>
           {
-            if (!string.IsNullOrWhiteSpace(cosmos.ApplicationName))
-            {
-              cosmosOptions.HttpClientFactory(() =>
-              {
-                var client = new HttpClient();
-                client.DefaultRequestHeaders.Add("User-Agent", cosmos.ApplicationName);
-                return client;
-              });
-            }
-
-            if (cosmos.DatabaseThroughput.HasValue)
-              cosmosOptions.LimitToEndpoint(cosmos.DatabaseThroughput.Value);
+            // EF Core 10 handles container mapping via ModelBuilder.ToContainer()
+            // in the DbContext, so we avoid setting a default container here
+            // to prevent mapping collisions.
+            ConfigureCosmosProvider(cosmosBuilder, cosmos);
           }
       );
     });
 
-    // 3️⃣ Register Outbox + Inbox Stores
     services.AddScoped<IMessageStore, CosmosEfMessageStore>();
     services.AddScoped<IInboxStore, CosmosEfInboxStore>();
 
     return services;
+  }
+
+  private static void ConfigureCosmosOptions(this IServiceCollection services, IConfiguration configuration)
+  {
+    services.AddOptions<CosmosOptions>()
+        .Bind(configuration.GetSection(DefaultSection))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+  }
+
+  private static void ConfigureCosmosProvider(
+      Microsoft.EntityFrameworkCore.Infrastructure.CosmosDbContextOptionsBuilder builder,
+      CosmosOptions settings)
+  {
+    if (!string.IsNullOrWhiteSpace(settings.ApplicationName))
+    {
+      builder.HttpClientFactory(() =>
+      {
+        var client = new HttpClient();
+        client.DefaultRequestHeaders.Add("User-Agent", settings.ApplicationName);
+        return client;
+      });
+    }
+
+    // EF Core 10 Best Practice: Always use the execution strategy for 
+    // built-in Cosmos retries on transient failures.
+    builder.ExecutionStrategy(d => new CosmosExecutionStrategy(d));
+
+    // Use region-based routing if available
+    builder.LimitToEndpoint();
   }
 }

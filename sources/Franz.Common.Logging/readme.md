@@ -3,7 +3,7 @@
 A comprehensive logging library within the **Franz Framework**, designed to enhance application monitoring and diagnostics using **Serilog** and **Elastic APM**.
 This package provides tools for centralized logging, tracing, and seamless integration with ASP.NET Core applications.
 
-* **Current Version**: 1.7.8
+* **Current Version**:  2.0.1
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -171,6 +171,13 @@ Agent.Setup(new AgentComponents());
 
 ## **Changelog**
 
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
+
 ### Version 1.7.6
 
 * Dual production logs: `prod-sre-.json` for SRE, `prod-dev-.log` for Dev
@@ -188,17 +195,4 @@ Agent.Setup(new AgentComponents());
 (Older versions omitted for brevity)
 
 ---
-
-### Suggested Commit Message
-
-```
-chore(logging): release Franz.Common.Logging 1.7.6
-
-- Dual production logging: SRE JSON + Dev human-readable logs
-- UTF-8 safe, rolling files, 30-day retention
-- Preserves console logging for live monitoring
-- Noise suppression applied consistently
-- Ready for integration with Franz.Common.OpenTelemetry
-- Updated README and usage examples
-```
 

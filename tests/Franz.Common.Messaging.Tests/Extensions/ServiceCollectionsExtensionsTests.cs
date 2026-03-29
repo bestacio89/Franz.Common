@@ -64,46 +64,4 @@ public class ServiceCollectionExtensionsTests
         });
   }
 
-  [Fact]
-  public void AddMessagingOptions_WithValidConfiguration_ShouldRegisterOptions()
-  {
-    // Arrange
-    var configDict = new Dictionary<string, string?> { { "Messaging:HostName", "localhost" } };
-    var configuration = new ConfigurationBuilder().AddInMemoryCollection(configDict).Build();
-
-    // Act
-    _services.AddMessagingOptions(configuration);
-
-    // Assert
-    _services.Should().Contain(sd => sd.ServiceType == typeof(IConfigureOptions<MessagingOptions>));
-  }
-
-  [Fact]
-  public void AddMessagingOptions_WithMissingConfiguration_ShouldThrowTechnicalException()
-  {
-    // Arrange
-    var configuration = new ConfigurationBuilder().Build(); // Empty config
-
-    // Act
-    Action act = () => _services.AddMessagingOptions(configuration);
-
-    // Assert
-    act.Should().Throw<TechnicalException>();
-  }
-
-  [Fact]
-  public void AddMessagingOptions_WhenAlreadyConfigured_ShouldNotOverrideOrThrow()
-  {
-    // Arrange
-    _services.Configure<MessagingOptions>(opt => { });
-    var configuration = new ConfigurationBuilder().Build();
-
-    // Act
-    Action act = () => _services.AddMessagingOptions(configuration);
-
-    // Assert
-    act.Should().NotThrow();
-    // Should still only have the one registration we manually added
-    _services.Count(sd => sd.ServiceType == typeof(IConfigureOptions<MessagingOptions>)).Should().Be(1);
-  }
 }

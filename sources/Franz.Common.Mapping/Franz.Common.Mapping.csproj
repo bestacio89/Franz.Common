@@ -1,15 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <Import Project="..\..\common.targets" />
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common.Errors\Franz.Common.Errors.csproj" />
   </ItemGroup>
-
- 
+  <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Mapping.Generators\Franz.Common.Mapping.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Franz.Common.Reflection\Franz.Common.Reflection.csproj" />
+  </ItemGroup>
 
 </Project>

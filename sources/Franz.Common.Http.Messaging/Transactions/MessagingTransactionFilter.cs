@@ -16,8 +16,8 @@ public class MessagingTransactionFilter : IAsyncActionFilter
     var executedContext = await next.Invoke();
 
     if (executedContext.Exception == null)
-      messagingTransaction.Complete();
+     await messagingTransaction.CompleteAsync();
     else
-      messagingTransaction.Rollback();
+      await messagingTransaction.RollbackAsync();
   }
 }

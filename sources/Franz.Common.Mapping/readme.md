@@ -8,7 +8,7 @@ Here’s the **updated README draft** (in your project’s tone and formatting):
 
 *A lightweight, fast, and extensible object mapping library for the Franz ecosystem.*
 
-**Current Version**: 1.7.8
+**Current Version**:  2.0.1
 **Codename:** *Constructor-Aware Evolution*
 - Part of the private **Franz Framework** ecosystem.
 ---
@@ -107,6 +107,14 @@ Console.WriteLine(dto.Email);    // john@acme.com
 ```
 
 ---
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
+
+
 ### Version 1.6.20
 - Updated to **.NET 10.0**
 

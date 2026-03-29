@@ -1,50 +1,49 @@
-﻿using Confluent.Kafka;
+﻿#nullable enable
+using Confluent.Kafka;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.KafKa.Consumers;
+using Franz.Common.Messaging.Kafka.Tests.Fixtures;
+using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Consumers;
 
-public class KafkaConsumerProviderTests
+[Collection("KafkaConsumer")]
+public sealed class KafkaConsumerProviderTests(KafkaContainerFixture fixture)
 {
-  private static KafkaConsumerProvider CreateProvider()
+  private KafkaConsumerProvider CreateProvider()
   {
-    var options = Options.Create(new MessagingOptions
+    var cleanedAddress = fixture.BootstrapServers
+        .Replace("plaintext://", "", StringComparison.OrdinalIgnoreCase)
+        .TrimEnd('/');
+
+    var options = Options.Create(new KafkaMessagingOptions
     {
-      BootStrapServers = "localhost:9092",
-      GroupID = "test-group"
+      BootStrapServers = cleanedAddress,
+      GroupID = $"provider-test-{Guid.NewGuid():N}"
     });
 
-    return new KafkaConsumerProvider(options);
+    return new KafkaConsumerProvider(options, NullLogger<KafkaConsumerProvider>.Instance);
   }
 
   [Fact]
   public void CreateConsumer_Should_Create_New_Instance()
   {
-    // Arrange
     var provider = CreateProvider();
-
-    // Act
-    var consumer1 = provider.CreateConsumer();
-    var consumer2 = provider.CreateConsumer();
-
-    // Assert
-    consumer1.Should().NotBeNull();
-    consumer2.Should().NotBeNull();
-    consumer1.Should().NotBeSameAs(consumer2);
+    using var c1 = provider.CreateConsumer();
+    using var c2 = provider.CreateConsumer();
+    c1.Should().NotBeSameAs(c2);
   }
 
   [Fact]
-  public void CreateConsumer_Should_Use_Configured_Values()
+  public void CreateConsumer_Should_Return_Valid_Handle()
   {
-    // Arrange
     var provider = CreateProvider();
-
-    // Act
-    var consumer = provider.CreateConsumer();
-
-    // Assert
-    consumer.Should().NotBeNull();
+    using var consumer = provider.CreateConsumer();
+    consumer.Handle.Should().NotBeNull();
+    // FIX for CS1061:
+    Library.Version.Should().NotBe(0);
   }
 }

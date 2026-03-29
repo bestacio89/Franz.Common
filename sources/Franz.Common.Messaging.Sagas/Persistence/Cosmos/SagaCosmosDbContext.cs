@@ -1,9 +1,11 @@
 ﻿#nullable enable
 
 using Franz.Common.AzureCosmosDB.Context;
+using Franz.Common.AzureCosmosDB.Options;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.EntityFramework.Auditing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Messaging.Sagas.Persistence.Cosmos;
 
@@ -12,8 +14,9 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
   public CosmosSagaDbContext(
       DbContextOptions<CosmosSagaDbContext> options,
       IDispatcher dispatcher,
+      IOptions<CosmosOptions> cosmosOptions, // 🛠️ Added this to match base
       ICurrentUserService? currentUser = null)
-      : base(options, dispatcher, currentUser)
+      : base(options, dispatcher, cosmosOptions, currentUser)
   {
   }
 
@@ -25,13 +28,13 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
 
     modelBuilder.Entity<CosmosSagaStateDocument>(entity =>
     {
-      entity.ToContainer("sagaStates");
+      // The base.OnModelCreating already sets a fallback container,
+      // but for Sagas we explicitly override it here.
+      entity.ToContainer("SagaStates");
 
-      // Partition key = SagaId
       entity.HasKey(x => x.Id);
       entity.HasPartitionKey(x => x.Id);
 
-      // Cosmos concurrency (etag)
       entity.UseETagConcurrency();
 
       entity.Property(x => x.SagaType);

@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Franz.Common.Messaging.Hosting.Listeners;
 
-public class OutboxMessageListener : IListener
+public sealed class OutboxMessageListener : IListener
 {
   private readonly IMessageStore _messageStore;
   private readonly IInboxStore _inbox;
@@ -32,35 +32,40 @@ public class OutboxMessageListener : IListener
     _logger = logger;
   }
 
-  public event EventHandler<MessageEventArgs>? Received;
+  // ✅ FIX: Replaced synchronous event with awaitable Func delegate
+  public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
 
   public async Task Listen(CancellationToken stoppingToken = default)
   {
+    _logger.LogInformation("🚀 OutboxMessageListener started polling...");
+
     while (!stoppingToken.IsCancellationRequested)
     {
       try
       {
-        // Fetching stored records (StoredMessage.Id should be Guid)
+        // Fetching stored records
         var pending = await _messageStore.GetPendingAsync(stoppingToken);
 
         foreach (var stored in pending)
         {
-          // Bridge stored data to our native Guid v7 Message
+          // Bridge stored data to our native Message
           var message = stored.ToMessage();
 
-          // 👉 Inbox check (High-performance Guid comparison)
+          // 👉 Inbox check (Idempotency)
           if (await _inbox.HasProcessedAsync(message.Id, stoppingToken))
           {
             _logger.LogInformation("⏩ Skipping already processed message {MessageId}", message.Id);
-            // Mark as sent in outbox so we don't fetch it again, even if it was a duplicate
             await _messageStore.MarkAsSentAsync(stored.Id, stoppingToken);
             continue;
           }
 
-          // Fire event for subscribers
-          Received?.Invoke(this, new MessageEventArgs(message));
+          // 🚀 THE FIX: Await external processing before committing state changes
+          if (OnMessageReceivedAsync != null)
+          {
+            await OnMessageReceivedAsync(new MessageEventArgs(message));
+          }
 
-          // Deserialize domain object
+          // Deserialize domain object for internal dispatch
           object? domainObject = TryDeserializeDomainObject(message);
 
           using var scope = _logger.BeginScope(new Dictionary<string, object>
@@ -84,7 +89,7 @@ public class OutboxMessageListener : IListener
             _logger.LogWarning("⚠️ Outbox message {Id} is neither ICommand nor IEvent", message.Id);
           }
 
-          // 👉 Atomic logical completion
+          // 👉 Atomic logical completion: mark both stores
           await _inbox.MarkProcessedAsync(message.Id, stoppingToken);
           await _messageStore.MarkAsSentAsync(stored.Id, stoppingToken);
 
@@ -96,16 +101,19 @@ public class OutboxMessageListener : IListener
         _logger.LogError(ex, "💥 Unexpected error in OutboxMessageListener loop");
       }
 
-      // Consider making this interval configurable
+      // Polling interval - in a production scenario, consider a backoff strategy or SignalR/DbNotification trigger
       await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
     }
   }
 
-  public void StopListen() { /* No-op */ }
+  public Task StopListenAsync(CancellationToken cancellationToken = default)
+  {
+    _logger.LogInformation("🛑 OutboxMessageListener stopping...");
+    return Task.CompletedTask;
+  }
 
   private object? TryDeserializeDomainObject(Message message)
   {
-    // Use the MessageType property we defined in the Message base class
     var typeName = message.MessageType;
 
     if (!string.IsNullOrWhiteSpace(typeName) && message.Body is string bodyJson)

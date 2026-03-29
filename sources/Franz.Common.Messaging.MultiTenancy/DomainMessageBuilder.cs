@@ -1,34 +1,44 @@
+#nullable enable
 using Franz.Common.Headers;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.MultiTenancy;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.MultiTenancy;
 
-public class DomainMessageBuilder : IMessageBuilder
+/// <summary>
+/// Enriches messages with Domain ID metadata from the current context.
+/// Senior Architect Note: Updated to IMessageBuilder async contract. Using Task.CompletedTask 
+/// as domain resolution from context accessors is typically an in-memory operation.
+/// </summary>
+public class DomainMessageBuilder(IDomainContextAccessor? domainContextAccessor = null)
+    : IMessageBuilder
 {
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    private readonly IDomainContextAccessor? domainContextAccessor;
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  private readonly IDomainContextAccessor? _domainContextAccessor = domainContextAccessor;
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-    public DomainMessageBuilder(IDomainContextAccessor? domainContextAccessor = null)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+  /// <summary>
+  /// Determines if the builder can proceed based on the availability of a Domain ID.
+  /// </summary>
+  public bool CanBuild(Message message)
+  {
+    // Senior Note: .HasValue check remains synchronous as it targets local execution context.
+    return _domainContextAccessor?.GetCurrentDomainId().HasValue == true;
+  }
+
+  /// <summary>
+  /// Asynchronously enriches the message headers with the current Domain ID.
+  /// </summary>
+  public Task BuildAsync(Message message, CancellationToken ct = default)
+  {
+    var id = _domainContextAccessor?.GetCurrentDomainId();
+
+    if (id.HasValue)
     {
-        this.domainContextAccessor = domainContextAccessor;
+      // Consistent use of string array for header values to support multi-value transport standards.
+      message.Headers[HeaderConstants.DomainId] = new[] { id.Value.ToString() };
     }
 
-    public bool CanBuild(Message message)
-    {
-        var result = domainContextAccessor?.GetCurrentDomainId().HasValue == true;
-
-        return result;
-    }
-
-    public void Build(Message message)
-    {
-        var id = domainContextAccessor?.GetCurrentDomainId();
-
-        if (id != null)
-            message.Headers.Add(HeaderConstants.DomainId, id.ToString());
-    }
+    return Task.CompletedTask;
+  }
 }

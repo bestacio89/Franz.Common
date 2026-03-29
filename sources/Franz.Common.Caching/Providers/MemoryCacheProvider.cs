@@ -1,25 +1,26 @@
 ﻿using Franz.Common.Caching.Abstractions;
 using Microsoft.Extensions.Caching.Memory;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Caching.Providers;
 
 public sealed class MemoryCacheProvider : ICacheProvider
 {
   private readonly IMemoryCache _cache;
-  private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(5);
+  private readonly IOptionsMonitor<CacheOptions> _optionsMonitor;
 
-  public MemoryCacheProvider(IMemoryCache cache)
+  public MemoryCacheProvider(
+      IMemoryCache cache,
+      IOptionsMonitor<CacheOptions> optionsMonitor)
   {
     _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+    _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
   }
 
   public async Task<CacheResult<T>> GetOrSetAsync<T>(
       string key,
       Func<CancellationToken, Task<T>> factory,
-      CacheOptions? options = null,
+      CacheOptions? requestOptions = null,
       CancellationToken ct = default)
   {
     if (string.IsNullOrWhiteSpace(key))
@@ -27,8 +28,6 @@ public sealed class MemoryCacheProvider : ICacheProvider
 
     if (factory is null)
       throw new ArgumentNullException(nameof(factory));
-
-    ValidateOptions(options);
 
     // 🔹 1. Try cache
     if (_cache.TryGetValue(key, out var existing))
@@ -39,10 +38,10 @@ public sealed class MemoryCacheProvider : ICacheProvider
     // 🔹 2. Cache miss → compute
     var value = await factory(ct);
 
-    _cache.Set(
-        key,
-        value!,
-        CreateMemoryCacheOptions(options));
+    // 🔹 3. Create entry options using Reactive Monitor for defaults
+    var entryOptions = CreateMemoryCacheOptions(requestOptions);
+
+    _cache.Set(key, value!, entryOptions);
 
     return new CacheResult<T>(value, IsHit: false);
   }
@@ -57,100 +56,32 @@ public sealed class MemoryCacheProvider : ICacheProvider
   }
 
   public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
-    => throw new NotSupportedException(
-        "Tag-based invalidation is not supported by MemoryCacheProvider.");
+      => throw new NotSupportedException("Tag-based invalidation is not supported by MemoryCacheProvider.");
 
-  // ============================
-  // Helpers
-  // ============================
-
-  private static MemoryCacheEntryOptions CreateMemoryCacheOptions(CacheOptions? options)
+  private MemoryCacheEntryOptions CreateMemoryCacheOptions(CacheOptions? requestOptions)
   {
+    var globalSettings = _optionsMonitor.CurrentValue;
     var memoryOptions = new MemoryCacheEntryOptions();
 
-    if (options is null)
+    // Use global monitor defaults if no specific request options provided
+    if (requestOptions is null)
     {
-      memoryOptions.AbsoluteExpirationRelativeToNow = DefaultExpiration;
+      memoryOptions.AbsoluteExpirationRelativeToNow = globalSettings.DefaultAbsoluteExpiration;
+      memoryOptions.SlidingExpiration = globalSettings.DefaultSlidingExpiration;
+      memoryOptions.Priority = globalSettings.DefaultPriority;
       return memoryOptions;
     }
 
-    // Priority order:
-    // AbsoluteExpirationRelativeToNow > AbsoluteExpiration > SlidingExpiration > Default
-    if (options.AbsoluteExpirationRelativeToNow.HasValue)
-    {
-      memoryOptions.AbsoluteExpirationRelativeToNow =
-          options.AbsoluteExpirationRelativeToNow.Value;
-    }
-    else if (options.AbsoluteExpiration.HasValue)
-    {
-      memoryOptions.AbsoluteExpiration = options.AbsoluteExpiration.Value;
-    }
-    else if (options.SlidingExpiration.HasValue)
-    {
-      memoryOptions.SlidingExpiration = options.SlidingExpiration.Value;
-    }
-    else
-    {
-      memoryOptions.AbsoluteExpirationRelativeToNow = DefaultExpiration;
-    }
+    // Map request-specific overrides with reactive fallbacks
+    memoryOptions.AbsoluteExpirationRelativeToNow = requestOptions.DefaultAbsoluteExpiration;
+    memoryOptions.SlidingExpiration = requestOptions.DefaultSlidingExpiration;
+    memoryOptions.Priority = requestOptions.DefaultPriority;
 
-    // Map priority if specified
-    if (options.Priority.HasValue)
+    if (requestOptions.DefaultEstimatedSizeInBytes!=0)
     {
-      memoryOptions.Priority = options.Priority.Value switch
-      {
-        CacheItemPriority.Low =>
-          Microsoft.Extensions.Caching.Memory.CacheItemPriority.Low,
-
-        CacheItemPriority.Normal =>
-          Microsoft.Extensions.Caching.Memory.CacheItemPriority.Normal,
-
-        CacheItemPriority.High =>
-          Microsoft.Extensions.Caching.Memory.CacheItemPriority.High,
-
-        CacheItemPriority.NeverRemove =>
-          Microsoft.Extensions.Caching.Memory.CacheItemPriority.NeverRemove,
-
-        _ =>
-          Microsoft.Extensions.Caching.Memory.CacheItemPriority.Normal
-      };
-    }
-
-    // Set size if specified (for size-limited caches)
-    if (options.EstimatedSizeInBytes.HasValue)
-    {
-      memoryOptions.Size = options.EstimatedSizeInBytes.Value;
+      memoryOptions.Size = requestOptions.DefaultEstimatedSizeInBytes;
     }
 
     return memoryOptions;
-  }
-
-  private static void ValidateOptions(CacheOptions? options)
-  {
-    if (options is null)
-      return;
-
-    if (options.AbsoluteExpirationRelativeToNow.HasValue &&
-        options.AbsoluteExpirationRelativeToNow.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(
-          nameof(options.AbsoluteExpirationRelativeToNow));
-
-    if (options.SlidingExpiration.HasValue &&
-        options.SlidingExpiration.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(
-          nameof(options.SlidingExpiration));
-
-    if (options.AbsoluteExpiration.HasValue &&
-        options.AbsoluteExpiration.Value <= DateTimeOffset.UtcNow)
-      throw new ArgumentOutOfRangeException(
-          nameof(options.AbsoluteExpiration));
-
-    if (options.LocalCacheHint is not null)
-      throw new NotSupportedException(
-          "LocalCacheHint is not applicable to memory-only cache providers.");
-
-    if (options.Tags is not null)
-      throw new NotSupportedException(
-          "Tags are not supported by MemoryCacheProvider.");
   }
 }

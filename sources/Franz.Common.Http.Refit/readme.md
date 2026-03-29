@@ -7,7 +7,7 @@ Provides **typed Refit clients** pre-wired with **correlation and tenant propaga
 
 ---
 
-* **Current Version**: 1.7.8
+* **Current Version**:  2.0.1
 - Part of the private **Franz Framework** ecosystem.
 ---
 
@@ -249,6 +249,8 @@ Refit clients can be registered automatically from configuration:
 
 ## **Changelog**
 
+
+
 ### **Franz 1.6.17 — Refit Overhaul & Self-Healing Auth**
 
 🔹 **Highlights**
@@ -280,6 +282,13 @@ Refit clients can be registered automatically from configuration:
 * **Better Sandbox Behavior**
 
   * Auto-switch to `NoOpTokenProvider` when authentication is not required.
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
+
 
 ---
 

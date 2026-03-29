@@ -1,8 +1,8 @@
 ﻿using Franz.Common.DependencyInjection.Extensions;
+using Franz.Common.Http.Messaging.Health;
 using Franz.Common.Http.Messaging.Transactions;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
-using HealthChecks.RabbitMQ;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -38,16 +38,9 @@ public static class ServiceCollectionExtensions
 
   public static IServiceCollection AddMessagingHealthCheck(this IServiceCollection services)
   {
-    var rabbitMQHealthCheckType = typeof(RabbitMQHealthCheck);
-
-    var allReadyReferenced = services.Any(service => service.ServiceType == rabbitMQHealthCheckType);
-
-    if (!allReadyReferenced)
-    {
-      services
-        .AddHealthChecks()
-        .AddRabbitMQ(serviceProvider => serviceProvider.GetRequiredService<IConnectionProvider>().Current);
-    }
+    services
+      .AddHealthChecks()
+      .AddCheck<RabbitMQConnectionHealthCheck>("rabbitmq");
 
     return services;
   }

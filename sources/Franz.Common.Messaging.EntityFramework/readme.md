@@ -28,7 +28,7 @@ This package ensures **transactional consistency** for outbox patterns in relati
 
 ## **Version Information**
 
-* **Current Version**: 1.7.8
+* **Current Version**:  2.0.1
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -184,3 +184,8 @@ The **Franz.Common.Messaging.EntityFramework** package integrates seamlessly wit
 - Removal and Deprecation of oracle support due to Oracle's shift away from EF Core.
 ---
 
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.

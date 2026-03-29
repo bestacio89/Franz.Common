@@ -1,28 +1,30 @@
 ﻿using Franz.Common.Caching.Abstractions;
 using Microsoft.Extensions.Caching.Hybrid;
-using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Franz.Common.Caching.Hybrid;
 
+/// <summary>
+/// A high-performance HybridCache implementation for Franz.Common.
+/// Optimized for .NET 10 and aligned with the simplified CacheOptions schema.
+/// </summary>
 public sealed class HybridCacheProvider : ICacheProvider
 {
   private readonly HybridCache _cache;
+  private readonly CacheOptions _defaultOptions;
 
-  // Franz-level defaults (boring, predictable)
-  private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(30);
-  private static readonly TimeSpan DefaultLocalHint = TimeSpan.FromMinutes(5);
-
-  public HybridCacheProvider(HybridCache cache)
+  public HybridCacheProvider(HybridCache cache, CacheOptions options)
   {
     _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+    _defaultOptions = options ?? throw new ArgumentNullException(nameof(options));
   }
 
   public async Task<CacheResult<T>> GetOrSetAsync<T>(
       string key,
       Func<CancellationToken, Task<T>> factory,
-      CacheOptions? options = null,
+      CacheOptions? overrideOptions = null,
       CancellationToken ct = default)
   {
     if (string.IsNullOrWhiteSpace(key))
@@ -30,20 +32,19 @@ public sealed class HybridCacheProvider : ICacheProvider
     if (factory is null)
       throw new ArgumentNullException(nameof(factory));
 
-    ValidateOptions(options);
-
-    // Use HybridCache's GetOrCreateAsync, wrap result in CacheResult<T>
+    // Apply KeyPrefix from the "Correct Cereal" options
+    var effectiveKey = $"{_defaultOptions.KeyPrefix}{key}";
     var isHit = true;
+
     var value = await _cache.GetOrCreateAsync<Func<CancellationToken, Task<T>>, T>(
-        key,
+        effectiveKey,
         factory,
         async (f, cancellationToken) =>
         {
-          isHit = false; // factory invoked → MISS
+          isHit = false; // Factory invoked → Cache MISS
           return await f(cancellationToken);
         },
-        CreateEntryOptions(options),
-        tags: options?.Tags,
+        CreateEntryOptions(overrideOptions ?? _defaultOptions),
         cancellationToken: ct
     );
 
@@ -55,37 +56,29 @@ public sealed class HybridCacheProvider : ICacheProvider
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
 
-    return _cache.RemoveAsync(key, ct).AsTask();
+    var effectiveKey = $"{_defaultOptions.KeyPrefix}{key}";
+
+    // Use native ValueTask conversion for hot-path efficiency
+    return _cache.RemoveAsync(effectiveKey, ct).AsTask();
   }
 
+  /// <summary>
+  /// Note: RemoveByTagAsync is deprecated in this provider to maintain 
+  /// high-performance deterministic invalidation.
+  /// </summary>
+  [Obsolete("Tag-based invalidation is disabled for performance consistency. Use key-based removal.")]
   public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
   {
-    if (string.IsNullOrWhiteSpace(tag))
-      throw new ArgumentException("Tag cannot be null or empty.", nameof(tag));
-
-    return _cache.RemoveByTagAsync(tag, ct).AsTask();
+    throw new NotSupportedException("Tag-based invalidation is highly inefficient in distributed contexts and has been removed from Franz.Common.Caching.");
   }
 
-  private static HybridCacheEntryOptions CreateEntryOptions(CacheOptions? options)
+  private static HybridCacheEntryOptions CreateEntryOptions(CacheOptions options)
       => new()
       {
-        Expiration = options?.Expiration ?? DefaultExpiration,
-        LocalCacheExpiration = options?.LocalCacheHint ?? DefaultLocalHint
+        // Mapping Absolute Expiration to HybridCache
+        Expiration = options.DefaultAbsoluteExpiration,
+
+        // LocalCacheHint allows for L1 (Memory) vs L2 (Distributed) tiering
+        LocalCacheExpiration = options.LocalCacheHint ?? options.DefaultSlidingExpiration
       };
-
-  private static void ValidateOptions(CacheOptions? options)
-  {
-    if (options is null)
-      return;
-
-    if (options.Expiration.HasValue && options.Expiration.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(
-          nameof(options.Expiration),
-          "Expiration must be greater than zero.");
-
-    if (options.LocalCacheHint.HasValue && options.LocalCacheHint.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(
-          nameof(options.LocalCacheHint),
-          "LocalCacheHint must be greater than zero.");
-  }
 }

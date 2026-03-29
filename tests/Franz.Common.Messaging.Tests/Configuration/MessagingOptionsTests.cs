@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.RabbitMQ;
 using Xunit;
 
 namespace Franz.Common.Messaging.Tests.Configuration;
@@ -7,55 +8,74 @@ namespace Franz.Common.Messaging.Tests.Configuration;
 public class MessagingOptionsTests
 {
   [Fact]
-  public void MessagingOptions_ShouldHaveDefaultValues()
+  public void BaseMessagingOptions_ShouldHaveDefaultValues()
   {
-    // Arrange & Act
     var options = new MessagingOptions();
 
-    // Assert
-    options.BootStrapServers.Should().Be("localhost:9092");
-    options.GroupID.Should().BeEmpty();
     options.SslEnabled.Should().BeNull();
     options.Port.Should().BeNull();
   }
 
   [Fact]
-  public void MessagingOptions_ShouldSetAndGetProperties()
+  public void BaseMessagingOptions_ShouldSetAndGetProperties()
   {
-    // Arrange
-    var options = new MessagingOptions();
-    var expectedHost = "rabbitmq.local";
-    var expectedPort = 5672;
-    var expectedGroupId = "orders-service-group";
+    var options = new MessagingOptions
+    {
+      HostName = "localhost",
+      Port = 5672,
+      SslEnabled = true,
+      SslCaLocation = "/ca.pem",
+      SslCertificateLocation = "/cert.pem",
+      SslKeyLocation = "/key.pem"
+    };
 
-    // Act
-    options.HostName = expectedHost;
-    options.Port = expectedPort;
-    options.GroupID = expectedGroupId;
-    options.SslEnabled = true;
-
-    // Assert
-    options.HostName.Should().Be(expectedHost);
-    options.Port.Should().Be(expectedPort);
-    options.GroupID.Should().Be(expectedGroupId);
+    options.HostName.Should().Be("localhost");
+    options.Port.Should().Be(5672);
     options.SslEnabled.Should().BeTrue();
+    options.SslCaLocation.Should().Be("/ca.pem");
+    options.SslCertificateLocation.Should().Be("/cert.pem");
+    options.SslKeyLocation.Should().Be("/key.pem");
   }
 
   [Fact]
-  public void MessagingOptions_SslLocations_ShouldBeAssignable()
+  public void RabbitMQMessagingOptions_ShouldSetAndGetRabbitSpecificProperties()
   {
-    // Arrange
-    var options = new MessagingOptions();
-    var path = "/etc/ssl/certs/ca.pem";
+    var options = new RabbitMQMessagingOptions
+    {
+      ExchangeName = "orders-exchange",
+      QueueName = "orders-queue",
+      DeadLetterQueueName = "orders-dlq",
+      DeadLetterExchangeName = "orders-dlx",
+      DefaultRoutingKey = "orders.default",
+      RequestedHeartbeatSeconds = 45
+    };
 
-    // Act
-    options.SslCaLocation = path;
-    options.SslCertificateLocation = path;
-    options.SslKeyLocation = path;
+    options.ExchangeName.Should().Be("orders-exchange");
+    options.QueueName.Should().Be("orders-queue");
+    options.DeadLetterQueueName.Should().Be("orders-dlq");
+    options.DeadLetterExchangeName.Should().Be("orders-dlx");
+    options.DefaultRoutingKey.Should().Be("orders.default");
+    options.RequestedHeartbeatSeconds.Should().Be(45);
+  }
 
-    // Assert
-    options.SslCaLocation.Should().Be(path);
-    options.SslCertificateLocation.Should().Be(path);
-    options.SslKeyLocation.Should().Be(path);
+  [Fact]
+  public void KafkaMessagingOptions_ShouldSetAndGetKafkaSpecificProperties()
+  {
+    var options = new KafkaMessagingOptions
+    {
+      BootStrapServers = "kafka:9092",
+      GroupID = "kafka-group",
+      TopicName = "orders-topic",
+      DeadLetterTopicName = "orders-dlt",
+      Partitions = 3,
+      ReplicationFactor = 2
+    };
+
+    options.BootStrapServers.Should().Be("kafka:9092");
+    options.GroupID.Should().Be("kafka-group");
+    options.TopicName.Should().Be("orders-topic");
+    options.DeadLetterTopicName.Should().Be("orders-dlt");
+    options.Partitions.Should().Be(3);
+    options.ReplicationFactor.Should().Be(2);
   }
 }

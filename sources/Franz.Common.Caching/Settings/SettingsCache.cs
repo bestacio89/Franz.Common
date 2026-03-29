@@ -26,7 +26,7 @@ public sealed class SettingsCache : ISettingsCache
     var result = await _cache.GetOrSetAsync(
         $"settings:{key}",
         _ => Task.FromResult(default(T)!),
-        new CacheOptions { Expiration = DefaultExpiration },
+        new CacheOptions {  },
         ct
     );
 
@@ -46,7 +46,7 @@ public sealed class SettingsCache : ISettingsCache
     await _cache.GetOrSetAsync(
         $"settings:{key}",
         _ => Task.FromResult(value!),
-        new CacheOptions { Expiration = DefaultExpiration },
+        new CacheOptions { },
         ct
     );
   }

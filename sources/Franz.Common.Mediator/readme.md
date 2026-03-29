@@ -14,7 +14,7 @@ Unlike minimal mediators, Franz ships with:
 
 ---
 
-* **Current Version**: 1.7.8
+* **Current Version**:  2.0.1
 - Part of the private **Franz Framework** ecosystem.
 ---
 
@@ -378,3 +378,10 @@ Patch release aligning **commands, queries, and events** with proper semantics:
 - Improved Overvability with GuidV7 correlation id instead of string
 - Added metrics observer, logging + metrics observer,
 - Updated to .NET 10.0.3 SDK.
+
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.

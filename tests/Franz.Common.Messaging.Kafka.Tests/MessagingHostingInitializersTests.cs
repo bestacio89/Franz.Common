@@ -6,6 +6,7 @@ using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Hosting
 {
+  [Collection("Kafka")]
   public class MessagingHostingInitializerTests
   {
     [Fact]
@@ -19,7 +20,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Hosting
       hostingInitializer.Initialize();
 
       // Assert
-      messagingMock.Verify(m => m.Initialize(), Times.Once);
+      messagingMock.Verify(m => m.InitializeAsync(), Times.Once);
     }
 
     [Fact]

@@ -1,35 +1,39 @@
 ﻿using Franz.Common.Caching.Abstractions;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using System.Text.Json;
+
 namespace Franz.Common.Caching.Providers;
 
 public sealed class RedisCacheProvider : ICacheProvider
 {
-  private readonly IDatabase _db;
   private readonly IConnectionMultiplexer _multiplexer;
-  private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(30);
+  private readonly IOptionsMonitor<CacheOptions> _optionsMonitor;
+  private readonly IDatabase _db;
 
-  public RedisCacheProvider(IConnectionMultiplexer connection)
+  public RedisCacheProvider(
+      IConnectionMultiplexer connection,
+      IOptionsMonitor<CacheOptions> optionsMonitor)
   {
     _multiplexer = connection ?? throw new ArgumentNullException(nameof(connection));
+    _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
     _db = _multiplexer.GetDatabase();
   }
 
   public async Task<CacheResult<T>> GetOrSetAsync<T>(
-    string key,
-    Func<CancellationToken, Task<T>> factory,
-    CacheOptions? options = null,
-    CancellationToken ct = default)
+      string key,
+      Func<CancellationToken, Task<T>> factory,
+      CacheOptions? requestOptions = null,
+      CancellationToken ct = default)
   {
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
-    if (factory is null)
-      throw new ArgumentNullException(nameof(factory));
 
-    ValidateOptions(options);
+    var settings = _optionsMonitor.CurrentValue;
+    var fullKey = ApplyPrefix(key, settings.KeyPrefix);
 
-    // 🔹 1. Try cache
-    var value = await _db.StringGetAsync(key);
+    // 🔹 1. Try cache (Standard Get)
+    var value = await _db.StringGetAsync(fullKey);
     if (value.HasValue)
     {
       var deserialized = JsonSerializer.Deserialize<T>((string)value!)!;
@@ -39,18 +43,10 @@ public sealed class RedisCacheProvider : ICacheProvider
     // 🔹 2. Cache miss → compute
     var computed = await factory(ct);
     var serialized = JsonSerializer.Serialize(computed);
-    var expiration = GetExpiration(options);
+    var expiration = GetExpiration(requestOptions, settings);
 
-    await _db.StringSetAsync(key, serialized, expiration);
-
-    // 🔹 3. Handle tags
-    if (options?.Tags != null)
-    {
-      foreach (var tag in options.Tags)
-      {
-        await _db.SetAddAsync($"tag:{tag}", key);
-      }
-    }
+    // 🔹 3. Atomic Write (Standard Set)
+    await _db.StringSetAsync(fullKey, serialized, expiration);
 
     return new CacheResult<T>(computed, IsHit: false);
   }
@@ -60,65 +56,33 @@ public sealed class RedisCacheProvider : ICacheProvider
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
 
-    await _db.KeyDeleteAsync(key);
-
-    var server = GetServer();
-    foreach (var tagKey in server.Keys(pattern: "tag:*"))
-    {
-      await _db.SetRemoveAsync(tagKey, key);
-    }
+    var settings = _optionsMonitor.CurrentValue;
+    await _db.KeyDeleteAsync(ApplyPrefix(key, settings.KeyPrefix));
   }
 
-  public async Task RemoveByTagAsync(string tag, CancellationToken ct = default)
+  /// <summary>
+  /// Intentionally unsupported to maintain O(1) performance and lean Redis state.
+  /// </summary>
+  public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
+      => throw new NotSupportedException("Tag-based invalidation is disabled for performance reasons.");
+
+  #region Helpers
+
+  private static string ApplyPrefix(string key, string prefix) => $"{prefix}{key}";
+
+  private static TimeSpan GetExpiration(CacheOptions? request, CacheOptions global)
   {
-    var tagSetKey = $"tag:{tag}";
-    var keys = await _db.SetMembersAsync(tagSetKey);
+    // 1. Explicit request override
+    if (request?.DefaultAbsoluteExpiration != default && request.DefaultAbsoluteExpiration != global.DefaultAbsoluteExpiration)
+      return request.DefaultAbsoluteExpiration;
 
-    if (keys.Length > 0)
-    {
-      await _db.KeyDeleteAsync(keys.Select(k => (RedisKey)(string)k!).ToArray());
-    }
+    // 2. Sliding expiration fallback
+    if (request?.DefaultSlidingExpiration != default && request.DefaultSlidingExpiration != global.DefaultSlidingExpiration)
+      return request.DefaultSlidingExpiration;
 
-    await _db.KeyDeleteAsync(tagSetKey);
+    // 3. Reactive global setting from IOptionsMonitor
+    return global.DefaultAbsoluteExpiration;
   }
 
-  private void ValidateOptions(CacheOptions? options)
-  {
-    if (options is null) return;
-
-    if (options.AbsoluteExpirationRelativeToNow.HasValue &&
-        options.AbsoluteExpirationRelativeToNow.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpirationRelativeToNow));
-
-    if (options.SlidingExpiration.HasValue &&
-        options.SlidingExpiration.Value <= TimeSpan.Zero)
-      throw new ArgumentOutOfRangeException(nameof(options.SlidingExpiration));
-
-    if (options.AbsoluteExpiration.HasValue &&
-        options.AbsoluteExpiration.Value <= DateTimeOffset.UtcNow)
-      throw new ArgumentOutOfRangeException(nameof(options.AbsoluteExpiration));
-
-    if (options.LocalCacheHint is not null)
-      throw new NotSupportedException("LocalCacheHint is not applicable to RedisCacheProvider.");
-  }
-
-  private TimeSpan GetExpiration(CacheOptions? options)
-  {
-    if (options?.AbsoluteExpirationRelativeToNow.HasValue == true)
-      return options.AbsoluteExpirationRelativeToNow.Value;
-
-    if (options?.AbsoluteExpiration.HasValue == true)
-      return options.AbsoluteExpiration.Value - DateTimeOffset.UtcNow;
-
-    if (options?.SlidingExpiration.HasValue == true)
-      return options.SlidingExpiration.Value;
-
-    return DefaultExpiration;
-  }
-
-  private IServer GetServer()
-  {
-    var endpoints = _multiplexer.GetEndPoints();
-    return _multiplexer.GetServer(endpoints.First());
-  }
+  #endregion
 }

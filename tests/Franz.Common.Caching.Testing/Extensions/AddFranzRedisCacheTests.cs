@@ -1,54 +1,85 @@
 ﻿using FluentAssertions;
+using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.Caching.Abstractions;
-using Franz.Common.Caching.Extensions;
+using Franz.Common.Caching.Extensions; // Assuming your extensions are here
 using Franz.Common.Caching.Providers;
-using Franz.Common.Caching.Tests.Models;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Moq;
 using StackExchange.Redis;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using Xunit;
 
 namespace Franz.Common.Caching.Tests.Extensions;
 
 public sealed class AddFranzRedisCachingTests
 {
   [Fact]
-  public void Should_Register_Redis_Provider()
+  public void Should_Register_Redis_Provider_With_ConnectionString()
   {
-    using var sp = ServiceTestHelper.Build(services =>
-      services.AddFranzRedisCaching("localhost:6379"));
+    // Arrange & Act
+    // We use the Action-only overload we created for Fixtures/Tests
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddFranzRedisCaching(options =>
+    {
+      options.ConnectionString = "localhost:6379";
+      options.KeyPrefix = "test:";
+    });
 
-    sp.GetRequiredService<IConnectionMultiplexer>()
-      .Should().NotBeNull();
+    var sp = services.BuildServiceProvider();
 
-    sp.GetRequiredService<ICacheProvider>()
-      .GetType().Name.Should().Be("RedisCacheProvider");
-  }
-
-  [Fact]
-  public void Should_Register_Redis_Provider_Using_Factory()
-  {
-    var muxer = new Mock<IConnectionMultiplexer>().Object;
-
-    using var sp = ServiceTestHelper.Build(services =>
-      services.AddFranzRedisCaching(
-        multiplexerFactory: _ => muxer));
-
+    // Assert
+    // Verify the provider is registered correctly
     sp.GetRequiredService<ICacheProvider>()
       .Should().BeOfType<RedisCacheProvider>();
+
+    // Verify the Options contain our string
+    var options = sp.GetRequiredService<IOptions<CacheOptions>>().Value;
+    options.ConnectionString.Should().Be("localhost:6379");
   }
 
   [Fact]
-  public void AddFranzCaching_Should_Default_To_Memory()
+  public void Should_Register_Redis_Provider_Using_Existing_Multiplexer()
   {
-    using var sp = ServiceTestHelper.Build(services =>
-      services.AddFranzCaching());
+    // Arrange
+    var muxerMock = new Mock<IConnectionMultiplexer>();
+    var services = new ServiceCollection();
+    services.AddLogging();
 
+    // 1. Manually register the multiplexer (simulating a factory/existing instance)
+    services.AddSingleton(muxerMock.Object);
+
+    // 2. Register Redis caching
+    // The RegisterRedisInternal logic uses TryAddSingleton, 
+    // so it will respect the existing muxer.
+    services.AddFranzRedisCaching(options => {
+      options.ConnectionString = "unused-but-required-for-validation";
+    });
+
+    var sp = services.BuildServiceProvider();
+
+    // Assert
+    var provider = sp.GetRequiredService<ICacheProvider>();
+    provider.Should().BeOfType<RedisCacheProvider>();
+
+    sp.GetRequiredService<IConnectionMultiplexer>()
+      .Should().Be(muxerMock.Object);
+  }
+
+  [Fact]
+  public void AddFranzMemoryCaching_Should_Register_MemoryProvider()
+  {
+    // Arrange
+    var services = new ServiceCollection();
+    services.AddLogging();
+
+    // Act
+    services.AddFranzMemoryCaching();
+
+    var sp = services.BuildServiceProvider();
+
+    // Assert
     sp.GetRequiredService<ICacheProvider>()
       .Should().BeOfType<MemoryCacheProvider>();
   }
-
-
 }

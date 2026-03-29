@@ -1,54 +1,41 @@
+#nullable enable
+using Franz.Common.Headers;
 using Franz.Common.Identity;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Headers;
 
 namespace Franz.Common.Messaging.Identity;
 
-public class IdentityContextAccessor : IIdentityContextAccessor
+/// <summary>
+/// Extracts identity information from the current message context headers.
+/// Senior Note: Updated to handle the new IDictionary<string, string[]> header contract.
+/// </summary>
+public sealed class IdentityContextAccessor(IMessageContextAccessor messageContextAccessor)
+    : IIdentityContextAccessor
 {
-  private readonly IMessageContextAccessor messageContextAccessor;
+  public string? GetCurrentEmail() =>
+      TryGetHeader(HeaderConstants.UserEmail, out var v) ? v : null;
 
-  public IdentityContextAccessor(IMessageContextAccessor messageContextAccessor)
-  {
-    this.messageContextAccessor = messageContextAccessor;
-  }
+  public Guid? GetCurrentId() =>
+      TryGetHeaderGuid(HeaderConstants.UserId, out var v) ? v : null;
 
-  public string? GetCurrentEmail()
-  {
-    var headers = messageContextAccessor.Current?.Message.Headers;
-    return headers != null && headers.TryGetIdentityEmail(out var v) ? v : null;
-  }
+  public string? GetCurrentFullName() =>
+      TryGetHeader(HeaderConstants.UserFullName, out var v) ? v : null;
 
-  public Guid? GetCurrentId()
-  {
-    var headers = messageContextAccessor.Current?.Message.Headers;
-    return headers != null && headers.TryGetMessageId(out var v) ? v : null;
-  }
+  public Guid? GetCurrentTenantId() =>
+      TryGetHeaderGuid(HeaderConstants.TenantId, out var v) ? v : null;
 
-  public string? GetCurrentFullName()
-  {
-    var headers = messageContextAccessor.Current?.Message.Headers;
-    return headers != null && headers.TryGetIdentityFullName(out var v) ? v : null;
-  }
-
-  public Guid? GetCurrentTenantId()
-  {
-    var headers = messageContextAccessor.Current?.Message.Headers;
-    return headers != null && headers.TryGetTenantId(out var v) ? v : null;
-  }
-
-  public Guid? GetCurrentDomainId()
-  {
-    var headers = messageContextAccessor.Current?.Message.Headers;
-    return headers != null && headers.TryGetDomainId(out var v) ? v : null;
-  }
+  public Guid? GetCurrentDomainId() =>
+      TryGetHeaderGuid(HeaderConstants.DomainId, out var v) ? v : null;
 
   public string[] GetCurrentRoles()
   {
     var headers = messageContextAccessor.Current?.Message.Headers;
-    return headers != null && headers.TryGetIdentityRoles(out var v)
-      ? v.ToArray()
-      : Array.Empty<string>();
+    if (headers != null && headers.TryGetValue(HeaderConstants.UserRoles, out var roles))
+    {
+      return roles; // Already a string[]
+    }
+    return Array.Empty<string>();
   }
 
   public FranzIdentityContext? GetCurrentIdentity()
@@ -56,23 +43,39 @@ public class IdentityContextAccessor : IIdentityContextAccessor
     var ctx = messageContextAccessor.Current;
     if (ctx == null) return null;
 
-    var headers = ctx.Message.Headers;
-
-    headers.TryGetIdentityId(out var userId);
-    headers.TryGetIdentityEmail(out var email);
-    headers.TryGetIdentityFullName(out var fullName);
-    headers.TryGetTenantId(out var tenantId);
-    headers.TryGetDomainId(out var domainId);
-    headers.TryGetIdentityRoles(out var roles);
-
     return new FranzIdentityContext
     {
-      UserId = userId,
-      Email = email,
-      FullName = fullName,
-      TenantId = tenantId,
-      DomainId = domainId,
-      Roles = roles?.ToArray() ?? Array.Empty<string>()
+      UserId = GetCurrentId(),
+      Email = GetCurrentEmail(),
+      FullName = GetCurrentFullName(),
+      TenantId = GetCurrentTenantId(),
+      DomainId = GetCurrentDomainId(),
+      Roles = GetCurrentRoles()
     };
+  }
+
+  // --- INTERNAL HELPERS FOR NEW CONTRACT ---
+
+  private bool TryGetHeader(string key, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? value)
+  {
+    value = null;
+    var headers = messageContextAccessor.Current?.Message.Headers;
+    if (headers != null && headers.TryGetValue(key, out var values) && values.Length > 0)
+    {
+      value = values[0];
+      return true;
+    }
+    return false;
+  }
+
+  private bool TryGetHeaderGuid(string key, out Guid? value)
+  {
+    value = null;
+    if (TryGetHeader(key, out var s) && Guid.TryParse(s, out var guid))
+    {
+      value = guid;
+      return true;
+    }
+    return false;
   }
 }

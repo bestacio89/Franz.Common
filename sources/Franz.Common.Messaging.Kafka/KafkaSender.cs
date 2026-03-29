@@ -1,6 +1,5 @@
-﻿#nullable enable
+#nullable enable
 using Confluent.Kafka;
-using Franz.Common.Errors;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
@@ -11,78 +10,90 @@ using System.Text;
 
 namespace Franz.Common.Messaging.Kafka.Senders;
 
-public sealed class KafkaSender : IMessagingSender, IDisposable
+public sealed class KafkaSender(
+    IOptions<KafkaMessagingOptions> messagingOptions,
+    IMessageSerializer serializer,
+    IAssemblyAccessor assemblyAccessor,
+    ILogger<KafkaSender> logger) : IMessagingSender, IAsyncDisposable, IDisposable
 {
-  private readonly IProducer<string, string> _producer;
-  private readonly IMessageSerializer _serializer;
-  private readonly IAssemblyAccessor _assemblyAccessor;
-  private readonly ILogger<KafkaSender> _logger;
-
-  public KafkaSender(
-      IOptions<MessagingOptions> messagingOptions,
-      IMessageSerializer serializer,
-      IAssemblyAccessor assemblyAccessor,
-      ILogger<KafkaSender> logger)
-  {
-    _producer = new ProducerBuilder<string, string>(
-        new ProducerConfig
-        {
-          BootstrapServers = messagingOptions.Value.BootStrapServers,
-          // Best practice for Guid v7: idempotent delivery
-          EnableIdempotence = true
-        }).Build();
-
-    _serializer = serializer;
-    _assemblyAccessor = assemblyAccessor;
-    _logger = logger;
-  }
-
-  public async Task SendAsync(Message message, CancellationToken cancellationToken = default)
-  {
-    if (message is null)
-      throw new TechnicalException("Cannot send Kafka message: Message is null");
-
-    // ✅ Topic resolution
-    var assembly = _assemblyAccessor.GetEntryAssembly();
-    var topicName = TopicNamer.GetTopicName(assembly);
-
-    var jsonBody = _serializer.Serialize(message.Body ?? string.Empty);
-
-    // BAZOOKA REFACTOR: Bridge native Guid v7 to Kafka Headers and Key
-    var kafkaHeaders = new Confluent.Kafka.Headers();
-
-    // Explicitly add the Guid v7 CorrelationId to headers for consumer re-hydration
-    kafkaHeaders.Add("X-Correlation-ID", Encoding.UTF8.GetBytes(message.CorrelationId.ToString()));
-    kafkaHeaders.Add("X-Message-ID", Encoding.UTF8.GetBytes(message.Id.ToString()));
-
-    foreach (var header in message.Headers)
-    {
-      foreach (var v in header.Value)
+  private readonly IProducer<string, string> _producer = new ProducerBuilder<string, string>(
+      new ProducerConfig
       {
-        if (!string.IsNullOrWhiteSpace(v))
-          kafkaHeaders.Add(header.Key, Encoding.UTF8.GetBytes(v));
-      }
-    }
+        BootstrapServers = messagingOptions.Value.BootStrapServers,
+        EnableIdempotence = true,
+        Acks = Acks.All,
+        MessageSendMaxRetries = int.MaxValue
+      }).Build();
 
-    var kafkaMessage = new Confluent.Kafka.Message<string, string>
+  private int _disposed = 0;
+
+  // Senior Architect Note: Using ValueTask to reduce heap allocations on the messaging hot-path.
+  public async ValueTask SendAsync(Message message, CancellationToken cancellationToken = default)
+  {
+    ArgumentNullException.ThrowIfNull(message);
+
+    if (Volatile.Read(ref _disposed) == 1)
+      throw new ObjectDisposedException(nameof(KafkaSender));
+
+    try
     {
-      // USING THE GUID V7 AS KEY: 
-      // This ensures all messages in a "Saga" or "Transaction" hit the same Kafka partition
-      // but stay chronologically sorted thanks to the v7 timestamp prefix.
-      Key = message.CorrelationId.ToString(),
-      Value = jsonBody,
-      Headers = kafkaHeaders
-    };
+      var kafkaMessage = new Message<string, string>
+      {
+        Key = message.CorrelationId.ToString(),
+        Value = serializer.Serialize(message.Body),
+        Headers = new Confluent.Kafka.Headers()
+      };
 
-    var deliveryResult = await _producer.ProduceAsync(topicName, kafkaMessage, cancellationToken);
+      // Mapping Architectural Headers
+      kafkaMessage.Headers.Add("X-Message-ID", Encoding.UTF8.GetBytes(message.Id.ToString()));
 
-    _logger.LogInformation(
-        "📤 Kafka message delivered | ID={MessageId} Corr={CorrelationId} Topic={Topic} Offset={Offset}",
-        message.Id,
-        message.CorrelationId,
-        deliveryResult.Topic,
-        deliveryResult.Offset.Value);
+      foreach (var header in message.Headers)
+      {
+        foreach (var value in header.Value)
+        {
+          if (value is not null)
+          {
+            kafkaMessage.Headers.Add(header.Key, Encoding.UTF8.GetBytes(value));
+          }
+        }
+      }
+
+      var topic = TopicNamer.GetTopicName(assemblyAccessor.GetEntryAssembly());
+
+      // Kafka Client's ProduceAsync returns a Task, which is safely wrapped by ValueTask
+      await _producer.ProduceAsync(topic, kafkaMessage, cancellationToken);
+
+      logger.LogDebug("[Franz.Messaging] Produced message {MessageId} to {Topic}",
+          message.Id, topic);
+    }
+    catch (Exception ex)
+    {
+      logger.LogError(ex, "[Franz.Messaging] Failed to produce message {MessageId}",
+          message.Id);
+      throw;
+    }
   }
 
-  public void Dispose() => _producer.Dispose();
+  public async ValueTask DisposeAsync()
+  {
+    if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+    await Task.Run(() =>
+    {
+      _producer.Flush(TimeSpan.FromSeconds(10));
+      _producer.Dispose();
+    });
+
+    GC.SuppressFinalize(this);
+  }
+
+  public void Dispose()
+  {
+    if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+    _producer.Flush(TimeSpan.FromSeconds(10));
+    _producer.Dispose();
+
+    GC.SuppressFinalize(this);
+  }
 }

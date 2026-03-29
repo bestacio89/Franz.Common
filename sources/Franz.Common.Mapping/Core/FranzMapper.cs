@@ -1,4 +1,4 @@
-﻿using Franz.Common.Errors;
+using Franz.Common.Errors;
 using Franz.Common.Mapping.Abstractions;
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
@@ -6,14 +6,9 @@ using System.Reflection;
 
 namespace Franz.Common.Mapping.Core;
 
-public class FranzMapper : IFranzMapper
+public class FranzMapper(MappingConfiguration config) : IFranzMapper
 {
-  private readonly MappingConfiguration _config;
-
-  public FranzMapper(MappingConfiguration config)
-  {
-    _config = config ?? throw new ArgumentNullException(nameof(config));
-  }
+  private readonly MappingConfiguration _config = config ?? throw new ArgumentNullException(nameof(config));
 
   [return: NotNull]
   public TDestination Map<TSource, TDestination>([DisallowNull] TSource source)
@@ -172,7 +167,7 @@ public class FranzMapper : IFranzMapper
 
         if (mapMethod != null)
         {
-          var nested = mapMethod.Invoke(this, new[] { srcValue });
+          var nested = mapMethod.Invoke(this, [srcValue]);
           destProp.SetValue(destination, nested);
         }
       }
@@ -238,7 +233,7 @@ public class FranzMapper : IFranzMapper
 
       try
       {
-        var mapped = mapMethod.Invoke(this, new[] { item });
+        var mapped = mapMethod.Invoke(this, [item]);
         result.Add(mapped);
       }
       catch (TargetInvocationException ex)

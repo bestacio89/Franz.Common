@@ -40,7 +40,7 @@ This package simplifies transactional handling, dependency injection, and middle
 
 ## **Version Information**
 
-* **Current Version**: 1.7.8
+* **Current Version**:  2.0.1
   → Adds **environment-aware validation**, stronger governance for multi-database setups, and provider-context alignment.
 * Part of the private **Franz Framework** ecosystem.
 
@@ -203,5 +203,11 @@ The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
 ### Version 1.2.65
 
 * Upgraded version to **.NET 9**
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
 
 ---

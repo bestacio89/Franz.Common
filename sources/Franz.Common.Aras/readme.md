@@ -18,7 +18,7 @@ It lets you treat ARAS as just another persistence provider — with **Entities**,
 - ? **Full samples** for Entities, Aggregates, UoW, Testing, and Snapshots  
 ````
 ---
-- **Current Version**: 1.7.8
+- **Current Version**:  2.0.1
 --- 
 ## ?? Installation
 
@@ -283,3 +283,8 @@ Franz.Common.Aras v1.5.0 — **bringing ARAS into the DDD world.**
 
 ---
 
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.

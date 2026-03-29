@@ -6,7 +6,7 @@
 High-performance, pipeline-driven gRPC for distributed microservices
 
 ---
-- **Current Version**: 1.7.8
+- **Current Version**:  2.0.1
 
 ---
 
@@ -287,3 +287,8 @@ This makes Franz one of the **strictest, most consistent, and most architectural
 
 ---
 
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.

@@ -7,6 +7,7 @@ We follow a lightweight, disciplined workflow to keep history readable and relea
 
 - Repo owner / maintainer: Bernardo (primary)
 - Keep commits small and focused.
+- Commits must not excee
 - Use the commit tag convention below to make logs readable and release automation simple.
 
 ---
@@ -28,9 +29,15 @@ Examples:
 - `[Patch]` — backward-compatible bug fixes/refactors
 - `[Fix]` — bug fixes (use when user-facing bug)
 - `[Doc]` — documentation only
-- `[Test]` — tests or test infra
+- `[Tests]` — tests or test infra
 - `[Chore]` — maintenance tasks: CI, deps, renames
 - `[Release]` — release commit / tag preparation
+
+### Dual tags
+Tags may involve dual intentions for example
+[Feat][Tests] Creation of a new test
+[Patch][Tests] Refactoring of tests
+[Fix][Tests] Fix of bugs in tests
 
 ### Format
 ```

@@ -1,76 +1,95 @@
-﻿using Franz.Common.Errors;
+﻿#nullable enable
+using Franz.Common.Errors;
 using Franz.Common.Headers;
-using Microsoft.Extensions.Primitives;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection.PortableExecutable;
 
 namespace Franz.Common.Messaging.Headers;
 
 public static class MessageHeadersExtensions
 {
-  public static bool TryGetMessageId(this MessageHeaders messageHeaders, out Guid messageId)
+  public static bool TryGetMessageId(this IDictionary<string, string[]> messageHeaders, out Guid messageId)
       => messageHeaders.TryGetGuid(MessagingConstants.MessageId, out messageId);
 
-  public static bool TryGetIdentityId(this MessageHeaders messageHeaders, out Guid userId)
+  public static bool TryGetIdentityId(this IDictionary<string, string[]> messageHeaders, out Guid userId)
       => messageHeaders.TryGetGuid(HeaderConstants.UserId, out userId);
 
-  public static bool TryGetIdentityEmail(this MessageHeaders messageHeaders, out string userEmail)
+  public static bool TryGetIdentityEmail(this IDictionary<string, string[]> messageHeaders, [NotNullWhen(true)] out string? userEmail)
       => messageHeaders.TryGetString(HeaderConstants.UserEmail, out userEmail);
 
-  public static bool TryGetIdentityFullName(this MessageHeaders messageHeaders, out string userFullName)
+  public static bool TryGetIdentityFullName(this IDictionary<string, string[]> messageHeaders, [NotNullWhen(true)] out string? userFullName)
       => messageHeaders.TryGetString(HeaderConstants.UserFullName, out userFullName);
 
-  public static bool TryGetIdentityRoles(this MessageHeaders messageHeaders, out IEnumerable<string> userRoles)
+  public static bool TryGetIdentityRoles(this IDictionary<string, string[]> messageHeaders, out IEnumerable<string> userRoles)
       => messageHeaders.TryGetStringEnumerable(HeaderConstants.UserRoles, out userRoles);
 
-  public static bool TryGetTenantId(this MessageHeaders messageHeaders, out Guid tenantId)
+  public static bool TryGetTenantId(this IDictionary<string, string[]> messageHeaders, out Guid tenantId)
       => messageHeaders.TryGetGuid(HeaderConstants.TenantId, out tenantId);
 
-  public static bool TryGetDomainId(this MessageHeaders messageHeaders, out Guid domainId)
-      => messageHeaders.TryGetGuid(HeaderConstants.DomainId, out domainId);
+    public static bool TryGetDomainId(this IDictionary<string, string[]> messageHeaders, out Guid domainId)
+        => messageHeaders.TryGetGuid(HeaderConstants.DomainId, out domainId);
 
-  public static bool TryGetClassName(this MessageHeaders messageHeaders, out string classEventName)
+  public static bool TryGetClassName(this IDictionary<string, string[]> messageHeaders, [NotNullWhen(true)] out string? classEventName)
       => messageHeaders.TryGetString(MessagingConstants.ClassName, out classEventName);
 
-  public static string GetClassName(this MessageHeaders messageHeaders)
+  public static string GetClassName(this IDictionary<string, string[]> messageHeaders)
   {
-    var check = messageHeaders.TryGetClassName(out var result);
-    return !check
-        ? throw new TechnicalException(string.Format(Common.Headers.Properties.Resources.HeaderNotFoundException, MessagingConstants.ClassName))
-        : result;
+    if (!messageHeaders.TryGetClassName(out var result))
+      throw new TechnicalException(string.Format(Common.Headers.Properties.Resources.HeaderNotFoundException, MessagingConstants.ClassName));
+    return result;
   }
 
-  public static bool TryGetGuid(this MessageHeaders messageHeaders, string key, out Guid value)
+  public static bool TryGetGuid(this IDictionary<string, string[]> messageHeaders, string key, out Guid value)
   {
-    var result = messageHeaders.TryGetValue(key, out var obj);
     value = default;
-    if (result && Guid.TryParse(obj, out var id))
-      value = id;
-    return result;
+    return messageHeaders.TryGetString(key, out var s) && Guid.TryParse(s, out value);
   }
 
-  public static bool TryGetString(this MessageHeaders messageHeaders, string key, out string value)
+  public static bool TryGetString(this IDictionary<string, string[]> messageHeaders, string key, [NotNullWhen(true)] out string? value)
   {
-    var result = messageHeaders.TryGetValue(key, out var obj);
-    value = obj!;
-    return result;
+    value = default;
+    // FIX: Extract the first element from the string array
+    if (messageHeaders.TryGetValue(key, out var values) && values.Length > 0)
+    {
+      value = values[0];
+      return true;
+    }
+    return false;
   }
 
-  public static string? GetString(this MessageHeaders messageHeaders, string key)
+  public static string? GetString(this IDictionary<string, string[]> messageHeaders, string key)
   {
-    return messageHeaders.TryGetValue(key, out var obj) ? (string?)obj : null;
+    return messageHeaders.TryGetString(key, out var value) ? value : null;
   }
 
-  public static bool TryGetStringEnumerable(this MessageHeaders messageHeaders, string key, out IEnumerable<string> value)
+  public static bool TryGetStringEnumerable(this IDictionary<string, string[]> messageHeaders, string key, out IEnumerable<string> value)
   {
-    var result = messageHeaders.TryGetValue(key, out var obj);
-    value = result ? obj : StringValues.Empty;
-    return result;
+    if (messageHeaders.TryGetValue(key, out var obj))
+    {
+      value = obj;
+      return true;
+    }
+    value = Array.Empty<string>();
+    return false;
   }
 
-  // --- Setters ---
-  public static void SetTenantId(this MessageHeaders messageHeaders, Guid tenantId) => messageHeaders[HeaderConstants.TenantId] = tenantId.ToString();
-  public static void SetDomainId(this MessageHeaders messageHeaders, Guid domainId) => messageHeaders[HeaderConstants.DomainId] = domainId.ToString();
-  public static void SetIdentityId(this MessageHeaders messageHeaders, Guid userId) => messageHeaders[HeaderConstants.UserId] = userId.ToString();
-  public static void SetIdentityEmail(this MessageHeaders messageHeaders, string email) => messageHeaders[HeaderConstants.UserEmail] = email;
-  public static void SetIdentityFullName(this MessageHeaders messageHeaders, string fullName) => messageHeaders[HeaderConstants.UserFullName] = fullName;
-  public static void SetIdentityRoles(this MessageHeaders messageHeaders, IEnumerable<string> roles) => messageHeaders[HeaderConstants.UserRoles] = new StringValues(roles.ToArray());
+  // --- Setters (The "Wrap in Array" Fixes) ---
+
+  public static void SetTenantId(this IDictionary<string, string[]> messageHeaders, Guid tenantId)
+      => messageHeaders[HeaderConstants.TenantId] = [tenantId.ToString()];
+
+  public static void SetDomainId(this IDictionary<string, string[]> messageHeaders, Guid domainId)
+      => messageHeaders[HeaderConstants.DomainId] = [domainId.ToString()];
+
+  public static void SetIdentityId(this IDictionary<string, string[]> messageHeaders, Guid userId)
+      => messageHeaders[HeaderConstants.UserId] = [userId.ToString()];
+
+  public static void SetIdentityEmail(this IDictionary<string, string[]> messageHeaders, string email)
+      => messageHeaders[HeaderConstants.UserEmail] = [email];
+
+  public static void SetIdentityFullName(this IDictionary<string, string[]> messageHeaders, string fullName)
+      => messageHeaders[HeaderConstants.UserFullName] = [fullName];
+
+  public static void SetIdentityRoles(this IDictionary<string, string[]> messageHeaders, IEnumerable<string> roles)
+      => messageHeaders[HeaderConstants.UserRoles] = roles.ToArray();
 }

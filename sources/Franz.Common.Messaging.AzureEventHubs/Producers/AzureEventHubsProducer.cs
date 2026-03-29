@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Producer;
 using Franz.Common.Messaging.AzureEventHubs.Infrastructure;
@@ -7,10 +7,11 @@ using Franz.Common.Messaging.Messages;
 
 namespace Franz.Common.Messaging.AzureEventHubs.Producers;
 
-public sealed class AzureEventHubsProducer : IMessagingSender, IAsyncDisposable
+public sealed class AzureEventHubsProducer : IMessagingSender, IAsyncDisposable, IDisposable
 {
   private readonly EventHubProducerClient _producer;
   private readonly AzureEventHubsMessageSerializer _serializer;
+  private int _disposed = 0;
 
   public AzureEventHubsProducer(
       EventHubsClientFactory factory,
@@ -20,11 +21,14 @@ public sealed class AzureEventHubsProducer : IMessagingSender, IAsyncDisposable
     _serializer = serializer;
   }
 
-  public async Task SendAsync(
+  public async ValueTask SendAsync(
       Message message,
       CancellationToken cancellationToken = default)
   {
-    if (message is null) throw new ArgumentNullException(nameof(message));
+    ArgumentNullException.ThrowIfNull(message);
+
+    if (Volatile.Read(ref _disposed) == 1)
+      throw new ObjectDisposedException(nameof(AzureEventHubsProducer));
 
     using var batch = await _producer.CreateBatchAsync(cancellationToken);
 
@@ -52,5 +56,23 @@ public sealed class AzureEventHubsProducer : IMessagingSender, IAsyncDisposable
     await _producer.SendAsync(batch, cancellationToken);
   }
 
-  public async ValueTask DisposeAsync() => await _producer.DisposeAsync();
+  public async ValueTask DisposeAsync()
+  {
+    if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+    await _producer.DisposeAsync();
+
+    GC.SuppressFinalize(this);
+  }
+
+  public void Dispose()
+  {
+    if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+    // EventHubProducerClient.DisposeAsync() is the preferred way to close the connection.
+    // In a synchronous Dispose call, we must block to ensure resources are released.
+    _producer.DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+    GC.SuppressFinalize(this);
+  }
 }

@@ -53,7 +53,7 @@ Choose **Kafka** or **RabbitMQ** — your application code does not change.
 
 ---
 
-**Current Version**: 1.7.8
+**Current Version**:  2.0.1
 
 ---
 
@@ -89,3 +89,10 @@ This release finalizes RabbitMQ as a **first-class transport** in Franz.
 - Improved messaging DI patterns
 - Updated RabbitMQ client
 - Alignment of messaging abstractions across transports
+
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.

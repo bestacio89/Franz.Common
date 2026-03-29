@@ -4,6 +4,7 @@ using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using Franz.Common.Messaging;
 
 namespace Franz.Common.Messaging.RabbitMQ.Replay;
 
@@ -27,7 +28,7 @@ public class NoReplayStrategy : IReplayStrategy
 
   public async Task ReplayAsync(BasicDeliverEventArgs e, Exception ex)
   {
-    var channel = _provider.Current;
+    var channel = await _provider.GetChannelAsync();
 
     var props = new BasicProperties
     {

@@ -2,15 +2,15 @@
   <Import Project="..\..\common.targets" />
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="8.0.0">
+    <PackageReference Include="coverlet.collector" Version="8.0.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="FluentAssertions" Version="8.8.0" />
+    <PackageReference Include="FluentAssertions" Version="8.9.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
-    <PackageReference Include="Testcontainers" Version="4.10.0" />
-    <PackageReference Include="Testcontainers.MongoDb" Version="4.10.0" />
-    <PackageReference Include="Testcontainers.RabbitMQ" Version="4.10.0" />
+    <PackageReference Include="Testcontainers" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.MongoDb" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.RabbitMQ" Version="4.11.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <PrivateAssets>all</PrivateAssets>
@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\sources\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.RabbitMQ\Franz.Common.Messaging.Hosting.RabbitMQ.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.RabbitMQ\Franz.Common.Messaging.RabbitMQ.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.MongoDB\Franz.Common.MongoDB.csproj" />
   </ItemGroup>

@@ -1,91 +1,68 @@
-﻿using Franz.Common.Messaging.RabbitMQ.Connections;
-using RabbitMQ.Client;
+using System;
 using System.Threading;
+using System.Threading.Tasks;
+using Franz.Common.Messaging.RabbitMQ.Connections;
+using RabbitMQ.Client;
 
 namespace Franz.Common.Messaging.RabbitMQ.Modeling;
 
-public sealed class ModelProvider : IModelProvider, IAsyncDisposable, IDisposable
+public sealed class ModelProvider : IModelProvider, IAsyncDisposable
 {
-  private readonly IConnectionProvider _connectionProvider;
-  private readonly SemaphoreSlim _sync = new(1, 1);
+    private readonly IConnectionProvider _connectionProvider;
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private IChannel? _channel;
+    private bool _disposed;
 
-  private IChannel? _channel;
-  private bool _disposed;
-
-  public ModelProvider(IConnectionProvider connectionProvider)
-  {
-    _connectionProvider = connectionProvider
-      ?? throw new ArgumentNullException(nameof(connectionProvider));
-  }
-
-  public IChannel Current
-  {
-    get
+    public ModelProvider(IConnectionProvider connectionProvider)
     {
-      ThrowIfDisposed();
-      return GetOrCreateChannelAsync()
-        .GetAwaiter()
-        .GetResult();
-    }
-  }
-
-  private async Task<IChannel> GetOrCreateChannelAsync()
-  {
-    if (_channel is { IsOpen: true })
-      return _channel;
-
-    await _sync.WaitAsync().ConfigureAwait(false);
-    try
-    {
-      if (_channel is { IsOpen: true })
-        return _channel;
-
-      var connection = _connectionProvider.Current;
-
-      // 🔑 Correct: await async channel creation
-      _channel = await connection
-        .CreateChannelAsync()
-        .ConfigureAwait(false);
-
-      return _channel;
-    }
-    finally
-    {
-      _sync.Release();
-    }
-  }
-
-  private void ThrowIfDisposed()
-  {
-    if (_disposed)
-      throw new ObjectDisposedException(nameof(ModelProvider));
-  }
-
-  public async ValueTask DisposeAsync()
-  {
-    if (_disposed)
-      return;
-
-    _disposed = true;
-
-    if (_channel is null)
-      return;
-
-    try
-    {
-      await _channel.CloseAsync().ConfigureAwait(false);
-    }
-    catch
-    {
-      // swallow on dispose
+        _connectionProvider = connectionProvider;
     }
 
-    await _channel.DisposeAsync().ConfigureAwait(false);
-    _channel = null;
-  }
+    public async ValueTask<IChannel> GetChannelAsync(CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
-  void IDisposable.Dispose()
-  {
-    DisposeAsync().AsTask().GetAwaiter().GetResult();
-  }
+        if (_channel is { IsOpen: true })
+            return _channel;
+
+        await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_channel is { IsOpen: true })
+                return _channel;
+
+            var connection = await _connectionProvider.GetConnectionAsync(cancellationToken).ConfigureAwait(false);
+            _channel = await connection.CreateChannelAsync().ConfigureAwait(false);
+
+            return _channel;
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+
+        await _semaphore.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (_channel is not null)
+            {
+                await _channel.CloseAsync().ConfigureAwait(false);
+                _channel.Dispose();
+                _channel = null;
+            }
+        }
+        finally
+        {
+            _semaphore.Release();
+            _semaphore.Dispose();
+        }
+    }
 }

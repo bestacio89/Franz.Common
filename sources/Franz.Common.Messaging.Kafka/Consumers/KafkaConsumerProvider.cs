@@ -1,28 +1,61 @@
+﻿#nullable enable
 using Confluent.Kafka;
-using Microsoft.Extensions.Options;
 using Franz.Common.Messaging.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
-namespace Franz.Common.Messaging.KafKa.Consumers
+namespace Franz.Common.Messaging.KafKa.Consumers;
+
+/// <summary>
+/// Factory for Kafka Consumers. 
+/// Senior Note: Implements strict validation to prevent "Ghost Consumer" initialization.
+/// </summary>
+public sealed class KafkaConsumerProvider(
+    IOptions<KafkaMessagingOptions> messagingOptions,
+    ILogger<KafkaConsumerProvider> logger)
 {
-  public class KafkaConsumerProvider 
+  public IConsumer<Ignore, string> CreateConsumer()
   {
-    private readonly IOptions<MessagingOptions> messagingOptions;
+    var options = messagingOptions.Value;
 
-    public KafkaConsumerProvider(IOptions<MessagingOptions> messagingOptions)
+    // --- THE ARCHITECTURAL GUARD ---
+    // Prevents the native client from spinning up if the config is invalid.
+    if (string.IsNullOrWhiteSpace(options.BootStrapServers))
     {
-      this.messagingOptions = messagingOptions;
+      throw new ArgumentException("Kafka BootstrapServers must be configured in MessagingOptions.", nameof(messagingOptions));
     }
 
-    public IConsumer<Ignore, string> CreateConsumer()
+    var config = new ConsumerConfig
     {
-      var config = new ConsumerConfig
-      {
-        BootstrapServers = messagingOptions.Value.BootStrapServers,
-        GroupId = messagingOptions.Value.GroupID,
-        AutoOffsetReset = AutoOffsetReset.Earliest
-      };
+      BootstrapServers = options.BootStrapServers,
+      GroupId = options.GroupID ?? $"franz-consumer-{Guid.NewGuid():N}",
+      AutoOffsetReset = AutoOffsetReset.Earliest,
+      EnableAutoCommit = true,
+      StatisticsIntervalMs = 5000,
+      SessionTimeoutMs = 6000,
+      HeartbeatIntervalMs = 2000,
 
-      return new ConsumerBuilder<Ignore, string>(config).Build();
-    }
+      // .NET 10 / Cloud-Native Tuning
+      AllowAutoCreateTopics = true,
+      SocketTimeoutMs = 30000
+    };
+
+    return new ConsumerBuilder<Ignore, string>(config)
+        .SetErrorHandler((_, e) =>
+        {
+          if (e.IsFatal)
+          {
+            logger.LogCritical("🚨 FATAL Kafka Error: {Reason} | Code: {Code}", e.Reason, e.Code);
+          }
+          else
+          {
+            logger.LogWarning("⚠️ Kafka Consumer Warning: {Reason}", e.Reason);
+          }
+        })
+        .SetStatisticsHandler((_, json) =>
+        {
+          logger.LogDebug("📊 Kafka Statistics: {Stats}", json);
+        })
+        .Build();
   }
 }

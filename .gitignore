@@ -17,6 +17,7 @@ nupkg/
 *.user
 *.userosscache
 *.sln.docstates
+.context
 
 # Build results
 [Dd]ebug/
@@ -39,6 +40,5 @@ TestResults
 
 # Visual Studio
 .vs/
-
 *.ps1
 *.config

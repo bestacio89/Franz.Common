@@ -9,7 +9,7 @@ Provides **unified cache abstractions**, **hybrid caching (L1 + L2)**, Mediator 
 
 ---
 
-* **Current Version**: **1.7.8**
+* **Current Version**: **2.0.1**
 * **Target Framework**: **.NET 10.0**
 
 ---
@@ -160,6 +160,12 @@ Exports relevant stats only (hits/misses/size) to Excel for **offline analysis**
 ---
 
 ## 📝 Changelog
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
 
 ### **1.7.8**
 

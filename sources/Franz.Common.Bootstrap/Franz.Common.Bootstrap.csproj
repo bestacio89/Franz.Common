@@ -8,7 +8,6 @@
 	
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
-    <ProjectReference Include="..\Franz.Common.AutoMapper\Franz.Common.AutoMapper.csproj" />
     <ProjectReference Include="..\Franz.Common.Business\Franz.Common.Business.csproj" />
     <ProjectReference Include="..\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
     <ProjectReference Include="..\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />

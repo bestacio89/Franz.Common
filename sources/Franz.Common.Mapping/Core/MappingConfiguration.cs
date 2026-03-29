@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace Franz.Common.Mapping.Core;
 public class MappingConfiguration
 {
-  private readonly ConcurrentDictionary<(Type, Type), object> _mappings = new();
+  private readonly ConcurrentDictionary<(Type, Type), object> _mappings = [];
 
   public void Register<TSource, TDestination>(MappingExpression<TSource, TDestination> expression)
   {

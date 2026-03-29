@@ -3,17 +3,16 @@
 OpenTelemetry integration for the **Franz Framework**.
 This package provides **automatic distributed tracing** across applications using the Franz ecosystem, including Mediator pipelines, HTTP calls, and custom instrumentation.
 
-* **Current Version**: 1.7.8
+* **Current Version**:  2.0.1
 * Part of the private **Franz Framework** ecosystem.
 
 ---
 
-## 🚀 What’s New in 1.7.6
+## 🚀 What’s New in  v2.0.1 – Internal Modernization
 
-* **Self-contained OpenTelemetry configuration** — no need to call `AddOpenTelemetry()` manually in your API.
-* **Automatic production-grade defaults**: OTLP exporter, sampling, instrumentation, and enriched span tags are configured internally.
-* **Fail-fast OTLP enforcement in production** — prevents missing endpoint misconfiguration.
-* **Seamless integration with Franz Mediator** pipelines.
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
 
 ---
 

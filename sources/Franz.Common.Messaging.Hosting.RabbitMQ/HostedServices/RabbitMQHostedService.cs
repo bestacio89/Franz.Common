@@ -1,24 +1,24 @@
 ﻿using Franz.Common.Messaging.Hosting.Listeners;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Abstractions;
-using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Hosting;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Franz.Common.Messaging;
 
 namespace Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices;
 
 public sealed class RabbitMQHostedService : BackgroundService
 {
-  private readonly Listener _listener;
+  private readonly RabbitMQListener _listener;
   private readonly IQueueProvisioner? _provisioner;
   private readonly IModelProvider _modelProvider;
   private readonly IAssemblyAccessor _assemblyAccessor;
   private readonly ILogger<RabbitMQHostedService> _logger;
 
   public RabbitMQHostedService(
-    Listener listener,
+    RabbitMQListener listener,
     IModelProvider modelProvider,
     IAssemblyAccessor assemblyAccessor,
     ILogger<RabbitMQHostedService> logger,

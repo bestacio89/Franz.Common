@@ -1,0 +1,252 @@
+﻿  Identification des projets ├á restaurer...
+  Tous les projets sont ├á jour pour la restauration.
+  Franz.Common.Errors -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Errors\bin\Debug\net10.0\Franz.Common.Errors.dll
+  Franz.Common -> e:\Source\Repos\Franz.Common\sources\Franz.Common\bin\Debug\net10.0\Franz.Common.dll
+  Franz.Common.Testing -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Testing\bin\Debug\net10.0\Franz.Common.Testing.dll
+  Franz.Common.Logging -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Logging\bin\Debug\net10.0\Franz.Common.Logging.dll
+  Franz.Common.Mediator -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Mediator\bin\Debug\net10.0\Franz.Common.Mediator.dll
+  Franz.Common.Reflection -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Reflection\bin\Debug\net10.0\Franz.Common.Reflection.dll
+  Franz.Common.DependencyInjection -> e:\Source\Repos\Franz.Common\sources\Franz.Common.DependencyInjection\bin\Debug\net10.0\Franz.Common.DependencyInjection.dll
+  Franz.Common.Business -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Business\bin\Debug\net10.0\Franz.Common.Business.dll
+  Franz.Common.Headers -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Headers\bin\Debug\net10.0\Franz.Common.Headers.dll
+  Franz.Common.Hosting -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Hosting\bin\Debug\net10.0\Franz.Common.Hosting.dll
+  Franz.Common.Serialization -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Serialization\bin\Debug\net10.0\Franz.Common.Serialization.dll
+  Franz.Common.Messaging -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Messaging\bin\Debug\net10.0\Franz.Common.Messaging.dll
+  Franz.Common.Messaging.Hosting -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Messaging.Hosting\bin\Debug\net10.0\Franz.Common.Messaging.Hosting.dll
+  Franz.Common.Messaging.RabbitMQ -> e:\Source\Repos\Franz.Common\sources\Franz.Common.Messaging.RabbitMQ\bin\Debug\net10.0\Franz.Common.Messaging.RabbitMQ.dll
+  Franz.Common.Messaging.RabbitMQ.Tests -> e:\Source\Repos\Franz.Common\tests\Franz.Common.Messaging.RabbitMQ.Tests\bin\Debug\net10.0\Franz.Common.Messaging.RabbitMQ.Tests.dll
+S├⌐rie de tests pour e:\Source\Repos\Franz.Common\tests\Franz.Common.Messaging.RabbitMQ.Tests\bin\Debug\net10.0\Franz.Common.Messaging.RabbitMQ.Tests.dll (.NETCoreApp,Version=v10.0)
+Version de VSTest 18.0.1 (x64)
+
+D├⌐marrage de l'ex├⌐cution de tests, patientez...
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├⌐cifi├⌐.
+  ├ëchou├⌐ Franz.Common.Messaging.RabbitMQ.Tests.Connections.ConnectionTests.ConnectionProvider_Should_Return_Open_Connection [1 ms]
+  Message d'erreur┬á:
+   DotNet.Testcontainers.Builders.DockerUnavailableException : Docker is either not running or misconfigured. Please ensure that Docker is running and that the endpoint is properly configured.
+You can customize your configuration using either the environment variables or the ~/.testcontainers.properties file.
+For more information, visit: https://dotnet.testcontainers.org/custom_configuration/.
+  Details: 
+    Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+---- System.AggregateException : One or more errors occurred. (Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.)
+-------- DotNet.Testcontainers.Builders.DockerUnavailableException : Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+------------ System.TimeoutException : The operation has timed out.
+  Arborescence des appels de proc├⌐dure┬á:
+     at DotNet.Testcontainers.Guard.ThrowIf[TType](ArgumentInfo`1& argument, Func`2 condition, Func`2 ifClause) in /_/src/Testcontainers/Guard.Null.cs:line 62
+   at DotNet.Testcontainers.Builders.AbstractBuilder`4.Validate() in /_/src/Testcontainers/Builders/AbstractBuilder`4.cs:line 146
+   at DotNet.Testcontainers.Builders.ContainerBuilder`3.Validate() in /_/src/Testcontainers/Builders/ContainerBuilder`3.cs:line 497
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Validate() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 113
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Build() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 95
+   at Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure.RabbitMqContainerFixture..ctor() in e:\Source\Repos\Franz.Common\tests\Franz.Common.Messaging.RabbitMQ.Tests\Infrastructure\RabbitMqContainerFixture.cs:line 9
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+   at System.IO.Pipes.NamedPipeClientStream.ConnectInternal(Int32 timeout, CancellationToken cancellationToken, Int32 startTime)
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Docker.DotNet.DockerClient.<>c__DisplayClass5_0.<<-ctor>b__0>d.MoveNext() in /_/src/Docker.DotNet/DockerClient.cs:line 69
+--- End of stack trace from previous location ---
+   at Microsoft.Net.Http.Client.ManagedHandler.ProcessRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 160
+   at Microsoft.Net.Http.Client.ManagedHandler.SendAsync(HttpRequestMessage httpRequestMessage, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 77
+   at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+   at Docker.DotNet.DockerClient.PrivateMakeRequestAsync(TimeSpan timeout, HttpCompletionOption completionOption, HttpMethod method, String path, IQueryString queryString, IDictionary`2 headers, IRequestContent data, CancellationToken cancellationToken) in /_/src/Docker.DotNet/DockerClient.cs:line 433
+   at Docker.DotNet.DockerClient.MakeRequestAsync[T](IEnumerable`1 errorHandlers, HttpMethod method, String path, IQueryString queryString, IRequestContent body, IDictionary`2 headers, TimeSpan timeout, CancellationToken token) in /_/src/Docker.DotNet/DockerClient.cs:line 243
+   at DotNet.Testcontainers.Builders.DockerEndpointAuthenticationProvider.<>c__DisplayClass5_0.<<IsAvailable>b__0>d.MoveNext() in /_/src/Testcontainers/Builders/DockerEndpointAuthenticationProvider.cs:line 48
+  ├ëchou├⌐ Franz.Common.Messaging.RabbitMQ.Tests.Connections.ConnectionTests.GetConnectionAsync_ShouldBeThreadSafe [1 ms]
+  Message d'erreur┬á:
+   DotNet.Testcontainers.Builders.DockerUnavailableException : Docker is either not running or misconfigured. Please ensure that Docker is running and that the endpoint is properly configured.
+You can customize your configuration using either the environment variables or the ~/.testcontainers.properties file.
+For more information, visit: https://dotnet.testcontainers.org/custom_configuration/.
+  Details: 
+    Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+---- System.AggregateException : One or more errors occurred. (Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.)
+-------- DotNet.Testcontainers.Builders.DockerUnavailableException : Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+------------ System.TimeoutException : The operation has timed out.
+  Arborescence des appels de proc├⌐dure┬á:
+     at DotNet.Testcontainers.Guard.ThrowIf[TType](ArgumentInfo`1& argument, Func`2 condition, Func`2 ifClause) in /_/src/Testcontainers/Guard.Null.cs:line 62
+   at DotNet.Testcontainers.Builders.AbstractBuilder`4.Validate() in /_/src/Testcontainers/Builders/AbstractBuilder`4.cs:line 146
+   at DotNet.Testcontainers.Builders.ContainerBuilder`3.Validate() in /_/src/Testcontainers/Builders/ContainerBuilder`3.cs:line 497
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Validate() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 113
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Build() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 95
+   at Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure.RabbitMqContainerFixture..ctor() in e:\Source\Repos\Franz.Common\tests\Franz.Common.Messaging.RabbitMQ.Tests\Infrastructure\RabbitMqContainerFixture.cs:line 9
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+   at System.IO.Pipes.NamedPipeClientStream.ConnectInternal(Int32 timeout, CancellationToken cancellationToken, Int32 startTime)
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Docker.DotNet.DockerClient.<>c__DisplayClass5_0.<<-ctor>b__0>d.MoveNext() in /_/src/Docker.DotNet/DockerClient.cs:line 69
+--- End of stack trace from previous location ---
+   at Microsoft.Net.Http.Client.ManagedHandler.ProcessRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 160
+   at Microsoft.Net.Http.Client.ManagedHandler.SendAsync(HttpRequestMessage httpRequestMessage, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 77
+   at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+   at Docker.DotNet.DockerClient.PrivateMakeRequestAsync(TimeSpan timeout, HttpCompletionOption completionOption, HttpMethod method, String path, IQueryString queryString, IDictionary`2 headers, IRequestContent data, CancellationToken cancellationToken) in /_/src/Docker.DotNet/DockerClient.cs:line 433
+   at Docker.DotNet.DockerClient.MakeRequestAsync[T](IEnumerable`1 errorHandlers, HttpMethod method, String path, IQueryString queryString, IRequestContent body, IDictionary`2 headers, TimeSpan timeout, CancellationToken token) in /_/src/Docker.DotNet/DockerClient.cs:line 243
+   at DotNet.Testcontainers.Builders.DockerEndpointAuthenticationProvider.<>c__DisplayClass5_0.<<IsAvailable>b__0>d.MoveNext() in /_/src/Testcontainers/Builders/DockerEndpointAuthenticationProvider.cs:line 48
+  ├ëchou├⌐ Franz.Common.Messaging.RabbitMQ.Tests.Connections.ConnectionTests.GetModelAsync_ShouldReturnOpenChannel [1 ms]
+  Message d'erreur┬á:
+   DotNet.Testcontainers.Builders.DockerUnavailableException : Docker is either not running or misconfigured. Please ensure that Docker is running and that the endpoint is properly configured.
+You can customize your configuration using either the environment variables or the ~/.testcontainers.properties file.
+For more information, visit: https://dotnet.testcontainers.org/custom_configuration/.
+  Details: 
+    Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+---- System.AggregateException : One or more errors occurred. (Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.)
+-------- DotNet.Testcontainers.Builders.DockerUnavailableException : Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+------------ System.TimeoutException : The operation has timed out.
+  Arborescence des appels de proc├⌐dure┬á:
+     at DotNet.Testcontainers.Guard.ThrowIf[TType](ArgumentInfo`1& argument, Func`2 condition, Func`2 ifClause) in /_/src/Testcontainers/Guard.Null.cs:line 62
+   at DotNet.Testcontainers.Builders.AbstractBuilder`4.Validate() in /_/src/Testcontainers/Builders/AbstractBuilder`4.cs:line 146
+   at DotNet.Testcontainers.Builders.ContainerBuilder`3.Validate() in /_/src/Testcontainers/Builders/ContainerBuilder`3.cs:line 497
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Validate() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 113
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Build() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 95
+   at Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure.RabbitMqContainerFixture..ctor() in e:\Source\Repos\Franz.Common\tests\Franz.Common.Messaging.RabbitMQ.Tests\Infrastructure\RabbitMqContainerFixture.cs:line 9
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+   at System.IO.Pipes.NamedPipeClientStream.ConnectInternal(Int32 timeout, CancellationToken cancellationToken, Int32 startTime)
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Docker.DotNet.DockerClient.<>c__DisplayClass5_0.<<-ctor>b__0>d.MoveNext() in /_/src/Docker.DotNet/DockerClient.cs:line 69
+--- End of stack trace from previous location ---
+   at Microsoft.Net.Http.Client.ManagedHandler.ProcessRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 160
+   at Microsoft.Net.Http.Client.ManagedHandler.SendAsync(HttpRequestMessage httpRequestMessage, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 77
+   at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+   at Docker.DotNet.DockerClient.PrivateMakeRequestAsync(TimeSpan timeout, HttpCompletionOption completionOption, HttpMethod method, String path, IQueryString queryString, IDictionary`2 headers, IRequestContent data, CancellationToken cancellationToken) in /_/src/Docker.DotNet/DockerClient.cs:line 433
+   at Docker.DotNet.DockerClient.MakeRequestAsync[T](IEnumerable`1 errorHandlers, HttpMethod method, String path, IQueryString queryString, IRequestContent body, IDictionary`2 headers, TimeSpan timeout, CancellationToken token) in /_/src/Docker.DotNet/DockerClient.cs:line 243
+   at DotNet.Testcontainers.Builders.DockerEndpointAuthenticationProvider.<>c__DisplayClass5_0.<<IsAvailable>b__0>d.MoveNext() in /_/src/Testcontainers/Builders/DockerEndpointAuthenticationProvider.cs:line 48
+  ├ëchou├⌐ Franz.Common.Messaging.RabbitMQ.Tests.Naming.NamingTests.GetDeadLetterQueueName_ShouldAppendDlq [1 ms]
+  Message d'erreur┬á:
+   DotNet.Testcontainers.Builders.DockerUnavailableException : Docker is either not running or misconfigured. Please ensure that Docker is running and that the endpoint is properly configured.
+You can customize your configuration using either the environment variables or the ~/.testcontainers.properties file.
+For more information, visit: https://dotnet.testcontainers.org/custom_configuration/.
+  Details: 
+    Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+---- System.AggregateException : One or more errors occurred. (Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.)
+-------- DotNet.Testcontainers.Builders.DockerUnavailableException : Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+------------ System.TimeoutException : The operation has timed out.
+  Arborescence des appels de proc├⌐dure┬á:
+     at DotNet.Testcontainers.Guard.ThrowIf[TType](ArgumentInfo`1& argument, Func`2 condition, Func`2 ifClause) in /_/src/Testcontainers/Guard.Null.cs:line 62
+   at DotNet.Testcontainers.Builders.AbstractBuilder`4.Validate() in /_/src/Testcontainers/Builders/AbstractBuilder`4.cs:line 146
+   at DotNet.Testcontainers.Builders.ContainerBuilder`3.Validate() in /_/src/Testcontainers/Builders/ContainerBuilder`3.cs:line 497
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Validate() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 113
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Build() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 95
+   at Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure.RabbitMqContainerFixture..ctor() in e:\Source\Repos\Franz.Common\tests\Franz.Common.Messaging.RabbitMQ.Tests\Infrastructure\RabbitMqContainerFixture.cs:line 9
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+   at System.IO.Pipes.NamedPipeClientStream.ConnectInternal(Int32 timeout, CancellationToken cancellationToken, Int32 startTime)
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Docker.DotNet.DockerClient.<>c__DisplayClass5_0.<<-ctor>b__0>d.MoveNext() in /_/src/Docker.DotNet/DockerClient.cs:line 69
+--- End of stack trace from previous location ---
+   at Microsoft.Net.Http.Client.ManagedHandler.ProcessRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 160
+   at Microsoft.Net.Http.Client.ManagedHandler.SendAsync(HttpRequestMessage httpRequestMessage, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 77
+   at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+   at Docker.DotNet.DockerClient.PrivateMakeRequestAsync(TimeSpan timeout, HttpCompletionOption completionOption, HttpMethod method, String path, IQueryString queryString, IDictionary`2 headers, IRequestContent data, CancellationToken cancellationToken) in /_/src/Docker.DotNet/DockerClient.cs:line 433
+   at Docker.DotNet.DockerClient.MakeRequestAsync[T](IEnumerable`1 errorHandlers, HttpMethod method, String path, IQueryString queryString, IRequestContent body, IDictionary`2 headers, TimeSpan timeout, CancellationToken token) in /_/src/Docker.DotNet/DockerClient.cs:line 243
+   at DotNet.Testcontainers.Builders.DockerEndpointAuthenticationProvider.<>c__DisplayClass5_0.<<IsAvailable>b__0>d.MoveNext() in /_/src/Testcontainers/Builders/DockerEndpointAuthenticationProvider.cs:line 48
+  ├ëchou├⌐ Franz.Common.Messaging.RabbitMQ.Tests.Naming.NamingTests.GetEventExchangeName_Should_Return_Correct_Name [1 ms]
+  Message d'erreur┬á:
+   DotNet.Testcontainers.Builders.DockerUnavailableException : Docker is either not running or misconfigured. Please ensure that Docker is running and that the endpoint is properly configured.
+You can customize your configuration using either the environment variables or the ~/.testcontainers.properties file.
+For more information, visit: https://dotnet.testcontainers.org/custom_configuration/.
+  Details: 
+    Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+---- System.AggregateException : One or more errors occurred. (Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.)
+-------- DotNet.Testcontainers.Builders.DockerUnavailableException : Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+------------ System.TimeoutException : The operation has timed out.
+  Arborescence des appels de proc├⌐dure┬á:
+     at DotNet.Testcontainers.Guard.ThrowIf[TType](ArgumentInfo`1& argument, Func`2 condition, Func`2 ifClause) in /_/src/Testcontainers/Guard.Null.cs:line 62
+   at DotNet.Testcontainers.Builders.AbstractBuilder`4.Validate() in /_/src/Testcontainers/Builders/AbstractBuilder`4.cs:line 146
+   at DotNet.Testcontainers.Builders.ContainerBuilder`3.Validate() in /_/src/Testcontainers/Builders/ContainerBuilder`3.cs:line 497
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Validate() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 113
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Build() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 95
+   at Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure.RabbitMqContainerFixture..ctor() in e:\Source\Repos\Franz.Common\tests\Franz.Common.Messaging.RabbitMQ.Tests\Infrastructure\RabbitMqContainerFixture.cs:line 9
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+   at System.IO.Pipes.NamedPipeClientStream.ConnectInternal(Int32 timeout, CancellationToken cancellationToken, Int32 startTime)
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Docker.DotNet.DockerClient.<>c__DisplayClass5_0.<<-ctor>b__0>d.MoveNext() in /_/src/Docker.DotNet/DockerClient.cs:line 69
+--- End of stack trace from previous location ---
+   at Microsoft.Net.Http.Client.ManagedHandler.ProcessRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 160
+   at Microsoft.Net.Http.Client.ManagedHandler.SendAsync(HttpRequestMessage httpRequestMessage, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 77
+   at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+   at Docker.DotNet.DockerClient.PrivateMakeRequestAsync(TimeSpan timeout, HttpCompletionOption completionOption, HttpMethod method, String path, IQueryString queryString, IDictionary`2 headers, IRequestContent data, CancellationToken cancellationToken) in /_/src/Docker.DotNet/DockerClient.cs:line 433
+   at Docker.DotNet.DockerClient.MakeRequestAsync[T](IEnumerable`1 errorHandlers, HttpMethod method, String path, IQueryString queryString, IRequestContent body, IDictionary`2 headers, TimeSpan timeout, CancellationToken token) in /_/src/Docker.DotNet/DockerClient.cs:line 243
+   at DotNet.Testcontainers.Builders.DockerEndpointAuthenticationProvider.<>c__DisplayClass5_0.<<IsAvailable>b__0>d.MoveNext() in /_/src/Testcontainers/Builders/DockerEndpointAuthenticationProvider.cs:line 48
+  ├ëchou├⌐ Franz.Common.Messaging.RabbitMQ.Tests.Naming.NamingTests.GetQueueName_ShouldReturnLowerCasedDashedName [1 ms]
+  Message d'erreur┬á:
+   DotNet.Testcontainers.Builders.DockerUnavailableException : Docker is either not running or misconfigured. Please ensure that Docker is running and that the endpoint is properly configured.
+You can customize your configuration using either the environment variables or the ~/.testcontainers.properties file.
+For more information, visit: https://dotnet.testcontainers.org/custom_configuration/.
+  Details: 
+    Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+---- System.AggregateException : One or more errors occurred. (Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.)
+-------- DotNet.Testcontainers.Builders.DockerUnavailableException : Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'.
+------------ System.TimeoutException : The operation has timed out.
+  Arborescence des appels de proc├⌐dure┬á:
+     at DotNet.Testcontainers.Guard.ThrowIf[TType](ArgumentInfo`1& argument, Func`2 condition, Func`2 ifClause) in /_/src/Testcontainers/Guard.Null.cs:line 62
+   at DotNet.Testcontainers.Builders.AbstractBuilder`4.Validate() in /_/src/Testcontainers/Builders/AbstractBuilder`4.cs:line 146
+   at DotNet.Testcontainers.Builders.ContainerBuilder`3.Validate() in /_/src/Testcontainers/Builders/ContainerBuilder`3.cs:line 497
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Validate() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 113
+   at Testcontainers.RabbitMq.RabbitMqBuilder.Build() in /_/src/Testcontainers.RabbitMq/RabbitMqBuilder.cs:line 95
+   at Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure.RabbitMqContainerFixture..ctor() in e:\Source\Repos\Franz.Common\tests\Franz.Common.Messaging.RabbitMQ.Tests\Infrastructure\RabbitMqContainerFixture.cs:line 9
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+
+----- Inner Stack Trace -----
+   at System.IO.Pipes.NamedPipeClientStream.ConnectInternal(Int32 timeout, CancellationToken cancellationToken, Int32 startTime)
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Docker.DotNet.DockerClient.<>c__DisplayClass5_0.<<-ctor>b__0>d.MoveNext() in /_/src/Docker.DotNet/DockerClient.cs:line 69
+--- End of stack trace from previous location ---
+   at Microsoft.Net.Http.Client.ManagedHandler.ProcessRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 160
+   at Microsoft.Net.Http.Client.ManagedHandler.SendAsync(HttpRequestMessage httpRequestMessage, CancellationToken cancellationToken) in /_/src/Docker.DotNet/Microsoft.Net.Http.Client/ManagedHandler.cs:line 77
+   at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+   at Docker.DotNet.DockerClient.PrivateMakeRequestAsync(TimeSpan timeout, HttpCompletionOption completionOption, HttpMethod method, String path, IQueryString queryString, IDictionary`2 headers, IRequestContent data, CancellationToken cancellationToken) in /_/src/Docker.DotNet/DockerClient.cs:line 433
+   at Docker.DotNet.DockerClient.MakeRequestAsync[T](IEnumerable`1 errorHandlers, HttpMethod method, String path, IQueryString queryString, IRequestContent body, IDictionary`2 headers, TimeSpan timeout, CancellationToken token) in /_/src/Docker.DotNet/DockerClient.cs:line 243
+   at DotNet.Testcontainers.Builders.DockerEndpointAuthenticationProvider.<>c__DisplayClass5_0.<<IsAvailable>b__0>d.MoveNext() in /_/src/Testcontainers/Builders/DockerEndpointAuthenticationProvider.cs:line 48
+
+├ëchou├⌐!  - ├⌐chec┬á:     6, r├⌐ussite┬á:     1, ignor├⌐e(s)┬á:     0, total┬á:     7, dur├⌐e┬á: 5 s - Franz.Common.Messaging.RabbitMQ.Tests.dll (net10.0)

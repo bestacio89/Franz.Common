@@ -7,7 +7,7 @@ It gives you **retry, circuit breaker, advanced circuit breaker, timeout, and bu
 
 ---
 
-* **Current Version**: 1.7.8
+* **Current Version**:  2.0.1
 * **Target Frameworks**: .NET 9+
 * **Dependencies**: `Polly`, `Serilog`, `Franz.Common.Mediator`
 - Part of the private **Franz Framework** ecosystem.
@@ -246,6 +246,15 @@ All pipelines automatically participate in **Franz’s logging & correlation sys
 * ✨ Added `AddFranzResilience(IConfiguration)` for **config-driven resilience**.
 * ♻️ Unified policy registry and Mediator pipelines.
 * 🛡 Simplified startup — <20 lines bootstraps resilience + mediator.
+
+---
+
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
 
 ---
 

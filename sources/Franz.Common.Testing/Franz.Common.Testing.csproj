@@ -2,13 +2,13 @@
 	<Import Project="..\..\common.targets" />
 
 	<ItemGroup>
-		<PackageReference Include="FluentAssertions" Version="8.8.0">
+		<PackageReference Include="FluentAssertions" Version="8.9.0">
 			<PrivateAssets>none</PrivateAssets>
 		</PackageReference>
-		<PackageReference Include="Moq.AutoMock" Version="3.6.1">
+		<PackageReference Include="Moq.AutoMock" Version="4.0.1">
 			<PrivateAssets>none</PrivateAssets>
 		</PackageReference>
-		<PackageReference Include="MockQueryable.Moq" Version="10.0.2" />
+		<PackageReference Include="MockQueryable.Moq" Version="10.0.5" />
 	</ItemGroup>
 
 	<ItemGroup>

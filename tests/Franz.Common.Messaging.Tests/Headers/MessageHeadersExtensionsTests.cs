@@ -1,8 +1,8 @@
-﻿using FluentAssertions;
+﻿#nullable enable
+using FluentAssertions;
 using Franz.Common.Errors;
 using Franz.Common.Headers;
 using Franz.Common.Messaging.Headers;
-using Microsoft.Extensions.Primitives;
 using Xunit;
 
 namespace Franz.Common.Messaging.Tests.Headers;
@@ -15,7 +15,8 @@ public class MessageHeadersExtensionsTests
     // Arrange
     var headers = new MessageHeaders();
     var messageId = Guid.NewGuid();
-    headers.Add(MessagingConstants.MessageId, messageId.ToString());
+    // FIX: Wrap the value in a string array using collection expression []
+    headers.Add(MessagingConstants.MessageId, [messageId.ToString()]);
 
     // Act
     var success = headers.TryGetMessageId(out var result);
@@ -67,8 +68,9 @@ public class MessageHeadersExtensionsTests
     headers.SetIdentityEmail(email);
 
     // Assert
-    headers[HeaderConstants.TenantId].ToString().Should().Be(tenantId.ToString());
-    headers[HeaderConstants.UserEmail].ToString().Should().Be(email);
+    // FIX: headers[key] returns string[]. We check the first element.
+    headers[HeaderConstants.TenantId][0].Should().Be(tenantId.ToString());
+    headers[HeaderConstants.UserEmail][0].Should().Be(email);
   }
 
   [Fact]

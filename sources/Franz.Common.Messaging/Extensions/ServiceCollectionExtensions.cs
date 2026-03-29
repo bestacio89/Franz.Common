@@ -43,22 +43,5 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  public static IServiceCollection AddMessagingOptions(this IServiceCollection services, IConfiguration? configuration)
-  {
-    var configurationSection = configuration?.GetSection("Messaging");
-    var hasMessagingConnectionOptions = services.Any(service => service.ServiceType == typeof(IConfigureOptions<MessagingOptions>));
 
-    if (configurationSection?.Exists() == true && !hasMessagingConnectionOptions)
-    {
-      services
-          .AddOptions()
-          .Configure<MessagingOptions>(configurationSection);
-    }
-    else if (!hasMessagingConnectionOptions)
-    {
-      throw new TechnicalException(Resources.MessagingNoConfigurationException);
-    }
-
-    return services;
-  }
 }

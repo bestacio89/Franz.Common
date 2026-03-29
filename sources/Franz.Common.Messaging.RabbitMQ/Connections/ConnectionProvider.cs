@@ -1,12 +1,15 @@
-﻿using System.Threading;
+#nullable enable
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using RabbitMQ.Client;
 
 namespace Franz.Common.Messaging.RabbitMQ.Connections;
 
-public sealed class ConnectionProvider : IConnectionProvider, IDisposable
+public sealed class ConnectionProvider : IConnectionProvider, IAsyncDisposable
 {
   private readonly IConnectionFactoryProvider _factoryProvider;
-  private readonly SemaphoreSlim _sync = new(1, 1);
+  private readonly SemaphoreSlim _lock = new(1, 1);
 
   private IConnection? _connection;
   private bool _disposed;
@@ -16,65 +19,65 @@ public sealed class ConnectionProvider : IConnectionProvider, IDisposable
     _factoryProvider = factoryProvider;
   }
 
-  public IConnection Current
+  public async ValueTask<IConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
   {
-    get
-    {
-      ThrowIfDisposed();
-      return GetOrCreateConnectionAsync()
-        .GetAwaiter()
-        .GetResult();
-    }
-  }
+    ObjectDisposedException.ThrowIf(_disposed, this);
 
-  private async Task<IConnection> GetOrCreateConnectionAsync()
-  {
+    // Fast path (no lock)
     if (_connection is { IsOpen: true })
       return _connection;
 
-    await _sync.WaitAsync().ConfigureAwait(false);
+    await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
     try
     {
+      // Double-check after acquiring lock
       if (_connection is { IsOpen: true })
         return _connection;
 
       var factory = _factoryProvider.Current;
 
-      // 🔑 Correct: await async factory
       _connection = await factory
-        .CreateConnectionAsync()
-        .ConfigureAwait(false);
+          .CreateConnectionAsync(cancellationToken)
+          .ConfigureAwait(false);
 
       return _connection;
     }
     finally
     {
-      _sync.Release();
+      _lock.Release();
     }
   }
 
-  private void ThrowIfDisposed()
-  {
-    if (_disposed)
-      throw new ObjectDisposedException(nameof(ConnectionProvider));
-  }
-
-  public void Dispose()
+  public async ValueTask DisposeAsync()
   {
     if (_disposed)
       return;
 
     _disposed = true;
 
+    await _lock.WaitAsync().ConfigureAwait(false);
     try
     {
-      _connection?.Dispose();
-    }
-    catch
-    {
-      // swallow — closing a dead connection may throw
-    }
+      if (_connection is not null)
+      {
+        try
+        {
+          if (_connection.IsOpen)
+            await _connection.CloseAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+          // swallow � shutdown path
+        }
 
-    _sync.Dispose();
+        _connection.Dispose();
+        _connection = null;
+      }
+    }
+    finally
+    {
+      _lock.Release();
+      _lock.Dispose();
+    }
   }
 }

@@ -209,7 +209,7 @@ Other Azure transports are implemented separately:
 * Event Hubs streaming adapter (Kafka-style)
 
 
-* **Current Version**: 1.7.8
+* **Current Version**:  2.0.1
 * Target Framework: **.NET 10**
 * Part of the **Franz Framework**
 
@@ -231,4 +231,10 @@ MIT License — see `LICENSE`.
 
 ---
 
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
 

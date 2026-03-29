@@ -1,17 +1,24 @@
 #nullable enable
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Headers;
-using Microsoft.Extensions.Primitives;
+using System.Text.Json.Serialization;
 
 namespace Franz.Common.Messaging.Messages;
 
-public class Message : INotification
+/// <summary>
+/// Transport-neutral message DTO.
+/// Senior Note: Standardized on IDictionary<string, string[]> for high-performance, 
+/// serializable headers across Kafka, RabbitMQ, and HTTP.
+/// </summary>
+public class Message : INotification, IEvent
 {
   private Guid _correlationId;
 
   public Message()
   {
     Id = Guid.CreateVersion7();
+    // Set via property to trigger synchronization across Metadata buckets
+    CorrelationId = Guid.CreateVersion7();
   }
 
   public Message(string? messageBody) : this()
@@ -19,74 +26,55 @@ public class Message : INotification
     Body = messageBody;
   }
 
-  public Message(string? body, IDictionary<string, IReadOnlyCollection<string>> dictionary) : this(body)
+  // SENIOR FIX: Parameter aligned with string[] to resolve CS1503
+  public Message(string? body, IDictionary<string, string[]> dictionary) : this(body)
   {
     foreach (var kv in dictionary)
-      Headers[kv.Key] = new StringValues(kv.Value.ToArray());
+    {
+      Headers[kv.Key] = kv.Value;
+    }
 
     SyncCorrelationFromHeaders();
   }
 
-  public Message(string? body, MessageHeaders headers) : this(body)
-  {
-    Headers = headers;
-    SyncCorrelationFromHeaders();
-  }
-
-  /// <summary>
-  /// Unique message identifier (Message ID).
-  /// </summary>
   public Guid Id { get; set; }
-
-  /// <summary>
-  /// Raw message payload.
-  /// </summary>
+  public DateTimeOffset OccurredOn { get; set; } = DateTimeOffset.UtcNow;
   public virtual string? Body { get; set; }
-
-  /// <summary>
-  /// Semantic kind of message (Command / Query / Event / Fault).
-  /// </summary>
   public MessageKind Kind { get; set; } = MessageKind.Command;
 
-  /// <summary>
-  /// Transport-agnostic headers.
-  /// </summary>
-  public virtual MessageHeaders Headers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+  // SENIOR FIX: Initialized as MessageHeaders to provide helper methods natively
+  public virtual IDictionary<string, string[]> Headers { get; set; } = new MessageHeaders();
 
-  /// <summary>
-  /// Logical metadata for internal processing.
-  /// </summary>
   public virtual IDictionary<string, object> Properties { get; set; } = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
   /// <summary>
-  /// Hardened CorrelationId. Defaults to a new Guid v7 if not provided.
+  /// The Single Source of Truth for Correlation.
+  /// Synchronizes across Properties (for internal logic) and Headers (for wire transport).
   /// </summary>
+  [JsonIgnore]
   public virtual Guid CorrelationId
   {
-    get
-    {
-      if (_correlationId == Guid.Empty)
-      {
-        // Check Properties for legacy/deserialization compatibility
-        if (Properties.TryGetValue(nameof(CorrelationId), out var value))
-        {
-          if (value is Guid guidValue) _correlationId = guidValue;
-          else if (value is string str && Guid.TryParse(str, out var g)) _correlationId = g;
-        }
-
-        // If still empty, generate the sequential v7
-        if (_correlationId == Guid.Empty)
-        {
-          _correlationId = Guid.CreateVersion7();
-          Properties[nameof(CorrelationId)] = _correlationId;
-        }
-      }
-      return _correlationId;
-    }
+    get => _correlationId;
     set
     {
       _correlationId = value;
       Properties[nameof(CorrelationId)] = value;
+      // Wrap in array for JSON/Transport compliance
+      Headers["X-Correlation-ID"] = [value.ToString()];
+    }
+  }
+
+  private void SyncCorrelationFromHeaders()
+  {
+    // Check standard and lowercase variants for cross-platform compatibility
+    if (Headers.TryGetValue("X-Correlation-ID", out var values) ||
+        Headers.TryGetValue("correlation-id", out values))
+    {
+      if (values.Length > 0 && Guid.TryParse(values[0], out var cid))
+      {
+        _correlationId = cid;
+        Properties[nameof(CorrelationId)] = cid;
+      }
     }
   }
 
@@ -101,12 +89,4 @@ public class Message : INotification
 
   public void SetProperty<T>(string key, T value)
       => Properties[key] = value!;
-
-  private void SyncCorrelationFromHeaders()
-  {
-    if (Headers.TryGetValue("correlation-id", out var values) && Guid.TryParse(values.ToString(), out var cid))
-    {
-      CorrelationId = cid;
-    }
-  }
 }

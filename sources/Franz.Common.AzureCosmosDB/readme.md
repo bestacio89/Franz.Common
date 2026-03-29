@@ -169,9 +169,15 @@ await messageStore.SaveAsync(msg);
 
 ---
 
-**Current Version**: 1.7.8
+**Current Version**:  2.0.1
 
 ## **Changelog**
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
 
 ### **Version 1.7.8**
 🔹 Updated to .NET 10.0.3 SDK.

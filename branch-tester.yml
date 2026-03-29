@@ -5,14 +5,13 @@ pool:
 
 variables:
   buildConfiguration: 'Release'
+  FocusedFilter: 'FullyQualifiedName~Messaging.Kafka'
 
 steps:
-# Checkout with full history + credentials
 - checkout: self
   persistCredentials: 'true'
   fetchDepth: '0'
 
-# Install .NET 10 SDK
 - task: UseDotNet@2
   displayName: 'Install .NET 10 SDK'
   inputs:
@@ -20,23 +19,36 @@ steps:
     version: '10.0.x'
     includePreviewVersions: true
 
-# Authenticate to Azure Artifacts
 - task: NuGetAuthenticate@1
   displayName: 'Authenticate to Azure Artifacts'
 
-# Restore
 - script: dotnet restore
   displayName: 'Restore NuGet packages'
 
-# Build
 - script: dotnet build --configuration $(buildConfiguration) --no-restore
   displayName: 'Build solution'
 
-# Test
-- task: DotNetCoreCLI@2
-  displayName: 'Run tests'
+# Test - Surgical Strike on Core Kafka Messaging
+# Using raw script instead of DotNetCoreCLI@2 so that --blame-hang and
+# --blame-hang-timeout are passed directly to the dotnet CLI rather than
+# being proxied through MSBuild's VSTest target, which rejects them.
+- script: |
+    dotnet test tests/Franz.Common.Messaging.Kafka.Tests/Franz.Common.Messaging.Kafka.Tests.csproj \
+      --configuration $(buildConfiguration) \
+      --no-build \
+      --filter "$(FocusedFilter)" \
+      --logger "trx;LogFileName=test_results.trx" \
+      --results-directory $(Agent.TempDirectory) \
+      --verbosity normal \
+      --blame-hang \
+      --blame-hang-timeout 60s
+  displayName: 'Run Core Kafka Messaging Hosting Tests'
+
+# Publish results separately with condition: always() so the TRX is
+# uploaded even when the test run hangs or exits with a non-zero code.
+- task: PublishTestResults@2
+  displayName: 'Publish Test Results'
+  condition: always()
   inputs:
-    command: 'test'
-    projects: '**/*.Tests.csproj'
-    arguments: '--configuration $(buildConfiguration) --no-build --logger "trx;LogFileName=test_results.trx" --verbosity normal'
-    publishTestResults: true
+    testResultsFormat: 'VSTest'
+    testResultsFiles: '$(Agent.TempDirectory)/*.trx'

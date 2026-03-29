@@ -1,9 +1,9 @@
-﻿using Franz.Common.Mapping.Abstractions;
+using Franz.Common.Mapping.Abstractions;
 using Franz.Common.Mapping.Core;
 
 public abstract class FranzMapProfile : IFranzMapProfile
 {
-  private readonly List<Action<MappingConfiguration>> _registrations = new();
+  private readonly List<Action<MappingConfiguration>> _registrations = [];
 
   protected MappingExpression<TSource, TDestination> CreateMap<TSource, TDestination>()
   {

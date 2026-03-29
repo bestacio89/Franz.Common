@@ -1,54 +1,76 @@
-using Franz.Common.Errors;
+﻿using Franz.Common.Errors;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Hosting.Executing;
 using Franz.Common.Messaging.Hosting.Properties;
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace Franz.Common.Messaging.Hosting;
 
-public class MessagingHostedService : IHostedService
+public sealed class MessagingHostedService : IHostedService
 {
-    private readonly IListener listener;
-    private readonly IServiceProvider serviceProvider;
+  private readonly IListener _listener;
+  private readonly IServiceProvider _serviceProvider;
 
-    public MessagingHostedService(IListener listener, IServiceProvider serviceProvider)
+  public MessagingHostedService(IListener listener, IServiceProvider serviceProvider)
+  {
+    _listener = listener;
+    _serviceProvider = serviceProvider;
+  }
+
+  public async Task StartAsync(CancellationToken cancellationToken)
+  {
+    // ✅ FIX: Register the Task-based delegate instead of the synchronous event
+    _listener.OnMessageReceivedAsync = HandleMessageAsync;
+
+    // We await the Listen call. Most IListener implementations (Kafka/Rabbit) 
+    // will internally start a long-running loop or task.
+    await _listener.Listen(cancellationToken);
+  }
+
+  /// <summary>
+  /// Processes the incoming message within a dedicated DI scope.
+  /// This method is now fully async, allowing the Listener to await its completion.
+  /// </summary>
+  private async Task HandleMessageAsync(MessageEventArgs messageEventArgs)
+  {
+    var message = messageEventArgs.Message;
+
+    // 🛡️ Senior Architect Note: The scope is strictly tied to this Task.
+    // Because the Listener 'awaits' this Task, the scope is guaranteed 
+    // to be disposed ONLY after the strategy execution is finished.
+    using var scope = _serviceProvider.CreateScope();
+
+    var messageContextAccessor = scope.ServiceProvider.GetRequiredService<MessageContextAccessor>();
+    messageContextAccessor.Set(new MessageContext(message));
+
+    var strategyExecuters = scope.ServiceProvider.GetServices<IMessagingStrategyExecuter>();
+
+    // ⚡ .NET 10 Standards: Use native async iteration to find the correct executer
+    IMessagingStrategyExecuter? selectedExecuter = null;
+    foreach (var executer in strategyExecuters)
     {
-        this.listener = listener;
-        this.serviceProvider = serviceProvider;
+      if (await executer.CanExecuteAsync(message))
+      {
+        selectedExecuter = executer;
+        break;
+      }
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    if (selectedExecuter == null)
     {
-#pragma warning disable CS8622 // Nullability of reference types in type of parameter doesn't match the target delegate (possibly because of nullability attributes).
-        listener.Received += Listener_Received;
-#pragma warning restore CS8622 // Nullability of reference types in type of parameter doesn't match the target delegate (possibly because of nullability attributes).
-
-        await Task.Run(() => listener.Listen(), cancellationToken);
+      throw new TechnicalException(Resources.StrategyExecuterNotFoundException);
     }
 
-    internal void Listener_Received(object sender, MessageEventArgs messageEventArgs)
-    {
-        var message = messageEventArgs.Message;
+    // ✅ Non-blocking execution of the message strategy
+    await selectedExecuter.ExecuteAsync(message);
+  }
 
-        using var serviceProviderScope = serviceProvider.CreateScope();
-        var messageContextAccessor = serviceProviderScope.ServiceProvider.GetRequiredService<MessageContextAccessor>();
-        messageContextAccessor.Set(new MessageContext(message));
+  public async Task StopAsync(CancellationToken cancellationToken)
+  {
+    // Clean up the delegate reference to prevent calls during shutdown
+    _listener.OnMessageReceivedAsync = null;
 
-        var messagingStrategyExecuters = serviceProviderScope.ServiceProvider.GetServices<IMessagingStrategyExecuter>();
-
-        var messagingStrategyExecuter = messagingStrategyExecuters
-          .FirstOrDefault(x => x.CanExecuteAsync(message).Result);
-
-        if (messagingStrategyExecuter == null)
-            throw new TechnicalException(Resources.StrategyExecuterNotFoundException);
-
-        messagingStrategyExecuter.ExecuteAsync(message).Wait();
-    }
-
-    public async Task StopAsync(CancellationToken cancellationToken)
-    {
-        await Task.Run(() => listener.StopListen(), cancellationToken);
-    }
+    await _listener.StopListenAsync(cancellationToken);
+  }
 }

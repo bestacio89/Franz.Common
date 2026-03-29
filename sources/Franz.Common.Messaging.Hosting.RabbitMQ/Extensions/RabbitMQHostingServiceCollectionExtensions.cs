@@ -18,7 +18,7 @@ public static class RabbitMQHostingServiceCollectionExtensions
     services.Configure(configureOptions);
  
     // Transport-level listener
-    services.AddSingleton<Listener>();
+    services.AddSingleton<RabbitMQListener>();
 
     // Hosted service wrapping the listener
     services.AddHostedService<RabbitMQHostedService>();

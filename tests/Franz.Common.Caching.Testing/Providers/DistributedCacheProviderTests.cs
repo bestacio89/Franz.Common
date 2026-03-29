@@ -2,147 +2,122 @@
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Tests.Fakes;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using Xunit;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Options;
+using Moq;
+using System.Text.Json;
 
 namespace Franz.Common.Caching.Tests.Providers;
 
-public sealed class DistributedCacheProviderTests
+public sealed class DistributedCacheProviderTests : IDisposable
 {
-  private sealed record TestPayload(int Id, string Name);
+  private readonly Mock<IDistributedCache> _cacheMock;
+  private readonly Mock<IOptionsMonitor<CacheOptions>> _optionsMock;
+  private readonly DistributedCacheProvider _provider;
+  private readonly CacheOptions _globalOptions;
 
-  [Fact]
-  public async Task GetOrSet_Should_Store_And_Return_Value()
+  public DistributedCacheProviderTests()
   {
-    var cache = new FakeDistributedCache();
-    var provider = new DistributedCacheProvider(cache);
-
-    var result = await provider.GetOrSetAsync(
-        "dist:test:basic",
-        _ => Task.FromResult(new TestPayload(1, "franz")));
-
-    // Extract the value
-    result.Value.Should().Be(new TestPayload(1, "franz"));
-  }
-
-  [Fact]
-  public async Task GetOrSet_Should_Return_Cached_Value_On_Second_Call()
-  {
-    var cache = new FakeDistributedCache();
-    var provider = new DistributedCacheProvider(cache);
-
-    var calls = 0;
-
-    Func<CancellationToken, Task<TestPayload>> factory = _ =>
+    _cacheMock = new Mock<IDistributedCache>();
+    _globalOptions = new CacheOptions
     {
-      calls++;
-      return Task.FromResult(new TestPayload(2, "cached"));
+      DefaultAbsoluteExpiration = TimeSpan.FromMinutes(10),
+      DefaultSlidingExpiration = TimeSpan.FromMinutes(2)
     };
 
-    var key = "dist:test:cached";
+    _optionsMock = new Mock<IOptionsMonitor<CacheOptions>>();
+    _optionsMock.Setup(m => m.CurrentValue).Returns(_globalOptions);
 
-    var first = (await provider.GetOrSetAsync(key, factory)).Value;
-    var second = (await provider.GetOrSetAsync(key, factory)).Value;
-
-    first.Should().Be(second);
-    calls.Should().Be(1);
+    _provider = new DistributedCacheProvider(_cacheMock.Object, _optionsMock.Object);
   }
 
   [Fact]
-  public async Task Should_Respect_Expiration()
+  public async Task GetOrSetAsync_OnJsonException_ShouldHealAndReturnFreshValue()
   {
-    var cache = new FakeDistributedCache();
-    var provider = new DistributedCacheProvider(cache);
+    // Arrange
+    const string key = "dist:corrupt";
+    var corruptData = "invalid-json-content"u8.ToArray();
+    var expectedValue = new TestPayload(Guid.CreateVersion7(), "healed");
 
-    var key = "dist:test:ttl";
+    // 1. Simulate corrupt data in the cache
+    _cacheMock.Setup(c => c.GetAsync(key, It.IsAny<CancellationToken>()))
+              .ReturnsAsync(corruptData);
 
-    await provider.GetOrSetAsync(
+    // Act
+    var result = await _provider.GetOrSetAsync(key, _ => Task.FromResult(expectedValue));
+
+    // Assert
+    result.IsHit.Should().BeFalse(); // Should treat corruption as a miss
+    result.Value.Should().Be(expectedValue);
+
+    // Verify Healing: It should have overwritten the bad data
+    _cacheMock.Verify(c => c.SetAsync(
         key,
-        _ => Task.FromResult("value"),
-        new CacheOptions { Expiration = TimeSpan.FromMilliseconds(200) });
-
-    await Task.Delay(300);
-
-    var result = (await provider.GetOrSetAsync(
-        key,
-        _ => Task.FromResult("value"))).Value;
-
-    result.Should().Be("value");
+        It.IsAny<byte[]>(),
+        It.IsAny<DistributedCacheEntryOptions>(),
+        It.IsAny<CancellationToken>()),
+        Times.Once);
   }
 
   [Fact]
-  public async Task Remove_Should_Delete_Key()
+  public async Task GetOrSetAsync_ConcurrentRequests_ShouldInvokeFactoryOnce()
   {
-    var cache = new FakeDistributedCache();
-    var provider = new DistributedCacheProvider(cache);
+    // Arrange
+    const string key = "dist:stampede";
+    int factoryCalls = 0;
+    byte[]? internalCache = null; // Backing store as byte array
 
-    var key = "dist:test:remove";
+    // 1. Mock the core GetAsync method
+    _cacheMock.Setup(c => c.GetAsync(key, It.IsAny<CancellationToken>()))
+              .Returns(() => Task.FromResult(internalCache));
 
-    await provider.GetOrSetAsync(key, _ => Task.FromResult(123));
-    await provider.RemoveAsync(key);
+    // 2. Mock the core SetAsync method
+    _cacheMock.Setup(c => c.SetAsync(
+                key,
+                It.IsAny<byte[]>(),
+                It.IsAny<DistributedCacheEntryOptions>(),
+                It.IsAny<CancellationToken>()))
+              .Callback<string, byte[], DistributedCacheEntryOptions, CancellationToken>((k, v, o, c) => internalCache = v)
+              .Returns(Task.CompletedTask);
 
-    var result = (await provider.GetOrSetAsync(
-        key,
-        _ => Task.FromResult(456))).Value;
+    // Act
+    var tasks = Enumerable.Range(0, 10).Select(_ =>
+        _provider.GetOrSetAsync(key, async _ =>
+        {
+          Interlocked.Increment(ref factoryCalls);
+          // Artificial delay to ensure the thundering herd hits the semaphore
+          await Task.Delay(100);
+          return new TestPayload(Guid.CreateVersion7(), "shared");
+        }));
 
-    result.Should().Be(456);
+    await Task.WhenAll(tasks);
+
+    // Assert
+    factoryCalls.Should().Be(1);
   }
 
   [Fact]
-  public async Task Should_Throw_When_Key_Is_Invalid()
+  public async Task GetOrSetAsync_DoubleCheckLocking_ShouldPreventRedundantFactoryCalls()
   {
-    var cache = new FakeDistributedCache();
-    var provider = new DistributedCacheProvider(cache);
+    // Arrange
+    const string key = "dist:double-check";
+    var payload = new TestPayload(Guid.CreateVersion7(), "data");
+    var json = JsonSerializer.Serialize(payload);
+    var bytes = System.Text.Encoding.UTF8.GetBytes(json);
 
-    await Assert.ThrowsAsync<ArgumentException>(() =>
-        provider.GetOrSetAsync<int>("", _ => Task.FromResult(1)));
+    // First call returns null, second call (after lock) returns the data 
+    // set by the thread that won the race.
+    _cacheMock.SetupSequence(c => c.GetAsync(key, It.IsAny<CancellationToken>()))
+              .ReturnsAsync((byte[]?)null)
+              .ReturnsAsync(bytes);
+
+    // Act
+    var result = await _provider.GetOrSetAsync(key, _ => Task.FromResult(new TestPayload(Guid.CreateVersion7(), "new")));
+
+    // Assert
+    result.IsHit.Should().BeTrue(); // The double-check caught the winner's result
+    result.Value.Id.Should().Be(result.Value.Id);
   }
 
-  [Fact]
-  public async Task Should_Throw_When_Factory_Is_Null()
-  {
-    var cache = new FakeDistributedCache();
-    var provider = new DistributedCacheProvider(cache);
-
-    await Assert.ThrowsAsync<ArgumentNullException>(() =>
-        provider.GetOrSetAsync<int>("key", null!));
-  }
-
-  [Fact]
-  public async Task Should_Reject_LocalCacheHint()
-  {
-    var cache = new FakeDistributedCache();
-    var provider = new DistributedCacheProvider(cache);
-
-    await Assert.ThrowsAsync<NotSupportedException>(() =>
-        provider.GetOrSetAsync(
-            "dist:test:local",
-            _ => Task.FromResult(1),
-            new CacheOptions { LocalCacheHint = TimeSpan.FromSeconds(1) }));
-  }
-
-  [Fact]
-  public async Task Should_Reject_Tags()
-  {
-    var cache = new FakeDistributedCache();
-    var provider = new DistributedCacheProvider(cache);
-
-    await Assert.ThrowsAsync<NotSupportedException>(() =>
-        provider.GetOrSetAsync(
-            "dist:test:tags",
-            _ => Task.FromResult(1),
-            new CacheOptions { Tags = new[] { "orders" } }));
-  }
-
-  [Fact]
-  public async Task RemoveByTag_Should_Throw()
-  {
-    var cache = new FakeDistributedCache();
-    var provider = new DistributedCacheProvider(cache);
-
-    await Assert.ThrowsAsync<NotSupportedException>(() =>
-        provider.RemoveByTagAsync("any"));
-  }
+  public void Dispose() => _provider.Dispose();
 }

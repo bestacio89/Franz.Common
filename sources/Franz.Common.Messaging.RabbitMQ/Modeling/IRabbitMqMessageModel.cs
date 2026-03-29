@@ -1,8 +1,8 @@
-﻿namespace Franz.Common.Messaging.RabbitMQ.Modeling;
+namespace Franz.Common.Messaging.RabbitMQ.Modeling;
 
 public interface IRabbitMqMessageModel
 {
-  Task ProduceAsync<TMessage>(
+  ValueTask ProduceAsync<TMessage>(
       string exchange,
       string routingKey,
       TMessage message,

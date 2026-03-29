@@ -1,20 +1,27 @@
-﻿namespace Franz.Common.AzureCosmosDB.Options;
+﻿using Franz.Common.AzureCosmosDB.Configuration;
+using System.ComponentModel.DataAnnotations;
+
+namespace Franz.Common.AzureCosmosDB.Options;
 
 public sealed class CosmosOptions
 {
   /// <summary>
   /// Cosmos DB Account endpoint (URI).
   /// </summary>
+  [Required(AllowEmptyStrings = false)]
+  [Url]
   public string AccountEndpoint { get; set; } = default!;
 
   /// <summary>
   /// Cosmos DB primary or secondary key.
   /// </summary>
+  [Required(AllowEmptyStrings = false)]
   public string AccountKey { get; set; } = default!;
 
   /// <summary>
   /// Name of the database to use.
   /// </summary>
+  [Required(AllowEmptyStrings = false)]
   public string DatabaseName { get; set; } = default!;
 
   /// <summary>
@@ -29,7 +36,10 @@ public sealed class CosmosOptions
   public string? ApplicationName { get; set; }
 
   /// <summary>
-  /// Default throughput on database creation.
+  /// Default throughput on database creation (RU/s).
   /// </summary>
-  public bool? DatabaseThroughput { get; set; }
+  [Range(400, 1000000)]
+  public int? DatabaseThroughput { get; set; }
+
+  public CosmosMessagingOptions Messaging { get; set; } = new();
 }

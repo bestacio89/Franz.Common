@@ -1,46 +1,44 @@
-using Franz.Common.Business.Domain;
-using Franz.Common.Errors;
+#nullable enable
+using Franz.Common.Business.Events;
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Messaging.Factories;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.Kafka;
 
-public sealed class MessagingPublisher : IMessagingPublisher
-{
-  private readonly IMessagingInitializer messagingInitializer;
-  private readonly IMessageFactory messageFactory;
-  private readonly IDispatcher dispatcher;
-  private readonly IMessagingSender sender;
-
-  public MessagingPublisher(
+/// <summary>
+/// Senior Note: Using Primary Constructor for clean dependency injection.
+/// Sealed for JIT devirtualization and performance optimization on the hot path.
+/// </summary>
+public sealed class MessagingPublisher(
     IMessagingInitializer messagingInitializer,
     IMessageFactory messageFactory,
     IDispatcher dispatcher,
-    IMessagingSender sender)
+    IMessagingSender sender) : IMessagingPublisher
+{
+  public async ValueTask Publish<TIntegrationEvent>(
+      TIntegrationEvent integrationEvent,
+      CancellationToken ct = default)
+      where TIntegrationEvent : IIntegrationEvent
   {
-    this.messagingInitializer = messagingInitializer;
-    this.messageFactory = messageFactory;
-    this.dispatcher = dispatcher;
-    this.sender = sender;
-  }
+    // .NET 10 optimized guard
+    ArgumentNullException.ThrowIfNull(integrationEvent);
 
-  public async Task Publish<TIntegrationEvent>(TIntegrationEvent integrationEvent)
-    where TIntegrationEvent : IIntegrationEvent
-  {
-    if (integrationEvent is null)
-      throw new TechnicalException("Integration event cannot be null");
+    // 1. Ensure Kafka infra exists (topics, DLQ, etc.) 
+    // Propagating CT to handle potential infrastructure timeouts.
+    await messagingInitializer.InitializeAsync(ct);
 
-    // Ensure Kafka infra exists (topics, DLQ, etc.)
-    messagingInitializer.Initialize();
-
-    // Build Franz message
+    // 2. Build Franz message (Transform domain event to transport envelope)
     var message = messageFactory.Build(integrationEvent);
 
-    // Run mediator pipeline (notifications must NOT fail the system)
-    await dispatcher.PublishNotificationAsync(message);
+    // 3. Run mediator pipeline (Internal notifications/Audit)
+    // Senior Note: Await here ensures internal side-effects complete before external publish.
+    await dispatcher.PublishNotificationAsync(message, ct);
 
-    // Delegate transport publishing
-    await sender.SendAsync(message);
+    // 4. Delegate transport publishing
+    // Async v7+ compliant: honors cancellation during the Kafka Produce call.
+    await sender.SendAsync(message, ct);
   }
 }

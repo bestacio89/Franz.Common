@@ -1,0 +1,6 @@
+{
+  {
+    "parallelizeAssembly": false,
+    "parallelizeTestCollections": false
+  }
+}

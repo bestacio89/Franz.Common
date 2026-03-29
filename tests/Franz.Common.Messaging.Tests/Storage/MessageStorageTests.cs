@@ -1,7 +1,7 @@
-﻿using FluentAssertions;
+﻿#nullable enable
+using FluentAssertions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Storage;
-using Microsoft.Extensions.Primitives;
 using Xunit;
 
 namespace Franz.Common.Messaging.Tests.Storage;
@@ -32,8 +32,10 @@ public class MessageStorageTests
       MessageType = "Franz.TestEvent",
       CorrelationId = Guid.CreateVersion7()
     };
-    message.Headers.Add("X-Tenant-Id", "tenant-1");
-    message.Headers.Add("X-Empty", "   "); // Should be stripped
+
+    // FIX: Use collection expressions [] for header initialization
+    message.Headers.Add("X-Tenant-Id", ["tenant-1"]);
+    message.Headers.Add("X-Empty", ["   "]); // Should be stripped by the mapper logic
     message.Properties["InternalFlag"] = true;
 
     // Act
@@ -43,6 +45,8 @@ public class MessageStorageTests
     stored.Id.Should().Be(originalId);
     stored.Body.Should().Be(message.Body);
     stored.Headers.Should().ContainKey("X-Tenant-Id");
+
+    // Senior Note: ToStored mapper should filter out whitespace-only headers
     stored.Headers.Should().NotContainKey("X-Empty");
     stored.Properties["InternalFlag"].Should().Be(true);
     stored.CreatedOn.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
@@ -56,9 +60,9 @@ public class MessageStorageTests
     {
       Id = Guid.CreateVersion7(),
       Body = "payload",
-      Headers = new Dictionary<string, string[]>
+      Headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
             {
-                { "X-Roles", new[] { "Admin", "User" } }
+                { "X-Roles", ["Admin", "User"] }
             }
     };
 
@@ -66,8 +70,9 @@ public class MessageStorageTests
     var message = stored.ToMessage();
 
     // Assert
+    // FIX: headers.TryGetValue now outputs string[] instead of StringValues
     message.Headers.TryGetValue("X-Roles", out var values).Should().BeTrue();
-    values.Count.Should().Be(2);
+    values!.Length.Should().Be(2);
     values.Should().Contain("Admin").And.Contain("User");
   }
 
@@ -78,7 +83,7 @@ public class MessageStorageTests
     var stored = new StoredMessage();
 
     // Assert
-    // Check version 7 (the 13th character in a hyphenated GUID string)
+    // Verify Guid Version 7 (the character at index 14 in the string representation)
     stored.Id.ToString()[14].Should().Be('7');
   }
 }

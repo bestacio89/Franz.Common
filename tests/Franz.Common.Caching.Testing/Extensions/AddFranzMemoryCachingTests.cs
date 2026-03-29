@@ -1,91 +1,131 @@
-﻿using Franz.Common.Caching.Abstractions;
+﻿using FluentAssertions;
+using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Providers;
 using Microsoft.Extensions.Caching.Memory;
-using Xunit;
-using FluentAssertions;
+using Microsoft.Extensions.Options;
+using Moq;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Xunit;
 
-public class MemoryCacheProviderTests
+namespace Franz.Common.Caching.Tests.Providers;
+
+public sealed class MemoryCacheProviderTests : IDisposable
 {
-  private MemoryCacheProvider CreateProvider()
-      => new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()));
+  private readonly IMemoryCache _memoryCache;
+  private readonly Mock<IOptionsMonitor<CacheOptions>> _optionsMock;
+  private readonly CacheOptions _globalOptions;
+  private readonly MemoryCacheProvider _provider;
+
+  public MemoryCacheProviderTests()
+  {
+    _memoryCache = new MemoryCache(new MemoryCacheOptions());
+
+    _globalOptions = new CacheOptions
+    {
+      DefaultAbsoluteExpiration = TimeSpan.FromMinutes(5)
+    };
+
+    _optionsMock = new Mock<IOptionsMonitor<CacheOptions>>();
+    _optionsMock.Setup(m => m.CurrentValue).Returns(_globalOptions);
+
+    _provider = new MemoryCacheProvider(_memoryCache, _optionsMock.Object);
+  }
 
   [Fact]
-  public async Task GetOrSetAsync_Should_Set_And_Get_Value()
+  public async Task GetOrSetAsync_Should_Return_Value_And_Manage_Cache_State()
   {
-    var provider = CreateProvider();
+    // Arrange
+    const string key = "mem:test:1";
+    const string value = "franz-memory-data";
+    var calls = 0;
 
-    // First call → set
-    var result = await provider.GetOrSetAsync(
-        "key",
-        _ => Task.FromResult("value"),
-        new CacheOptions { Expiration = TimeSpan.FromMinutes(1) }
-    );
+    Func<CancellationToken, Task<string>> factory = _ =>
+    {
+      calls++;
+      return Task.FromResult(value);
+    };
 
-    result.Value.Should().Be("value");
+    // Act - Initial Load (Miss)
+    var firstResult = await _provider.GetOrSetAsync(key, factory);
+
+    // Act - Subsequent Load (Hit)
+    var secondResult = await _provider.GetOrSetAsync(key, factory);
+
+    // Assert
+    firstResult.Value.Should().Be(value);
+    firstResult.IsHit.Should().BeFalse();
+
+    secondResult.Value.Should().Be(value);
+    secondResult.IsHit.Should().BeTrue();
+
+    calls.Should().Be(1);
+  }
+
+  [Fact]
+  public async Task RemoveAsync_Should_Invalidate_Key()
+  {
+    // Arrange
+    const string key = "mem:test:remove";
+    await _provider.GetOrSetAsync(key, _ => Task.FromResult(100));
+
+    // Act
+    await _provider.RemoveAsync(key);
+
+    // Assert
+    var result = await _provider.GetOrSetAsync(key, _ => Task.FromResult(200));
     result.IsHit.Should().BeFalse();
-
-    // Second call → get from cache
-    var cachedResult = await provider.GetOrSetAsync(
-        "key",
-        _ => Task.FromResult("wrong"),
-        new CacheOptions { Expiration = TimeSpan.FromMinutes(1) }
-    );
-
-    cachedResult.Value.Should().Be("value"); // cached value
-    cachedResult.IsHit.Should().BeTrue();
+    result.Value.Should().Be(200);
   }
 
   [Fact]
-  public async Task RemoveAsync_Should_Delete_Cached_Value()
+  public async Task GetOrSetAsync_Should_Respect_Request_Specific_Expiration()
   {
-    var provider = CreateProvider();
+    // Arrange
+    const string key = "mem:test:ttl";
+    var requestOptions = new CacheOptions
+    {
+      DefaultAbsoluteExpiration = TimeSpan.FromMilliseconds(200)
+    };
 
-    // Set value
-    await provider.GetOrSetAsync("temp", _ => Task.FromResult(42), new CacheOptions { Expiration = TimeSpan.FromMinutes(1) });
+    // Act
+    await _provider.GetOrSetAsync(key, _ => Task.FromResult("expiring"), requestOptions);
 
-    // Remove it
-    await provider.RemoveAsync("temp");
+    // Wait for memory cache eviction
+    await Task.Delay(300);
 
-    // Retrieve again
-    var result = await provider.GetOrSetAsync<int?>(
-        "temp",
-        _ => Task.FromResult<int?>(null),
-        new CacheOptions { Expiration = TimeSpan.FromMinutes(1) }
-    );
-
-    // The value should be null (not the CacheResult itself)
-    result.Value.Should().BeNull();
+    // Assert
+    var result = await _provider.GetOrSetAsync(key, _ => Task.FromResult("fresh"));
     result.IsHit.Should().BeFalse();
+    result.Value.Should().Be("fresh");
   }
 
   [Fact]
-  public async Task GetOrSetAsync_Should_Throw_On_Invalid_Options()
+  public async Task RemoveByTagAsync_Should_Throw_NotSupportedException()
   {
-    var provider = CreateProvider();
+    // Arrange & Act
+    var act = () => _provider.RemoveByTagAsync("any-tag");
 
-    await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-        provider.GetOrSetAsync("key", _ => Task.FromResult("v"), new CacheOptions { Expiration = TimeSpan.Zero })
-    );
-
-    await Assert.ThrowsAsync<NotSupportedException>(() =>
-        provider.GetOrSetAsync("key", _ => Task.FromResult("v"), new CacheOptions { LocalCacheHint = TimeSpan.FromSeconds(1) })
-    );
-
-    await Assert.ThrowsAsync<NotSupportedException>(() =>
-        provider.GetOrSetAsync("key", _ => Task.FromResult("v"), new CacheOptions { Tags = new[] { "tag1" } })
-    );
+    // Assert
+    await act.Should().ThrowAsync<NotSupportedException>()
+        .WithMessage("*Tag-based*support*"); // Broadened to catch 'support' or 'supported'
   }
 
-  [Fact]
-  public async Task RemoveByTagAsync_Should_Throw_NotSupported()
+  [Theory]
+  [InlineData("")]
+  [InlineData("   ")]
+  public async Task GetOrSetAsync_Should_Throw_ArgumentException_On_Invalid_Key(string invalidKey)
   {
-    var provider = CreateProvider();
+    // Act
+    var act = () => _provider.GetOrSetAsync(invalidKey, _ => Task.FromResult(1));
 
-    await Assert.ThrowsAsync<NotSupportedException>(() =>
-        provider.RemoveByTagAsync("tag1")
-    );
+    // Assert
+    await act.Should().ThrowAsync<ArgumentException>();
+  }
+
+  public void Dispose()
+  {
+    _memoryCache.Dispose();
   }
 }

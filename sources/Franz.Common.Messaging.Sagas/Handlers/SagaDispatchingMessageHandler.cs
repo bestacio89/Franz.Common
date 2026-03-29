@@ -1,30 +1,41 @@
 ﻿#nullable enable
 using Franz.Common.Mediator;
-using Franz.Common.Mediator.Pipelines.Logging; // Added for ambient context
+using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Serialization;
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.Sagas.Handlers;
 
-public sealed class SagaDispatchingMessageHandler : IMessageHandler
+/// <summary>
+/// Dispatches incoming messages to the Saga Orchestrator.
+/// Senior Architect Note: Refactored to native Async v7+ to prevent thread-pool starvation.
+/// Leverages Guid-based CorrelationId context with guaranteed cleanup.
+/// </summary>
+public sealed class SagaDispatchingMessageHandler(
+    SagaOrchestrator orchestrator,
+    IMessageSerializer serializer) : IMessageHandler
 {
-  private readonly SagaOrchestrator _orchestrator;
-  private readonly IMessageSerializer _serializer;
+  private readonly SagaOrchestrator _orchestrator = orchestrator;
+  private readonly IMessageSerializer _serializer = serializer;
 
-  public SagaDispatchingMessageHandler(
-      SagaOrchestrator orchestrator,
-      IMessageSerializer serializer)
+  public async Task ProcessAsync(Message message, CancellationToken ct = default)
   {
-    _orchestrator = orchestrator;
-    _serializer = serializer;
-  }
+    // 1. Resolve Type Name 
+    var typeName = message.MessageType;
 
-  public void Process(Message message)
-  {
-    // 1. Resolve Type Name (Prioritize the semantic MessageType property)
-    var typeName = message.MessageType ?? message.Headers.GetValueOrDefault("type").ToString();
+    // Fallback to manual header lookup
+    if (string.IsNullOrWhiteSpace(typeName) &&
+        message.Headers.TryGetValue("type", out var values) && values.Length > 0)
+    {
+      typeName = values[0];
+    }
+
     if (string.IsNullOrWhiteSpace(typeName)) return;
 
     var type = ResolveType(typeName);
@@ -32,38 +43,29 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
 
     // 2. Deserialize with Null-Safety
     if (string.IsNullOrWhiteSpace(message.Body)) return;
-    var evt = (IIntegrationEvent?)_serializer.Deserialize(message.Body!, type);
+
+    var evt = (IIntegrationEvent?)_serializer.Deserialize(message.Body, type);
     if (evt is null) return;
 
-    // 3. Extract IDs - Leveraging the hardened Message properties
-    // This property now guarantees a Guid V7 via its lazy-init logic.
+    // 3. Extract IDs 
     var correlationId = message.CorrelationId;
-
-    // Use the Message ID as the Causation ID (The 'Id' property is already Guid V7)
     var causationId = message.Id;
 
-    // 4. Bridge to Ambient Context
-    // This is vital: Seeding the context so the Saga's internal logic is 'connected'
+    // 4. Bridge to Ambient Context & Dispatch
+    // Senior Note: We wrap the orchestrator call to ensure the AsyncLocal CorrelationId 
+    // is cleared even if the orchestrator throws.
     CorrelationId.Current = correlationId;
-
-    // 5. Hand off to Orchestrator
-    // Note: If Orchestrator still uses strings, we .ToString() here, 
-    // but the 'Source of Truth' remains the binary Guid.
     try
     {
-      _orchestrator
-          .HandleEventAsync(
-              evt,
-              correlationId,
-              causationId,
-              CancellationToken.None)
-          .GetAwaiter()
-          .GetResult();
+      await _orchestrator.HandleEventAsync(
+          evt,
+          correlationId,
+          causationId,
+          ct).ConfigureAwait(false);
     }
     finally
     {
-      // Clear context if you want to prevent leakage, 
-      // though AsyncLocal usually handles this per-flow.
+      // Clear context to prevent leakage across threads in high-concurrency environments
       CorrelationId.Current = Guid.Empty;
     }
   }

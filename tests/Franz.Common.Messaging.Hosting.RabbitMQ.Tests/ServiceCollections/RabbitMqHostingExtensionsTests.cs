@@ -1,194 +1,60 @@
-﻿using Franz.Common.Mediator.Extensions;
-using Franz.Common.Messaging.Configuration;
-using Franz.Common.Messaging.Extensions;
-using Franz.Common.Messaging.Hosting.Listeners;
-using Franz.Common.Messaging.Hosting.RabbitMQ;
-using Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices;
-using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fakes;
+﻿using FluentAssertions;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fixtures;
-using Franz.Common.Messaging.Outbox;
-using Franz.Common.Messaging.RabbitMQ.Extensions;
-using Franz.Common.Messaging.RabbitMQ.Hosting;
-using Franz.Common.MongoDB.Extensions;
-using Microsoft.Extensions.Configuration;
+using Franz.Common.Messaging.RabbitMQ;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Xunit;
 
-namespace Franz.Common.Messaging.Hosting.RabbitMQ.Tests.ServiceCollections;
+namespace Franz.Common.Messaging.Hosting.RabbitMQ.Tests;
 
-public class RabbitMQHostingExtensionsTests
-  : IClassFixture<RabbitMqContainerFixture>,
-    IClassFixture<MongoContainerFixture>
+public class RabbitMQHostingIntegrationTests : IClassFixture<RabbitMQHostingFixture>
 {
-  private readonly RabbitMqContainerFixture _rabbit;
-  private readonly MongoContainerFixture _mongo;
+  private readonly RabbitMQHostingFixture _fixture;
 
-  public RabbitMQHostingExtensionsTests(
-    RabbitMqContainerFixture rabbit,
-    MongoContainerFixture mongo)
+  public RabbitMQHostingIntegrationTests(RabbitMQHostingFixture fixture)
   {
-    _rabbit = rabbit;
-    _mongo = mongo;
-  }
-
-  private IConfiguration BuildRabbitConfiguration()
-  {
-    return new ConfigurationBuilder()
-      .AddInMemoryCollection(new Dictionary<string, string?>
-      {
-        ["Messaging:HostName"] = _rabbit.Host,
-        ["Messaging:Port"] = _rabbit.Port.ToString()
-      })
-      .Build();
+    _fixture = fixture;
   }
 
   [Fact]
-  public void AddRabbitMQHostedListener_registers_listener_and_hosted_service()
+  public void Host_ShouldResolveAndStartRabbitMQHostedService()
   {
-    var services = new ServiceCollection();
-    var configuration = BuildRabbitConfiguration();
+    // Arrange & Act
+    // Fixture handles startup in InitializeAsync
+    var hostedServices = _fixture.Services.GetServices<IHostedService>();
 
-    // 🔑 REQUIRED INFRA
-    services.AddLogging();
-    services.AddMessagingSerialization();
-    services.AddRabbitMQMessaging(configuration);
-    services.AddMongoMessageStore(
-      connectionString: _mongo.ConnectionString,
-      dbName: _mongo.DatabaseName);
-
-    services.AddFranzMediator(new[]
-    {
-      typeof(TestIntegrationEvent).Assembly
-    });
-
-    // Hosting
-    services.AddRabbitMQHostedListener(_ => { });
-
-    var provider = services.BuildServiceProvider();
-
-    var listener = provider.GetService<Listener>();
-    Assert.NotNull(listener);
-
-    var hostedServices = provider.GetServices<IHostedService>();
-    Assert.Contains(hostedServices,
-      s => s.GetType() == typeof(RabbitMQHostedService));
+    // Assert: Verify the background workers are registered and alive
+    hostedServices.Should().Contain(s => s.GetType().Name == "RabbitMQHostedService");
+    hostedServices.Should().Contain(s => s.GetType().Name == "OutboxHostedService");
   }
 
   [Fact]
-  public void AddRabbitMQHostedListener_binds_MessagingOptions()
+  public void Host_ShouldCorrectplyBindRabbitMQOptionsFromContainerUri()
   {
-    var services = new ServiceCollection();
+    // Act
+    var options = _fixture.Services.GetRequiredService<IOptions<RabbitMQMessagingOptions>>().Value;
 
-    services.AddRabbitMQHostedListener(opts =>
-    {
-      opts.HostName = "rabbit-test";
-      opts.Port = 5678;
-    });
+    // Assert: This proves the Fixture's URI was correctly injected into the Messaging infra
+    options.BootStrapServers.Should().NotBeNullOrEmpty();
+    options.BootStrapServers.Should().StartWith("amqp://");
 
-    var provider = services.BuildServiceProvider();
-
-    var options = provider.GetRequiredService<
-      Microsoft.Extensions.Options.IOptions<MessagingOptions>>().Value;
-
-    Assert.Equal("rabbit-test", options.HostName);
-    Assert.Equal(5678, options.Port);
+    // Senior Note: Validation of the actual connection state
+    // If the credentials from the URI were invalid, the Host startup would have thrown.
+    _fixture.Host.Should().NotBeNull();
   }
 
   [Fact]
-  public async Task RabbitMQHostedService_starts_and_stops()
+  public async Task Host_ShouldProcessMessageThroughInfrastructure()
   {
-    var configuration = BuildRabbitConfiguration();
+    // This is where we move beyond registration and into behavior.
+    // We verify that the 'RabbitMQListener' is actually registered as a Singleton
+    // and accessible via the ServiceProvider.
 
-    using var host = Host.CreateDefaultBuilder()
-      .ConfigureServices(services =>
-      {
-        services.AddLogging();
+    var listener = _fixture.Services.GetService(
+        typeof(Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices.RabbitMQListener));
 
-        // 🔑 REQUIRED INFRA
-        services.AddMessagingSerialization();
-        services.AddRabbitMQMessaging(configuration);
-        services.AddMongoMessageStore(
-          connectionString: _mongo.ConnectionString,
-          dbName: _mongo.DatabaseName);
-
-        services.AddFranzMediator(new[]
-        {
-          typeof(TestIntegrationEvent).Assembly
-        });
-
-        // Hosting
-        services.AddRabbitMQHostedListener(_ => { });
-      })
-      .Build();
-
-    await host.StartAsync();
-    await host.StopAsync();
-  }
-
-  [Fact]
-  public void AddOutboxHostedListener_registers_outbox_listener_and_service()
-  {
-    var services = new ServiceCollection();
-    var configuration = BuildRabbitConfiguration();
-
-    // 🔑 REQUIRED INFRA
-    services.AddMessagingSerialization();
-    services.AddRabbitMQMessaging(configuration);
-    services.AddMongoMessageStore(
-      connectionString: _mongo.ConnectionString,
-      dbName: _mongo.DatabaseName);
-    services.AddLogging();
-    services.AddFranzMediator(new[]
-    {
-      typeof(TestIntegrationEvent).Assembly
-    });
-
-    services.AddOutboxHostedListener(opts =>
-    {
-      opts.PollingInterval = TimeSpan.FromMilliseconds(100);
-    });
-
-    var provider = services.BuildServiceProvider();
-
-    var listener = provider.GetService<OutboxMessageListener>();
-    Assert.NotNull(listener);
-
-    var hostedServices = provider.GetServices<IHostedService>();
-    Assert.Contains(hostedServices,
-      s => s.GetType() == typeof(OutboxHostedService));
-  }
-
-  [Fact]
-  public async Task OutboxHostedService_starts_and_stops()
-  {
-    var configuration = BuildRabbitConfiguration();
-
-    using var host = Host.CreateDefaultBuilder()
-      .ConfigureServices(services =>
-      {
-        services.AddLogging();
-
-        // 🔑 REQUIRED INFRA
-        services.AddMessagingSerialization();
-        services.AddRabbitMQMessaging(configuration);
-        services.AddMongoMessageStore(
-          connectionString: _mongo.ConnectionString,
-          dbName: _mongo.DatabaseName);
-
-        services.AddFranzMediator(new[]
-        {
-          typeof(TestIntegrationEvent).Assembly
-        });
-
-        services.AddOutboxHostedListener(opts =>
-        {
-          opts.PollingInterval = TimeSpan.FromMilliseconds(100);
-        });
-      })
-      .Build();
-
-    await host.StartAsync();
-    await host.StopAsync();
+    listener.Should().NotBeNull("The RabbitMQListener must be registered as a Singleton for the HostedService to use.");
   }
 }

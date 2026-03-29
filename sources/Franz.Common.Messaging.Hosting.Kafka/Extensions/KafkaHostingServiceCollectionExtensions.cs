@@ -10,7 +10,7 @@ public static class KafkaHostingServiceCollectionExtensions
 {
   public static IServiceCollection AddKafkaHostedListener(
       this IServiceCollection services,
-      Action<MessagingOptions> configureOptions)
+      Action<KafkaMessagingOptions> configureOptions)
   {
     services.Configure(configureOptions);
 
@@ -18,7 +18,7 @@ public static class KafkaHostingServiceCollectionExtensions
     services.AddSingleton<KafkaMessageListener>();
 
     // Hosted service wrapping the listener
-    services.AddHostedService<KafkaHostedService>();
+    services.AddHostedService<KafkaMessagingHostedService>();
 
     return services;
   }

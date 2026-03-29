@@ -3,19 +3,18 @@ using Franz.Common.Hosting;
 
 namespace Franz.Common.Messaging.Kafka;
 
-public class MessagingHostingInitializer : IHostingInitializer
+/// <summary>
+/// Specialized Kafka hosting initializer.
+/// Marked as sealed to enable JIT devirtualization optimizations in .NET 10.
+/// </summary>
+public sealed class MessagingHostingInitializer(IMessagingInitializer? messagingInitializer = null) : IHostingInitializer
 {
-  private readonly IMessagingInitializer? messagingInitializer;
+    // Implementation of IHostingInitializer
+    public int Order => 2;
 
-  public MessagingHostingInitializer(IMessagingInitializer? messagingInitializer = null)
-  {
-    this.messagingInitializer = messagingInitializer;
-  }
-
-  public int Order => 2;
-
-  public void Initialize()
-  {
-    messagingInitializer?.Initialize();
-  }
+    public void Initialize()
+    {
+        // Executes the captured messaging initialization logic
+        messagingInitializer?.InitializeAsync();
+    }
 }

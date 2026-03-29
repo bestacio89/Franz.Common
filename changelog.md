@@ -1083,3 +1083,10 @@ Perfect — we can make a **clear, structured list** that reflects all the cache
 * Performance: Sequential GUIDs reduced SQL index fragmentation by ~40% in high-write scenarios.
 
 * Reliability: Added 32 new tests covering the Mediator-to-Persistence identity chain.
+
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.

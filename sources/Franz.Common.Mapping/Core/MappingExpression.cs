@@ -1,9 +1,9 @@
-﻿using System.Linq.Expressions;
+using System.Linq.Expressions;
 
 public class MappingExpression<TSource, TDestination>
 {
-  private readonly Dictionary<string, string> _memberBindings = new();
-  private readonly HashSet<string> _ignored = new();
+  private readonly Dictionary<string, string> _memberBindings = [];
+  private readonly HashSet<string> _ignored = [];
 
   // source-aware constructor
   internal Func<TSource, TDestination>? Constructor { get; private set; }

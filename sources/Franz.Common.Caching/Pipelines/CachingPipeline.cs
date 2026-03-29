@@ -17,18 +17,21 @@ public sealed class CachingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
   private readonly ICacheProvider _cache;
   private readonly ILogger<CachingPipeline<TRequest, TResponse>> _logger;
   private readonly ICacheKeyStrategy _keyStrategy;
-  private readonly MediatorCachingOptions _options;
+  private readonly IOptionsMonitor<MediatorCachingOptions> _optionsMonitor;
+  private readonly IEnumerable<ICacheMetadataProvider> _metadataProviders;
 
   public CachingPipeline(
       ICacheProvider cache,
-      IOptions<MediatorCachingOptions> options,
+      IOptionsMonitor<MediatorCachingOptions> optionsMonitor,
       ICacheKeyStrategy keyStrategy,
-      ILogger<CachingPipeline<TRequest, TResponse>> logger)
+      ILogger<CachingPipeline<TRequest, TResponse>> logger,
+      IEnumerable<ICacheMetadataProvider> metadataProviders) // Strategy injection
   {
     _cache = cache ?? throw new ArgumentNullException(nameof(cache));
     _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     _keyStrategy = keyStrategy ?? throw new ArgumentNullException(nameof(keyStrategy));
-    _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+    _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
+    _metadataProviders = metadataProviders;
   }
 
   public async Task<TResponse> Handle(
@@ -36,7 +39,10 @@ public sealed class CachingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
       Func<Task<TResponse>> next,
       CancellationToken cancellationToken = default)
   {
-    if (!_options.Enabled || (_options.ShouldCache != null && !_options.ShouldCache(request)))
+    var options = _optionsMonitor.CurrentValue;
+
+    // 1. Check Global Toggle & Strategy-based "ShouldCache"
+    if (!options.Enabled || options.BypassAll || _metadataProviders.Any(p => !p.ShouldCache(request)))
     {
       return await next();
     }
@@ -44,20 +50,26 @@ public sealed class CachingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
     var key = _keyStrategy.BuildKey(request);
     var sw = Stopwatch.StartNew();
 
-    // 🔹 Use GetOrSetAsync directly
+    // 2. Resolve TTL from Strategy or Fallback to Options Default
+    var customTtl = _metadataProviders
+        .Select(p => p.GetCustomTtl(request))
+        .FirstOrDefault(t => t.HasValue) ?? options.DefaultTtl;
+
+    // 3. Execution via Reactive Cache Provider
     var result = await _cache.GetOrSetAsync(
         key,
         async ct => await next(),
         new CacheOptions
         {
-          Expiration = _options.TtlSelector?.Invoke(request) ?? _options.DefaultTtl
+          DefaultAbsoluteExpiration = customTtl,
+          DefaultSlidingExpiration = options.DefaultSlidingExpiration,
         },
         cancellationToken
     );
 
     sw.Stop();
 
-    // 🔹 Metrics
+    // 🔹 Metrics (Native .NET 10 System.Diagnostics.Metrics)
     if (result.IsHit)
       CacheMetrics.Hits.Add(1);
     else
@@ -65,14 +77,14 @@ public sealed class CachingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
 
     CacheMetrics.LookupLatencyMs.Record(sw.Elapsed.TotalMilliseconds);
 
-    // 🔹 Logging
+    // 🔹 Structured Logging with Reactive Log Levels
     using (LogContext.PushProperty("FranzCorrelationId", MediatorContext.Current?.CorrelationId))
     using (LogContext.PushProperty("FranzPipeline", nameof(CachingPipeline<TRequest, TResponse>)))
     using (LogContext.PushProperty("FranzCacheKey", key))
     using (LogContext.PushProperty("FranzCacheHit", result.IsHit))
     {
       _logger.Log(
-          result.IsHit ? _options.LogHitLevel : _options.LogMissLevel,
+          result.IsHit ? options.LogHitLevel : options.LogMissLevel,
           "Cache {HitOrMiss} for {RequestType} in {Elapsed}ms",
           result.IsHit ? "HIT" : "MISS",
           typeof(TRequest).Name,

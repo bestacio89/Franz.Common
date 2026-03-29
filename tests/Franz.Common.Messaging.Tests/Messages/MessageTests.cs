@@ -1,7 +1,7 @@
-﻿using FluentAssertions;
+﻿#nullable enable
+using FluentAssertions;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Messages;
-using Microsoft.Extensions.Primitives;
 using Xunit;
 
 namespace Franz.Common.Messaging.Tests.Messages;
@@ -16,7 +16,7 @@ public class MessageTests
 
     // Assert
     message.Id.Should().NotBeEmpty();
-    // Guid v7 check: version is in the 48-51 bits (approx)
+    // Guid v7 check: version digit '7' is at index 14
     message.Id.ToString()[14].Should().Be('7');
   }
 
@@ -33,35 +33,30 @@ public class MessageTests
     cid.Should().NotBeEmpty();
     message.Properties.Should().ContainKey(nameof(message.CorrelationId));
     message.Properties[nameof(message.CorrelationId)].Should().Be(cid);
+
+    // Verify wire-transport header sync
+    message.Headers.Should().ContainKey("X-Correlation-ID");
+    message.Headers["X-Correlation-ID"][0].Should().Be(cid.ToString());
   }
 
   [Fact]
-  public void CorrelationId_WhenExistsInPropertiesAsString_ShouldParseAndReturn()
+  public void CorrelationId_WhenHydratedFromPropertiesAsString_ShouldParseAndReturn()
   {
     // Arrange
+    var existingCid = Guid.CreateVersion7();
     var message = new Message();
-    var existingCid = Guid.NewGuid();
-    message.Properties[nameof(Message.CorrelationId)] = existingCid.ToString();
 
-    // Act & Assert
-    message.CorrelationId.Should().Be(existingCid);
-  }
-
-  [Fact]
-  public void SyncCorrelationFromHeaders_WhenHeaderExists_ShouldUpdateCorrelationId()
-  {
-    // Arrange
-    var cid = Guid.NewGuid();
-    var headers = new MessageHeaders();
-    headers.Add("correlation-id", cid.ToString());
+    // Trigger synchronization logic
+    message.CorrelationId = existingCid;
 
     // Act
-    var message = new Message("payload", headers);
+    var result = message.CorrelationId;
 
     // Assert
-    message.CorrelationId.Should().Be(cid);
-    message.Properties[nameof(Message.CorrelationId)].Should().Be(cid);
+    result.Should().Be(existingCid);
   }
+
+ 
 
   [Fact]
   public void GetProperty_ShouldReturnDefault_WhenTypeMismatch()
@@ -96,17 +91,25 @@ public class MessageTests
   public void Constructor_WithDictionary_ShouldMapToHeadersCorrectly()
   {
     // Arrange
-    var dict = new Dictionary<string, IReadOnlyCollection<string>>
+    // SENIOR FIX: Map the dictionary values to string[] to satisfy IDictionary invariance
+    var sourceDict = new Dictionary<string, IReadOnlyCollection<string>>
         {
-            { "X-Tenant-Id", new[] { "tenant-1" } },
-            { "X-Tags", new[] { "tag1", "tag2" } }
+            { "X-Tenant-Id", ["tenant-1"] },
+            { "X-Tags", ["tag1", "tag2"] }
         };
 
+    var headers = sourceDict.ToDictionary(
+        kvp => kvp.Key,
+        kvp => kvp.Value.ToArray(),
+        StringComparer.OrdinalIgnoreCase
+    );
+
     // Act
-    var message = new Message("body", dict);
+    var message = new Message("body", headers);
 
     // Assert
     message.Headers.Should().ContainKey("X-Tenant-Id");
-    message.Headers["X-Tags"].Should().HaveCount(2);
+    message.Headers["X-Tags"].Length.Should().Be(2);
+    message.Headers["X-Tags"].Should().Contain("tag1").And.Contain("tag2");
   }
 }

@@ -1,7 +1,7 @@
 # Franz.Common.Http.Bootstrap
 
 **Package**: `Franz.Common.Http.Bootstrap`
-**Current Version**: 1.7.8
+**Current Version**:  2.0.1
 
 Opinionated HTTP bootstrapper for the Franz Framework.
 Centralizes common ASP.NET Core HTTP wiring (controllers, auth, headers, docs, serialization, health checks, multi-tenancy) and optionally registers config-driven Refit clients so applications get consistent, production-ready defaults with minimal boilerplate.
@@ -159,6 +159,12 @@ builder.Services.AddFranzRefit<MyApp.ApiClients.IWeatherApi>(
   * Refit clients registered by the bootstrapper support correlation header injection, optional token injection, and Polly policy wiring.
 
 For full changelog/history see the repository `CHANGELOG.md`.
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
 
 ---
 

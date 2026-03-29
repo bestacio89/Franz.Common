@@ -25,7 +25,7 @@ They operate transport-agnostically and integrate seamlessly with:
 
 ---
 
-## 🔖 **Current Version: 1.7.7**
+## 🔖 **Current Version: 2.0.1**
 
 ---
 
@@ -304,3 +304,9 @@ The Saga engine adheres to Franz’s core principles:
 ---
 
 
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
