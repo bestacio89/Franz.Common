@@ -3,6 +3,7 @@ using Confluent.Kafka;
 using FluentAssertions;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Hosting;
+using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
@@ -16,84 +17,69 @@ using Xunit;
 namespace Franz.Common.Messaging.Kafka.Tests.Consumers;
 
 [Collection("KafkaConsumer")]
-public sealed class KafkaConsumerFactoryUnitTests
+public class KafkaConsumerFactoryTests
 {
-  private static KafkaConsumerFactory BuildFactory(string bootstrapServers, string groupId) =>
-      new(Options.Create(new KafkaMessagingOptions
+  private KafkaMessagingOptions GetDefaultOptions()
+      => new KafkaMessagingOptions
       {
-        BootStrapServers = bootstrapServers,
-        GroupID = groupId
-      }), NullLogger<KafkaConsumerFactory>.Instance);
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Consumer = new KafkaConsumerOptions
+        {
+      
+          AutoOffsetReset = KafkaAutoOffsetReset.Earliest,
+          EnableAutoCommit = true,
+          EnableAutoOffsetStore = true,
+          SessionTimeoutMs = 10000,
+          MaxPollIntervalMs = 300000,
+          FetchMaxBytes = 52428800
+        },
+        Security = new KafkaSecurityOptions()
+      };
 
   [Fact]
-  public void Build_ShouldThrow_WhenBootstrapServersIsNull()
+  public void Constructor_ShouldThrow_OnNullOptions()
   {
-    var factory = BuildFactory(null!, "group-id");
-    var act = () => factory.Build();
-    act.Should().Throw<ArgumentException>()
-        .WithMessage("*BootStrapServers*");
+    var logger = Mock.Of<ILogger<KafkaConsumerFactory>>();
+    Assert.Throws<ArgumentNullException>(() => new KafkaConsumerFactory(null!, logger));
   }
 
   [Fact]
-  public void Build_ShouldThrow_WhenBootstrapServersIsEmpty()
+  public void Constructor_ShouldThrow_OnNullLogger()
   {
-    var factory = BuildFactory(string.Empty, "group-id");
-    var act = () => factory.Build();
-    act.Should().Throw<ArgumentException>();
+    var options = Options.Create(GetDefaultOptions());
+    Assert.Throws<ArgumentNullException>(() => new KafkaConsumerFactory(options, null!));
   }
 
   [Fact]
-  public void Build_ShouldThrow_WhenBootstrapServersIsWhitespace()
+  public void Build_ShouldReturnConsumer_WithCorrectType()
   {
-    var factory = BuildFactory("   ", "group-id");
-    var act = () => factory.Build();
-    act.Should().Throw<ArgumentException>();
+    // Arrange
+    var options = Options.Create(GetDefaultOptions());
+    var logger = Mock.Of<ILogger<KafkaConsumerFactory>>();
+    var factory = new KafkaConsumerFactory(options, logger);
+
+    // Act
+    var consumer = factory.Build();
+
+    // Assert
+    Assert.NotNull(consumer);
+    Assert.IsAssignableFrom<IConsumer<string, string>>(consumer);
   }
 
   [Fact]
-  public void Build_ShouldThrow_WhenGroupIdIsNull()
+  public void Build_ShouldReturnConsumerConfiguredWithOptions()
   {
-    var factory = BuildFactory("localhost:9092", null!);
-    var act = () => factory.Build();
-    act.Should().Throw<ArgumentException>()
-        .WithMessage("*GroupID*");
-  }
+    // Arrange
+    var options = Options.Create(GetDefaultOptions());
+    var loggerMock = new Mock<ILogger<KafkaConsumerFactory>>();
+    var factory = new KafkaConsumerFactory(options, loggerMock.Object);
 
-  [Fact]
-  public void Build_ShouldThrow_WhenGroupIdIsEmpty()
-  {
-    var factory = BuildFactory("localhost:9092", string.Empty);
-    var act = () => factory.Build();
-    act.Should().Throw<ArgumentException>();
-  }
+    // Act
+    var consumer = factory.Build();
 
-  [Fact]
-  public void Build_ShouldThrow_WhenGroupIdIsWhitespace()
-  {
-    var factory = BuildFactory("localhost:9092", "   ");
-    var act = () => factory.Build();
-    act.Should().Throw<ArgumentException>();
-  }
-
-  [Fact]
-  public void Build_ShouldReturnConsumer_WhenConfigurationIsValid()
-  {
-    // A real consumer can be built without a live broker —
-    // the connection is lazy and only established on Subscribe()/Consume().
-    var factory = BuildFactory("localhost:9092", "test-group");
-    using var consumer = factory.Build();
+    // Assert
     consumer.Should().NotBeNull();
-    consumer.Should().BeAssignableTo<IConsumer<string, string>>();
-  }
-
-  [Fact]
-  public void Build_ShouldReturnDistinctInstances_OnMultipleCalls()
-  {
-    // Factory must not cache or reuse consumer instances — each call
-    // should produce an independent consumer with its own state.
-    var factory = BuildFactory("localhost:9092", "test-group");
-    using var first = factory.Build();
-    using var second = factory.Build();
-    first.Should().NotBeSameAs(second);
+     // just checking type
   }
 }

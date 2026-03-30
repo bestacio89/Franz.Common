@@ -20,7 +20,7 @@
      <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
 
      <!-- OpenTelemetry API (your module annotates Activity.Current; host configures exporters) -->
-     <PackageReference Include="OpenTelemetry.Api" Version="1.15.0" />
+     <PackageReference Include="OpenTelemetry.Api" Version="1.15.1" />
      <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
     </ItemGroup>
   <Import Project="..\..\common.targets" />  

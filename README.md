@@ -309,17 +309,17 @@ dotnet test --filter Category=Integration
 ```
 
 ---
-🔹 Latest Release:  v2.0.1 – Internal Modernization
+🔹 Latest Release:  v2.0.2 – Kafka and Asyncronicity Overhaul
 
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
+- Overhaul of kafka using full Configurations.
+- Overhaul of the asyncronicity and KafkaMessagingOptions.
 - Tests, listeners, and pipeline components modernized.
 ---
 
 # 🛣️ Roadmap
 
 * Graphql Adapters and Implementations
-
+* SignalR adapters and Implementations
 ---
 
 # 🏢 Enterprise Adoption & Support

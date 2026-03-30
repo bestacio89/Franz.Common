@@ -1090,3 +1090,9 @@ Perfect — we can make a **clear, structured list** that reflects all the cache
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+## v2.0.2 – Kafka and Asyncronicity Overhaul
+
+- Overhaul of kafka using full Configurations.
+- Overhaul of the asyncronicity and KafkaMessagingOptions.
+- Tests, listeners, and pipeline components modernized.

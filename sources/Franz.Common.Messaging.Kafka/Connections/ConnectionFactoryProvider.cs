@@ -1,52 +1,75 @@
-#nullable enable
 using Confluent.Kafka;
-using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Kafka.Connections;
 using Microsoft.Extensions.Options;
 
-namespace Franz.Common.Messaging.Kafka.Connections;
-
-/// <summary>
-/// Provides Kafka Producer configuration based on MessagingOptions.
-/// Senior Note: Implements strict null-checking to support multi-transport (Kafka/RabbitMQ) environments.
-/// </summary>
-public sealed class ConnectionFactoryProvider(IOptions<KafkaMessagingOptions> messagingOptions)
-    : IConnectionFactoryProvider
+public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
 {
-  private readonly IOptions<KafkaMessagingOptions> _messagingOptions = messagingOptions;
+  private readonly KafkaMessagingOptions _options;
 
-  public ProducerConfig Current => GetCurrent();
-
-  public ProducerConfig GetCurrent()
+  public ConnectionFactoryProvider(IOptions<KafkaMessagingOptions> messagingOptions)
   {
-    var options = _messagingOptions.Value;
+    _options = messagingOptions?.Value ?? throw new ArgumentNullException(nameof(messagingOptions));
+  }
 
-    // --- ARCHITECTURAL FAIL-FAST LOGIC ---
-    // We prioritize BootStrapServers. If null, we fall back to HostName.
-    // If both are null, we throw an ArgumentException. 
-    // This prevents the "localhost" ghost from causing silent failures in RabbitMQ-only environments.
-    var bootstrapServers = options.BootStrapServers
-        ?? options.HostName
-        ?? throw new ArgumentException("Kafka BootstrapServers or HostName must be provided in MessagingOptions.");
+  public ProducerConfig Current => BuildProducerConfig();
 
+  private ProducerConfig BuildProducerConfig()
+  {
     return new ProducerConfig
     {
-      BootstrapServers = bootstrapServers,
+      BootstrapServers = _options.BootstrapServers,
+      ClientId = _options.ClientId,
+      Acks = MapAcks(_options.Producer.Acks),
+      EnableIdempotence = _options.Producer.EnableIdempotence,
+      MessageMaxBytes = _options.Producer.MessageMaxBytes,
+      LingerMs = _options.Producer.LingerMs,
+      BatchSize = _options.Producer.BatchSize,
+      CompressionType = MapCompression(_options.Producer.CompressionType),
 
-      // Security Mapping: Default to Plaintext if SslEnabled is null or false
-      SecurityProtocol = options.SslEnabled == true
-            ? SecurityProtocol.Ssl
-            : SecurityProtocol.Plaintext,
-
-      // SSL Credentials (only relevant if SecurityProtocol is Ssl)
-      SslCaLocation = options.SslCaLocation,
-      SslCertificateLocation = options.SslCertificateLocation,
-      SslKeyLocation = options.SslKeyLocation,
-
-      // --- .NET 10 / High-Throughput Standards ---
-      Acks = Acks.All,             // Ensure data safety
-      EnableIdempotence = true,    // Prevent duplicate messages on retry
-      LingerMs = 5,                // Optimize batching without significant latency
-      MessageTimeoutMs = 30000     // Standard 30s timeout
+      // Security
+      SecurityProtocol = MapSecurityProtocol(_options.Security.SecurityProtocol),
+      SaslMechanism = MapSaslMechanism(_options.Security.SaslMechanism),
+      SaslUsername = _options.Security.SaslUsername,
+      SaslPassword = _options.Security.SaslPassword,
+      SslCaLocation = _options.Security.SslCaLocation,
+      SslCertificateLocation = _options.Security.SslCertificateLocation,
+      SslKeyLocation = _options.Security.SslKeyLocation,
     };
   }
+
+  // --- Mappers ---
+  private static Acks MapAcks(KafkaAcks a) => a switch
+  {
+    KafkaAcks.None => Acks.None,
+    KafkaAcks.Leader => Acks.Leader,
+    _ => Acks.All
+  };
+
+  private static CompressionType MapCompression(KafkaCompressionType c) => c switch
+  {
+    KafkaCompressionType.Gzip => CompressionType.Gzip,
+    KafkaCompressionType.Lz4 => CompressionType.Lz4,
+    KafkaCompressionType.Zstd => CompressionType.Zstd,
+    KafkaCompressionType.None => CompressionType.None,
+    _ => CompressionType.Snappy
+  };
+
+  private static SecurityProtocol MapSecurityProtocol(KafkaSecurityProtocol p) => p switch
+  {
+    KafkaSecurityProtocol.Ssl => SecurityProtocol.Ssl,
+    KafkaSecurityProtocol.SaslPlaintext => SecurityProtocol.SaslPlaintext,
+    KafkaSecurityProtocol.SaslSsl => SecurityProtocol.SaslSsl,
+    _ => SecurityProtocol.Plaintext
+  };
+
+  private static SaslMechanism? MapSaslMechanism(KafkaSaslMechanism? m) => m switch
+  {
+    KafkaSaslMechanism.Plain => SaslMechanism.Plain,
+    KafkaSaslMechanism.ScramSha256 => SaslMechanism.ScramSha256,
+    KafkaSaslMechanism.ScramSha512 => SaslMechanism.ScramSha512,
+    KafkaSaslMechanism.Gssapi => SaslMechanism.Gssapi,
+    KafkaSaslMechanism.OAuthBearer => SaslMechanism.OAuthBearer,
+    _ => null
+  };
 }

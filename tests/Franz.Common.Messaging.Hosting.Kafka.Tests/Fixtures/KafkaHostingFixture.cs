@@ -80,8 +80,8 @@ public sealed class KafkaHostingFixture : IAsyncLifetime
     var configuration = new ConfigurationBuilder()
       .AddInMemoryCollection(new Dictionary<string, string?>
       {
-        ["Messaging:Kafka:BootStrapServers"] = BootstrapServers,
-        ["Messaging:Kafka:GroupID"] = groupId,
+        ["Messaging:Kafka:BootstrapServers"] = BootstrapServers,
+        ["Messaging:Kafka:GroupId"] = groupId,
         ["Mongo:ConnectionString"] = MongoConnectionString,
         ["Mongo:Database"] = MongoDatabaseName
       })
@@ -94,6 +94,7 @@ public sealed class KafkaHostingFixture : IAsyncLifetime
         services.AddLogging();
         services.AddSingleton<ITestProbe, TestProbe>();
         services.AddSingleton<ITestPipelineProbe, TestPipelineProbe>();
+        services.AddSingleton<IConfiguration>(configuration);
 
         // 🔹 Mediator
         services.AddFranzMediator(new[] { typeof(KafkaHostingFixture).Assembly });

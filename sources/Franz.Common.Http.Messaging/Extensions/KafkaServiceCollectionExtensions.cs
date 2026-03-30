@@ -12,9 +12,7 @@ using Franz.Common.Messaging.Kafka.Extensions;
     public static IServiceCollection AddKafkaMessagingInHttpContext(this IServiceCollection services, IConfiguration configuration)
     {
       services
-          .AddKafkaMessagingPublisher(configuration)
-          .AddKafkaMessagingSender(configuration)
-          .AddKafkaMessagingConsumer(configuration)
+          .AddKafkaMessaging(configuration)
           .AddKafkaMessagingTransactionPerHttpCall()
           .AddKafkaMessagingHealthCheck(); // Register health check
 

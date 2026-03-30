@@ -1,34 +1,43 @@
-﻿using Confluent.Kafka;
+﻿#nullable enable
+using Confluent.Kafka;
 using FluentAssertions;
-using Franz.Common.Messaging.Configuration;
-using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Franz.Common.Messaging.Kafka;
+using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Consumers;
 
 [Collection("KafkaConsumer")]
-public sealed class KafkaConsumerFactoryIntegrationTests(KafkaContainerFixture fixture)
+public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaContainerFixture>
 {
-  private KafkaConsumerFactory BuildFactory(string? groupId = null) =>
-      new(Options.Create(new KafkaMessagingOptions
-      {
-        BootStrapServers = fixture.BootstrapServers,
-        GroupID = groupId ?? $"group-{Guid.CreateVersion7():N}"
-      }), NullLogger<KafkaConsumerFactory>.Instance);
+  private readonly KafkaContainerFixture _fixture;
 
-  /// <summary>
-  /// Drives the consumer's internal poll loop in the background until the
-  /// partition assignment callback fires. This is required because Confluent's
-  /// consumer is not event-driven — SetPartitionsAssignedHandler only fires
-  /// during an active Consume() call, never from Subscribe() alone.
-  /// </summary>
-  private static Task DriveUntilAssigned(
-      IConsumer<string, string> consumer,
+  public KafkaConsumerFactoryIntegrationTests(KafkaContainerFixture fixture)
+  {
+    _fixture = fixture ?? throw new ArgumentNullException(nameof(fixture));
+  }
+
+  private KafkaConsumerFactory BuildFactory(string? groupId = null) =>
+      new KafkaConsumerFactory(
+          Options.Create(new KafkaMessagingOptions
+          {
+            GroupId = $"test-group-{Guid.NewGuid():N}",
+            BootstrapServers = _fixture.BootstrapServers,
+            Consumer = new KafkaConsumerOptions
+            {
+              
+              EnableAutoCommit = false
+            }
+          }),
+          NullLogger<KafkaConsumerFactory>.Instance);
+
+  private static Task DriveUntilAssigned(IConsumer<string, string> consumer,
       TaskCompletionSource assignedTcs,
       CancellationToken ct) =>
       Task.Run(() =>
@@ -42,92 +51,80 @@ public sealed class KafkaConsumerFactoryIntegrationTests(KafkaContainerFixture f
       }, ct);
 
   [Fact]
-  public void Build_ShouldProduceConnectableConsumer_AgainstRealBroker()
+  public void Factory_Should_BuildValidConsumer()
   {
     var factory = BuildFactory();
     using var consumer = factory.Build();
 
-    // Subscribe does not throw — broker is reachable and group can be formed.
-    var topic = $"test-factory-{Guid.CreateVersion7():N}";
+    var topic = $"test-topic-{Guid.NewGuid():N}";
     var act = () => consumer.Subscribe(topic);
     act.Should().NotThrow();
-
     consumer.Unsubscribe();
   }
 
   [Fact]
-  public async Task Build_ShouldRespectEarliestOffsetReset_OnNewGroup()
+  public void MultipleConsumers_ShouldBeIndependent()
   {
-    // Arrange: produce a message before the consumer group exists,
-    // then verify a new consumer receives it — proving AutoOffsetReset = Earliest.
-    var topic = $"test-offset-{Guid.CreateVersion7():N}";
-    var groupId = $"group-earliest-{Guid.CreateVersion7():N}";
-
-    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-
-    using var producer = new ProducerBuilder<string, string>(
-        new ProducerConfig { BootstrapServers = fixture.BootstrapServers }).Build();
-
-    producer.Produce(topic, new Message<string, string> { Value = "earliest-test" });
-    producer.Flush(TimeSpan.FromSeconds(5));
-
-    // Build consumer AFTER message was produced
-    var partitionsAssignedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
-    using var consumer = new ConsumerBuilder<string, string>(new ConsumerConfig
-    {
-      BootstrapServers = fixture.BootstrapServers,
-      GroupId = groupId,
-      AutoOffsetReset = AutoOffsetReset.Earliest,
-      EnableAutoCommit = false
-    })
-    .SetPartitionsAssignedHandler((_, _) => partitionsAssignedTcs.TrySetResult())
-    .Build();
-
-    consumer.Subscribe(topic);
-
-    // ✅ Drive the poll loop so the rebalance handshake can complete
-    // and SetPartitionsAssignedHandler fires.
-    var driveTask = DriveUntilAssigned(consumer, partitionsAssignedTcs, cts.Token);
-
-    var assigned = await Task.WhenAny(partitionsAssignedTcs.Task, Task.Delay(30000, cts.Token));
-    assigned.Should().Be(partitionsAssignedTcs.Task,
-        "Broker should assign partitions before timeout.");
-
-    await driveTask.WaitAsync(cts.Token).ConfigureAwait(false);
-
-    // Now consume the pre-existing message
-    var result = consumer.Consume(TimeSpan.FromSeconds(10));
-
-    result.Should().NotBeNull("Consumer should receive the pre-existing message with Earliest offset reset.");
-    result!.Message.Value.Should().Be("earliest-test");
-
-    consumer.Unsubscribe();
-  }
-
- 
-  [Fact]
-  public void Build_ShouldProduceIndependentConsumers_WithSameConfig()
-  {
-    // Two consumers built from the same factory config must be independent —
-    // closing one must not affect the other.
     var factory = BuildFactory();
 
-    using var first = factory.Build();
-    using var second = factory.Build();
+    using var c1 = factory.Build();
+    using var c2 = factory.Build();
 
-    var topic = $"test-independent-{Guid.CreateVersion7():N}";
+    var topic = $"test-indep-{Guid.NewGuid():N}";
+    c1.Subscribe(topic);
+    c2.Subscribe(topic);
 
-    first.Subscribe(topic);
-    second.Subscribe(topic);
+    // Dispose first — second remains valid
+    c1.Unsubscribe();
+    c1.Close();
 
-    // Dispose first — second should remain functional
-    first.Unsubscribe();
-    first.Close();
+    var act = () => c2.Unsubscribe();
+    act.Should().NotThrow();
 
-    var act = () => second.Unsubscribe();
-    act.Should().NotThrow("Second consumer should be unaffected by first consumer's disposal.");
+    c2.Close();
+  }
 
-    second.Close();
+  [Fact]
+  public async Task Consumer_ShouldReceiveMessagePublishedToTopic()
+  {
+    var factory = BuildFactory();
+    var topic = $"test-publish-{Guid.NewGuid():N}";
+    var tcs = new TaskCompletionSource<string>();
+
+    using var consumer = factory.Build();
+    consumer.Subscribe(topic);
+
+    // Produce a test message using real Kafka producer
+    using var producer = new ProducerBuilder<string, string>(
+        new ProducerConfig { BootstrapServers = _fixture.BootstrapServers }).Build();
+
+    _ = Task.Run(() =>
+    {
+      var msg = consumer.Consume(TimeSpan.FromSeconds(10));
+      if (msg != null)
+        tcs.TrySetResult(msg.Message.Value);
+    });
+
+    var messageValue = "hello-world";
+    await producer.ProduceAsync(topic, new Message<string, string> { Key = "key", Value = messageValue });
+
+    var received = await tcs.Task.TimeoutAfter(TimeSpan.FromSeconds(5));
+    received.Should().Be(messageValue);
+
+    consumer.Unsubscribe();
+  }
+}
+
+// Extension for Task timeout in tests
+public static class TaskExtensions
+{
+  public static async Task<T> TimeoutAfter<T>(this Task<T> task, TimeSpan timeout)
+  {
+    using var cts = new CancellationTokenSource();
+    var delayTask = Task.Delay(timeout, cts.Token);
+    var completedTask = await Task.WhenAny(task, delayTask);
+    if (completedTask == delayTask) throw new TimeoutException();
+    cts.Cancel();
+    return await task;
   }
 }

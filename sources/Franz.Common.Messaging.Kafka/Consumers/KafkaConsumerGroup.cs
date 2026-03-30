@@ -1,83 +1,135 @@
 #nullable enable
 using Confluent.Kafka;
 using Franz.Common.Messaging.Configuration;
-using Microsoft.Extensions.Options;
+using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.KafKa.Consumers.Interfaces;
+using Microsoft.Extensions.Options;
+using System;
+using System.Threading;
 
 namespace Franz.Common.Messaging.KafKa.Consumers;
 
 /// <summary>
-/// Manages a persistent Kafka Consumer instance for a specific GroupID.
-/// Senior Note: Uses Lazy initialization to prevent DI container failure during construction.
+/// Represents a Kafka consumer group with proper disposal and fallback group ID logic.
 /// </summary>
 public sealed class KafkaConsumerGroup : IConsumerGroup, IAsyncDisposable, IDisposable
 {
   private readonly IConsumer<Ignore, string> _consumer;
   private bool _disposed;
 
+  /// <summary>
+  /// The effective GroupId used by this consumer group.
+  /// </summary>
+  public string GroupId { get; }
+
   public KafkaConsumerGroup(IOptions<KafkaMessagingOptions> messagingOptions)
   {
-    var options = messagingOptions.Value;
+    var options = messagingOptions?.Value ?? throw new ArgumentNullException(nameof(messagingOptions));
 
-    // --- THE ARCHITECTURAL GUARD ---
-    if (string.IsNullOrWhiteSpace(options.BootStrapServers))
-    {
+    if (string.IsNullOrWhiteSpace(options.BootstrapServers))
       throw new ArgumentException("Kafka BootstrapServers must be configured.", nameof(messagingOptions));
-    }
+
+    var consumerOptions = options.Consumer;
+
+    // Compute GroupId: fallback if null or empty
+    GroupId = string.IsNullOrWhiteSpace(options.GroupId)
+        ? $"franz-group-{Guid.NewGuid():N}"
+        : options.GroupId;
 
     var config = new ConsumerConfig
     {
-      BootstrapServers = options.BootStrapServers,
-      GroupId = options.GroupID ?? $"franz-group-{Guid.NewGuid():N}",
-      AutoOffsetReset = AutoOffsetReset.Earliest,
-      EnableAutoCommit = true,
-      SessionTimeoutMs = 6000,
-      // Optimization for .NET 10
+      BootstrapServers = options.BootstrapServers,
+      GroupId = GroupId,
+      AutoOffsetReset = consumerOptions.AutoOffsetReset switch
+      {
+        KafkaAutoOffsetReset.Latest => AutoOffsetReset.Latest,
+        KafkaAutoOffsetReset.None => AutoOffsetReset.Error,
+        _ => AutoOffsetReset.Earliest
+      },
+      EnableAutoCommit = consumerOptions.EnableAutoCommit,
+      SessionTimeoutMs = consumerOptions.SessionTimeoutMs,
+      MaxPollIntervalMs = consumerOptions.MaxPollIntervalMs,
+      FetchMaxBytes = consumerOptions.FetchMaxBytes,
       AllowAutoCreateTopics = true
     };
 
     _consumer = new ConsumerBuilder<Ignore, string>(config).Build();
   }
 
+  /// <summary>
+  /// Subscribes to a Kafka topic.
+  /// </summary>
+  /// <param name="topic">The topic name.</param>
   public void Subscribe(string topic)
   {
-    ObjectDisposedException.ThrowIf(_disposed, this);
+    ThrowIfDisposed();
     _consumer.Subscribe(topic);
   }
 
+  /// <summary>
+  /// Unsubscribes from all topics.
+  /// </summary>
   public void Unsubscribe()
   {
-    ObjectDisposedException.ThrowIf(_disposed, this);
+    ThrowIfDisposed();
     _consumer.Unsubscribe();
   }
 
+  /// <summary>
+  /// Returns the underlying Kafka consumer instance.
+  /// </summary>
   public IConsumer<Ignore, string> CreateConsumer()
   {
-    ObjectDisposedException.ThrowIf(_disposed, this);
+    ThrowIfDisposed();
     return _consumer;
   }
 
-  public async ValueTask DisposeAsync()
+  /// <summary>
+  /// Synchronously disposes the consumer and closes the connection.
+  /// </summary>
+  public void Dispose()
   {
     if (_disposed) return;
 
-    // Senior Note: We must Close() before Dispose() to ensure the group coordinator 
-    // is notified and rebalance is triggered immediately for other members.
-    await Task.Run(() =>
+    try
     {
       _consumer.Close();
-      _consumer.Dispose();
-    }).ConfigureAwait(false);
+    }
+    catch
+    {
+      // Swallow exceptions on dispose
+    }
 
+    _consumer.Dispose();
     _disposed = true;
     GC.SuppressFinalize(this);
   }
 
-  public void Dispose()
+  /// <summary>
+  /// Asynchronously disposes the consumer.
+  /// </summary>
+  public ValueTask DisposeAsync()
   {
-    if (_disposed) return;
-    _consumer.Close();
+    if (_disposed) return ValueTask.CompletedTask;
+
+    try
+    {
+      _consumer.Close();
+    }
+    catch
+    {
+      // Swallow exceptions on dispose
+    }
+
     _consumer.Dispose();
     _disposed = true;
+    GC.SuppressFinalize(this);
+    return ValueTask.CompletedTask;
+  }
+
+  private void ThrowIfDisposed()
+  {
+    if (_disposed)
+      throw new ObjectDisposedException(nameof(KafkaConsumerGroup));
   }
 }

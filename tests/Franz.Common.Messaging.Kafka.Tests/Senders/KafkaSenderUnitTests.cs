@@ -1,14 +1,13 @@
-﻿using FluentAssertions;
-using Franz.Common.Messaging.Configuration;
+﻿#nullable enable
+using Confluent.Kafka;
+using FluentAssertions;
 using Franz.Common.Messaging.Kafka.Senders;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Senders;
@@ -16,18 +15,24 @@ namespace Franz.Common.Messaging.Kafka.Tests.Senders;
 [Collection("KafkaSender")]
 public sealed class KafkaSenderUnitTests
 {
-  private static KafkaSender BuildSender(string bootstrapServers = "localhost:9092")
+  private static KafkaSender BuildSender()
   {
     var mockAssembly = new Mock<IAssembly>();
     mockAssembly.Setup(a => a.Name).Returns("Company.Test.Api");
-    mockAssembly.Setup(a => a.Assembly).Returns(typeof(KafkaSender).Assembly);
 
     var mockAccessor = new Mock<IAssemblyAccessor>();
     mockAccessor.Setup(a => a.GetEntryAssembly()).Returns(mockAssembly.Object);
 
+    // Deep Refactoring: The Sender no longer requires IOptions<KafkaMessagingOptions>.
+    // We mock the IProducer natively, confirming the DI container's ownership of the transport lifecycle.
+    var mockProducer = new Mock<IProducer<string, byte[]>>();
+
+    var mockSerializer = new Mock<IMessageSerializer>();
+    mockSerializer.Setup(s => s.Serialize(It.IsAny<object>())).Returns("{}");
+
     return new KafkaSender(
-        Options.Create(new KafkaMessagingOptions { BootStrapServers = bootstrapServers }),
-        new JsonMessageSerializer(),
+        mockProducer.Object,
+        mockSerializer.Object,
         mockAccessor.Object,
         NullLogger<KafkaSender>.Instance);
   }
@@ -52,7 +57,7 @@ public sealed class KafkaSenderUnitTests
   public void Dispose_ShouldNotThrow_WhenCalledTwice()
   {
     // Idempotent dispose — calling twice must not throw even though
-    // the underlying producer is already disposed on the first call.
+    // the underlying producer lifecycle is now managed by the DI container.
     var sender = BuildSender();
     sender.Dispose();
     var act = () => sender.Dispose();

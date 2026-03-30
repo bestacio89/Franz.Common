@@ -1,6 +1,7 @@
 ﻿#nullable enable
 using Confluent.Kafka;
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.Kafka.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -20,15 +21,15 @@ public sealed class KafkaConsumerProvider(
 
     // --- THE ARCHITECTURAL GUARD ---
     // Prevents the native client from spinning up if the config is invalid.
-    if (string.IsNullOrWhiteSpace(options.BootStrapServers))
+    if (string.IsNullOrWhiteSpace(options.BootstrapServers))
     {
       throw new ArgumentException("Kafka BootstrapServers must be configured in MessagingOptions.", nameof(messagingOptions));
     }
 
     var config = new ConsumerConfig
     {
-      BootstrapServers = options.BootStrapServers,
-      GroupId = options.GroupID ?? $"franz-consumer-{Guid.NewGuid():N}",
+      BootstrapServers = options.BootstrapServers,
+      GroupId = options.GroupId ?? $"franz-consumer-{Guid.NewGuid():N}",
       AutoOffsetReset = AutoOffsetReset.Earliest,
       EnableAutoCommit = true,
       StatisticsIntervalMs = 5000,

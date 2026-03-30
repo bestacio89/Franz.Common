@@ -1,34 +1,24 @@
-#nullable enable
+﻿#nullable enable
 using Confluent.Kafka;
-using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System.Text;
+using System.Threading;
 
 namespace Franz.Common.Messaging.Kafka.Senders;
 
 public sealed class KafkaSender(
-    IOptions<KafkaMessagingOptions> messagingOptions,
+    IProducer<string, byte[]> producer,
     IMessageSerializer serializer,
     IAssemblyAccessor assemblyAccessor,
-    ILogger<KafkaSender> logger) : IMessagingSender, IAsyncDisposable, IDisposable
+    ILogger<KafkaSender> logger)
+    : IMessagingSender, IAsyncDisposable, IDisposable
 {
-  private readonly IProducer<string, string> _producer = new ProducerBuilder<string, string>(
-      new ProducerConfig
-      {
-        BootstrapServers = messagingOptions.Value.BootStrapServers,
-        EnableIdempotence = true,
-        Acks = Acks.All,
-        MessageSendMaxRetries = int.MaxValue
-      }).Build();
+  private int _disposed;
 
-  private int _disposed = 0;
-
-  // Senior Architect Note: Using ValueTask to reduce heap allocations on the messaging hot-path.
-  public async ValueTask SendAsync(Message message, CancellationToken cancellationToken = default)
+  public async ValueTask SendAsync(Message message, CancellationToken ct = default)
   {
     ArgumentNullException.ThrowIfNull(message);
 
@@ -37,63 +27,123 @@ public sealed class KafkaSender(
 
     try
     {
-      var kafkaMessage = new Message<string, string>
+      // 🔥 HOT PATH OPTIMIZATION
+      var payload = Serialize(message);
+
+      var kafkaMessage = new Message<string, byte[]>
       {
         Key = message.CorrelationId.ToString(),
-        Value = serializer.Serialize(message.Body),
-        Headers = new Confluent.Kafka.Headers()
+        Value = payload,
+        Headers = BuildHeaders(message)
       };
-
-      // Mapping Architectural Headers
-      kafkaMessage.Headers.Add("X-Message-ID", Encoding.UTF8.GetBytes(message.Id.ToString()));
-
-      foreach (var header in message.Headers)
-      {
-        foreach (var value in header.Value)
-        {
-          if (value is not null)
-          {
-            kafkaMessage.Headers.Add(header.Key, Encoding.UTF8.GetBytes(value));
-          }
-        }
-      }
 
       var topic = TopicNamer.GetTopicName(assemblyAccessor.GetEntryAssembly());
 
-      // Kafka Client's ProduceAsync returns a Task, which is safely wrapped by ValueTask
-      await _producer.ProduceAsync(topic, kafkaMessage, cancellationToken);
+      var result = await producer
+          .ProduceAsync(topic, kafkaMessage, ct)
+          .ConfigureAwait(false);
 
-      logger.LogDebug("[Franz.Messaging] Produced message {MessageId} to {Topic}",
-          message.Id, topic);
+      // 🔍 Delivery insight (VERY useful in prod)
+      logger.LogDebug(
+          "[Kafka] Delivered {MessageId} to {Topic} [Partition: {Partition}, Offset: {Offset}]",
+          message.Id,
+          result.Topic,
+          result.Partition.Value,
+          result.Offset.Value);
+    }
+    catch (ProduceException<string, byte[]> ex)
+    {
+      logger.LogError(ex,
+          "[Kafka] Produce failure {MessageId} | Reason: {Reason}",
+          message.Id,
+          ex.Error.Reason);
+
+      throw;
     }
     catch (Exception ex)
     {
-      logger.LogError(ex, "[Franz.Messaging] Failed to produce message {MessageId}",
+      logger.LogError(ex,
+          "[Kafka] Unexpected error producing {MessageId}",
           message.Id);
+
       throw;
     }
   }
 
+  // =========================
+  // 🔥 HOT PATH HELPERS
+  // =========================
+
+  private byte[] Serialize(Message message)
+  {
+    var str = serializer.Serialize(message.Body);
+
+    if (string.IsNullOrEmpty(str))
+      return Array.Empty<byte>();
+
+    return Encoding.UTF8.GetBytes(str);
+  }
+
+  private static Confluent.Kafka.Headers BuildHeaders(Message message)
+  {
+    var headers = new Confluent.Kafka.Headers
+    {
+      { "X-Message-ID", Encoding.UTF8.GetBytes(message.Id.ToString()) }
+    };
+
+    foreach (var (key, values) in message.Headers)
+    {
+      foreach (var value in values)
+      {
+        if (value is not null)
+        {
+          headers.Add(key, Encoding.UTF8.GetBytes(value));
+        }
+      }
+    }
+
+    return headers;
+  }
+
+  // =========================
+  // 🧹 LIFECYCLE
+  // =========================
+
   public async ValueTask DisposeAsync()
   {
-    if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+    if (Interlocked.Exchange(ref _disposed, 1) == 1)
+      return;
 
-    await Task.Run(() =>
+    try
     {
-      _producer.Flush(TimeSpan.FromSeconds(10));
-      _producer.Dispose();
-    });
+      // 🔥 Ensure messages are flushed before shutdown
+      producer.Flush(TimeSpan.FromSeconds(5));
+    }
+    catch
+    {
+      // swallow — shutdown path
+    }
 
+    producer.Dispose();
     GC.SuppressFinalize(this);
+
+    await ValueTask.CompletedTask;
   }
 
   public void Dispose()
   {
-    if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+    if (Interlocked.Exchange(ref _disposed, 1) == 1)
+      return;
 
-    _producer.Flush(TimeSpan.FromSeconds(10));
-    _producer.Dispose();
+    try
+    {
+      producer.Flush(TimeSpan.FromSeconds(5));
+    }
+    catch
+    {
+    }
 
+    producer.Dispose();
     GC.SuppressFinalize(this);
   }
 }

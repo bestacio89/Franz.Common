@@ -3,6 +3,7 @@ using Franz.Common.Messaging.Hosting.Kafka.HostedServices;
 using Franz.Common.Messaging.Outbox;
 using Franz.Common.Messaging.Hosting.Listeners;
 using Microsoft.Extensions.DependencyInjection;
+using Franz.Common.Messaging.Kafka.Configuration;
 
 namespace Franz.Common.Messaging.Hosting.Kafka;
 

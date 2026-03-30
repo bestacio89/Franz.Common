@@ -222,7 +222,7 @@ Kafka is treated as a **transport**, not an execution model.
 
 ## 🧾 Versioning & Changelog
 
-### **Current Version**:  2.0.1
+### **Current Version**:  2.0.2
 
 ### **Version 1.7.01**
 
@@ -234,9 +234,10 @@ Kafka is treated as a **transport**, not an execution model.
 * 🧪 Improved Testcontainers and CI reliability
 
 
-### v2.0.1 – Internal Modernization
+### v2.0.2 – Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- Full granular control of KafkaMessagingOptions.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
 

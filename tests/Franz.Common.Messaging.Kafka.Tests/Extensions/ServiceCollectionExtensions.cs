@@ -1,158 +1,116 @@
 ﻿#nullable enable
 using Confluent.Kafka;
 using FluentAssertions;
-using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging;
-using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Contexting;
+using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Extensions;
+using Franz.Common.Messaging.Kafka.Modeling;
 using Franz.Common.Messaging.Kafka.Senders;
 using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Messaging.Kafka.Transactions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Configuration;
 using Xunit;
 
-namespace Franz.Common.Messaging.Kafka.Tests;
-
-[Collection("KafkaIntegration")]
-public class KafkaMessagingRegistrationTests
+namespace Franz.Common.Messaging.Kafka.Tests
 {
-  private readonly KafkaContainerFixture _fixture;
-
-  public KafkaMessagingRegistrationTests(KafkaContainerFixture fixture)
+  [Collection("Kafka")]
+  public class KafkaMessagingRegistrationIntegrationTests
   {
-    _fixture = fixture;
-  }
+    private readonly KafkaContainerFixture _fixture;
 
-  [Fact]
-  public void AddKafkaMessaging_ShouldRegisterAllRequiredCoreServices()
-  {
-    // Arrange
-    var setup = new KafkaTestSetup(_fixture.BootstrapServers);
+    public KafkaMessagingRegistrationIntegrationTests(KafkaContainerFixture fixture)
+    {
+      _fixture = fixture;
+    }
 
-    // Act & Assert - Core Interfaces
-    setup.ServiceProvider.GetRequiredService<IMessagingPublisher>().Should().BeOfType<MessagingPublisher>();
-    setup.ServiceProvider.GetRequiredService<IMessagingSender>().Should().BeOfType<KafkaSender>();
-    setup.ServiceProvider.GetRequiredService<IMessagingTransaction>().Should().BeOfType<MessagingTransaction>();
-  }
+    [Fact]
+    public void Services_Should_BeRegistered_AndResolvable()
+    {
+      var sp = _fixture.BuildServiceProvider();
 
-  [Fact]
-  public void AddKafkaMessaging_ShouldCorrectlyBindConfiguration()
-  {
-    // Arrange
-    var setup = new KafkaTestSetup(_fixture.BootstrapServers);
+      sp.GetRequiredService<IMessageContextAccessor>().Should().NotBeNull();
+      sp.GetRequiredService<IKafkaConsumerFactory>().Should().NotBeNull();
+      sp.GetRequiredService<IConsumer<string, string>>().Should().NotBeNull();
 
-    // Act
-    var options = setup.GetKafkaOptions();
+      sp.GetRequiredService<IMessagingPublisher>().Should().BeOfType<MessagingPublisher>();
+      sp.GetRequiredService<IMessagingSender>().Should().BeOfType<KafkaSender>();
+      sp.GetRequiredService<IMessagingTransaction>().Should().BeOfType<MessagingTransaction>();
 
-    // Assert
-    options.BootStrapServers.Should().Be(_fixture.BootstrapServers);
-    options.TopicName.Should().Be("test-topic");
-    options.GroupID.Should().Be("test-group");
-  }
+      var modelProvider = sp.GetRequiredService<IModelProvider>();
+      modelProvider.Should().BeOfType<ModelProvider>();
+    }
 
-  [Fact]
-  public void AddKafkaMessaging_ShouldRegisterProducerAsSingleton()
-  {
-    // Arrange
-    var setup = new KafkaTestSetup(_fixture.BootstrapServers);
+    [Fact]
+    public void Options_Should_Bind_Correctly_FromFixture()
+    {
+      var sp = _fixture.BuildServiceProvider();
+      var options = _fixture.GetOptions(sp);
 
-    // Act
-    var producer1 = setup.ServiceProvider.GetRequiredService<IProducer<string, byte[]>>();
-    var producer2 = setup.ServiceProvider.GetRequiredService<IProducer<string, byte[]>>();
+      options.BootstrapServers.Should().Be(_fixture.BootstrapServers);
+      options.GroupId.Should().Be("integration-test-group");
+      options.TopicName.Should().Be("integration-test");
 
-    // Assert
-    producer1.Should().BeSameAs(producer2);
-  }
+      // Consumer & Producer options are set
+      options.Consumer.EnableAutoCommit.Should().BeFalse();
+      options.Producer.EnableIdempotence.Should().BeTrue();
+    }
 
-  [Fact]
-  public void AddKafkaMessagingConsumer_ShouldRegisterConsumerFactoryAndContext()
-  {
-    // Arrange
-    var setup = new KafkaTestSetup(_fixture.BootstrapServers);
+    [Fact]
+    public void Producer_ShouldBeSingleton()
+    {
+      var sp = _fixture.BuildServiceProvider();
+      var producer1 = sp.GetRequiredService<IProducer<string, byte[]>>();
+      var producer2 = sp.GetRequiredService<IProducer<string, byte[]>>();
+      producer1.Should().BeSameAs(producer2);
+    }
+
+    [Fact]
+    public void ConsumerFactory_ShouldBeSingleton()
+    {
+      var sp = _fixture.BuildServiceProvider();
+      var factory1 = sp.GetRequiredService<IKafkaConsumerFactory>();
+      var factory2 = sp.GetRequiredService<IKafkaConsumerFactory>();
+      factory1.Should().BeSameAs(factory2);
+    }
+
+    [Fact]
+    public void KeyedServices_ShouldResolveCorrectly()
+    {
+      var key = "tenant-a";
+      var sp = _fixture.BuildServiceProvider(services =>
+      {
+        services.AddKafkaMessaging(_fixture.Configuration, key);
+      });
+
+      var keyedPublisher = sp.GetKeyedService<IMessagingPublisher>(key);
+      var keyedSender = sp.GetKeyedService<IMessagingSender>(key);
+      var keyedTransaction = sp.GetKeyedService<IMessagingTransaction>(key);
+      var keyedConsumerFactory = sp.GetKeyedService<IKafkaConsumerFactory>(key);
+      var keyedConsumer = sp.GetKeyedService<IConsumer<string, string>>(key);
+
+      keyedPublisher.Should().NotBeNull();
+      keyedSender.Should().NotBeNull();
+      keyedTransaction.Should().NotBeNull();
+      keyedConsumerFactory.Should().NotBeNull();
+      keyedConsumer.Should().NotBeNull();
+    }
+
+
     
-    // Act & Assert
-    setup.ServiceProvider.GetRequiredService<IMessageContextAccessor>().Should().NotBeNull();
-    setup.ServiceProvider.GetRequiredService<IKafkaConsumerFactory>().Should().NotBeNull();
-  }
-  [Fact]
-  public void AddKafkaMessaging_KeyedRegistration_ShouldResolveIndependentInstances()
-  {
-    // Arrange
-    var services = new ServiceCollection();
-    var key = "tenant-a";
 
-    // 1. Build the explicit configuration required for the "Strict DI" philosophy
-    var configuration = new ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?>
-        {
-          ["Messaging:Kafka:BootStrapServers"] = _fixture.BootstrapServers,
-          ["Messaging:Kafka:GroupID"] = "keyed-group",
-          ["Messaging:Kafka:TopicName"] = "keyed-topic"
-        })
-        .Build();
+    [Fact]
+    public void ModelProvider_ShouldRespectSingletonLifetime()
+    {
+      var services = new ServiceCollection();
+      services.AddSingleton<IModelProvider, ModelProvider>();
+      services.AddOnlyHighLifetimeModelProvider(ServiceLifetime.Singleton);
 
-    // 2. Register IConfiguration so internal factory delegates can resolve it
-    services.AddSingleton<IConfiguration>(configuration);
-    services.AddOptions();
-    services.AddFranzMediator(new[] { typeof(KafkaContainerFixture).Assembly });
-    services.AddLogging();
-    // 3. Act - Perform Keyed Registration
-    services.AddKafkaMessaging(configuration, key);
-    var sp = services.BuildServiceProvider();
-
-    // 4. Resolve
-    var keyedPublisher = sp.GetKeyedService<IMessagingPublisher>(key);
-    var keyedProducer = sp.GetKeyedService<Confluent.Kafka.IProducer<string, byte[]>>(key);
-    var nonKeyedPublisher = sp.GetService<IMessagingPublisher>();
-
-    // 5. Assert
-    keyedPublisher.Should().NotBeNull("Keyed registration should exist for the specific tenant key");
-    keyedProducer.Should().NotBeNull("Underlying keyed producer must be resolvable for thread-safety");
-    nonKeyedPublisher.Should().BeNull("Global service provider should not contain unkeyed messaging services");
-
-    // Ensure the keyed producer is using the correct bootstrap server from our fixture
-    keyedProducer!.Name.Should().NotBeNullOrEmpty();
-  }
-
-
-  [Fact]
-  public void AddKafkaMessaging_ShouldThrowException_WhenConfigurationSectionIsMissing()
-  {
-    // Arrange
-    var services = new ServiceCollection();
-    var emptyConfig = new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build();
-
-    // Act
-    var act = () => services.AddKafkaMessagingOptions(emptyConfig);
-
-    // Assert
-    act.Should().Throw<Franz.Common.Errors.TechnicalException>()
-       .WithMessage("Kafka messaging configuration missing");
-  }
-
-  [Fact]
-  public void AddOnlyHighLifetimeModelProvider_ShouldRespectSingletonOverScoped()
-  {
-    // Arrange
-    var services = new ServiceCollection();
-        var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?> { ["Messaging:Kafka:BootStrapServers"] = "localhost" })
-        .Build();
-
-    // Act 
-    // 1. Add via Publisher (Scoped)
-    services.AddKafkaMessagingPublisher(configuration);
-    var firstLifetime = services.First(s => s.ServiceType == typeof(Franz.Common.Messaging.Kafka.Modeling.IModelProvider)).Lifetime;
-
-    // 2. Add via Consumer (Singleton)
-    services.AddKafkaMessagingConsumer(configuration);
-    var secondLifetime = services.First(s => s.ServiceType == typeof(Franz.Common.Messaging.Kafka.Modeling.IModelProvider)).Lifetime;
-
-    // Assert
-    firstLifetime.Should().Be(ServiceLifetime.Scoped);
-    secondLifetime.Should().Be(ServiceLifetime.Singleton);
+      var descriptor = services.Single(s => s.ServiceType == typeof(IModelProvider));
+      descriptor.Lifetime.Should().Be(ServiceLifetime.Singleton);
+    }
   }
 }

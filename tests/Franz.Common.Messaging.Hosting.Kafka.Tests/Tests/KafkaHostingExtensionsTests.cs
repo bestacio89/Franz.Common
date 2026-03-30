@@ -12,6 +12,7 @@ using Microsoft.Extensions.Hosting;
 using Xunit;
 using Franz.Common.MongoDB.Extensions;
 using Franz.Common.Messaging.Hosting.Kafka.Tests.Fixtures;
+using Franz.Common.Messaging.Kafka.Configuration;
 
 namespace Franz.Common.Messaging.Hosting.Kafka.Tests.ServiceCollections;
 
@@ -33,8 +34,8 @@ public sealed class KafkaHostingExtensionsTests
     return new ConfigurationBuilder()
       .AddInMemoryCollection(new Dictionary<string, string?>
       {
-        ["Messaging:Kafka:BootStrapServers"] = _kafka.BootstrapServers,
-        ["Messaging:KafKa:GroupID"] = $"franz-test-group-{Guid.NewGuid():N}"
+        ["Messaging:Kafka:BootstrapServers"] = _kafka.BootstrapServers,
+        ["Messaging:Kafka:GroupId"] = $"franz-test-group-{Guid.NewGuid():N}"
       })
       .Build();
   }
@@ -47,9 +48,12 @@ public sealed class KafkaHostingExtensionsTests
   public void AddKafkaHostedListener_registers_listener_and_hosted_service()
   {
     var services = new ServiceCollection();
+   
     var configuration = BuildKafkaConfiguration();
 
-    // 🔑 REQUIRED INFRA (same philosophy as RabbitMQ)
+    // 🔑 REQUIRED INFRA (same philosophy as RabbitMQ
+    
+    services.AddSingleton<IConfiguration>(BuildKafkaConfiguration());
     services.AddLogging();
     services.AddMessagingSerialization();
     services.AddKafkaMessaging(configuration);
@@ -83,8 +87,8 @@ public sealed class KafkaHostingExtensionsTests
 
     services.AddKafkaHostedListener(opts =>
     {
-      opts.BootStrapServers = "kafka-test:9092";
-      opts.GroupID = "group-test";
+      opts.BootstrapServers = "kafka-test:9092";
+      opts.GroupId = "group-test";
     });
 
     var provider = services.BuildServiceProvider();
@@ -92,8 +96,8 @@ public sealed class KafkaHostingExtensionsTests
     var options = provider.GetRequiredService<
       Microsoft.Extensions.Options.IOptions<KafkaMessagingOptions>>().Value;
 
-    Assert.Equal("kafka-test:9092", options.BootStrapServers);
-    Assert.Equal("group-test", options.GroupID);
+    Assert.Equal("kafka-test:9092", options.BootstrapServers);
+    Assert.Equal("group-test", options.GroupId);
   }
 
   // ------------------------------------------------------------
@@ -109,7 +113,7 @@ public sealed class KafkaHostingExtensionsTests
       .ConfigureServices(services =>
       {
         services.AddLogging();
-
+        services.AddSingleton<IConfiguration>(configuration);
         // 🔑 REQUIRED INFRA
         services.AddMessagingSerialization();
         services.AddKafkaMessaging(configuration);
@@ -176,7 +180,7 @@ public sealed class KafkaHostingExtensionsTests
       .ConfigureServices(services =>
       {
         services.AddLogging();
-
+        services.AddSingleton<IConfiguration>(configuration);
         // 🔑 REQUIRED INFRA
         services.AddMessagingSerialization();
         services.AddKafkaMessaging(configuration);

@@ -3,6 +3,7 @@ using Confluent.Kafka;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

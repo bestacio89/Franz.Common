@@ -1,45 +1,133 @@
 ﻿#nullable enable
-using FluentAssertions;
-using Microsoft.Extensions.Options;
+using Confluent.Kafka;
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.KafKa.Consumers;
-using Franz.Common.Messaging.Kafka.Tests.Fixtures;
+using Microsoft.Extensions.Options;
+using FluentAssertions;
+using System;
 using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Consumers;
 
-[Collection("KafkaConsumer")]
-public sealed class KafkaConsumerGroupTests(KafkaContainerFixture fixture)
+public class KafkaConsumerGroupTests
 {
-  private KafkaConsumerGroup CreateSutGroup() // Unique Helper Name
+  // Helper to create the group
+  private static KafkaConsumerGroup CreateSutGroup(KafkaMessagingOptions options)
   {
-    var cleanedAddress = fixture.BootstrapServers
-        .Replace("plaintext://", "", StringComparison.OrdinalIgnoreCase)
-        .TrimEnd('/');
+    var opt = Options.Create(options);
+    return new KafkaConsumerGroup(opt);
+  }
 
-    var options = Options.Create(new KafkaMessagingOptions
+  [Fact]
+  public void Should_UseProvidedGroupId_WhenNotNull()
+  {
+    var expectedGroupId = $"custom-group-{Guid.NewGuid():N}";
+    var options = new KafkaMessagingOptions
     {
-      BootStrapServers = cleanedAddress,
-      GroupID = $"test-group-{Guid.NewGuid():N}"
-    });
+      BootstrapServers = "localhost:9092",
+      GroupId = expectedGroupId,
+      Consumer = new KafkaConsumerOptions()
+    };
 
-    return new KafkaConsumerGroup(options);
+    using var group = CreateSutGroup(options);
+
+    group.GroupId.Should().Be(expectedGroupId);
   }
 
   [Fact]
-  public void CreateConsumer_Should_Return_Same_Instance()
+  public void Should_GenerateFallbackGroupId_WhenNull()
   {
-    using var group = CreateSutGroup();
-    var c1 = group.CreateConsumer();
-    var c2 = group.CreateConsumer();
-    c1.Should().BeSameAs(c2);
+    var options = new KafkaMessagingOptions
+    {
+      BootstrapServers = "localhost:9092",
+      GroupId = null,
+      Consumer = new KafkaConsumerOptions()
+    };
+
+    using var group = CreateSutGroup(options);
+
+    group.GroupId.Should().StartWith("franz-group-");
   }
 
   [Fact]
-  public void Subscribe_Should_Not_Throw()
+  public void Subscribe_And_Unsubscribe_Should_NotThrow()
   {
-    using var group = CreateSutGroup();
-    // Act: Subscribe returns void, so we just call it.
-    group.Subscribe("test-topic");
+    var options = new KafkaMessagingOptions
+    {
+      BootstrapServers = "localhost:9092",
+      GroupId = null,
+      Consumer = new KafkaConsumerOptions()
+    };
+
+    using var group = CreateSutGroup(options);
+
+    Action subscribe = () => group.Subscribe("test-topic");
+    Action unsubscribe = () => group.Unsubscribe();
+
+    subscribe.Should().NotThrow();
+    unsubscribe.Should().NotThrow();
+  }
+
+  [Fact]
+  public void CreateConsumer_Should_ReturnConsumerInstance()
+  {
+    var options = new KafkaMessagingOptions
+    {
+      BootstrapServers = "localhost:9092",
+      GroupId = null,
+      Consumer = new KafkaConsumerOptions()
+    };
+
+    using var group = CreateSutGroup(options);
+
+    var consumer = group.CreateConsumer();
+
+    consumer.Should().NotBeNull();
+    consumer.Should().BeAssignableTo<IConsumer<Ignore, string>>();
+  }
+
+  [Fact]
+  public void Dispose_Should_PreventFurtherUsage()
+  {
+    var options = new KafkaMessagingOptions
+    {
+      BootstrapServers = "localhost:9092",
+      GroupId = null,
+      Consumer = new KafkaConsumerOptions()
+    };
+
+    var group = CreateSutGroup(options);
+    group.Dispose();
+
+    Action subscribe = () => group.Subscribe("topic");
+    Action unsubscribe = () => group.Unsubscribe();
+    Action create = () => _ = group.CreateConsumer();
+
+    subscribe.Should().Throw<ObjectDisposedException>();
+    unsubscribe.Should().Throw<ObjectDisposedException>();
+    create.Should().Throw<ObjectDisposedException>();
+  }
+
+  [Fact]
+  public async Task DisposeAsync_Should_PreventFurtherUsage()
+  {
+    var options = new KafkaMessagingOptions
+    {
+      BootstrapServers = "localhost:9092",
+      GroupId = null,
+      Consumer = new KafkaConsumerOptions()
+    };
+
+    var group = CreateSutGroup(options);
+    await group.DisposeAsync();
+
+    Action subscribe = () => group.Subscribe("topic");
+    Action unsubscribe = () => group.Unsubscribe();
+    Action create = () => _ = group.CreateConsumer();
+
+    subscribe.Should().Throw<ObjectDisposedException>();
+    unsubscribe.Should().Throw<ObjectDisposedException>();
+    create.Should().Throw<ObjectDisposedException>();
   }
 }
