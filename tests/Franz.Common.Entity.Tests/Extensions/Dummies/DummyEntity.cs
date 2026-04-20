@@ -1,14 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Franz.Common.Business.Domain;
+﻿using Franz.Common.Business.Domain;
 
-namespace Franz.Common.EntityFramework.Tests.Extensions.Dummies;
+namespace Franz.Common.EntityFramework.Tests.Repositories.Fakes;
 
-public class DummyEntity : Entity
+public class DummyEntity : Entity<Guid>
 {
-  public int Id { get; set; }
-  // Ensure this property is public and has a getter/setter
-  public TestEnum EnumProp { get; set; } = TestEnum.First;
-}
+  public string Name { get; private set; } = string.Empty;
 
+  public TestEnum EnumProp { get; set; } = TestEnum.One;
+
+  public DummyEntity()
+  {
+  }
+
+  public void SetName(string name)
+  {
+    Name = name;
+  }
+
+  public void SetEnum(TestEnum value)
+  {
+    EnumProp = value;
+  }
+}

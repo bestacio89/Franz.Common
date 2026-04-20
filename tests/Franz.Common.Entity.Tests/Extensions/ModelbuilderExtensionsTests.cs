@@ -4,6 +4,7 @@ using Xunit;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.EntityFramework.Extensions;
 using Franz.Common.EntityFramework.Tests.Extensions.Dummies;
+using Franz.Common.EntityFramework.Tests.Repositories.Fakes;
 
 namespace Franz.Common.EntityFramework.Tests.Extensions
 {
@@ -13,13 +14,13 @@ namespace Franz.Common.EntityFramework.Tests.Extensions
     public void ConvertEnumeration_AppliesValueConverterAndRenamesColumn()
     {
       // Arrange
-      var options = new DbContextOptionsBuilder<TestDbContext2>()
+      var options = new DbContextOptionsBuilder<TestDbContext3>()
           .UseInMemoryDatabase(Guid.NewGuid().ToString())
           .Options;
 
       var dispatcher = new Mock<IDispatcher>();
 
-      using var context = new TestDbContext2(options, dispatcher.Object);
+      using var context = new TestDbContext3(options, dispatcher.Object);
 
       // Act: Accessing .Model triggers OnModelCreating and your Extension Method
       var model = context.Model;

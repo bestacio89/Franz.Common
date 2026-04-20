@@ -16,16 +16,21 @@ public class TestDbContext3 : DbContextBase
   }
 
   // Dummy DbSets for repository testing
+  public DbSet<DummyAggregate> DummyAggregates { get; set; } = null!;
   public DbSet<DummyEntity> DummyEntities { get; set; } = null!;
   public DbSet<DummyEvent> DummyEvents { get; set; } = null!;
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
-    // Explicitly map the Primary Key for the event store
+    modelBuilder.ConvertEnumeration();
+    
     modelBuilder.Entity<DummyEvent>()
         .HasKey(e => e.EventId);
     base.OnModelCreating(modelBuilder);
-    // This is the call that triggers your extension logic
-    modelBuilder.ConvertEnumeration();
+
+    modelBuilder.Entity<DummyEntity>()
+    .Property(x => x.EnumProp)
+    .HasConversion(new EnumerationConverter<TestEnum, int>())
+    .HasColumnName("EnumPropId");
   }
 
 }

@@ -4,6 +4,7 @@ using Franz.Common.EntityFramework.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Franz.Common.EntityFramework.Tests.Repositories.Fakes;
 
 namespace Franz.Common.EntityFramework.Tests.Extensions.Dummies;
 

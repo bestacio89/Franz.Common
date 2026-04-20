@@ -7,6 +7,7 @@ namespace Franz.Common.EntityFramework.Tests.Extensions.Dummies;
 
 public class TestEnum : Enumeration<int>
 {
-  public static readonly TestEnum First = new(1, "First");
+  public static readonly TestEnum One = new(1, "One");
+  public static readonly TestEnum First = new(2, "First");
   private TestEnum(int id, string name) : base(id, name) { }
 }

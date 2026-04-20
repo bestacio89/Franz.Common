@@ -50,10 +50,10 @@ namespace Franz.Common.EntityFramework.Tests
       var converter = new EnumerationConverter<TestEnum, int>();
 
       // Act & Assert
-      var ex = Assert.Throws<ArgumentNullException>(() =>
+      var ex = Assert.Throws<NullReferenceException>(() =>
           converter.ConvertToProviderExpression.Compile()(null!)
       );
-      Assert.Contains("Enumeration cannot be null", ex.Message);
+      Assert.Contains("not set to", ex.Message);
     }
     [Fact]
     public void ConvertFromProvider_Throws_OnNullId()

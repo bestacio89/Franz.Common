@@ -1,32 +1,129 @@
-﻿using Franz.Common.EntityFramework.Repositories;
-using Franz.Common.EntityFramework.Tests.Extensions.Dummies;
+﻿using FluentAssertions;
+using Franz.Common.Business.Domain.Factories;
+using Franz.Common.Business.Domain.IdGenerators;
+using Franz.Common.EntityFramework.Repositories;
 using Franz.Common.EntityFramework.Tests.Repositories.Fakes;
+using Franz.Common.Errors;
 using Franz.Common.Mediator.Dispatchers;
 using Microsoft.EntityFrameworkCore;
 using Moq;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using Xunit;
 
 namespace Franz.Common.EntityFramework.Tests.Repositories;
 
 public class EntityRepositoryTests
 {
-  [Fact]
-  public async Task AddAndGetEntity_Works()
+  private static TestDbContext3 CreateDbContext()
   {
-    var options = new DbContextOptionsBuilder<TestDbContext3>()
-        .UseInMemoryDatabase(Guid.NewGuid().ToString())
-        .Options;
+    var options =
+        new DbContextOptionsBuilder<TestDbContext3>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
 
-    using var context = new TestDbContext3(options, new Mock<IDispatcher>().Object);
-    var repo = new EntityRepository<TestDbContext3, DummyEntity>(context);
+    return new TestDbContext3(
+        options,
+        new Mock<IDispatcher>().Object);
+  }
 
-    var entity = new DummyEntity();
+  private static DummyEntity CreateEntity()
+  {
+    var factory =
+        new EntityFactory<Guid, DummyEntity>(
+            new GuidV7Generator());
+
+    return factory.Create();
+  }
+
+  [Fact]
+  public async Task AddAsync_ShouldPersistEntity()
+  {
+    using var context = CreateDbContext();
+
+    var repo =
+        new EntityRepository<
+            TestDbContext3,
+            DummyEntity,
+            Guid>(context);
+
+    var entity = CreateEntity();
+
     await repo.AddAsync(entity);
 
-    var fetched = await repo.GetByIdAsync(entity.Id);
+    var persisted =
+        await context.Set<DummyEntity>()
+            .FirstOrDefaultAsync(x => x.Id == entity.Id);
 
-    Assert.Equal(entity.Id, fetched.Id);
+    Assert.NotNull(persisted);
+  }
+
+  [Fact]
+  public async Task GetByIdAsync_ShouldReturnEntity()
+  {
+    using var context = CreateDbContext();
+
+    var repo =
+        new EntityRepository<
+            TestDbContext3,
+            DummyEntity,
+            Guid>(context);
+
+    var entity = CreateEntity();
+
+    await repo.AddAsync(entity);
+
+    var fetched =
+        await repo.GetByIdAsync(entity.Id);
+
+    Assert.NotNull(fetched);
+    Assert.Equal(entity.Id, fetched!.Id);
+  }
+
+  [Fact]
+  public async Task UpdateAsync_ShouldPersistChanges()
+  {
+    using var context = CreateDbContext();
+
+    var repo =
+        new EntityRepository<
+            TestDbContext3,
+            DummyEntity,
+            Guid>(context);
+
+    var entity = CreateEntity();
+
+    await repo.AddAsync(entity);
+
+    entity.SetName("Updated");
+
+    await repo.UpdateAsync(entity);
+
+    var updated =
+        await context.Set<DummyEntity>()
+            .FirstAsync(x => x.Id == entity.Id);
+
+    Assert.Equal("Updated", updated.Name);
+  }
+
+  [Fact]
+  public async Task DeleteAsync_ShouldSoftDelete_AndBeNotFoundInNewContext()
+  {
+    // Arrange
+    var entity = CreateEntity();
+    using (var context = CreateDbContext())
+    {
+      var repo = new EntityRepository<TestDbContext3, DummyEntity, Guid>(context);
+      await repo.AddAsync(entity);
+      await repo.DeleteAsync(entity);
+    } // Context disposed, cache cleared
+
+    // Act & Assert
+    using (var context = CreateDbContext()) // New context, no local cache
+    {
+      var repo = new EntityRepository<TestDbContext3, DummyEntity, Guid>(context);
+
+      // NOW it will hit the DB, apply the filter, return null, and throw.
+      await repo.Awaiting(r => r.GetByIdAsync(entity.Id))
+          .Should().ThrowAsync<NotFoundException>();
+    }
   }
 }
