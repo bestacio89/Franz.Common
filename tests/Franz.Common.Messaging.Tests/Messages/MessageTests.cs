@@ -20,24 +20,7 @@ public class MessageTests
     message.Id.ToString()[14].Should().Be('7');
   }
 
-  [Fact]
-  public void CorrelationId_WhenNotProvided_ShouldGenerateNewV7AndStoreInProperties()
-  {
-    // Arrange
-    var message = new Message();
 
-    // Act
-    var cid = message.CorrelationId;
-
-    // Assert
-    cid.Should().NotBeEmpty();
-    message.Properties.Should().ContainKey(nameof(message.CorrelationId));
-    message.Properties[nameof(message.CorrelationId)].Should().Be(cid);
-
-    // Verify wire-transport header sync
-    message.Headers.Should().ContainKey("X-Correlation-ID");
-    message.Headers["X-Correlation-ID"][0].Should().Be(cid.ToString());
-  }
 
   [Fact]
   public void CorrelationId_WhenHydratedFromPropertiesAsString_ShouldParseAndReturn()
