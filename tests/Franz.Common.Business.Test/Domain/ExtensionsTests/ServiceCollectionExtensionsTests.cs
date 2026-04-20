@@ -1,85 +1,80 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Franz.Common.Business.Tests.Domain.ExtensionsTests;
-
-using FluentAssertions;
+﻿using FluentAssertions;
+using Franz.Common.Business.Domain;
+using Franz.Common.Business.Domain.Factories;
+using Franz.Common.Business.Domain.IdGenerators;
 using Franz.Common.Business.Extensions;
-using Franz.Common.Errors;
 using Franz.Common.Mediator.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-public sealed class ServiceCollectionExtensionsTests
+namespace Franz.Common.Business.Tests.Domain.ExtensionsTests;
+
+public sealed class BusinessBootstrapExtensionsTests
 {
   [Fact]
-  public void AddBusinessWithMediator_Should_Not_Throw_When_Application_Assembly_Not_Found()
+  public void AddBusiness_Should_Register_Core_Domain_Services()
   {
     var services = new ServiceCollection();
-    var entryAssembly = typeof(ServiceCollectionExtensionsTests).Assembly;
+    var assembly = typeof(BusinessBootstrapExtensionsTests).Assembly;
 
-    Action act = () => services.AddBusinessWithMediator(entryAssembly);
+    services.AddBusiness(assembly);
 
-    act.Should().NotThrow();
-  }
+    var provider = services.BuildServiceProvider();
 
+    provider.GetService<IIdGenerator<Guid>>()
+        .Should()
+        .NotBeNull();
 
-  [Fact]
-  public void TryAddBusinessWithMediator_Should_Not_Throw_When_Application_Assembly_Not_Found()
-  {
-    var services = new ServiceCollection();
-    var entryAssembly = typeof(ServiceCollectionExtensionsTests).Assembly;
-
-    Action act = () =>
-        services.TryAddBusinessWithMediator(entryAssembly);
-
-    act.Should().NotThrow();
+    provider.GetService<IEntityFactory<Guid, DummyEntity>>()
+        .Should()
+        .NotBeNull();
   }
 
   [Fact]
-  public void AddBusinessWithMediator_Should_Register_Services_When_Application_Assembly_Exists()
+  public void AddBusiness_Should_Not_Throw()
   {
     var services = new ServiceCollection();
+    var assembly = typeof(BusinessBootstrapExtensionsTests).Assembly;
 
-    // Simulate Product.Application
-    var entryAssembly = typeof(ServiceCollectionExtensionsTests).Assembly;
-    var productName = string.Join(".", entryAssembly.GetName().Name!.Split(".").Take(2));
-    TestAssemblyHelper.LoadFakeApplicationAssembly($"{productName}.Application");
-
-    Action act = () =>
-        services.AddBusinessWithMediator(entryAssembly, _ => { });
+    Action act = () => services.AddBusiness(assembly);
 
     act.Should().NotThrow();
   }
 
   [Fact]
-  public void TryAddBusinessWithMediator_Should_Delegate_To_Add_When_Assembly_Exists()
+  public void AddBusinessPlatform_Should_Return_Same_ServiceCollection()
   {
     var services = new ServiceCollection();
-    var entryAssembly = typeof(ServiceCollectionExtensionsTests).Assembly;
-    var productName = string.Join(".", entryAssembly.GetName().Name!.Split(".").Take(2));
 
-    TestAssemblyHelper.LoadFakeApplicationAssembly($"{productName}.Application");
-
-    Action act = () =>
-        services.TryAddBusinessWithMediator(entryAssembly, _ => { });
-
-    act.Should().NotThrow();
-  }
-
-  [Fact]
-  public void AddFranzPlatform_Should_Not_Throw_And_Return_ServiceCollection()
-  {
-    var services = new ServiceCollection();
-    var entryAssembly = typeof(ServiceCollectionExtensionsTests).Assembly;
-    var productName = string.Join(".", entryAssembly.GetName().Name!.Split(".").Take(2));
-
-    TestAssemblyHelper.LoadFakeApplicationAssembly($"{productName}.Application");
-
-    var result = services.AddFranzPlatform(entryAssembly);
+    var result = services.AddBusinessPlatform();
 
     result.Should().BeSameAs(services);
   }
-}
 
+  [Fact]
+  public void TryAddBusiness_Should_Handle_Null_Assembly()
+  {
+    var services = new ServiceCollection();
+
+    var result = services.TryAddBusiness(null);
+
+    result.Should().BeSameAs(services);
+  }
+
+  [Fact]
+  public void TryAddBusiness_Should_Not_Throw_With_Valid_Assembly()
+  {
+    var services = new ServiceCollection();
+    var assembly = typeof(BusinessBootstrapExtensionsTests).Assembly;
+
+    Action act = () => services.TryAddBusiness(assembly);
+
+    act.Should().NotThrow();
+  }
+
+  // Minimal dummy entity for DI resolution tests
+  private sealed class DummyEntity : Entity<Guid>
+  {
+    public DummyEntity() : base(Guid.NewGuid()) { }
+  }
+}

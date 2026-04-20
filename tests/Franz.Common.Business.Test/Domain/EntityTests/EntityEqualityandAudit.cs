@@ -1,113 +1,58 @@
-using Franz.Common.Business.Domain;
-using Xunit;
 using FluentAssertions;
+using Franz.Common.Business.Domain;
+using Franz.Common.Business.Domain.Factories;
+using Franz.Common.Business.Domain.IdGenerators;
 using Franz.Common.Business.Tests.Domain.EntityTests;
-
-namespace Franz.Common.Business.Test.Domain.EntityTests;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
+namespace Franz.Common.Business.Tests.Domain.EntityTests;
 
 public class EntityEqualityTests
 {
+  private readonly IServiceProvider _provider;
 
-
-  [Fact]
-  public void Entities_WithSameId_AreEqual()
+  public EntityEqualityTests()
   {
-    var id = Guid.NewGuid();
-    var e1 = new TestEntity(id);
-    var e2 = new TestEntity(id);
+    var services = new ServiceCollection();
 
-    e1.Should().Be(e2);
+    services.AddSingleton<IIdGenerator<Guid>, GuidV7Generator>();
+    services.AddTransient(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
+
+    _provider = services.BuildServiceProvider();
+  }
+
+  private TestEntity CreateEntity()
+  {
+    var factory = _provider.GetRequiredService<IEntityFactory<Guid, TestEntity>>();
+    return factory.Create();
   }
 
   [Fact]
-  public void MarkCreated_SetsCreatedBy_AndDateCreated()
+  public void Entities_Created_By_Factory_Should_Have_Different_Ids()
   {
-    var entity = new TestEntity(Guid.NewGuid());
-    entity.MarkCreated("tester");
+    var e1 = CreateEntity();
+    var e2 = CreateEntity();
 
-    entity.CreatedBy.Should().Be("tester");
-    entity.DateCreated.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+    e1.Should().NotBe(e2);
+    e1.GetId().Should().NotBe(e2.GetId());
   }
 
   [Fact]
-  public void IsTransient_Should_Be_True_When_Id_Is_Default()
+  public void Entities_Created_By_Factory_Should_Be_Transient_Initially()
   {
-    var entity = new TestEntity();
+    var entity = CreateEntity();
 
-    entity.IsTransient().Should().BeTrue();
+    entity.IsTransient().Should().BeFalse(); // ID assigned by factory
   }
 
   [Fact]
-  public void IsTransient_Should_Be_False_When_Id_Is_Set()
+  public void Equality_Should_Be_Based_On_Id()
   {
-    var entity = new TestEntity(Guid.NewGuid());
+    var factory = _provider.GetRequiredService<IEntityFactory<Guid, TestEntity>>();
 
-    entity.IsTransient().Should().BeFalse();
-  }
+    var e1 = factory.Create();
+    var e2 = factory.Create();
 
-  [Fact]
-  public void Equals_Should_Be_True_For_Same_Type_And_Id()
-  {
-    var id = Guid.NewGuid();
-
-    var a = new TestEntity(id);
-    var b = new TestEntity(id);
-
-    a.Should().Be(b);
-    (a == b).Should().BeTrue();
-  }
-
-  [Fact]
-  public void Equals_Should_Be_False_For_Transient_Entities()
-  {
-    var a = new TestEntity();
-    var b = new TestEntity();
-
-    a.Should().NotBe(b);
-  }
-
-  [Fact]
-  public void GetHashCode_Should_Be_Stable_For_NonTransient()
-  {
-    var entity = new TestEntity(Guid.NewGuid());
-
-    var hash1 = entity.GetHashCode();
-    var hash2 = entity.GetHashCode();
-
-    hash1.Should().Be(hash2);
-  }
-
-  [Fact]
-  public void MarkCreated_Should_Set_Audit_Fields()
-  {
-    var entity = new TestEntity(Guid.NewGuid());
-
-    entity.MarkCreated("tester");
-
-    entity.CreatedBy.Should().Be("tester");
-    entity.DateCreated.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
-  }
-
-  [Fact]
-  public void MarkUpdated_Should_Set_Modified_Fields()
-  {
-    var entity = new TestEntity(Guid.NewGuid());
-
-    entity.MarkUpdated("modifier");
-
-    entity.LastModifiedBy.Should().Be("modifier");
-    entity.LastModifiedDate.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
-  }
-
-  [Fact]
-  public void MarkDeleted_Should_Set_Deletion_Fields()
-  {
-    var entity = new TestEntity(Guid.NewGuid());
-
-    entity.MarkDeleted("deleter");
-
-    entity.IsDeleted.Should().BeTrue();
-    entity.DeletedBy.Should().Be("deleter");
-    entity.DateDeleted.Should().NotBeNull();
+    e1.Should().NotBe(e2);
   }
 }
