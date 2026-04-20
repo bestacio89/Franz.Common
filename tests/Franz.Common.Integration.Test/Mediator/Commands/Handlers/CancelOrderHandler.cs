@@ -7,9 +7,9 @@ using Franz.Common.Mediator.Messages;
 
 public sealed class CancelOrderHandler : ICommandHandler<CancelOrderCommand, Unit>
 {
-  private readonly IAggregateRootRepository<OrderAggregate, IDomainEvent> _repository;
+  private readonly IAggregateRootRepository<OrderAggregate, IDomainEvent, Guid> _repository;
 
-  public CancelOrderHandler(IAggregateRootRepository<OrderAggregate, IDomainEvent> repository)
+  public CancelOrderHandler(IAggregateRootRepository<OrderAggregate, IDomainEvent, Guid> repository)
       => _repository = repository;
 
   public async Task<Unit> Handle(CancelOrderCommand command, CancellationToken ct = default)

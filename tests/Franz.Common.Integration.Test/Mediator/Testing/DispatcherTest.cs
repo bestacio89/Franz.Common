@@ -29,7 +29,7 @@ public class DispatcherTests
 
           // ✅ register repo + sink
           services.AddScoped<
-              IAggregateRootRepository<OrderAggregate, IDomainEvent>,
+              IAggregateRootRepository<OrderAggregate, IDomainEvent, Guid>,
               InMemoryOrderRepository>();
 
           services.AddScoped<InMemoryProcessedEventSink>();

@@ -5,7 +5,7 @@ using Franz.Common.Mediator.Dispatchers;
 using System.Collections.Generic;
 
 public sealed class InMemoryOrderRepository
-    : IAggregateRootRepository<OrderAggregate, IDomainEvent>
+    : IAggregateRootRepository<OrderAggregate, IDomainEvent, Guid>
 {
   private readonly Dictionary<Guid, List<IDomainEvent>> _store = new();
   private readonly IDispatcher _dispatcher;
