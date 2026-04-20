@@ -1,56 +1,69 @@
 
+# 📦 Franz.Common.EntityFramework
 
-# **Franz.Common.EntityFramework**
+A core infrastructure library of the **Franz Framework**, designed to extend and simplify **Entity Framework Core** integration in .NET systems.
 
-A comprehensive library within the **Franz Framework**, designed to extend and simplify the integration of **Entity Framework Core** in .NET applications.
-It provides clean abstractions, auditing, soft deletes, repositories, and seamless integration with Franz **Business** and **Mediator** packages.
+It provides a **pragmatic persistence layer**, supporting:
 
----
+* Domain-Driven Design (selectively applied)
+* CQRS architectures
+* Soft deletes + auditing
+* Event-driven persistence patterns
+* DI-driven modular design
 
-## **Features**
-
-* **Database Configurations*** 
-
-  * Flexible options for **Cosmos DB** (`CosmosDBConfig`) and **MongoDB** (`MongoDBConfig`).
-  * Centralized management of connection settings (`DatabaseOptions`).
-
-* **Repositories** (**Separation of Entity and Aggregate Repositories**)
-
-  * `EntityRepository<TEntity>`: CRUD operations for standalone entities.
-  * `AggregateRepository<TAggregateRoot>`: For event-sourced aggregates.
-  * `ReadRepository<T>`: Optimized read-only data access.
-
-* **DbContextBase (🆕 canonical context)**
-
-  * Built-in **auditing** (`CreatedBy`, `CreatedOn`, `LastModifiedBy`, `LastModifiedOn`).
-  * **Soft deletes** (`IsDeleted`, `DeletedBy`, `DeletedOn`) with global query filters.
-  * **Domain event dispatching** via Franz Mediator.
-  * Removes the need for `SaveEntitiesAsync` – now everything happens in `SaveChangesAsync`.
-
-* **Conversions**
-
-  * `EnumerationConverter`: Easily map domain enumerations to EF Core-friendly values.
-
-* **Extensions**
-
-  * `ModelBuilderExtensions`: Simplify entity configuration.
-  * `ServiceCollectionExtensions`: Wire up repositories and context with DI.
+Unlike strict DDD implementations, this library follows a **system-first pragmatic architecture**, where domain purity is preserved only where it adds value.
 
 ---
 
-## **Version Information**
+# 🚀 Version
 
-* **Current Version**:  2.0.2
-* Part of the private **Franz Framework** ecosystem.
+**v2.0.3**
 
 ---
 
-## **🆕 DbContextBase Example**
+# 🧠 Architectural Philosophy
+
+This library is built on a **pragmatic DDD enforcement model**:
+
+> DDD is applied where it improves domain correctness, not as a global constraint.
+
+## Core principles:
+
+* Persistence is **EF-native**, not domain-driven
+* Repositories are **identity-agnostic (`IEntity`)**
+* Domain identity (`Entity<TId>`) is isolated from persistence contracts
+* DI is **explicit and convention-based**
+* Infrastructure is optimized for **scalability over theoretical purity**
+
+---
+
+# 🧱 Core Concepts
+
+---
+
+# 1. DbContextBase (Canonical EF Context)
+
+The base DbContext provides:
+
+## ✔ Built-in Features
+
+* Auditing (`CreatedBy`, `CreatedOn`, etc.)
+* Soft deletes (`IsDeleted`, `DeletedOn`, `DeletedBy`)
+* Global query filters
+* Domain event dispatching via `IDispatcher`
+* Current user tracking integration
+
+---
+
+## 📌 Example
 
 ```csharp
 public class AppDbContext : DbContextBase
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options, IDispatcher dispatcher, ICurrentUserService currentUser)
+    public AppDbContext(
+        DbContextOptions<AppDbContext> options,
+        IDispatcher dispatcher,
+        ICurrentUserService currentUser)
         : base(options, dispatcher, currentUser)
     {
     }
@@ -65,173 +78,293 @@ public class AppDbContext : DbContextBase
 }
 ```
 
-### Key behaviors
+---
 
-* Automatically sets **CreatedBy / CreatedOn** when entities are added.
-* Automatically sets **LastModifiedBy / LastModifiedOn** when entities are updated.
-* Marks **IsDeleted / DeletedOn / DeletedBy** instead of physical deletes.
-* Dispatches **domain events** after each save.
+## 🧠 Behavior Summary
+
+* Automatically applies auditing on `SaveChanges`
+* Converts deletes into **soft deletes**
+* Filters deleted entities globally
+* Dispatches domain events after persistence
 
 ---
 
-## **Repositories**
+# 2. Repository System (Pragmatic Model)
 
-### 1️⃣ Entity Repository (CRUD Operations)
+The repository system is intentionally simplified for scalability.
+
+---
+
+## 📦 EntityRepository (CRUD)
 
 ```csharp
-public class OrderRepository : EntityRepository<AppDbContext, Order>
+public class EntityRepository<TDbContext, TEntity>
+    where TDbContext : DbContext
+    where TEntity : class, IEntity
+```
+
+### ✔ Responsibilities:
+
+* CRUD operations
+* EF Core persistence
+* Soft delete compliance
+* No domain logic
+* No identity assumptions
+
+---
+
+### 📌 Example
+
+```csharp
+public class OrderRepository 
+    : EntityRepository<AppDbContext, Order>
 {
-    public OrderRepository(AppDbContext dbContext) : base(dbContext) { }
+    public OrderRepository(AppDbContext dbContext) 
+        : base(dbContext) { }
 }
 ```
 
-✅ **Best for:**
+---
 
-* Entities that don’t require aggregate consistency.
-* Simple CRUD operations.
+## 🧠 Key Design Rule
+
+> Repositories do NOT manage identity.
+
+Identity is handled by:
+
+* `IEntity.GetId()`
+* EF Core key resolution
+* Domain layer (`Entity<TId>`)
 
 ---
 
-### 2️⃣ Aggregate Repository (Event-Sourced Aggregates)
+## 📦 AggregateRepository (Event-Sourced)
+
+Used for event-driven aggregates.
 
 ```csharp
-public class ProductRepository : AggregateRepository<AppDbContext, Product, ProductEvent>
-{
-    public ProductRepository(AppDbContext dbContext, IEventStore eventStore)
-        : base(dbContext, eventStore) { }
-}
+public class AggregateRepository<TDbContext, TAggregateRoot, TEvent>
 ```
 
-✅ **Best for:**
+### ✔ Responsibilities:
 
-* Aggregates requiring event sourcing.
-* Complex domain rules.
-* Systems that replay history for consistency.
-
----
-
-### 3️⃣ Choosing the Right Repository
-
-| **Feature**                 | **EntityRepository** | **AggregateRepository**  |
-| --------------------------- | -------------------- | ------------------------ |
-| **Use Case**                | Standalone entities  | Event-sourced aggregates |
-| **CRUD Support**            | ✅ Yes                | ❌ No (event-only)        |
-| **Supports Event Sourcing** | ❌ No                 | ✅ Yes                    |
-| **Direct Entity Access**    | ✅ Yes                | ❌ No (root only)         |
+* Event sourcing persistence
+* Aggregate rehydration
+* Event storage coordination
+* Domain event consistency
 
 ---
 
-## **Auditing & Soft Deletes**
+# 3. Auditing System
 
-All entities deriving from Franz’s `Entity<TId>` automatically get:
+All entities implementing `Entity<TId>` automatically support:
 
 * `CreatedOn`, `CreatedBy`
 * `LastModifiedOn`, `LastModifiedBy`
-* `IsDeleted`, `DeletedOn`, `DeletedBy`
+* `DeletedOn`, `DeletedBy`
+* `IsDeleted` soft delete flag
 
-### Example Entity
+---
+
+## ✔ Behavior
+
+* Automatically applied on `SaveChanges`
+* Fully transparent to application layer
+* No manual intervention required
+
+---
+
+# 4. Soft Delete System
+
+Instead of physical deletion:
+
+```text
+DELETE → UPDATE IsDeleted = true
+```
+
+### ✔ Features:
+
+* Global EF query filter
+* Automatic exclusion of deleted entities
+* Audit trail preserved
+
+---
+
+# 5. Domain Events Integration
+
+DbContext automatically dispatches domain events via:
 
 ```csharp
-public class Order : Entity<Guid>
-{
-    public string CustomerName { get; private set; } = string.Empty;
-    public decimal TotalAmount { get; private set; }
-
-    // Domain behavior...
-}
+IDispatcher
 ```
 
-EF Core automatically filters out `IsDeleted` entities via a global query filter.
+### ✔ Lifecycle:
+
+1. Entity changes tracked
+2. SaveChanges executed
+3. Events collected
+4. Dispatcher publishes after commit
 
 ---
 
-## **Installation**
+# 6. Entity Framework Conventions
 
-### From Private Azure Feed
+### ✔ Supported entity model
 
-```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+```csharp
+public abstract class Entity<TId> : IEntity
 ```
 
-Install the package:
+### ✔ Characteristics:
 
-```bash
-dotnet add package Franz.Common.EntityFramework
+* Strongly typed identity (`TId`)
+* EF-compatible mapping
+* Audit support (via DbContext)
+* Soft delete support
+
+---
+
+### ✔ Identity rules
+
+* Identity is defined in the domain (`Entity<TId>`)
+* Repositories are identity-agnostic
+* EF resolves identity via `object[]` keys
+
+---
+
+# 7. Dependency Injection Model
+
+This framework uses **explicit DI discovery**.
+
+---
+
+## ✔ Auto-registration rules
+
+Only services implementing:
+
+* `IScopedDependency`
+* `ISingletonDependency`
+
+are automatically registered.
+
+---
+
+## ✔ Benefits
+
+* No hidden service locator
+* Fully deterministic composition
+* Explicit module boundaries
+* Scalable modular architecture
+
+---
+
+# 8. Configuration Extensions
+
+## ✔ Register EF Infrastructure
+
+```csharp
+services.AddEntityFrameworkFranz();
+```
+
+Includes:
+
+* DbContextBase support
+* repositories
+* auditing pipeline
+* DI wiring
+
+---
+
+# ⚠️ Design Constraints
+
+## ❌ Do NOT
+
+* Inject identity logic into repositories
+* Use repository-level `TId` constraints
+* Bypass `Entity<TId>` model
+* Perform manual auditing
+
+---
+
+## ✔ Always
+
+* Let EF handle persistence
+* Let domain handle identity
+* Use repositories as orchestration layer only
+* Use DI markers for registration
+
+---
+
+# 🧭 Architecture Overview
+
+```
+Domain Layer
+ ├── Entity<TId>
+ ├── Domain Events
+ ├── Aggregates
+
+Application Layer
+ ├── CQRS / Mediator
+
+Infrastructure Layer
+ ├── DbContextBase
+ ├── EntityRepository
+ ├── AggregateRepository
+
+EF Core Layer
+ ├── DbSet<TEntity>
+ ├── ChangeTracker
+ ├── Global Filters
+
+DI Layer
+ ├── IScopedDependency
+ ├── IServiceCollection extensions
 ```
 
 ---
 
-## **Integration with Franz Framework**
+# 🧪 Version History
 
-* **Franz.Common.Business** → DDD & CQRS building blocks.
-* **Franz.Common.Mediator** → Pipeline behaviors & domain event dispatching.
-* **Franz.Common.Errors** → Standardized error handling.
+## v2.0.3 – Pragmatic Architecture Alignment
 
----
+### 🧠 Major Changes
 
-## **Contributing**
+* Replaced identity-coupled repositories with `IEntity`-based model
+* Removed `TId` dependency from repository contracts
+* Standardized EF Core identity resolution via `object`
+* Introduced explicit DI-based service discovery model
+* Reinforced pragmatic DDD enforcement strategy
 
-This package is part of a private framework. Contributions are limited to the internal team.
+### ⚙️ Improvements
 
-1. Clone the repository: [GitHub - Franz.Common](https://github.com/bestacio89/Franz.Common/)
-2. Create a feature branch.
-3. Submit a pull request.
+* Reduced repository complexity
+* Simplified DI wiring
+* Improved EF Core compatibility
+* Strengthened infrastructure scalability
 
----
+### ⚠️ Design Trade-off
 
-## **License**
-
-Licensed under the **MIT License**.
-
----
-
-## **Changelog**
-
-### **1.6.15**
-* Patch bump (package cleanup & docs).
-* Fixed Compiletime Error in ReadRepository and IReadrepository (because of stupid c# generic constraints).
-
-### **1.4.2**
-
-* 🗑️ Removed `DbContextMultiDatabase` (use `DbContextBase` instead).
-* 🗑️ Removed `SaveEntitiesAsync` (merged into `SaveChangesAsync`).
-* ✅ Unified auditing, soft deletes, and domain events under `DbContextBase`.
-
-### **1.4.1**
-
-* Patch bump (package cleanup & docs).
-
-### **1.4.0**
-
-* Migrated to **C# 12** typing rules.
-* Introduced auditing and soft delete handling in `DbContextBase`.
-* Aligned `EnumerationConverter` with stricter typing constraints.
-
-### **1.2.65**
-
-* Split repositories into `EntityRepository` and `AggregateRepository`.
-* Upgraded to .NET 9.
-
-### **1.3**
-
-* Upgraded to **.NET 9.0.8**.
-* Added new features and improvements.
-* Separated business from mediator concepts.
-* Compatible with Franz mediator **and** MediatR.
+* Reduced compile-time identity enforcement in repositories
+* Identity safety moved to domain layer (`Entity<TId>`)
 
 ---
 
+# 📌 Summary
 
-### Version 1.6.20
-- Updated to **.NET 10.0**
+Franz.Common.EntityFramework v2.0.3 provides:
 
+✔ EF-native persistence layer
+✔ Pragmatic DDD enforcement
+✔ Scalable repository abstraction
+✔ Auditing + soft delete system
+✔ Event-driven persistence support
+✔ DI-driven modular architecture
 
-### v2.0.1 – Internal Modernization
+---
 
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
+# 🧠 Final Statement
+
+> This library prioritizes system scalability and architectural clarity over theoretical purity, applying DDD only where it improves correctness, not as a global constraint.
+
+---
+

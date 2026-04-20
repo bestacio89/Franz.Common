@@ -1,59 +1,82 @@
 using Franz.Common.Business.Domain;
 using Franz.Common.Business.Events;
+using Franz.Common.Business.Repositories;
 using Franz.Common.Errors;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Messages;
-using Microsoft.EntityFrameworkCore;
 
 namespace Franz.Common.EntityFramework.Repositories;
 
-public abstract class AggregateRepository<TDbContext, TAggregateRoot, TEvent>
-    : IAggregateRootRepository<TAggregateRoot, TEvent>
-    where TDbContext : DbContext
-    where TAggregateRoot : class, IAggregateRoot<TEvent>, new()
+public abstract class AggregateRepository<TDbContext, TAggregateRoot, TEvent, TId>
+    : IAggregateRootRepository<TAggregateRoot, TEvent, TId>
+    where TDbContext : DbContextBase
+    where TAggregateRoot : AggregateRoot<TEvent>
     where TEvent : class, IDomainEvent
 {
   protected readonly TDbContext DbContext;
   private readonly IDispatcher _dispatcher;
 
-  protected AggregateRepository(TDbContext dbContext, IDispatcher dispatcher)
+  protected AggregateRepository(
+      TDbContext dbContext,
+      IDispatcher dispatcher)
   {
     DbContext = dbContext;
     _dispatcher = dispatcher;
   }
 
-  public async Task<TAggregateRoot> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+  // ---------------------------------------------------
+  // LOAD (STATE ONLY, NOT EVENT STORE)
+  // ---------------------------------------------------
+  public virtual async Task<TAggregateRoot> GetByIdAsync(
+      TId id,
+      CancellationToken cancellationToken = default)
   {
-    // load historical events from persistence
-    var history = await DbContext.Set<TEvent>()
-        .Where(e => e.AggregateId == id)
-        .OrderBy(e => e.OccurredOn)
-        .ToListAsync(cancellationToken);
+    var entity = await LoadAggregateAsync(id, cancellationToken);
 
-    if (!history.Any())
-      throw new NotFoundException($"{typeof(TAggregateRoot).Name} with ID {id} not found.");
+    if (entity is null)
+      throw new NotFoundException(
+        $"{typeof(TAggregateRoot).Name} with ID {id} not found.");
 
-    // rebuild aggregate from events
-    var aggregate = new TAggregateRoot();
-    aggregate.Rehydrate(id, history);
-    return aggregate;
+    return entity;
   }
 
-  public async Task SaveAsync(TAggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
+  // ---------------------------------------------------
+  // SAVE (STATE + DISPATCH EVENTS ONLY)
+  // ---------------------------------------------------
+  public virtual async Task SaveAsync(
+      TAggregateRoot aggregateRoot,
+      CancellationToken cancellationToken = default)
   {
-    var changes = aggregateRoot.GetUncommittedChanges().ToList();
+    await PersistAggregateAsync(aggregateRoot, cancellationToken);
 
-    if (!changes.Any())
-      return;
-
-    // persist new events
-    await DbContext.Set<TEvent>().AddRangeAsync(changes, cancellationToken);
     await DbContext.SaveChangesAsync(cancellationToken);
 
-    // dispatch them
+    var changes = aggregateRoot.GetUncommittedChanges();
+
     foreach (var ev in changes)
       await _dispatcher.PublishEventAsync(ev, cancellationToken);
 
     aggregateRoot.MarkChangesAsCommitted();
+  }
+
+  // ---------------------------------------------------
+  // EXTENSION POINTS (IMPLEMENTED PER AGGREGATE TYPE)
+  // ---------------------------------------------------
+
+  protected virtual Task<TAggregateRoot?> LoadAggregateAsync(
+      TId id,
+      CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException(
+      $"Aggregate loading must be implemented for {typeof(TAggregateRoot).Name}");
+  }
+
+  protected virtual Task PersistAggregateAsync(
+      TAggregateRoot aggregate,
+      CancellationToken cancellationToken)
+  {
+    // Default assumption: EF tracks the aggregate
+    DbContext.Update(aggregate);
+    return Task.CompletedTask;
   }
 }

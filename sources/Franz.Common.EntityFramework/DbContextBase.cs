@@ -23,8 +23,7 @@ public abstract class DbContextBase : DbContext
   }
 
   public override async Task<int> SaveChangesAsync(
-      CancellationToken cancellationToken = default
-  )
+      CancellationToken cancellationToken = default)
   {
     ApplyAuditing();
 
@@ -38,7 +37,7 @@ public abstract class DbContextBase : DbContext
   {
     var userId = _currentUser?.UserId ?? "system";
 
-    foreach (var entry in ChangeTracker.Entries<Entity>())
+    foreach (var entry in ChangeTracker.Entries<IEntity>())
     {
       switch (entry.State)
       {
@@ -52,7 +51,8 @@ public abstract class DbContextBase : DbContext
 
         case EntityState.Deleted:
           entry.Entity.MarkDeleted(userId);
-          // Ensure soft delete is persisted
+
+          // soft delete enforcement
           entry.State = EntityState.Modified;
           break;
       }
@@ -68,13 +68,15 @@ public abstract class DbContextBase : DbContext
       if (typeof(Entity).IsAssignableFrom(entityType.ClrType))
       {
         var parameter = Expression.Parameter(entityType.ClrType, "e");
-        var isDeletedProperty = Expression.Property(parameter, nameof(Entity.IsDeleted));
-        var filter = Expression.Lambda(
-            Expression.Equal(isDeletedProperty, Expression.Constant(false)),
-            parameter
-        );
+        var isDeleted = Expression.Property(parameter, nameof(Entity.IsDeleted));
 
-        modelBuilder.Entity(entityType.ClrType).HasQueryFilter(filter);
+        var filter = Expression.Lambda(
+          Expression.Equal(isDeleted, Expression.Constant(false)),
+          parameter);
+
+        modelBuilder
+          .Entity(entityType.ClrType)
+          .HasQueryFilter(filter);
       }
     }
   }

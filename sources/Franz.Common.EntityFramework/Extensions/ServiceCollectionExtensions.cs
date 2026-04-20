@@ -8,31 +8,34 @@ using Franz.Common.EntityFramework.Properties;
 using Franz.Common.EntityFramework.Repositories;
 using Franz.Common.Errors;
 using Franz.Common.Mediator.Pipelines.Core;
-using Franz.Common.Reflection.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System.Reflection;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Franz.Common.EntityFramework;
+
 public static class ServiceCollectionExtensions
 {
   private const string DatabaseSectionName = "Database";
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  public static IServiceCollection AddDatabaseOptions(this IServiceCollection services, IConfiguration? configuration)
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-  {
-    var configurationSection = configuration?.GetSection(DatabaseSectionName);
-    var hasMessagingConnectionOptions = services.Any(service => service.ServiceType == typeof(IConfigureOptions<DatabaseOptions>));
+  #region DATABASE OPTIONS
 
-    if (configurationSection?.Exists() == true && !hasMessagingConnectionOptions)
+  public static IServiceCollection AddDatabaseOptions(
+      this IServiceCollection services,
+      IConfiguration? configuration)
+  {
+    var section = configuration?.GetSection(DatabaseSectionName);
+
+    var alreadyConfigured = services.Any(s =>
+        s.ServiceType == typeof(IConfigureOptions<DatabaseOptions>));
+
+    if (section?.Exists() == true && !alreadyConfigured)
     {
-      services
-        .AddOptions()
-        .Configure<DatabaseOptions>(configurationSection);
+      services.AddOptions().Configure<DatabaseOptions>(section);
     }
-    else if (!hasMessagingConnectionOptions)
+    else if (!alreadyConfigured)
     {
       throw new TechnicalException(Resources.DatabaseNoConfigurationException);
     }
@@ -40,96 +43,95 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  public static IServiceCollection AddGenericRepositories<TDbContext>(this IServiceCollection services)
-    where TDbContext : DbContext
+  #endregion
+
+ 
+
+  #region ENTITY REPOSITORIES (FULL CRUD MODEL)
+
+  public static IServiceCollection AddEntityRepositories<TDbContext>(
+      this IServiceCollection services)
+      where TDbContext : DbContextBase
   {
-    services = services.AddScoped<DbContext>(sp => sp.GetRequiredService<TDbContext>());
+    services.AddScoped<DbContext>(sp => sp.GetRequiredService<TDbContext>());
 
-    var typeDbContext = typeof(TDbContext);
-    var entityTypes = GetEntityTypesFromDbContext(typeDbContext);
-
-    var repositoryInterface = typeof(IReadRepository<>);
-    var repositoryImplementation = typeof(ReadRepository<>);
+    var entityTypes = GetEfEntityTypes(typeof(TDbContext));
 
     foreach (var entityType in entityTypes)
     {
-      var genericRepositoryType = repositoryInterface.MakeGenericType(entityType);
-      if (!services.Any(x => x.ImplementationType == genericRepositoryType))
-      {
-        var implementationType = repositoryImplementation.MakeGenericType(entityType);
+      var serviceType = typeof(IEntityRepository<,>).MakeGenericType(entityType);
+      var implementationType = typeof(EntityRepository<,,>)
+          .MakeGenericType(typeof(TDbContext), entityType);
 
-        services.AddNoDuplicateScoped(genericRepositoryType, implementationType);
-      }
+      services.AddNoDuplicateScoped(serviceType, implementationType);
     }
 
     return services;
   }
 
-  public static IServiceCollection AddEntityRepositories<TDbContext>(this IServiceCollection services)
-    where TDbContext : DbContext
+  #endregion
+
+  #region AGGREGATES (EXPLICIT ONLY — DO NOT AUTO-SCAN)
+
+  /// <summary>
+  /// Aggregates are event-sourced and MUST be explicitly registered.
+  /// No reflection scanning is allowed for aggregates.
+  /// </summary>
+  public static IServiceCollection AddAggregateRepository<
+      TAggregate,
+      TEvent,
+      TId,
+      TRepository>(
+      this IServiceCollection services)
+      where TAggregate : class, IAggregateRoot<TEvent>
+      where TEvent : class, IDomainEvent
+      where TRepository : class, IAggregateRootRepository<TAggregate, TEvent, TId>
   {
-    services = services.AddScoped<DbContext>(sp => sp.GetRequiredService<TDbContext>());
+    services.AddScoped<
+        IAggregateRootRepository<TAggregate, TEvent, TId>,
+        TRepository>();
 
-    var typeDbContext = typeof(TDbContext);
-    var entityTypes = GetEntityTypesFromDbContext(typeDbContext)
-        .Where(type => typeof(IEntity).IsAssignableFrom(type) && !typeof(IAggregateRoot<>).IsAssignableFrom(type));
-
-    foreach (var entityType in entityTypes)
-    {
-      var repositoryInterface = typeof(IEntityRepository<>).MakeGenericType(entityType);
-      var repositoryImplementation = typeof(EntityRepository<,>).MakeGenericType(typeDbContext, entityType);
-
-      if (!services.Any(x => x.ServiceType == repositoryInterface))
-      {
-        services.AddScoped(repositoryInterface, repositoryImplementation);
-      }
-    }
+    services.AddScoped<TRepository>();
 
     return services;
   }
 
-  public static IServiceCollection AddAggregateRepositories<TDbContext, TEvent>(this IServiceCollection services)
-    where TDbContext : DbContext
-    where TEvent : IDomainEvent
+  #endregion
+
+  #region EF ENTITY DISCOVERY (HARDENED)
+
+  private static IEnumerable<Type> GetEfEntityTypes(Type dbContextType)
   {
-    services = services.AddScoped<DbContext>(sp => sp.GetRequiredService<TDbContext>());
+    return dbContextType
+      .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+      .Where(p => p.PropertyType.IsGenericType)
+      .Where(p => p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
+      .Select(p => p.PropertyType.GetGenericArguments().Single())
 
-    var typeDbContext = typeof(TDbContext);
-    var aggregateTypes = GetEntityTypesFromDbContext(typeDbContext)
-        .Where(type => typeof(IAggregateRoot<>).IsAssignableFrom(type));
+      // IMPORTANT: only persistence entities
+      .Where(t =>
+          typeof(IEntity).IsAssignableFrom(t) &&
+          !IsAggregateRoot(t))
 
-    foreach (var aggregateType in aggregateTypes)
-    {
-      var repositoryInterface = typeof(IAggregateRootRepository<,>).MakeGenericType(aggregateType);
-      var repositoryImplementation = typeof(AggregateRepository<, ,>).MakeGenericType(typeDbContext, aggregateType, typeof(TEvent));
-
-      if (!services.Any(x => x.ServiceType == repositoryInterface))
-      {
-        services.AddScoped(repositoryInterface, repositoryImplementation);
-      }
-    }
-
-    return services;
-  }
-
-
-
-  private static IEnumerable<Type> GetEntityTypesFromDbContext(Type typeDbContext)
-  {
-    var results = typeDbContext.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-      .Where(property => property.PropertyType.IsGenericType)
-      .Where(property => property.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
-      .Select(property => property.PropertyType.GetGenericArguments().Single())
-      .Where(type => type.Implements<IEntity>())
       .ToList();
-
-    return results;
   }
+
+  private static bool IsAggregateRoot(Type type)
+  {
+    return type.GetInterfaces()
+        .Any(i => i.IsGenericType &&
+                  i.GetGenericTypeDefinition() == typeof(IAggregateRoot<>));
+  }
+
+  #endregion
+
+  #region BEHAVIORS
 
   public static IServiceCollection AddBehaviors(this IServiceCollection services)
   {
     services.AddScoped(typeof(IPipeline<,>), typeof(PersistenceBehavior<,>));
-
     return services;
   }
+
+  #endregion
 }

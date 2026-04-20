@@ -5,13 +5,13 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Franz.Common.EntityFramework;
 
 public class EnumerationConverter<TEnumeration, TId> : ValueConverter<TEnumeration, TId>
-  where TEnumeration : Enumeration<TId>
-  where TId : notnull, IComparable<TId>
+    where TEnumeration : Enumeration<TId>
+    where TId : notnull, IComparable<TId>
 {
   public EnumerationConverter()
       : base(
-          v => v == null ? ThrowToProvider() : v.Id,
-          v => v == null ? ThrowFromProvider() : Enumeration<TId>.FromValue<TEnumeration>(v)
+          convertToProviderExpression: v => v.Id,
+          convertFromProviderExpression: v => Enumeration<TId>.FromValue<TEnumeration>(v)
       )
   {
   }
