@@ -1,7 +1,9 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
 
 namespace Franz.Common.Business.Domain;
 
+[NotMapped]
 public abstract class Enumeration<TId> : IComparable<Enumeration<TId>>
     where TId : notnull, IComparable<TId>
 {

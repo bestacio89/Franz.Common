@@ -14,58 +14,60 @@ public abstract class AggregateRoot<TEvent> : Entity<Guid>, IAggregateRoot<TEven
 
   public int Version { get; private set; } = -1;
 
-  protected AggregateRoot()
+  protected AggregateRoot() { }
+
+  protected AggregateRoot(Guid id)
   {
-    // Hardening: Initialize with Guid v7 for sequential DB inserts
-    Id = Guid.CreateVersion7();
+    SetId(id);
   }
 
-  protected AggregateRoot(Guid id) : base()
+  public IReadOnlyCollection<TEvent> GetUncommittedChanges()
+      => _changes.AsReadOnly();
+
+  public void MarkChangesAsCommitted()
+      => _changes.Clear();
+
+  protected void Register<T>(Action<T> handler)
+      where T : TEvent
   {
-    // Respect the provided ID, but fallback to v7 if it's empty
-    Id = id == Guid.Empty ? Guid.CreateVersion7() : id;
+    var type = typeof(T);
+
+    if (_handlers.ContainsKey(type))
+      throw new InvalidOperationException(
+          $"Handler already registered for {type.Name}");
+
+    _handlers[type] = e => handler((T)e);
   }
 
-  public IReadOnlyCollection<TEvent> GetUncommittedChanges() => _changes.AsReadOnly();
-
-  public void MarkChangesAsCommitted() => _changes.Clear();
-
-  protected void Register<T>(Action<T> handler) where T : TEvent
+  public void Rehydrate(Guid id, IEnumerable<TEvent> events)
   {
-    if (_handlers.ContainsKey(typeof(T)))
-      throw new InvalidOperationException($"Handler already registered for {typeof(T).Name}");
+    SetId(id);
 
-    _handlers[typeof(T)] = e => handler((T)e);
-  }
+    foreach (var @event in events)
+      ApplyChange(@event, false);
 
-  protected void RaiseEvent(TEvent @event)
-  {
-    // We apply the change first to update internal state
-    ApplyChange(@event, true);
+    MarkChangesAsCommitted();
   }
 
   public void ReplayEvents(IEnumerable<TEvent> events)
   {
     foreach (var @event in events)
-    {
       ApplyChange(@event, false);
-    }
   }
 
-  public void Rehydrate(Guid id, IEnumerable<TEvent> events)
-  {
-    Id = id;
-    ReplayEvents(events);
-    MarkChangesAsCommitted();
-  }
+  protected void RaiseEvent(TEvent @event)
+      => ApplyChange(@event, true);
 
   private void ApplyChange(TEvent @event, bool isNew)
   {
     var eventType = @event.GetType();
+
     if (!_handlers.TryGetValue(eventType, out var handler))
-      throw new InvalidOperationException($"Apply handler not found for {eventType.Name}");
+      throw new InvalidOperationException(
+          $"Apply handler not found for {eventType.Name}");
 
     handler(@event);
+
     Version++;
 
     if (isNew)

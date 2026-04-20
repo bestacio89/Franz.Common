@@ -1,4 +1,6 @@
-﻿using Franz.Common.Business.Helpers;
+﻿using Franz.Common.Business.Domain.Factories;
+using Franz.Common.Business.Domain.IdGenerators;
+using Franz.Common.Business.Helpers;
 using Franz.Common.Business.Properties;
 using Franz.Common.Errors;
 using Franz.Common.Mediator;
@@ -10,77 +12,45 @@ using System.Reflection;
 
 namespace Franz.Common.Business.Extensions;
 
-public static class ServiceCollectionExtensions
+public static class BusinessBootstrapExtensions
 {
   /// <summary>
-  /// Registers Business + Mediator automatically.
+  /// Full Business + Mediator + Handlers + Domain wiring (production-safe).
   /// </summary>
-  public static IServiceCollection AddBusinessWithMediator(
+  public static IServiceCollection AddBusiness(
       this IServiceCollection services,
-      Assembly entryAssembly,
+      Assembly applicationAssembly,
       Action<FranzMediatorOptions>? configure = null)
   {
-    var productName = string.Join(".", entryAssembly!.GetName().Name!.Split(".").Take(2));
-    var applicationAssemblyName = $"{productName}.Application";
+    if (applicationAssembly is null)
+      throw new ArgumentNullException(nameof(applicationAssembly));
 
-    var applicationAssembly = SearchApplicationAssemblyInCurrentAppDomain(applicationAssemblyName)
-        ?? throw new TechnicalException(Resources.ApplicationDependencyNotExistsException);
+    // -----------------------------
+    // DOMAIN LAYER
+    // -----------------------------
+    services.AddSingleton<IIdGenerator<Guid>, GuidV7Generator>();
+    services.AddTransient(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
 
-    // 🔹 Forward into Franz.Common.Mediator
+    // -----------------------------
+    // MEDIATOR LAYER
+    // -----------------------------
     services.AddFranzMediator(new[] { applicationAssembly }, configure);
 
-    // 🔹 Collect handlers (domain + application layer)
+    // -----------------------------
+    // HANDLER DISCOVERY
+    // -----------------------------
     HandlerCollector.CollectHandlers(services, applicationAssembly);
-
-    // 🔹 Log success (if logger is present in DI)
-    using var provider = services.BuildServiceProvider();
-    provider.GetService<ILoggerFactory>()?
-            .CreateLogger("Franz.BusinessBootstrap")
-            .LogInformation("✅ Franz.Business bootstrapped with {AppAssembly}", applicationAssembly.FullName);
 
     return services;
   }
 
   /// <summary>
-  /// Registers Business + Mediator, but continues without throwing if Application assembly is missing.
+  /// Optional platform stack (logging + resilience pipelines).
   /// </summary>
-  public static IServiceCollection TryAddBusinessWithMediator(
-      this IServiceCollection services,
-      Assembly entryAssembly,
-      Action<FranzMediatorOptions>? configure = null)
+  public static IServiceCollection AddBusinessPlatform(
+      this IServiceCollection services)
   {
-    var productName = string.Join(".", entryAssembly!.GetName().Name!.Split(".").Take(2));
-    var applicationAssemblyName = $"{productName}.Application";
-
-    var applicationAssembly = SearchApplicationAssemblyInCurrentAppDomain(applicationAssemblyName);
-    if (applicationAssembly == null)
-    {
-      using var provider = services.BuildServiceProvider();
-      provider.GetService<ILoggerFactory>()?
-              .CreateLogger("Franz.BusinessBootstrap")
-              .LogWarning("⚠️ No Application assembly found for {Name}, Business layer not registered.", applicationAssemblyName);
-
-      return services;
-    }
-
-    return services.AddBusinessWithMediator(entryAssembly, configure);
-  }
-
-  /// <summary>
-  /// Registers Business + Mediator + all FranzPlatform resilience/logging pipelines.
-  /// Useful when you want the full stack wired in.
-  /// </summary>
-  public static IServiceCollection AddFranzPlatform(
-      this IServiceCollection services,
-      Assembly entryAssembly,
-      Action<FranzMediatorOptions>? configure = null)
-  {
-    services.AddBusinessWithMediator(entryAssembly, configure);
-
-    // 🔹 Add Serilog-aware logging pipeline
     services.AddFranzSerilogLoggingPipeline();
-
-    // 🔹 Add Resilience pipelines (using default policy names)
     services.AddFranzRetryPipeline();
     services.AddFranzCircuitBreakerPipeline();
     services.AddFranzTimeoutPipeline();
@@ -89,11 +59,17 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  private static Assembly? SearchApplicationAssemblyInCurrentAppDomain(string applicationAssemblyName) =>
-    AppDomain.CurrentDomain
-      .GetAssemblies()
-      .FirstOrDefault(assembly =>
-          (assembly.GetName().Name
-              ?? throw new TechnicalException("Assembly without a name encountered."))
-          .Equals(applicationAssemblyName, StringComparison.InvariantCultureIgnoreCase));
+  /// <summary>
+  /// Safe fallback version (no exceptions if assembly missing).
+  /// </summary>
+  public static IServiceCollection TryAddBusiness(
+      this IServiceCollection services,
+      Assembly? applicationAssembly,
+      Action<FranzMediatorOptions>? configure = null)
+  {
+    if (applicationAssembly is null)
+      return services;
+
+    return services.AddBusiness(applicationAssembly, configure);
+  }
 }
