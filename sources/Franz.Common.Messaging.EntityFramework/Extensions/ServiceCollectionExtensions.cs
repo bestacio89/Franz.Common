@@ -48,7 +48,7 @@ public static class ServiceCollectionExtensions
     if (IsRelational(provider))
     {
       services
-          .AddGenericRepositories<TDbContext>()
+          .AddEntityRepositories<TDbContext>()
           .AddBehaviors();
     }
 
