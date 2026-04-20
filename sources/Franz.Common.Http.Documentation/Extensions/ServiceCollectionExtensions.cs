@@ -1,39 +1,87 @@
+#nullable enable
+
 using Franz.Common.Http.Documentation.Configuration;
-using Franz.Common.Http.Documentation.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 
 namespace Franz.Common.Http.Documentation.Extensions;
+
+public sealed class FranzDocumentationBuilder
+{
+  internal IServiceCollection Services { get; }
+
+  internal FranzDocumentationBuilder(IServiceCollection services)
+  {
+    Services = services;
+  }
+}
+
 public static class ServiceCollectionExtensions
 {
-  public static IServiceCollection AddDocumentation(this IServiceCollection services)
+  /// <summary>
+  /// Entry point to add Franz documentation pipeline.
+  /// </summary>
+  public static FranzDocumentationBuilder AddFranzDocumentation(this IServiceCollection services)
   {
-    services.AddEndpointsApiExplorer();
-    services.AddSwaggerGen(options =>
+    return new FranzDocumentationBuilder(services);
+  }
+
+  /// <summary>
+  /// Configures Swagger and XML documentation.
+  /// </summary>
+  public static FranzDocumentationBuilder ConfigureSwagger(this FranzDocumentationBuilder builder)
+  {
+    builder.Services.AddEndpointsApiExplorer();
+
+    builder.Services.AddSwaggerGen(options =>
     {
-      var xmlFilename = $"{Assembly.GetEntryAssembly()!.GetName().Name}.xml";
-      options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+      var entryAssembly = Assembly.GetEntryAssembly();
+      if (entryAssembly != null)
+      {
+        var xmlFilename = $"{entryAssembly.GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
+        if (File.Exists(xmlPath))
+          options.IncludeXmlComments(xmlPath);
+      }
+
       options.ConvertEnumeration();
     });
-    services.ConfigureOptions<ConfigureSwaggerOptions>();
-    services.AddControllersWithViews(options => options.UseGeneralRoutePrefix("api/v{version:apiVersion}"));
-    services.AddApiVersioning(opt =>
+
+    builder.Services.ConfigureOptions<ConfigureSwaggerOptions>();
+
+    return builder;
+  }
+
+  /// <summary>
+  /// Configures API versioning and general route prefix.
+  /// </summary>
+  public static FranzDocumentationBuilder ConfigureApiVersioning(this FranzDocumentationBuilder builder)
+  {
+    builder.Services.AddControllers(options =>
+    {
+      options.UseGeneralRoutePrefix("api/v{version:apiVersion}");
+    });
+
+    builder.Services.AddApiVersioning(opt =>
     {
       opt.DefaultApiVersion = new ApiVersion(1, 0);
       opt.AssumeDefaultVersionWhenUnspecified = true;
       opt.ReportApiVersions = true;
-      opt.ApiVersionReader = ApiVersionReader.Combine(new UrlSegmentApiVersionReader(),
-                                                      new HeaderApiVersionReader("x-api-version"),
-                                                      new MediaTypeApiVersionReader("x-api-version"));
+      opt.ApiVersionReader = ApiVersionReader.Combine(
+          new UrlSegmentApiVersionReader(),
+          new HeaderApiVersionReader("x-api-version"),
+          new MediaTypeApiVersionReader("x-api-version")
+      );
     });
-    services.AddVersionedApiExplorer(setup =>
+
+    builder.Services.AddVersionedApiExplorer(setup =>
     {
       setup.GroupNameFormat = "'v'VVV";
       setup.SubstituteApiVersionInUrl = true;
     });
 
-    return services;
+    return builder;
   }
 }

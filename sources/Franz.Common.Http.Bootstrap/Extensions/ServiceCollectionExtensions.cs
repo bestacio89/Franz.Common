@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Reflection;
+using Franz.Common.Http.Extensions;
 
 namespace Franz.Common.Http.Bootstrap.Extensions;
 
@@ -29,21 +30,28 @@ public static class ServiceCollectionExtensions
 
     services
         .AddCommonArchitecture(configuration, assembly)
-        .AddHttpControllers()
-        .AddFranzAuthentication()
+        .AddFranzHttp()
         .AddFrenchRouting()
         .AddDefaultCors(configuration)
         .AddForwardedHeaders()
-        .AddHttpHeaderContext()
-        .AddHeaderRequiredCapability()
+        .AddSerialization()
+        .AddErrors();
+
+    services
+        .AddFranzAuthentication();
+
+    services
+        
+        .AddHttpHeaderContext();
+    
+    services
+        .AddFranzDocumentation();
+    
+    services
         .AddHttpIdentityContext()
         .AddFranzMultiTenancy()
         .AddSerializers()
-        .AddHttpSerialization()
-        .AddDocumentation()
-        .AddHttpErrors()
         .AddHealthChecks();
-        
 
     // Note: Refit support is now provided in Franz.Common.Http.Refit
     // via AddFranzRefit<TClient>. Consumers must opt-in explicitly.

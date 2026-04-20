@@ -1,32 +1,45 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿#nullable enable
+
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi;
 using System.Text;
 
 namespace Franz.Common.Http.Authentication.Extensions;
 
-public static class ServiceCollectionExtensions
+public sealed class FranzSecurityBuilder
 {
-  public static IServiceCollection AddFranzAuthentication(
-      this IServiceCollection services,
-      string? issuerSigningKey = null)
+  public IServiceCollection Services { get; }
+
+  internal FranzSecurityBuilder(IServiceCollection services)
   {
-    services.AddSwaggerGen(options =>
-    {
-      options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-      {
-        Name = "Authorization",
-        Description = "Insert JWT as: Bearer {token}",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT"
-      });
+    Services = services;
+  }
+}
 
-    });
+public static class FranzAuthenticationExtensions
+{
+  /// <summary>
+  /// Entry point to register JWT authentication in Franz style.
+  /// </summary>
+  public static FranzSecurityBuilder AddFranzAuthentication(this IServiceCollection services)
+  {
+    // Avoid duplicating registrations if needed
+    return new FranzSecurityBuilder(services);
+  }
 
-    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+  /// <summary>
+  /// Configures JWT bearer authentication using the provided configuration section.
+  /// </summary>
+  public static FranzSecurityBuilder ConfigureJwtBearer(
+      this FranzSecurityBuilder builder,
+      IConfiguration configuration,
+      string sectionName = "JwtSettings")
+  {
+    var jwtSettings = configuration.GetSection(sectionName).Get<JwtSettings>()!;
+
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
           options.RequireHttpsMetadata = true;
@@ -34,21 +47,29 @@ public static class ServiceCollectionExtensions
 
           options.TokenValidationParameters = new TokenValidationParameters
           {
-            ValidateIssuer = false,
-            ValidateAudience = false,
+            ValidateIssuer = !string.IsNullOrEmpty(jwtSettings.Issuer),
+            ValidateAudience = !string.IsNullOrEmpty(jwtSettings.Audience),
             ValidateLifetime = true,
-            ValidateIssuerSigningKey = issuerSigningKey != null,
+            ValidateIssuerSigningKey = !string.IsNullOrEmpty(jwtSettings.SigningKey),
+            IssuerSigningKey = string.IsNullOrEmpty(jwtSettings.SigningKey)
+                      ? null
+                      : new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SigningKey)),
             NameClaimType = "name",
-            RoleClaimType = "role"
+            RoleClaimType = "role",
+            ClockSkew = TimeSpan.Zero
           };
-
-          if (issuerSigningKey != null)
-          {
-            options.TokenValidationParameters.IssuerSigningKey =
-                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(issuerSigningKey));
-          }
         });
 
-    return services;
+    return builder;
   }
+}
+
+/// <summary>
+/// Strongly typed JWT settings for configuration.
+/// </summary>
+public class JwtSettings
+{
+  public string Issuer { get; set; } = "";
+  public string Audience { get; set; } = "";
+  public string SigningKey { get; set; } = "";
 }

@@ -100,7 +100,7 @@ public static class MultiDatabaseServiceCollectionExtensions
 
     services
         .AddDatabaseTransactionPerHttpCall()
-        .AddGenericRepositories<TContext>()
+        .AddEntityRepositories<TContext>()
         .AddBehaviors();
   }
 
