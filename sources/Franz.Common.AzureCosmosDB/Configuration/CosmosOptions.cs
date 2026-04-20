@@ -9,7 +9,6 @@ public sealed class CosmosOptions
   /// Cosmos DB Account endpoint (URI).
   /// </summary>
   [Required(AllowEmptyStrings = false)]
-  [Url]
   public string AccountEndpoint { get; set; } = default!;
 
   /// <summary>

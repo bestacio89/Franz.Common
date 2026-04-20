@@ -1,5 +1,6 @@
 ﻿using Franz.Common.AzureCosmosDB.Conventions;
 using Franz.Common.AzureCosmosDB.Options; // New Reference
+using Franz.Common.Business.Domain;
 using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.Auditing;
 using Franz.Common.Mediator.Dispatchers;
@@ -25,6 +26,7 @@ public abstract class CosmosDbContextBase : DbContextBase
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
+
 
     // 1️⃣ Apply the dynamic fallback container from configuration
     ConfigureFallbackContainer(modelBuilder);
