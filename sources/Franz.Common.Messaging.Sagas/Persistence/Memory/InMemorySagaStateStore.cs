@@ -7,5 +7,5 @@ namespace Franz.Common.Messaging.Sagas.Persistence.Memory;
 /// </summary>
 public sealed class InMemorySagaStateStore
 {
-  public ConcurrentDictionary<string, string> Store { get; } = new();
+  public ConcurrentDictionary<Guid , string> Store { get; } = new();
 }

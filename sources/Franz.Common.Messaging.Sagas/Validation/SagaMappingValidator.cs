@@ -44,19 +44,19 @@ public static class SagaMappingValidator
     // expected signature:
     // (TMessage message, ISagaContext ctx, CancellationToken ct)
     if (parameters.Length != 3)
-      throw new SagaConfigurationException(
+      throw new SagaConfigurationError(
           HandlerError(reg, handler, "must have exactly 3 parameters."));
 
     if (parameters[0].ParameterType != messageType)
-      throw new SagaConfigurationException(
+      throw new SagaConfigurationError(
           HandlerError(reg, handler, "first parameter must be the message type."));
 
     if (parameters[1].ParameterType != typeof(ISagaContext))
-      throw new SagaConfigurationException(
+      throw new SagaConfigurationError(
           HandlerError(reg, handler, "second parameter must be ISagaContext."));
 
     if (parameters[2].ParameterType != typeof(System.Threading.CancellationToken))
-      throw new SagaConfigurationException(
+      throw new SagaConfigurationError(
           HandlerError(reg, handler, "third parameter must be CancellationToken."));
 
     // Return type can be:
@@ -71,7 +71,7 @@ public static class SagaMappingValidator
         returnType.GetGenericArguments()[0] == typeof(ISagaTransition))
       return; // valid
 
-    throw new SagaConfigurationException(
+    throw new SagaConfigurationError(
         HandlerError(reg, handler,
             "must return Task or Task<ISagaTransition>."));
   }
@@ -95,7 +95,7 @@ public static class SagaMappingValidator
 
       if (!sagaType.GetInterfaces().Contains(correlationInterface))
       {
-        throw new SagaConfigurationException(
+        throw new SagaConfigurationError(
             $"Saga '{sagaType.Name}' does not implement IMessageCorrelation<{msgType.Name}> " +
             $"required for non-start message '{msgType.Name}'.");
       }

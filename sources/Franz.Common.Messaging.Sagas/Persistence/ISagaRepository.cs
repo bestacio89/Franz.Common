@@ -16,16 +16,16 @@ public interface ISagaRepository : IScopedDependency
   /// <summary>
   /// Loads a saga state for the given ID and type, or returns null if not found.
   /// </summary>
-  Task<object?> LoadStateAsync(string sagaId, Type stateType, CancellationToken cancellationToken);
+  Task<object?> LoadStateAsync(Guid sagaId, Type stateType, CancellationToken cancellationToken);
 
   /// <summary>
   /// Saves the saga state. Creates or updates the record.
   /// </summary>
-  Task SaveStateAsync(string sagaId, object state, CancellationToken cancellationToken);
+  Task SaveStateAsync( Guid   sagaId, object state, CancellationToken cancellationToken);
 
   /// <summary>
   /// Deletes a saga state when the saga completes.
   /// Not all implementations must support delete.
   /// </summary>
-  Task DeleteStateAsync(string sagaId, CancellationToken cancellationToken);
+  Task DeleteStateAsync(Guid sagaId, CancellationToken cancellationToken);
 }

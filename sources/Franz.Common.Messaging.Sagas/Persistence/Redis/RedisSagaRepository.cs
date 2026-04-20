@@ -11,12 +11,12 @@ namespace Franz.Common.Messaging.Sagas.Persistence.Redis;
 /// </summary>
 public sealed class RedisSagaRepository : ISagaRepository
 {
-  public Task<object?> LoadStateAsync(string sagaId, Type stateType, CancellationToken cancellationToken)
+  public Task<object?> LoadStateAsync(Guid sagaId, Type stateType, CancellationToken cancellationToken)
       => throw new NotImplementedException("Redis saga persistence is not implemented yet.");
 
-  public Task SaveStateAsync(string sagaId, object state, CancellationToken cancellationToken)
+  public Task SaveStateAsync(Guid sagaId, object state, CancellationToken cancellationToken)
       => throw new NotImplementedException("Redis saga persistence is not implemented yet.");
 
-  public Task DeleteStateAsync(string sagaId, CancellationToken cancellationToken)
+  public Task DeleteStateAsync(Guid sagaId, CancellationToken cancellationToken)
       => Task.CompletedTask;
 }

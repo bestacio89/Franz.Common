@@ -14,7 +14,7 @@ namespace Franz.Common.Messaging.Sagas.Persistence.RabbitMq;
 internal sealed class RabbitMqSagaRepository : ISagaRepository
 {
   public Task<object?> LoadStateAsync(
-      string sagaId,
+      Guid sagaId,
       Type stateType,
       CancellationToken cancellationToken)
   {
@@ -24,7 +24,7 @@ internal sealed class RabbitMqSagaRepository : ISagaRepository
   }
 
   public Task SaveStateAsync(
-      string sagaId,
+      Guid sagaId,
       object state,
       CancellationToken cancellationToken)
   {
@@ -34,7 +34,7 @@ internal sealed class RabbitMqSagaRepository : ISagaRepository
   }
 
   public Task DeleteStateAsync(
-      string sagaId,
+      Guid sagaId,
       CancellationToken cancellationToken)
   {
     // Delete is meaningless; but we throw to be explicit.

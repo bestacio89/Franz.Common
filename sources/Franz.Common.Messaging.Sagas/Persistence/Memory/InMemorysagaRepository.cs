@@ -22,7 +22,7 @@ public sealed class InMemorySagaRepository : ISagaRepository
   }
 
   public Task<object?> LoadStateAsync(
-      string sagaId,
+      Guid sagaId,
       Type stateType,
       CancellationToken cancellationToken)
   {
@@ -36,7 +36,7 @@ public sealed class InMemorySagaRepository : ISagaRepository
   }
 
   public Task SaveStateAsync(
-      string sagaId,
+      Guid sagaId,
       object state,
       CancellationToken cancellationToken)
   {
@@ -46,7 +46,7 @@ public sealed class InMemorySagaRepository : ISagaRepository
   }
 
   public Task DeleteStateAsync(
-      string sagaId,
+      Guid sagaId,
       CancellationToken cancellationToken)
   {
     _store.Store.TryRemove(sagaId, out _);

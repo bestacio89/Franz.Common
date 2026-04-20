@@ -22,7 +22,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
   }
 
   public async Task<object?> LoadStateAsync(
-      string sagaId,
+      Guid sagaId,
       Type stateType,
       CancellationToken cancellationToken)
   {
@@ -37,7 +37,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
   }
 
   public async Task SaveStateAsync(
-      string sagaId,
+      Guid sagaId,
       object state,
       CancellationToken cancellationToken)
   {
@@ -55,7 +55,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
 
     if (existing == null)
     {
-      var doc = new CosmosSagaStateDocument(sagaId)
+      var doc = new CosmosSagaStateDocument()
       {
         
         Payload = json,
@@ -87,7 +87,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
   }
 
   public async Task DeleteStateAsync(
-      string sagaId,
+      Guid sagaId,
       CancellationToken cancellationToken)
   {
     var doc = await _db.SagaStates

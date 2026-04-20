@@ -8,7 +8,7 @@ namespace Franz.Common.Messaging.Sagas.Core;
 public sealed class SagaContext : ISagaContext
 {
   public SagaContext(
-      string sagaId,
+      Guid sagaId,
       Type sagaType,
       ISagaState state,
       object message,
@@ -25,11 +25,11 @@ public sealed class SagaContext : ISagaContext
     CancellationToken = cancellationToken;
   }
 
-  public string SagaId { get; }
+  public Guid SagaId { get; }
   public Type SagaType { get; }
   public ISagaState State { get; }
   public object Message { get; }
-  public Guid? CorrelationId { get; }
+  public Guid CorrelationId { get; }
   public Guid? CausationId { get; }
   public CancellationToken CancellationToken { get; }
 

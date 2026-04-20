@@ -14,7 +14,7 @@ public interface ISagaContext
   /// <summary>
   /// The unique identifier of the saga instance.
   /// </summary>
-  string SagaId { get; }
+  Guid SagaId { get; }
 
   /// <summary>
   /// The saga type being executed.
@@ -34,7 +34,7 @@ public interface ISagaContext
   /// <summary>
   /// Optional correlation identifier spanning the whole business process.
   /// </summary>
-  Guid? CorrelationId { get; }
+  Guid CorrelationId { get; }
 
   /// <summary>
   /// Optional parent message identifier for tracing.

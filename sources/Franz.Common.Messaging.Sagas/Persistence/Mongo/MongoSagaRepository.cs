@@ -31,7 +31,7 @@ public sealed class MongoSagaRepository : ISagaRepository
   }
 
   public async Task<object?> LoadStateAsync(
-      string sagaId,
+      Guid sagaId,
       Type stateType,
       CancellationToken cancellationToken)
   {
@@ -48,7 +48,7 @@ public sealed class MongoSagaRepository : ISagaRepository
   }
 
   public async Task SaveStateAsync(
-      string sagaId,
+      Guid sagaId,
       object state,
       CancellationToken cancellationToken)
   {
@@ -86,7 +86,7 @@ public sealed class MongoSagaRepository : ISagaRepository
   }
 
   public async Task DeleteStateAsync(
-      string sagaId,
+      Guid sagaId,
       CancellationToken cancellationToken)
   {
     var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, sagaId);
@@ -99,7 +99,7 @@ public sealed class MongoSagaRepository : ISagaRepository
   private sealed class SagaStateDocument
   {
     [BsonId]
-    public string Id { get; set; } = default!;
+    public Guid Id { get; set; } = default!;
 
     public string StateType { get; set; } = default!;
 

@@ -5,14 +5,14 @@ using Franz.Common.Business.Domain;
 namespace Franz.Common.Messaging.Sagas.Persistence.Cosmos;
 
 /// <summary>
-/// Cosmos document for saga state, inheriting Franz Entity conventions.
+/// Cosmos document for saga state, using Guid identity aligned with messaging + factories.
 /// </summary>
-public sealed class CosmosSagaStateDocument : Entity<string>
+public sealed class CosmosSagaStateDocument : Entity<Guid>
 {
-  public CosmosSagaStateDocument(string sagaId)
-  {
-    Id = sagaId;
-  }
+  public CosmosSagaStateDocument() { } // EF/Cosmos deserialization
+
+  
+
   /// <summary>
   /// Fully-qualified .NET type name of the saga state (for polymorphic deserialization).
   /// </summary>
@@ -24,7 +24,7 @@ public sealed class CosmosSagaStateDocument : Entity<string>
   public string Payload { get; set; } = default!;
 
   /// <summary>
-  /// Optional concurrency token (used by ISagaStateWithId).
+  /// Optional concurrency token.
   /// </summary>
   public string? ConcurrencyToken { get; set; }
 
