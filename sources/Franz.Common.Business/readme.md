@@ -1,96 +1,167 @@
-# **Franz.Common.Business**
 
-A core library of the **Franz Framework**, designed to facilitate **Domain-Driven Design (DDD)**, **Event Sourcing**, and **CQRS (Command Query Responsibility Segregation)** in .NET applications.
-It provides abstractions, utilities, and patterns for building **scalable, auditable, and testable business logic**.
+# 📦 Franz.Common.Business
 
----
+A core infrastructure library of the **Franz Framework**, designed to support **Domain-Driven Design (DDD)**, **CQRS**, and **Event-Sourcing-ready architectures** in modern .NET applications.
 
-* **Current Version**:  2.0.2
+It provides a **clean, deterministic, and production-grade foundation** for building scalable business systems with strong separation of concerns.
 
 ---
 
-## **Features**
+## 🚀 Version
 
-### **1. Domain-Driven Design (DDD) Building Blocks**
+**v2.1.1**
 
-#### **Entities**
+---
 
-Base class for domain objects with **identity, auditing, and lifecycle management** baked in:
+## 🧠 Core Philosophy
 
-* Strongly typed `Id`.
-* `PersistentId` (GUID) for cross-system correlation.
-* Built-in **audit fields** (`DateCreated`, `LastModifiedDate`, `CreatedBy`, etc.).
-* **Soft delete support** (`IsDeleted`, `DateDeleted`, `DeletedBy`).
-* Correct **equality semantics** (`==`, `!=`, `Equals`, `GetHashCode`).
+Franz.Common.Business enforces the following principles:
+
+- Identity is **factory-controlled**
+- Domain logic is **persistence-agnostic**
+- Repositories are **storage-only abstractions**
+- Entities are **immutable in identity after creation**
+- DI is **deterministic and explicit**
+- No hidden service locator or runtime DI construction
+
+---
+
+## ✨ Key Features
+
+---
+
+## 1. Domain Model (DDD Core)
+
+### ✔ Entity Model
+
+All domain entities derive from a unified base:
 
 ```csharp
 public abstract class Entity<TId> : IEntity
 {
-    public TId Id { get; protected set; } = default!;
-    public Guid PersistentId { get; private set; } = Guid.NewGuid();
+    public TId Id { get; private set; } = default!;
 
-    // Audit
-    public DateTime DateCreated { get; private set; }
-    public DateTime LastModifiedDate { get; private set; }
-    public string CreatedBy { get; private set; } = string.Empty;
-    public string? LastModifiedBy { get; private set; }
+    protected Entity() { }
 
-    // Lifecycle
-    public bool IsDeleted { get; private set; }
-    public DateTime? DateDeleted { get; private set; }
-    public string? DeletedBy { get; private set; }
+    protected Entity(TId id)
+    {
+        Id = id;
+    }
 
-    public void MarkCreated(string createdBy) { ... }
-    public void MarkUpdated(string modifiedBy) { ... }
-    public void MarkDeleted(string deletedBy) { ... }
-
-    public bool IsTransient() => EqualityComparer<TId>.Default.Equals(Id, default!);
-
-    public override bool Equals(object? obj) { ... }
-    public override int GetHashCode() { ... }
-
-    public static bool operator ==(Entity<TId>? left, Entity<TId>? right) => ...
-    public static bool operator !=(Entity<TId>? left, Entity<TId>? right) => ...
+    public object GetId() => Id!;
 }
-```
+````
 
-➡️ A non-generic version `Entity : Entity<int>` is also provided for convenience.
+### ✔ Key characteristics:
+
+* Strongly typed identity (`Guid` or `int`)
+* Factory-controlled identity assignment
+* Immutable identity after creation
+* Equality based on identity
+* EF Core compatible design
 
 ---
 
-#### **Value Objects**
+## 2. Identity System
 
-Immutable, equality-driven domain concepts.
+### ✔ Supported ID strategies
+
+* `Guid V7` (default standard)
+* `int` (database-generated identities)
+
+### ✔ Centralized ID generation
 
 ```csharp
-public class Address : ValueObject
+public interface IIdGenerator<TId>
 {
-    public string Street { get; }
-    public string City { get; }
-    public string PostalCode { get; }
-
-    protected override IEnumerable<object> GetEqualityComponents()
-    {
-        yield return Street;
-        yield return City;
-        yield return PostalCode;
-    }
+    TId Create();
 }
 ```
 
-#### **Enumerations**
+### ✔ Default implementation:
 
-Strongly typed enums with additional behavior and metadata.
-
-#### **Repositories**
-
-Interfaces for persistence with strict **event-first semantics** (see section below).
+```csharp
+public sealed class GuidV7Generator : IIdGenerator<Guid>
+{
+    public Guid Create() => Guid.CreateVersion7();
+}
+```
 
 ---
 
-### **2. Domain Events**
+## 3. Entity Factories
 
-All domain events implement the standardized `IDomainEvent` interface:
+Entities must be created through controlled factories.
+
+```csharp
+public interface IEntityFactory<TId, TEntity>
+    where TEntity : Entity<TId>
+{
+    TEntity Create();
+}
+```
+
+### ✔ Responsibilities:
+
+* Generate entity identity via `IIdGenerator<TId>`
+* Ensure consistent creation rules
+* Enforce domain construction invariants
+* Prevent identity bypass (e.g. `new Entity()` misuse)
+
+---
+
+## 4. Repositories (Persistence Layer)
+
+Repositories are **identity-agnostic and persistence-only abstractions**.
+
+```csharp
+public interface IEntityRepository<TEntity>
+    where TEntity : class, IEntity
+{
+    Task<TEntity> GetByIdAsync(object id, CancellationToken cancellationToken = default);
+    Task AddAsync(TEntity entity, CancellationToken cancellationToken = default);
+    Task UpdateAsync(TEntity entity, CancellationToken cancellationToken = default);
+    Task DeleteAsync(TEntity entity, CancellationToken cancellationToken = default);
+}
+```
+
+### ✔ Design principles:
+
+* No dependency on `TId`
+* No domain logic
+* EF Core handles identity resolution
+* Supports both `Guid` and `int` primary keys
+
+---
+
+## 5. Aggregates & Event Sourcing
+
+### ✔ Aggregate Root
+
+Supports event-driven state mutation:
+
+```csharp
+public abstract class AggregateRoot<TEvent> : Entity<Guid>
+    where TEvent : IEvent
+{
+    protected void RaiseEvent(TEvent @event) { }
+    public void ReplayEvents(IEnumerable<TEvent> events) { }
+    public void Rehydrate(Guid id, IEnumerable<TEvent> events) { }
+}
+```
+
+### ✔ Features:
+
+* Event-based state changes
+* Automatic version tracking
+* Uncommitted event collection
+* Full rehydration support
+
+---
+
+## 6. Domain Events
+
+All events implement:
 
 ```csharp
 public interface IDomainEvent : IEvent
@@ -104,91 +175,147 @@ public interface IDomainEvent : IEvent
 }
 ```
 
-* Every event is **auditable, traceable, and publish-ready**.
-* Provides **correlation + observability metadata** across distributed systems.
+### ✔ Benefits:
+
+* Full auditability
+* Distributed tracing support
+* Event correlation across services
 
 ---
 
-### **3. Aggregates (Event-Sourced)**
+## 7. CQRS Support
 
-* State modified **only via events** raised with `RaiseEvent()`.
-* Built-in **rehydration & replay** for event sourcing.
-* Versioning (`Version`) tracked automatically.
-* Uncommitted events kept until persistence.
+Built-in support for:
 
-```csharp
-public abstract class AggregateRoot<TEvent> : Entity<Guid>, IAggregateRoot<TEvent>
-    where TEvent : IEvent
-{
-    protected void RaiseEvent(TEvent @event) => ApplyChange(@event, true);
-    public void ReplayEvents(IEnumerable<TEvent> events) { ... }
-    public void Rehydrate(Guid id, IEnumerable<TEvent> events) { ... }
-    public IReadOnlyCollection<TEvent> GetUncommittedChanges() { ... }
-}
-```
+* Commands (`ICommandHandler`)
+* Queries (`IQueryHandler`)
+* Mediator-based execution pipeline
 
 ---
 
-### **4. Repository Contract**
+## 8. Resilience Pipelines
 
-Persistence is **event-first** with `IAggregateRootRepository`:
-
-```csharp
-public interface IAggregateRootRepository<TAggregateRoot, TEvent>
-    where TAggregateRoot : class, IAggregateRoot<TEvent>
-    where TEvent : IEvent
-{
-    Task<TAggregateRoot?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task SaveAsync(TAggregateRoot aggregate, CancellationToken cancellationToken = default);
-}
-```
-
-* Aggregates are **rehydrated from events**.
-* Saves commit **uncommitted domain events**.
-
----
-
-### **5. CQRS Support**
-
-* Commands (`ICommandRequest<T>`, `ICommandHandler<TCommand,TResponse>`)
-* Queries (`IQueryRequest<T>`, `IQueryHandler<TQuery,TResponse>`)
-* Built-in Mediator pipelines for resilience + logging.
-
----
-
-### **6. Resilience Pipelines**
+Production-ready pipeline support:
 
 * Retry
-* CircuitBreaker
+* Circuit Breaker
 * Timeout
-* Bulkhead
-  (Configurable via `appsettings.json`).
+* Bulkhead Isolation
 
 ---
 
-## **What’s New in 1.6.2**
+## 9. Dependency Injection Bootstrap
 
-* Added **auditing + soft delete** in `Entity<TId>`.
-* Introduced **`IDomainEvent`** with correlation & audit metadata.
-* Refactored **AggregateRoot<TEvent>** with strict event sourcing lifecycle.
-* Added **IAggregateRootRepository** enforcing event-first persistence.
-* Stronger **Mediator semantics** (`SendAsync` vs `PublishAsync`).
+### ✔ Single entry point:
+
+```csharp
+services.AddBusiness(applicationAssembly);
+services.AddBusinessPlatform();
+```
+
+### ✔ What it registers:
+
+#### Domain layer
+
+* `IIdGenerator<Guid>`
+* `IEntityFactory<,>`
+
+#### Mediator layer
+
+* Command/query pipeline
+* Event dispatching
+
+#### Handler discovery
+
+* Automatic handler registration
 
 ---
 
-### **1.6.15**
+## ⚠️ Important Design Rules
 
-* Fixed a compile-time error in ReadRepository and IReadRepository caused by an incorrect cast from List<T> to IQueryable<T>.
+### ❌ Do NOT:
 
-* Updated GetAll() to return an IReadOnlyCollection<T> for safer read-only semantics instead of forcing a materialized IQueryable<T>.
+* Generate IDs manually (`Guid.NewGuid()`)
+* Bypass factories for entity creation
+* Use service locator inside startup/configuration
+* Introduce custom repository identity types
+
+### ✔ Always:
+
+* Use factories for entity creation
+* Use `IIdGenerator<TId>` for identity
+* Treat repositories as persistence-only abstractions
+
 ---
 
-### Version 1.6.20
+## 🧩 Architecture Overview
 
-- Updated to **.NET 10.0**
+```
+Domain Layer
+    ├── Entities (Entity<TId>)
+    ├── Aggregates
+    ├── Value Objects
+    └── Domain Events
 
-### v2.0.1 – Internal Modernization
+Factory Layer
+    └── IEntityFactory<TId, TEntity>
 
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
+Identity Layer
+    └── IIdGenerator<TId>
+
+Persistence Layer
+    └── IEntityRepository<TEntity>
+
+Application Layer
+    └── CQRS + Mediator
+
+Bootstrap Layer
+    └── AddBusiness()
+```
+
+---
+
+## 🧪 Version History
+
+### v2.0.3 – Architecture Stabilization
+
+* Enforced factory-driven identity model
+* Removed mutable identity assignment (`SetId` eliminated)
+* Introduced immutable entity identity lifecycle
+* Simplified repository abstraction (identity-agnostic)
+* Consolidated DI bootstrap into single deterministic entry point
+* Removed ServiceProvider creation from configuration pipeline
+* Improved EF Core compatibility and consistency
+* Strengthened DDD alignment across domain layer
+
+---
+
+## 📌 Summary
+
+Franz.Common.Business v2.0.3 provides a:
+
+> ✔ deterministic
+> ✔ factory-driven
+> ✔ EF Core compatible
+> ✔ DDD-aligned
+> ✔ CQRS-ready
+
+foundation for enterprise-grade .NET applications.
+
+---
+
+## 🧠 Final Note
+
+This library enforces **architectural discipline by design**, not convention.
+
+It ensures that:
+
+* identity is always controlled
+* domain logic remains pure
+* persistence remains isolated
+* system composition is deterministic
+
+```
+
+---
+

@@ -1096,3 +1096,9 @@ Perfect — we can make a **clear, structured list** that reflects all the cache
 - Overhaul of kafka using full Configurations.
 - Overhaul of the asyncronicity and KafkaMessagingOptions.
 - Tests, listeners, and pipeline components modernized.
+
+## v2.1.0 – Hardening and busines Evolution
+
+- Creation of entity Factories for Type safety and cleaner Id Management
+- Overhaul of Persistence systems to include TId to avoid mazy identity management
+- Tests, listeners, and pipeline components modernized.

@@ -17,7 +17,7 @@ A modular library within the **Franz Framework** designed to streamline the setu
 
 ## **Version Information**
 
-- **Current Version**:  2.0.2
+- **Current Version**:  2.1.1
 - Part of the private **Franz Framework** ecosystem.
 
 ---

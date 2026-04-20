@@ -253,7 +253,7 @@ This makes Franz suitable for **large organizations**, where maintaining archite
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 1.7.2
+dotnet add package Franz.Common --version 2.1.0
 ```
 
 Messaging example:
@@ -309,10 +309,10 @@ dotnet test --filter Category=Integration
 ```
 
 ---
-🔹 Latest Release:  v2.0.2 – Kafka and Asyncronicity Overhaul
+🔹 Latest Release:  v2.1.0 – Hardening and busines Evolution
 
-- Overhaul of kafka using full Configurations.
-- Overhaul of the asyncronicity and KafkaMessagingOptions.
+- Creation of entity Factories for Type safety and cleaner Id Management
+- Overhaul of Persistence systems to include TId to avoid mazy identity management
 - Tests, listeners, and pipeline components modernized.
 ---
 
