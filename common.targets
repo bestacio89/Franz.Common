@@ -1,38 +1,53 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project>
+
   <PropertyGroup>
-    <!-- Target Framework -->- 
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- Versioning -->
+
     <Version>2.1.1</Version>
     <AssemblyVersion>2.1.1</AssemblyVersion>
     <FileVersion>2.1.1</FileVersion>
-    <!-- Author -->
+
     <Authors>Bernardo Estacio Abreu</Authors>
   </PropertyGroup>
+
   <PropertyGroup>
-    <!-- Test Settings -->
-    <RunSettingsFilePath>$(MSBuildProjectDirectory)\..\..\test.runsettings</RunSettingsFilePath>
+    <RunSettingsFilePath>
+      $(MSBuildProjectDirectory)\..\..\test.runsettings
+    </RunSettingsFilePath>
   </PropertyGroup>
+
   <PropertyGroup>
-    <!-- NuGet Metadata -->
     <PackageId>$(MSBuildProjectName)</PackageId>
     <Description>Shared utility library for the Franz Framework.</Description>
-    <Copyright>Copyright Â© 2025 Bernardo Estacio Abreu</Copyright>
-    <RepositoryUrl>https://dev.azure.com/AjnaTellus/Franz/_git/Franz.Common</RepositoryUrl>
+
+    <Copyright>Copyright (c) 2025 Bernardo Estacio Abreu</Copyright>
+
+    <RepositoryUrl>
+      https://dev.azure.com/AjnaTellus/Franz/_git/Franz.Common
+    </RepositoryUrl>
+
     <RepositoryType>git</RepositoryType>
     <RepositoryBranch>main</RepositoryBranch>
     <RepositoryCommit>$(SourceRevisionId)</RepositoryCommit>
+
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>Franz;Common;Utilities;Mediator;Kafka;RabbitMQ;Eventful;Microservices</PackageTags>
+
+    <PackageTags>
+      Franz;Common;Utilities;Mediator;Kafka;RabbitMQ;Eventful;Microservices
+    </PackageTags>
+
     <PackageReadmeFile>readme.md</PackageReadmeFile>
+
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
-  <!-- Include README File -->
+
   <ItemGroup>
-    <None Include="$(MSBuildProjectDirectory)\readme.md" Pack="true" PackagePath="" />
+    <None Include="$(MSBuildProjectDirectory)\readme.md"
+          Pack="true"
+          PackagePath="" />
   </ItemGroup>
+
 </Project>

@@ -3,12 +3,7 @@
   <Import Project="..\..\common.targets" />
 
   <ItemGroup>
-    <Compile Remove="Commands\**" />
-    <Compile Remove="Events\**" />
-    <EmbeddedResource Remove="Commands\**" />
-    <EmbeddedResource Remove="Events\**" />
-    <None Remove="Commands\**" />
-    <None Remove="Events\**" />
+    <Using Include="Xunit" />
   </ItemGroup>
 
   <ItemGroup>
