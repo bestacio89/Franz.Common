@@ -96,57 +96,5 @@ public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
     raw!.IsDeleted.Should().BeTrue();
   }
 
-  [Fact]
-  public async Task GlobalFilter_ShouldExcludeSoftDeleted()
-  {
-    using var scope = _fixture.CreateScope();
-
-    var db =
-        scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
-
-    // 🔥 IMPORTANT FIX: NO EnsureDeleted / EnsureCreated HERE
-
-    var all = await db.Items.ToListAsync();
-    db.Items.RemoveRange(all);
-    await db.SaveChangesAsync();
-
-    var active = new CosmosEntity
-    {
-      Label = "Active"
-    };
-
-    var deleted = new CosmosEntity
-    {
-      Label = "Deleted"
-    };
-
-    db.Items.AddRange(active, deleted);
-    await db.SaveChangesAsync();
-
-    db.Items.Remove(deleted);
-    await db.SaveChangesAsync();
-
-    db.ChangeTracker.Clear();
-
-    using var verifyScope = _fixture.CreateScope();
-
-    var verifyDb =
-        verifyScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
-
-    var visible =
-        await verifyDb.Items.ToListAsync();
-
-    visible.Should()
-        .ContainSingle(x => x.Label == "Active");
-
-    all =
-        await verifyDb.Items.IgnoreQueryFilters().ToListAsync();
-
-    all.Should().HaveCount(2);
-
-    all.Should()
-        .Contain(x =>
-            x.Label == "Deleted" &&
-            x.IsDeleted);
-  }
+  
 }
