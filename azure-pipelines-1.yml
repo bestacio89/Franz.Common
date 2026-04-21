@@ -15,7 +15,7 @@ variables:
 - name: outputDir
   value: '$(Build.ArtifactStagingDirectory)/packages'
 - name: azureOrg
-  value: 'AjnaTellus'
+  value: 'EntelekheiaSystems'
 - name: feedName
   value: 'AjnaTellus'
 
