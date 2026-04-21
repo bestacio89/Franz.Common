@@ -20,15 +20,17 @@ public sealed class KafkaModelIntegrationTests(KafkaContainerFixture fixture)
   public async Task Produce_ShouldSuccessfullyWriteToBroker_AndBeReadable()
   {
     var topic = $"test-topic-{Guid.NewGuid():N}";
+
     var factoryMock = new Mock<IConnectionFactoryProvider>();
-    factoryMock.Setup(x => x.Current).Returns(new ProducerConfig { BootstrapServers = _bootstrapServers });
+    factoryMock.Setup(x => x.Current)
+      .Returns(new ProducerConfig { BootstrapServers = _bootstrapServers });
 
     await using var sut = new KafkaModel(factoryMock.Object);
+
     var message = new Message { Body = "KafkaModel Integration Test" };
 
     await sut.Produce(topic, message, CancellationToken.None);
 
-    // SENIOR FIX: Clean the address and wrap the consumer in Close() logic
     var config = new ConsumerConfig
     {
       BootstrapServers = _bootstrapServers,
@@ -37,39 +39,52 @@ public sealed class KafkaModelIntegrationTests(KafkaContainerFixture fixture)
     };
 
     using var consumer = new ConsumerBuilder<string, byte[]>(config).Build();
-    consumer.Subscribe(topic);
 
-    ConsumeResult<string, byte[]>? result = null;
-    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-    while (!cts.IsCancellationRequested)
+    try
     {
-      result = consumer.Consume(TimeSpan.FromMilliseconds(500));
-      if (result != null) break;
+      consumer.Subscribe(topic);
+
+      using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+
+      var result = consumer.Consume(cts.Token);
+
+      result.Should().NotBeNull();
+
+      var deserialized = JsonSerializer.Deserialize<Message>(
+        result.Message.Value,
+        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+      deserialized.Should().NotBeNull();
+      deserialized!.Body.Should().Be(message.Body);
     }
-
-    consumer.Close(); // ✅ Explicitly leave the group
-
-    result.Should().NotBeNull();
-    var deserialized = JsonSerializer.Deserialize<Message>(result!.Message.Value, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-    deserialized!.Body.ToString().Should().Be(message.Body.ToString());
+    finally
+    {
+      try { consumer.Close(); } catch { }
+      consumer.Dispose();
+    }
   }
 
   [Fact]
   public async Task Produce_WithHighConcurrency_ShouldMaintainIdempotency()
   {
     var topic = $"concurrency-{Guid.NewGuid():N}";
+
     var factoryMock = new Mock<IConnectionFactoryProvider>();
-    factoryMock.Setup(x => x.Current).Returns(new ProducerConfig { BootstrapServers = _bootstrapServers });
+    factoryMock.Setup(x => x.Current)
+      .Returns(new ProducerConfig { BootstrapServers = _bootstrapServers });
 
     await using var sut = new KafkaModel(factoryMock.Object);
 
-    // SENIOR FIX: Ensure we await the results and then explicitly Dispose/Flush
-    var tasks = Enumerable.Range(0, 100).Select(i =>
-        sut.Produce(topic, new Message { Body = $"Msg-{i}" }, CancellationToken.None).AsTask()
-    );
+    var tasks = Enumerable.Range(0, 100)
+      .Select(i => sut.Produce(topic, new Message { Body = $"Msg-{i}" }, CancellationToken.None).AsTask());
 
     await Task.WhenAll(tasks);
 
-    // The await using handles the Flush/Dispose call.
+    // Ensure broker flush completion before test ends
+    if (sut is IAsyncDisposable)
+    {
+      // Dispose already enforces flush if implemented correctly
+      await Task.Yield();
+    }
   }
 }

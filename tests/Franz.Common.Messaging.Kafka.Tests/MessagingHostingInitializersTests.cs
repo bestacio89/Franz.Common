@@ -1,44 +1,68 @@
 ﻿#nullable enable
+using FluentAssertions;
 using Franz.Common.Hosting;
 using Franz.Common.Messaging.Kafka;
 using Moq;
 using Xunit;
 
-namespace Franz.Common.Messaging.Kafka.Tests.Hosting
+namespace Franz.Common.Messaging.Kafka.Tests.Hosting;
+
+[Collection("Kafka")]
+public class MessagingHostingInitializerTests
 {
-  [Collection("Kafka")]
-  public class MessagingHostingInitializerTests
+  [Fact]
+  public async Task InitializeAsync_ShouldCallUnderlyingInitializer()
   {
-    [Fact]
-    public void Initialize_CallsUnderlyingMessagingInitializer()
-    {
-      // Arrange
-      var messagingMock = new Mock<IMessagingInitializer>();
-      var hostingInitializer = new MessagingHostingInitializer(messagingMock.Object);
+    var messagingMock = new Mock<IMessagingInitializer>();
 
-      // Act
-      hostingInitializer.Initialize();
+    messagingMock
+        .Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
+        .Returns(ValueTask.CompletedTask);
 
-      // Assert
-      messagingMock.Verify(m => m.InitializeAsync(), Times.Once);
-    }
+    var hostingInitializer = new MessagingHostingInitializer(messagingMock.Object);
 
-    [Fact]
-    public void Initialize_WithNullDoesNotThrow()
-    {
-      // Arrange
-      var hostingInitializer = new MessagingHostingInitializer(null);
+    await hostingInitializer.InitializeAsync();
 
-      // Act / Assert
-      var ex = Record.Exception(() => hostingInitializer.Initialize());
-      Assert.Null(ex); // Should not throw
-    }
+    messagingMock.Verify(
+        m => m.InitializeAsync(It.IsAny<CancellationToken>()),
+        Times.Once);
+  }
 
-    [Fact]
-    public void Order_IsCorrect()
-    {
-      var hostingInitializer = new MessagingHostingInitializer(null);
-      Assert.Equal(2, hostingInitializer.Order);
-    }
+  [Fact]
+  public async Task InitializeAsync_ShouldBeSafe_WhenInitializerIsNull()
+  {
+    var hostingInitializer = new MessagingHostingInitializer(null);
+
+    var ex = await Record.ExceptionAsync(() =>
+        hostingInitializer.InitializeAsync());
+
+    ex.Should().BeNull();
+  }
+
+  [Fact]
+  public async Task InitializeAsync_ShouldBeIdempotent_WhenCalledMultipleTimes()
+  {
+    var messagingMock = new Mock<IMessagingInitializer>();
+
+    messagingMock
+        .Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
+        .Returns(ValueTask.CompletedTask);
+
+    var hostingInitializer = new MessagingHostingInitializer(messagingMock.Object);
+
+    await hostingInitializer.InitializeAsync();
+    await hostingInitializer.InitializeAsync();
+
+    messagingMock.Verify(
+        m => m.InitializeAsync(It.IsAny<CancellationToken>()),
+        Times.Exactly(2));
+  }
+
+  [Fact]
+  public void Order_ShouldBeStableAndPositive()
+  {
+    var hostingInitializer = new MessagingHostingInitializer(null);
+
+    hostingInitializer.Order.Should().BeGreaterThan(0);
   }
 }

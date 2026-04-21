@@ -5,7 +5,7 @@ public static class HostExtensions
 {
   public static IHost Initialize(this IHost host)
   {
-    host.Services.Initialize();
+    host.Services.InitializeAsync();
 
     return host;
   }

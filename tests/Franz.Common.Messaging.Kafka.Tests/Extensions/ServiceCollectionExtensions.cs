@@ -12,7 +12,6 @@ using Franz.Common.Messaging.Kafka.Transactions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using System.Configuration;
 using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests
@@ -40,67 +39,95 @@ namespace Franz.Common.Messaging.Kafka.Tests
       sp.GetRequiredService<IMessagingSender>().Should().BeOfType<KafkaSender>();
       sp.GetRequiredService<IMessagingTransaction>().Should().BeOfType<MessagingTransaction>();
 
-      var modelProvider = sp.GetRequiredService<IModelProvider>();
-      modelProvider.Should().BeOfType<ModelProvider>();
+      sp.GetRequiredService<IModelProvider>().Should().BeOfType<ModelProvider>();
     }
 
     [Fact]
-    public void Options_Should_Bind_Correctly_FromFixture()
+    public void Options_Should_Bind_Correctly_FromFixture_AndRemainStable()
     {
       var sp = _fixture.BuildServiceProvider();
-      var options = _fixture.GetOptions(sp);
 
-      options.BootstrapServers.Should().Be(_fixture.BootstrapServers);
-      options.GroupId.Should().Be("integration-test-group");
-      options.TopicName.Should().Be("integration-test");
+      var options1 = _fixture.GetOptions(sp);
+      var options2 = _fixture.GetOptions(sp);
 
-      // Consumer & Producer options are set
-      options.Consumer.EnableAutoCommit.Should().BeFalse();
-      options.Producer.EnableIdempotence.Should().BeTrue();
+      options1.Should().NotBeNull();
+      options2.Should().NotBeNull();
+
+      options1.Should().BeSameAs(options2);
+
+      options1.BootstrapServers.Should().Be(_fixture.BootstrapServers);
+      options1.GroupId.Should().Be("integration-test-group");
+      options1.TopicName.Should().Be("integration-test");
+
+      options1.Consumer.EnableAutoCommit.Should().BeFalse();
+      options1.Producer.EnableIdempotence.Should().BeTrue();
     }
 
     [Fact]
-    public void Producer_ShouldBeSingleton()
+    public void Producer_Should_BeSingleton_AndResolvable()
     {
       var sp = _fixture.BuildServiceProvider();
+
       var producer1 = sp.GetRequiredService<IProducer<string, byte[]>>();
       var producer2 = sp.GetRequiredService<IProducer<string, byte[]>>();
+
+      producer1.Should().NotBeNull();
+      producer2.Should().NotBeNull();
       producer1.Should().BeSameAs(producer2);
     }
 
     [Fact]
-    public void ConsumerFactory_ShouldBeSingleton()
+    public void ConsumerFactory_Should_BeSingleton_AndStateless()
     {
       var sp = _fixture.BuildServiceProvider();
+
       var factory1 = sp.GetRequiredService<IKafkaConsumerFactory>();
       var factory2 = sp.GetRequiredService<IKafkaConsumerFactory>();
+
+      factory1.Should().NotBeNull();
+      factory2.Should().NotBeNull();
       factory1.Should().BeSameAs(factory2);
     }
 
     [Fact]
-    public void KeyedServices_ShouldResolveCorrectly()
+    public void KeyedServices_Should_Resolve_And_Be_Isolated_PerKey()
     {
-      var key = "tenant-a";
       var sp = _fixture.BuildServiceProvider(services =>
       {
-        services.AddKafkaMessaging(_fixture.Configuration, key);
+        services.AddKafkaMessaging(_fixture.Configuration, "tenant-a");
+        services.AddKafkaMessaging(_fixture.Configuration, "tenant-b");
       });
 
-      var keyedPublisher = sp.GetKeyedService<IMessagingPublisher>(key);
-      var keyedSender = sp.GetKeyedService<IMessagingSender>(key);
-      var keyedTransaction = sp.GetKeyedService<IMessagingTransaction>(key);
-      var keyedConsumerFactory = sp.GetKeyedService<IKafkaConsumerFactory>(key);
-      var keyedConsumer = sp.GetKeyedService<IConsumer<string, string>>(key);
+      var pubA = sp.GetKeyedService<IMessagingPublisher>("tenant-a");
+      var pubB = sp.GetKeyedService<IMessagingPublisher>("tenant-b");
 
-      keyedPublisher.Should().NotBeNull();
-      keyedSender.Should().NotBeNull();
-      keyedTransaction.Should().NotBeNull();
-      keyedConsumerFactory.Should().NotBeNull();
-      keyedConsumer.Should().NotBeNull();
+      var senderA = sp.GetKeyedService<IMessagingSender>("tenant-a");
+      var senderB = sp.GetKeyedService<IMessagingSender>("tenant-b");
+
+      var txA = sp.GetKeyedService<IMessagingTransaction>("tenant-a");
+      var txB = sp.GetKeyedService<IMessagingTransaction>("tenant-b");
+
+      var factoryA = sp.GetKeyedService<IKafkaConsumerFactory>("tenant-a");
+      var factoryB = sp.GetKeyedService<IKafkaConsumerFactory>("tenant-b");
+
+      var consumerA = sp.GetKeyedService<IConsumer<string, string>>("tenant-a");
+      var consumerB = sp.GetKeyedService<IConsumer<string, string>>("tenant-b");
+
+      pubA.Should().NotBeNull();
+      pubB.Should().NotBeNull();
+      senderA.Should().NotBeNull();
+      senderB.Should().NotBeNull();
+      txA.Should().NotBeNull();
+      txB.Should().NotBeNull();
+      factoryA.Should().NotBeNull();
+      factoryB.Should().NotBeNull();
+      consumerA.Should().NotBeNull();
+      consumerB.Should().NotBeNull();
+
+      pubA.Should().NotBeSameAs(pubB);
+      senderA.Should().NotBeSameAs(senderB);
+      txA.Should().NotBeSameAs(txB);
     }
-
-
-    
 
     [Fact]
     public void ModelProvider_ShouldRespectSingletonLifetime()

@@ -13,8 +13,9 @@ public class RabbitMQMessagingHostingInitializer : IHostingInitializer
 
   public int Order => 2;
 
-  public void Initialize()
+  public Task InitializeAsync(CancellationToken cancellationToken = default)
   {
-    messagingInitializer?.InitializeAsync();
+    return messagingInitializer?.InitializeAsync(cancellationToken).AsTask()
+           ?? Task.CompletedTask;
   }
 }

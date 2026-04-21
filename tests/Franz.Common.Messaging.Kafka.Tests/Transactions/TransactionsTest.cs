@@ -1,9 +1,9 @@
 #nullable enable
 using Confluent.Kafka;
+using FluentAssertions;
 using Franz.Common.Messaging.Kafka.Transactions;
 using Moq;
 using Xunit;
-using FluentAssertions;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Transactions;
 
@@ -22,59 +22,61 @@ public class MessagingTransactionTests
   [Fact]
   public async Task BeginAsync_ShouldInvokeBeginOnProducer()
   {
-    // Act
     await _sut.BeginAsync();
 
-    // Assert
     _producerMock.Verify(x => x.BeginTransaction(), Times.Once);
   }
 
   [Fact]
-  public async Task CompleteAsync_ShouldCommitTransaction_WhenActive()
+  public async Task CompleteAsync_ShouldCommit_WhenTransactionStarted()
   {
-    // Arrange
     await _sut.BeginAsync();
-
-    // Act
     await _sut.CompleteAsync();
 
-    // Assert
     _producerMock.Verify(x => x.CommitTransaction(), Times.Once);
   }
 
   [Fact]
-  public async Task RollbackAsync_ShouldAbortTransaction_WhenActive()
+  public async Task RollbackAsync_ShouldAbort_WhenTransactionStarted()
   {
-    // Arrange
     await _sut.BeginAsync();
-
-    // Act
     await _sut.RollbackAsync();
 
-    // Assert
     _producerMock.Verify(x => x.AbortTransaction(), Times.Once);
   }
 
   [Fact]
-  public async Task DisposeAsync_ShouldAbortActiveTransaction_ToPreventZombieState()
+  public async Task CompleteAsync_ShouldBeNoOp_WhenNotStarted()
   {
-    // Arrange
-    await _sut.BeginAsync();
-
-    // Act
-    await _sut.DisposeAsync();
-
-    // Assert: Senior Architect Rule - Automatic rollback on disposal
-    _producerMock.Verify(x => x.AbortTransaction(), Times.Once);
-  }
-
-  [Fact]
-  public async Task CompleteAsync_ShouldNotInvokeProducer_WhenNotStarted()
-  {
-    // Act
     await _sut.CompleteAsync();
 
-    // Assert
     _producerMock.Verify(x => x.CommitTransaction(), Times.Never);
+    _producerMock.Verify(x => x.BeginTransaction(), Times.Never);
+  }
+
+  [Fact]
+  public async Task RollbackAsync_ShouldBeNoOp_WhenNotStarted()
+  {
+    await _sut.RollbackAsync();
+
+    _producerMock.Verify(x => x.AbortTransaction(), Times.Never);
+  }
+
+  [Fact]
+  public async Task DisposeAsync_ShouldAbortOnlyIfTransactionActive()
+  {
+    await _sut.BeginAsync();
+
+    await _sut.DisposeAsync();
+
+    _producerMock.Verify(x => x.AbortTransaction(), Times.Once);
+  }
+
+  [Fact]
+  public async Task DisposeAsync_ShouldBeSafe_WhenNoTransactionStarted()
+  {
+    await _sut.DisposeAsync();
+
+    _producerMock.Verify(x => x.AbortTransaction(), Times.Never);
   }
 }
