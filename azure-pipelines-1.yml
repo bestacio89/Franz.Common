@@ -4,29 +4,40 @@ trigger:
       - main
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: 'ubuntu-24.04'
 
 variables:
 - group: 'Secrets and variables'
+
 - name: buildConfiguration
   value: 'Release'
+
 - name: projectName
   value: 'Franz.Common'
+
 - name: outputDir
   value: '$(Build.ArtifactStagingDirectory)/packages'
+
 - name: azureOrg
   value: 'EntelekheiaSystems'
+
 - name: feedName
   value: 'AjnaTellus'
 
 steps:
 
-# 🧾 Checkout with full history for 34k LOC integrity
+# ------------------------------------------------------------
+# Checkout (full history required for tags + sync integrity)
+# ------------------------------------------------------------
+
 - checkout: self
   persistCredentials: true
-  fetchDepth: 0 
+  fetchDepth: 0
 
-# 🔐 Auth & Environment Setup
+# ------------------------------------------------------------
+# Auth + SDK
+# ------------------------------------------------------------
+
 - task: NuGetAuthenticate@1
   displayName: 'Authenticate Azure Artifacts'
 
@@ -36,51 +47,125 @@ steps:
     packageType: 'sdk'
     version: '10.x'
 
-# 🏗️ Standard Build/Test/Pack Chain
-- script: dotnet restore
+# ------------------------------------------------------------
+# Restore
+# ------------------------------------------------------------
+
+- script: |
+    set -euo pipefail
+    dotnet restore
   displayName: 'Restore'
 
-- script: dotnet build --configuration $(buildConfiguration) --no-restore
+# ------------------------------------------------------------
+# Build
+# ------------------------------------------------------------
+
+- script: |
+    set -euo pipefail
+    dotnet build \
+      --configuration $(buildConfiguration) \
+      --no-restore
   displayName: 'Build'
 
-- script: dotnet test --configuration $(buildConfiguration) --no-build --logger trx
-  displayName: 'Test'
+# ------------------------------------------------------------
+# Test
+# Excludes local-only Cosmos emulator tests
+# ------------------------------------------------------------
 
-- script: dotnet pack --configuration $(buildConfiguration) --no-build --output $(outputDir)
+- script: |
+    set -euo pipefail
+
+    dotnet test \
+      --configuration $(buildConfiguration) \
+      --no-build \
+      --logger trx \
+      --filter "SkipInCI!=true"
+
+  displayName: 'Test (Exclude Local-Only Cosmos Tests)'
+
+# ------------------------------------------------------------
+# Pack
+# ------------------------------------------------------------
+
+- script: |
+    set -euo pipefail
+
+    dotnet pack \
+      --configuration $(buildConfiguration) \
+      --no-build \
+      --output $(outputDir)
+
   displayName: 'Pack'
 
-# 🚀 1. Publish to Internal Azure Artifacts (Main Only)
+# ------------------------------------------------------------
+# Publish to Azure Artifacts
+# ------------------------------------------------------------
+
 - script: |
+    set -euo pipefail
+
     dotnet nuget push "$(outputDir)/*.nupkg" \
       --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/V3/index.json" \
       --api-key $(System.AccessToken) \
       --skip-duplicate
+
   displayName: 'Publish to Azure Feed'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
 
-# ----------------------------------------------------------------
-# 2. 🚀 GITHUB DEVELOP SYNC
-# ----------------------------------------------------------------
+  condition: and(
+    succeeded(),
+    eq(variables['Build.SourceBranch'], 'refs/heads/main')
+  )
+
+# ------------------------------------------------------------
+# Sync GitHub Develop
+# ------------------------------------------------------------
+
 - script: |
     set -euo pipefail
-    git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || git remote set-url github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
+
+    git remote add github \
+      "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" \
+      || git remote set-url github \
+      "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
+
     git push --force github origin/Develop:refs/heads/develop
-  displayName: 'Sync GitHub: Develop'
-  env: { GITHUB_USER: $(GITHUB_USER), GITHUB_TOKEN: $(GITHUB_TOKEN) }
 
-# ----------------------------------------------------------------
-# 3. 🚀 GITHUB MAIN & TAGS SYNC
-# ----------------------------------------------------------------
+  displayName: 'Sync GitHub: Develop'
+
+  env:
+    GITHUB_USER: $(GITHUB_USER)
+    GITHUB_TOKEN: $(GITHUB_TOKEN)
+
+# ------------------------------------------------------------
+# Sync GitHub Main + Tags
+# ------------------------------------------------------------
+
 - script: |
     set -euo pipefail
-    git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || git remote set-url github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
+
+    git remote add github \
+      "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" \
+      || git remote set-url github \
+      "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
+
     git push --force github origin/main:refs/heads/main
+
     git fetch --tags --force
-    LATEST_TAG=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 || true)
+
+    LATEST_TAG=$(git describe --tags --exact-match 2>/dev/null || \
+                 git describe --tags --abbrev=0 || true)
+
     if [ -n "$LATEST_TAG" ]; then
       git push github "$LATEST_TAG"
     fi
-  displayName: 'Sync GitHub: Main + Tags'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  env: { GITHUB_USER: $(GITHUB_USER), GITHUB_TOKEN: $(GITHUB_TOKEN) }
 
+  displayName: 'Sync GitHub: Main + Tags'
+
+  condition: and(
+    succeeded(),
+    eq(variables['Build.SourceBranch'], 'refs/heads/main')
+  )
+
+  env:
+    GITHUB_USER: $(GITHUB_USER)
+    GITHUB_TOKEN: $(GITHUB_TOKEN)
