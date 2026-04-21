@@ -5,7 +5,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Franz.Common.AzureCosmosDB.Tests;
 
+
+
 [Collection("Cosmos")]
+[Trait("SkipInCI", "true")]
 public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
 {
   private readonly CosmosFixture _fixture;

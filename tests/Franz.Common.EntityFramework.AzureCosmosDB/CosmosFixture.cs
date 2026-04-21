@@ -80,3 +80,7 @@ public sealed class CosmosFixture : IAsyncLifetime
     await Container.DisposeAsync();
   }
 }
+
+
+[CollectionDefinition("Cosmos", DisableParallelization = true)]
+public class CosmosCollection { }
