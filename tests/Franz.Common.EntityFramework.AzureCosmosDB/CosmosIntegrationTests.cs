@@ -23,10 +23,11 @@ public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
     var db =
         scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
-    var entity = new CosmosEntity
-    {
-      Label = "Cosmos Architect Item"
-    };
+    var factory =
+        scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
+
+    var entity = factory.Create();
+    entity.Label = $"Cosmos Item {Guid.NewGuid():N}";
 
     var beforeSave = DateTimeOffset.UtcNow;
 
@@ -61,10 +62,11 @@ public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
       var db =
           scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
-      var entity = new CosmosEntity
-      {
-        Label = "Disposable"
-      };
+      var factory =
+          scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
+
+      var entity = factory.Create();
+      entity.Label = $"Disposable {Guid.NewGuid():N}";
 
       db.Items.Add(entity);
       await db.SaveChangesAsync();
@@ -96,5 +98,50 @@ public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
     raw!.IsDeleted.Should().BeTrue();
   }
 
-  
+  [Fact]
+  public async Task GlobalFilter_ShouldExcludeSoftDeleted()
+  {
+    using var scope = _fixture.CreateScope();
+
+    var db =
+        scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+
+    var factory =
+        scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
+
+    var active = factory.Create();
+    active.Label = $"Active {Guid.NewGuid():N}";
+
+    var deleted = factory.Create();
+    deleted.Label = $"Deleted {Guid.NewGuid():N}";
+
+    db.Items.AddRange(active, deleted);
+    await db.SaveChangesAsync();
+
+    db.Items.Remove(deleted);
+    await db.SaveChangesAsync();
+
+    db.ChangeTracker.Clear();
+
+    using var verifyScope = _fixture.CreateScope();
+
+    var verifyDb =
+        verifyScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+
+    var visible =
+        await verifyDb.Items.ToListAsync();
+
+    visible.Should()
+        .ContainSingle(x => x.Id == active.Id);
+
+    var all =
+        await verifyDb.Items.IgnoreQueryFilters().ToListAsync();
+
+    all.Should().HaveCount(2);
+
+    all.Should()
+        .Contain(x =>
+            x.Id == deleted.Id &&
+            x.IsDeleted);
+  }
 }
