@@ -139,12 +139,12 @@ public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
     visible.Should()
         .ContainSingle(x => x.Label == "Active");
 
-    var allraw =
+    all =
         await verifyDb.Items.IgnoreQueryFilters().ToListAsync();
 
-    allraw.Should().HaveCount(2);
+    all.Should().HaveCount(2);
 
-    allraw.Should()
+    all.Should()
         .Contain(x =>
             x.Label == "Deleted" &&
             x.IsDeleted);
