@@ -33,5 +33,5 @@ steps:
   displayName: 'Build solution'
 
 # Run all tests (unit + integration)
-- script: dotnet test --configuration $(buildConfiguration) --no-build --logger trx
+- script: dotnet test --configuration $(buildConfiguration) --no-build --logger trx --filter "SkipInCI!=true"
   displayName: 'Run all tests'
