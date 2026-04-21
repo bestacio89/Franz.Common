@@ -1,11 +1,11 @@
 ﻿using FluentAssertions;
 using Franz.Common.Business.Domain.Factories;
-using Franz.Common.AzureCosmosDB.Tests;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Franz.Common.AzureCosmosDB.Tests;
 
+[Collection("Cosmos")]
 public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
 {
   private readonly CosmosFixture _fixture;
@@ -23,18 +23,16 @@ public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
     var db =
         scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
-    var factory =
-        scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
-
-    var entity = new CosmosEntity();
-    entity.Label = "Cosmos Architect Item";
+    var entity = new CosmosEntity
+    {
+      Label = "Cosmos Architect Item"
+    };
 
     var beforeSave = DateTimeOffset.UtcNow;
 
     db.Items.Add(entity);
     await db.SaveChangesAsync();
 
-    // IMPORTANT: avoid tracking reuse
     db.ChangeTracker.Clear();
 
     using var verifyScope = _fixture.CreateScope();
@@ -63,11 +61,10 @@ public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
       var db =
           scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
-      var factory =
-          scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
-
-      var entity = new CosmosEntity();
-      entity.Label = "Disposable";
+      var entity = new CosmosEntity
+      {
+        Label = "Disposable"
+      };
 
       db.Items.Add(entity);
       await db.SaveChangesAsync();
@@ -107,18 +104,21 @@ public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
     var db =
         scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
-    var factory =
-        scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
+    // 🔥 IMPORTANT FIX: NO EnsureDeleted / EnsureCreated HERE
 
-    // IMPORTANT: clean slate per test (Cosmos is not transactional like SQL)
-    await db.Database.EnsureDeletedAsync();
-    await db.Database.EnsureCreatedAsync();
+    var all = await db.Items.ToListAsync();
+    db.Items.RemoveRange(all);
+    await db.SaveChangesAsync();
 
-    var active = new CosmosEntity();
-    active.Label = "Active";
+    var active = new CosmosEntity
+    {
+      Label = "Active"
+    };
 
-    var deleted = new CosmosEntity();
-    deleted.Label = "Deleted";
+    var deleted = new CosmosEntity
+    {
+      Label = "Deleted"
+    };
 
     db.Items.AddRange(active, deleted);
     await db.SaveChangesAsync();
@@ -139,12 +139,12 @@ public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
     visible.Should()
         .ContainSingle(x => x.Label == "Active");
 
-    var all =
+    var allraw =
         await verifyDb.Items.IgnoreQueryFilters().ToListAsync();
 
-    all.Should().HaveCount(2);
+    allraw.Should().HaveCount(2);
 
-    all.Should()
+    allraw.Should()
         .Contain(x =>
             x.Label == "Deleted" &&
             x.IsDeleted);

@@ -11,11 +11,12 @@ using Testcontainers.CosmosDb;
 public sealed class CosmosFixture : IAsyncLifetime
 {
   private IServiceProvider _provider = default!;
+  private TestCosmosDbContext _db = default!;
 
   public CosmosDbContainer Container { get; } =
       new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
-              .WithPortBinding(8081, true)
-              .Build();
+          .WithPortBinding(8081, true)
+          .Build();
 
   public async Task InitializeAsync()
   {
@@ -23,56 +24,53 @@ public sealed class CosmosFixture : IAsyncLifetime
 
     var services = new ServiceCollection();
 
-    var databaseName =
-        $"FranzTest_{Guid.NewGuid():N}";
-
+    var databaseName = $"FranzTest_{Guid.NewGuid():N}";
     var port = Container.GetMappedPublicPort(8081);
-
     var endpoint = $"https://localhost:{port}/";
 
     var configuration =
         new ConfigurationBuilder()
-            .AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                  ["Cosmos:Enabled"] = "true",
-                  ["Cosmos:AccountEndpoint"] = endpoint,
-                  ["Cosmos:AccountKey"] =
-                        CosmosDbBuilder.DefaultAccountKey,
-                  ["Cosmos:DatabaseName"] = databaseName,
-                  ["Cosmos:ApplicationName"] =
-                        "Franz.Tests.Cosmos"
-                })
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+              ["Cosmos:Enabled"] = "true",
+              ["Cosmos:AccountEndpoint"] = endpoint,
+              ["Cosmos:AccountKey"] = CosmosDbBuilder.DefaultAccountKey,
+              ["Cosmos:DatabaseName"] = databaseName,
+              ["Cosmos:ApplicationName"] = "Franz.Tests.Cosmos"
+            })
             .Build();
 
-    services.AddSingleton<IDispatcher>(
-        Substitute.For<IDispatcher>());
+    services.AddSingleton<IDispatcher>(Substitute.For<IDispatcher>());
 
     services.AddLogging();
-    AppContext.SetSwitch(
-    "System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport",
-    true);
 
-    services.AddScoped(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
+    AppContext.SetSwitch(
+        "System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport",
+        true);
+
+    // IMPORTANT: factories should behave consistently
+    services.AddSingleton(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
     services.AddSingleton<IIdGenerator<Guid>, GuidV7Generator>();
+
     services.AddFranzCosmosDbContext<TestCosmosDbContext>(
         configuration,
         validateOnStart: false);
+
     services.AddCosmosInfrastructure<TestCosmosDbContext>(configuration);
+
     _provider = services.BuildServiceProvider();
 
-    // ONLY REAL REQUIRED STEP
+    // 🔥 SINGLE INITIALIZATION POINT
     using var scope = _provider.CreateScope();
 
-    var db =
-        scope.ServiceProvider
-            .GetRequiredService<TestCosmosDbContext>();
+    _db = scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
-    await db.Database.EnsureCreatedAsync();
+    await _db.Database.EnsureCreatedAsync();
   }
 
-  public IServiceScope CreateScope()
-      => _provider.CreateScope();
+  public IServiceScope CreateScope() => _provider.CreateScope();
+
+  public TestCosmosDbContext CreateDb() => _provider.GetRequiredService<TestCosmosDbContext>();
 
   public async Task DisposeAsync()
   {
