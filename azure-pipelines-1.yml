@@ -114,7 +114,7 @@ steps:
   condition: and(
     succeeded(),
     eq(variables['Build.SourceBranch'], 'refs/heads/main')
-  )
+    )
 
 # ------------------------------------------------------------
 # Sync GitHub Develop
@@ -164,7 +164,7 @@ steps:
   condition: and(
     succeeded(),
     eq(variables['Build.SourceBranch'], 'refs/heads/main')
-  )
+    )
 
   env:
     GITHUB_USER: $(GITHUB_USER)
