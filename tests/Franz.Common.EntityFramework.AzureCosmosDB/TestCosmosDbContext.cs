@@ -19,7 +19,7 @@ public class TestCosmosDbContext : CosmosDbContextBase
   {
   }
 
-  public DbSet<CosmosItem> Items => Set<CosmosItem>();
+  public DbSet<CosmosEntity> Items => Set<CosmosEntity>();
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
@@ -28,15 +28,11 @@ public class TestCosmosDbContext : CosmosDbContextBase
 
   
     // For testing generic repositories, mapping Id as the Partition Key is standard.
-    modelBuilder.Entity<CosmosItem>()
+    modelBuilder.Entity<CosmosEntity>()
         .ToContainer("Items")
         .HasPartitionKey(x => x.Id);
-    modelBuilder.Entity<CosmosItem>()
+    modelBuilder.Entity<CosmosEntity>()
     .HasQueryFilter(x => !x.IsDeleted);
   }
 }
 
-public class CosmosItem : Entity<Guid>
-{
-  public string Label { get; set; } = string.Empty;
-}

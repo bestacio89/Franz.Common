@@ -4,7 +4,7 @@ using Franz.Common.Mediator.Dispatchers;
 using Microsoft.EntityFrameworkCore;
 
 
-namespace Franz.Common.EntityFramework.SQLServer.Tests;
+namespace Franz.Common.AzureCosmosDB.Tests;
 
 
 

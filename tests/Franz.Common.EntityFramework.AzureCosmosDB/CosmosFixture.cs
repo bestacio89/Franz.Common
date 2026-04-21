@@ -1,5 +1,7 @@
 ﻿using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.AzureCosmosDB.Tests;
+using Franz.Common.Business.Domain.Factories;
+using Franz.Common.Business.Domain.IdGenerators;
 using Franz.Common.Mediator.Dispatchers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +52,9 @@ public sealed class CosmosFixture : IAsyncLifetime
     AppContext.SetSwitch(
     "System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport",
     true);
+
+    services.AddScoped(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
+    services.AddSingleton<IIdGenerator<Guid>, GuidV7Generator>();
     services.AddFranzCosmosDbContext<TestCosmosDbContext>(
         configuration,
         validateOnStart: false);

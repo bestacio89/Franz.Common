@@ -1,21 +1,16 @@
 ﻿using FluentAssertions;
 using Franz.Common.Business.Domain.Factories;
-using Franz.Common.Errors;
+using Franz.Common.AzureCosmosDB.Tests;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Threading.Tasks;
-using Xunit;
 
 namespace Franz.Common.AzureCosmosDB.Tests;
 
-public class CosmosIntegrationTests
-    : IClassFixture<CosmosFixture>
+public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
 {
   private readonly CosmosFixture _fixture;
 
-  public CosmosIntegrationTests(
-      CosmosFixture fixture)
+  public CosmosIntegrationTests(CosmosFixture fixture)
   {
     _fixture = fixture;
   }
@@ -26,47 +21,38 @@ public class CosmosIntegrationTests
     using var scope = _fixture.CreateScope();
 
     var db =
-        scope.ServiceProvider
-            .GetRequiredService<TestCosmosDbContext>();
+        scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
     var factory =
-        scope.ServiceProvider
-            .GetRequiredService<
-                IEntityFactory<Guid, CosmosItem>>();
+        scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
 
-    var entity = factory.Create();
-
+    var entity = new CosmosEntity();
     entity.Label = "Cosmos Architect Item";
-
-    db.Items.Add(entity);
 
     var beforeSave = DateTimeOffset.UtcNow;
 
+    db.Items.Add(entity);
     await db.SaveChangesAsync();
 
-    // Fresh scope to avoid tracking cache
+    // IMPORTANT: avoid tracking reuse
+    db.ChangeTracker.Clear();
+
     using var verifyScope = _fixture.CreateScope();
 
     var verifyDb =
-        verifyScope.ServiceProvider
-            .GetRequiredService<TestCosmosDbContext>();
+        verifyScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
     var saved =
-        await verifyDb.Items
-            .FirstOrDefaultAsync(
-                x => x.Id == entity.Id);
+        await verifyDb.Items.FirstOrDefaultAsync(x => x.Id == entity.Id);
 
     saved.Should().NotBeNull();
 
     saved!.DateCreated.Should()
-        .BeCloseTo(
-            beforeSave,
-            TimeSpan.FromSeconds(5));
+        .BeCloseTo(beforeSave, TimeSpan.FromSeconds(5));
 
-    saved.CreatedBy.Should()
-        .Be("system");
-
+    saved.CreatedBy.Should().Be("system");
   }
+
   [Fact]
   public async Task SoftDelete_ShouldApplyGlobalFilter()
   {
@@ -75,38 +61,32 @@ public class CosmosIntegrationTests
     using (var scope = _fixture.CreateScope())
     {
       var db =
-          scope.ServiceProvider
-              .GetRequiredService<TestCosmosDbContext>();
+          scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
       var factory =
-          scope.ServiceProvider
-              .GetRequiredService<
-                  IEntityFactory<Guid, CosmosItem>>();
+          scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
 
-      var entity = factory.Create();
-
+      var entity = new CosmosEntity();
       entity.Label = "Disposable";
 
       db.Items.Add(entity);
-
       await db.SaveChangesAsync();
 
       id = entity.Id;
 
       db.Items.Remove(entity);
-
       await db.SaveChangesAsync();
+
+      db.ChangeTracker.Clear();
     }
 
     using var verifyScope = _fixture.CreateScope();
 
     var verifyDb =
-        verifyScope.ServiceProvider
-            .GetRequiredService<TestCosmosDbContext>();
+        verifyScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
     var filtered =
-        await verifyDb.Items
-            .FirstOrDefaultAsync(x => x.Id == id);
+        await verifyDb.Items.FirstOrDefaultAsync(x => x.Id == id);
 
     var raw =
         await verifyDb.Items
@@ -116,48 +96,42 @@ public class CosmosIntegrationTests
     filtered.Should().BeNull();
 
     raw.Should().NotBeNull();
-
     raw!.IsDeleted.Should().BeTrue();
   }
 
   [Fact]
   public async Task GlobalFilter_ShouldExcludeSoftDeleted()
   {
-    using (var scope = _fixture.CreateScope())
-    {
-      var db =
-          scope.ServiceProvider
-              .GetRequiredService<TestCosmosDbContext>();
-      await db.Database.EnsureDeletedAsync();
-      await db.Database.EnsureCreatedAsync();
+    using var scope = _fixture.CreateScope();
 
-      var factory =
-          scope.ServiceProvider
-              .GetRequiredService<
-                  IEntityFactory<Guid, CosmosItem>>();
+    var db =
+        scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
-      var active = factory.Create();
-      active.Label = "Active";
+    var factory =
+        scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
 
-      var deleted = factory.Create();
-      deleted.Label = "Deleted";
+    // IMPORTANT: clean slate per test (Cosmos is not transactional like SQL)
+    await db.Database.EnsureDeletedAsync();
+    await db.Database.EnsureCreatedAsync();
 
-      await db.Items.AddRangeAsync(
-          active,
-          deleted);
+    var active = new CosmosEntity();
+    active.Label = "Active";
 
-      await db.SaveChangesAsync();
+    var deleted = new CosmosEntity();
+    deleted.Label = "Deleted";
 
-      db.Items.Remove(deleted);
+    db.Items.AddRange(active, deleted);
+    await db.SaveChangesAsync();
 
-      await db.SaveChangesAsync();
-    }
+    db.Items.Remove(deleted);
+    await db.SaveChangesAsync();
+
+    db.ChangeTracker.Clear();
 
     using var verifyScope = _fixture.CreateScope();
 
     var verifyDb =
-        verifyScope.ServiceProvider
-            .GetRequiredService<TestCosmosDbContext>();
+        verifyScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
     var visible =
         await verifyDb.Items.ToListAsync();
@@ -166,15 +140,13 @@ public class CosmosIntegrationTests
         .ContainSingle(x => x.Label == "Active");
 
     var all =
-        await verifyDb.Items
-            .IgnoreQueryFilters()
-            .ToListAsync();
+        await verifyDb.Items.IgnoreQueryFilters().ToListAsync();
 
     all.Should().HaveCount(2);
 
     all.Should()
-       .Contain(x =>
-           x.Label == "Deleted"
-           && x.IsDeleted);
+        .Contain(x =>
+            x.Label == "Deleted" &&
+            x.IsDeleted);
   }
 }
