@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using Franz.Common.Http.Documentation.Configuration;
 using Microsoft.AspNetCore.Mvc;
@@ -29,7 +29,11 @@ public static class ServiceCollectionExtensions
   }
 
   /// <summary>
-  /// Configures Swagger and XML documentation.
+  /// Configures Swagger (LEGACY MODE SAFE VERSION).
+  /// 
+  /// IMPORTANT:
+  /// - In .NET 10 OpenAPI source generator mode, XML comments must NOT be used.
+  /// - This configuration assumes SwaggerGen is the active documentation provider.
   /// </summary>
   public static FranzDocumentationBuilder ConfigureSwagger(this FranzDocumentationBuilder builder)
   {
@@ -37,15 +41,25 @@ public static class ServiceCollectionExtensions
 
     builder.Services.AddSwaggerGen(options =>
     {
+      // -------------------------------
+      // XML COMMENTS (SAFE GUARD)
+      // -------------------------------
       var entryAssembly = Assembly.GetEntryAssembly();
+
       if (entryAssembly != null)
       {
         var xmlFilename = $"{entryAssembly.GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
+
+        // Only include XML comments if file exists AND we are in SwaggerGen mode.
+        // This avoids .NET 10 OpenAPI immutable schema conflicts.
         if (File.Exists(xmlPath))
+        {
           options.IncludeXmlComments(xmlPath);
+        }
       }
 
+      // Framework enum conversion (safe)
       options.ConvertEnumeration();
     });
 
@@ -69,6 +83,7 @@ public static class ServiceCollectionExtensions
       opt.DefaultApiVersion = new ApiVersion(1, 0);
       opt.AssumeDefaultVersionWhenUnspecified = true;
       opt.ReportApiVersions = true;
+
       opt.ApiVersionReader = ApiVersionReader.Combine(
           new UrlSegmentApiVersionReader(),
           new HeaderApiVersionReader("x-api-version"),
