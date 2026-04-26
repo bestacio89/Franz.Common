@@ -13,7 +13,7 @@ A utility library within the **Franz Framework** designed to simplify input/outp
 
 ## **Version Information**
 
-- **Current Version**:  2.1.1
+- **Current Version**:  2.1.2
 - Part of the private **Franz Framework** ecosystem.
 
 ---

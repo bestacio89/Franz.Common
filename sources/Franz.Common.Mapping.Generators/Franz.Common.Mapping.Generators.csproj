@@ -8,7 +8,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="bin\Release\net10.0\\Franz.Common.Mapping.Generators.dll" />
+    <None Remove="bin\Debug\net10.0\\Franz.Common.Mapping.Generators.dll" />
   </ItemGroup>
 
   <ItemGroup>

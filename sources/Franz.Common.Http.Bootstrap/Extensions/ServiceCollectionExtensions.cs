@@ -45,8 +45,11 @@ public static class ServiceCollectionExtensions
         .AddHttpHeaderContext();
     
     services
-        .AddFranzDocumentation();
-    
+        .AddFranzDocumentation()
+        .ConfigureApiVersioning()
+        .ConfigureSwagger();
+
+
     services
         .AddHttpIdentityContext()
         .AddFranzMultiTenancy()

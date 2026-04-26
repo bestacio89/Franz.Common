@@ -7,7 +7,7 @@ It gives you **retry, circuit breaker, advanced circuit breaker, timeout, and bu
 
 ---
 
-* - **Current Version**:  2.1.1
+* - **Current Version**:  2.1.2
 * **Target Frameworks**: .NET 9+
 * **Dependencies**: `Polly`, `Serilog`, `Franz.Common.Mediator`
 - Part of the private **Franz Framework** ecosystem.

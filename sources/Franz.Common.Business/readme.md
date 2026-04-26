@@ -9,7 +9,7 @@ It provides a **clean, deterministic, and production-grade foundation** for buil
 
 ## 🚀 Version
 
-**v2.1.1**
+**v2.1.2**
 
 ---
 

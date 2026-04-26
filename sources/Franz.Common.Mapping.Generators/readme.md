@@ -1,5 +1,5 @@
 ## Franz.Common.Mapping.Generators
-**Version 2.0.2**
+**Version 2.1.2**
 
 ### Overview
 `Franz.Common.Mapping.Generators` is a high-performance **Incremental Source Generator** designed for .NET 10. It eliminates the boilerplate of manual object-to-object mapping by automatically implementing partial classes that inherit from `IMapper<TSource, TDestination>` or `IAsyncMapper<TSource, TDestination>`.
