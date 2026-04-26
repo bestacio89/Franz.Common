@@ -4,7 +4,7 @@ A utility library within the **Franz Framework** that enhances **ASP.NET Core** 
 This package provides tools for **identity context access**, **dependency injection**, and **plug-and-play SSO providers** (WS-Fed, OIDC, SAML2, Keycloak).
 
 ---
--- **Current Version**:  2.1.2
+-- **Current Version**:  2.1.3
 - Part of the private **Franz Framework** ecosystem.
 ---
 ## **Features**

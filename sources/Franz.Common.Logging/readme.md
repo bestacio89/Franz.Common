@@ -3,7 +3,7 @@
 A comprehensive logging library within the **Franz Framework**, designed to enhance application monitoring and diagnostics using **Serilog** and **Elastic APM**.
 This package provides tools for centralized logging, tracing, and seamless integration with ASP.NET Core applications.
 
-* - **Current Version**:  2.1.2
+* - **Current Version**:  2.1.3
 * Part of the private **Franz Framework** ecosystem.
 
 ---

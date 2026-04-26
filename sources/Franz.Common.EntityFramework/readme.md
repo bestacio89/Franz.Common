@@ -17,7 +17,7 @@ Unlike strict DDD implementations, this library follows a **system-first pragmat
 
 # 🚀 Version
 
-**v2.1.2**
+**v2.1.3**
 
 ---
 

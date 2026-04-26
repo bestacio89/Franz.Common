@@ -19,7 +19,7 @@ A dedicated library within the **Franz Framework** that extends **Entity Framewo
 
 ## **Version Information**
 
-- **Current Version**:  2.1.2
+- **Current Version**:  2.1.3
 - Part of the private **Franz Framework** ecosystem.
 
 ---
