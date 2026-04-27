@@ -16,11 +16,5 @@
     <ProjectReference Include="..\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="readme.md">
-      <PackagePath></PackagePath>
-      <Pack>true</Pack>
-    </None>
-  </ItemGroup>
 
 </Project>

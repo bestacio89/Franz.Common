@@ -20,12 +20,21 @@ public sealed class HeaderContextAccessor(
   public IDictionary<string, string[]> ListAll()
   {
     var headers = _httpContextAccessor.HttpContext?.Request?.Headers;
-    if (headers == null)
+
+    if (headers is null)
       return new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
 
     return headers.ToDictionary(
         kvp => kvp.Key,
-        kvp => kvp.Value.ToArray()!,
+        kvp =>
+        {
+          var array = kvp.Value.ToArray();
+
+          return array
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!)
+            .ToArray();
+        },
         StringComparer.OrdinalIgnoreCase
     );
   }

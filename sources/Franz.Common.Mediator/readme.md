@@ -14,7 +14,7 @@ Unlike minimal mediators, Franz ships with:
 
 ---
 
-* - **Current Version**:  2.1.3
+* - **Current Version**:  2.1.4
 - Part of the private **Franz Framework** ecosystem.
 ---
 

@@ -5,7 +5,9 @@ namespace Franz.Common.Business.Repositories;
 public interface IEntityRepository<TEntity, TId>
     where TEntity : Entity<TId>
 {
-  Task<TEntity?> GetByIdAsync(TId id, CancellationToken cancellationToken = default);
+  Task<TEntity> GetByIdAsync(TId id, CancellationToken cancellationToken = default);
+
+  Task<IReadOnlyList<TEntity>> GetAllAsync(CancellationToken cancellationToken = default);
 
   Task AddAsync(TEntity entity, CancellationToken cancellationToken = default);
 

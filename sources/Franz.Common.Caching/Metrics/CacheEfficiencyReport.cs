@@ -6,7 +6,7 @@ namespace Franz.Common.Caching.Metrics;
 
 public sealed record CacheEfficiencyReport
 {
-  public string Key { get; init; }
+  public required string Key { get; init; }
   public CacheEfficiencyStatus Status { get; init; }
-  public string Reason { get; init; }
+  public required string Reason { get; init; }
 }

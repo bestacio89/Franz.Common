@@ -14,7 +14,7 @@ namespace Franz.Common.EntityFramework.Postgres.Tests;
 
 public class PostgresFixture : IAsyncLifetime
 {
-  public readonly PostgreSqlContainer Container = new PostgreSqlBuilder()
+  public readonly PostgreSqlContainer Container = new PostgreSqlBuilder("postgres:16-alpine")
       .WithDatabase("franz_test")
       .WithUsername("postgres")
       .WithPassword("password")

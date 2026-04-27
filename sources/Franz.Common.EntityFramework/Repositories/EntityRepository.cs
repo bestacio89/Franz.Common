@@ -17,28 +17,32 @@ public class EntityRepository<TDbContext, TEntity, TId>
     DbContext = dbContext;
   }
 
-
-
   public async Task<TEntity> GetByIdAsync(
       TId id,
       CancellationToken cancellationToken = default)
   {
-    var entity = await DbContext.Set<TEntity>()
-        .FindAsync(new object[] { id }, cancellationToken);
+    
+    TEntity? entity = await DbContext.Set<TEntity>()
+      .FindAsync(id, cancellationToken);
 
     if (entity is null)
+    {
       throw new NotFoundException(
           $"{typeof(TEntity).Name} with id '{id}' was not found.");
+    }
 
-    return entity;
+    return entity!;
   }
-  public async Task<IReadOnlyList<TEntity>> GetAll(CancellationToken cancellationToken)
+
+  public async Task<IReadOnlyList<TEntity>> GetAllAsync(
+      CancellationToken cancellationToken = default)
   {
     return await DbContext
         .Set<TEntity>()
         .AsNoTracking()
         .ToListAsync(cancellationToken);
   }
+
   public async Task AddAsync(
       TEntity entity,
       CancellationToken cancellationToken = default)
@@ -54,7 +58,6 @@ public class EntityRepository<TDbContext, TEntity, TId>
       CancellationToken cancellationToken = default)
   {
     DbContext.Set<TEntity>().Update(entity);
-
     await DbContext.SaveChangesAsync(cancellationToken);
   }
 
@@ -63,7 +66,6 @@ public class EntityRepository<TDbContext, TEntity, TId>
       CancellationToken cancellationToken = default)
   {
     DbContext.Set<TEntity>().Remove(entity);
-
     await DbContext.SaveChangesAsync(cancellationToken);
   }
 }

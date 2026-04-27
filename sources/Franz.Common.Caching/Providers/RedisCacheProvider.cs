@@ -72,15 +72,22 @@ public sealed class RedisCacheProvider : ICacheProvider
 
   private static TimeSpan GetExpiration(CacheOptions? request, CacheOptions global)
   {
-    // 1. Explicit request override
-    if (request?.DefaultAbsoluteExpiration != default && request.DefaultAbsoluteExpiration != global.DefaultAbsoluteExpiration)
-      return request.DefaultAbsoluteExpiration;
+    var requestAbsolute = request?.DefaultAbsoluteExpiration;
+    if (requestAbsolute is not null &&
+        requestAbsolute != default &&
+        requestAbsolute != global.DefaultAbsoluteExpiration)
+    {
+      return requestAbsolute.Value;
+    }
 
-    // 2. Sliding expiration fallback
-    if (request?.DefaultSlidingExpiration != default && request.DefaultSlidingExpiration != global.DefaultSlidingExpiration)
-      return request.DefaultSlidingExpiration;
+    var requestSliding = request?.DefaultSlidingExpiration;
+    if (requestSliding is not null &&
+        requestSliding != default &&
+        requestSliding != global.DefaultSlidingExpiration)
+    {
+      return requestSliding.Value;
+    }
 
-    // 3. Reactive global setting from IOptionsMonitor
     return global.DefaultAbsoluteExpiration;
   }
 

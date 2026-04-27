@@ -15,7 +15,7 @@ public class RabbitHeaderMapperTests
     {
         // Arrange
         var properties = new BasicProperties();
-        properties.Headers = new Dictionary<string, object>
+        properties.Headers = new Dictionary<string, object?>
         {
             { "TenantId", "tenant-1" },
             { "ByteArrayHeader", Encoding.UTF8.GetBytes("byte-value") },

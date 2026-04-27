@@ -23,7 +23,7 @@ public sealed class KafkaSenderTests : IClassFixture<KafkaContainerFixture>, IAs
   private readonly IServiceScope _scope;
 
   private readonly KafkaSender _sut;
-  private readonly string _topicName = "integration-test";
+  
 
   public KafkaSenderTests(KafkaContainerFixture fixture)
   {

@@ -1,10 +1,8 @@
-﻿#nullable enable
-using Azure.Messaging.EventGrid;
+﻿using Azure.Messaging.EventGrid;
 using Franz.Common.Errors;
 using Franz.Common.Messaging.AzureEventGrid.Constants;
 using Franz.Common.Messaging.Messages;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Primitives;
 using System.Text.Json;
 
 namespace Franz.Common.Messaging.AzureEventGrid.Mapping;
@@ -23,64 +21,99 @@ internal sealed class AzureEventGridMessageMapper
     if (evt is null)
       throw new TechnicalException("EventGridEvent cannot be null.");
 
-    // If EventGrid ID isn't a valid Guid, the Message constructor will have already
-    // generated a fresh Guid v7 for us as a fallback.
     var message = new Message
     {
-      MessageType = evt.EventType,
-      Body = evt.Data?.ToString()
+      MessageType = Normalize(evt.EventType),
+      Body = evt.Data?.ToString(),
+      Id = TryParseGuid(evt.Id)
     };
 
-    if (Guid.TryParse(evt.Id, out var eventGuid))
-    {
-      message.Id = eventGuid;
-    }
+    // -----------------------------
+    // Correlation (safe nullable handling)
+    // -----------------------------
+    message.CorrelationId = ExtractCorrelationId(evt);
 
-    // CORRELATION LOGIC: 
-    // We shouldn't necessarily set CorrelationId = evt.Id (which is unique to this event).
-    // Instead, try to find a correlation ID in the data bag if it exists.
-    if (evt.Data != null)
-    {
-      try
-      {
-        // Simple attempt to extract correlation id from common JSON paths
-        using var doc = JsonDocument.Parse(evt.Data);
-        if (doc.RootElement.TryGetProperty("CorrelationId", out var prop) &&
-            Guid.TryParse(prop.GetString(), out var correlationGuid))
-        {
-          message.CorrelationId = correlationGuid;
-        }
-      }
-      catch { /* Fallback to default spine behavior in Message class */ }
-    }
+    // -----------------------------
+    // Headers (normalized boundary)
+    // -----------------------------
+    ApplyHeaders(message, evt);
 
-    // Event Grid → Franz transport headers
-    message.Headers[AzureEventGridHeaders.EventType] = new StringValues(evt.EventType);
-
-    if (!string.IsNullOrWhiteSpace(evt.Subject))
-    {
-      message.Headers[AzureEventGridHeaders.Subject] = new StringValues(evt.Subject);
-    }
-
-    if (!string.IsNullOrWhiteSpace(evt.Topic))
-    {
-      message.Headers[AzureEventGridHeaders.Topic] = new StringValues(evt.Topic);
-    }
-
-    message.Headers[AzureEventGridHeaders.EventTime] = new StringValues(evt.EventTime.ToString("O"));
-
-    if (!string.IsNullOrWhiteSpace(evt.DataVersion))
-    {
-      message.Headers[AzureEventGridHeaders.DataVersion] = new StringValues(evt.DataVersion);
-    }
-
+    // -----------------------------
+    // Logging
+    // -----------------------------
     _logger.LogDebug(
-        "Mapped EventGridEvent {EventId} ({EventType}) to Franz Message {MessageId} with Correlation {CorrelationId}",
-        evt.Id,
-        evt.EventType,
-        message.Id,
-        message.CorrelationId);
+      "Mapped EventGridEvent {EventId} ({EventType}) → Message {MessageId} (Correlation {CorrelationId})",
+      evt.Id,
+      evt.EventType,
+      message.Id,
+      message.CorrelationId);
 
     return message;
   }
+
+  // =====================================================
+  // Header Mapping (transport boundary)
+  // =====================================================
+
+  private static void ApplyHeaders(Message message, EventGridEvent evt)
+  {
+    var headers = message.Headers;
+
+    SetHeader(headers, AzureEventGridHeaders.EventType, evt.EventType);
+    SetHeader(headers, AzureEventGridHeaders.Subject, evt.Subject);
+    SetHeader(headers, AzureEventGridHeaders.Topic, evt.Topic);
+    SetHeader(headers, AzureEventGridHeaders.DataVersion, evt.DataVersion);
+
+    headers[AzureEventGridHeaders.EventTime] =
+      new[] { evt.EventTime.ToString("O") };
+  }
+
+  private static void SetHeader(
+    IDictionary<string, string[]> headers,
+    string key,
+    string? value)
+  {
+    if (string.IsNullOrWhiteSpace(value))
+      return;
+
+    headers[key] = new[] { value };
+  }
+
+  // =====================================================
+  // Correlation Extraction (safe, nullable-first design)
+  // =====================================================
+
+  private static Guid? ExtractCorrelationId(EventGridEvent evt)
+  {
+    if (evt.Data is null)
+      return null;
+
+    try
+    {
+      using var doc = JsonDocument.Parse(evt.Data);
+
+      if (!doc.RootElement.TryGetProperty("CorrelationId", out var prop))
+        return null;
+
+      var raw = prop.GetString();
+
+      return Guid.TryParse(raw, out var guid)
+        ? guid
+        : null;
+    }
+    catch
+    {
+      return null; // never fail transport mapping
+    }
+  }
+
+  // =====================================================
+  // Safe parsing helpers
+  // =====================================================
+
+  private static Guid TryParseGuid(string? value)
+  => Guid.TryParse(value, out var guid) ? guid : Guid.Empty;
+
+  private static string Normalize(string? value)
+    => string.IsNullOrWhiteSpace(value) ? string.Empty : value;
 }

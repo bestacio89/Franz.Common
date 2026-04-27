@@ -6,6 +6,7 @@
 
 	<Import Project="..\..\common.targets" />
 
+  
 	<ItemGroup>
 
 	  <PackageReference Include="AspNetCore.HealthChecks.AzureServiceBus" Version="9.0.0" />
@@ -22,5 +23,8 @@
 	  <ProjectReference Include="..\Franz.Common.Messaging.RabbitMQ\Franz.Common.Messaging.RabbitMQ.csproj" />
 	  <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
 	</ItemGroup>
-
+  
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.3" />
+  </ItemGroup>
 </Project>

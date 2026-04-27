@@ -1,4 +1,5 @@
 ﻿#nullable enable
+
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Messaging.Messages;
@@ -18,18 +19,15 @@ public static class MessageDeserializerExtensions
   public static ICommand? ToCommand(this Message message)
   {
     var type = ResolveType(message.MessageType, typeof(ICommand));
-    if (type is null || string.IsNullOrWhiteSpace(message.Body)) return null;
+    if (type is null || string.IsNullOrWhiteSpace(message.Body))
+      return null;
 
-    // FIX: Passing message.Body (string) instead of a boolean check
     var command = (ICommand?)JsonSerializer.Deserialize(message.Body, type, _jsonOptions);
 
-    if (command != null)
-    {
-      // Seed the ambient context with the native Guid v7
-      CorrelationId.Current = message.CorrelationId;
-      // Map the Guid to the command property if it exists
-      TrySetCorrelationProperty(command, message.CorrelationId);
-    }
+    if (command is null)
+      return null;
+
+    ApplyCorrelation(command, message.CorrelationId);
 
     return command;
   }
@@ -37,44 +35,79 @@ public static class MessageDeserializerExtensions
   public static IEvent? ToEvent(this Message message)
   {
     var type = ResolveType(message.MessageType, typeof(IEvent));
-    if (type is null || string.IsNullOrWhiteSpace(message.Body)) return null;
+    if (type is null || string.IsNullOrWhiteSpace(message.Body))
+      return null;
 
-    // FIX: Passing message.Body (string) instead of a boolean check
     var @event = (IEvent?)JsonSerializer.Deserialize(message.Body, type, _jsonOptions);
 
-    if (@event != null)
-    {
-      CorrelationId.Current = message.CorrelationId;
-      TrySetCorrelationProperty(@event, message.CorrelationId);
-    }
+    if (@event is null)
+      return null;
+
+    ApplyCorrelation(@event, message.CorrelationId);
 
     return @event;
   }
 
+  // =====================================================
+  // TYPE RESOLUTION (transport-safe)
+  // =====================================================
+
   private static Type? ResolveType(string? typeName, Type expectedBase)
   {
-    if (string.IsNullOrWhiteSpace(typeName)) return null;
-
-    var type = Type.GetType(typeName, throwOnError: false);
-    if (type != null && expectedBase.IsAssignableFrom(type)) return type;
+    if (string.IsNullOrWhiteSpace(typeName))
+      return null;
 
     foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
     {
-      type = asm.GetType(typeName, throwOnError: false);
-      if (type != null && expectedBase.IsAssignableFrom(type)) return type;
+      var type = asm.GetType(typeName, throwOnError: false);
+
+      if (type != null && expectedBase.IsAssignableFrom(type))
+        return type;
+    }
+
+    // fallback: search by FullName (more test-friendly)
+    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+    {
+      var type = asm.GetTypes()
+        .FirstOrDefault(t =>
+          t.FullName == typeName &&
+          expectedBase.IsAssignableFrom(t));
+
+      if (type != null)
+        return type;
     }
 
     return null;
   }
 
-  private static void TrySetCorrelationProperty(object target, Guid correlationId)
-  {
-    // No more string checks or Guid.Empty checks needed here 
-    // because the Message.CorrelationId property already guarantees a valid v7.
-    var prop = target.GetType().GetProperty("CorrelationId", BindingFlags.Public | BindingFlags.Instance);
+  // =====================================================
+  // CORRELATION (transport-agnostic injection)
+  // =====================================================
 
-    // HARDENING: Check for Guid type, not string
-    if (prop?.CanWrite == true && prop.PropertyType == typeof(Guid))
+  private static void ApplyCorrelation(object target, Guid? correlationId)
+  {
+    // -----------------------------
+    // 1. Ambient context (ONLY if present)
+    // -----------------------------
+    if (correlationId is Guid correlation)
+    {
+      CorrelationId.Current = correlation;
+    }
+
+    var prop = target.GetType()
+      .GetProperty("CorrelationId", BindingFlags.Public | BindingFlags.Instance);
+
+    if (prop is null || !prop.CanWrite)
+      return;
+
+    // -----------------------------
+    // 2. Domain hydration
+    // -----------------------------
+    if (prop.PropertyType == typeof(Guid))
+    {
+      prop.SetValue(target, correlationId ?? Guid.Empty);
+    }
+    else if (prop.PropertyType == typeof(Guid?))
     {
       prop.SetValue(target, correlationId);
     }

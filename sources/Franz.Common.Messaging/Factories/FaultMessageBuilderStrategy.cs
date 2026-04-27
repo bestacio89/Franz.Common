@@ -30,12 +30,12 @@ public sealed class ExecutionFaultMessageBuilderStrategy
     };
 
     message.Headers.Add(
-        MessagingConstants.ClassName,
-        new StringValues(nameof(ExecutionFault)));
+    MessagingConstants.ClassName,
+    new[] { nameof(ExecutionFault) });
 
     message.Headers.Add(
         MessagingConstants.FaultCode,
-        new StringValues(fault.Code));
+        new[] { fault.Code });
 
     return message;
   }

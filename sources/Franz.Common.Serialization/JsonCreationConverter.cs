@@ -3,10 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace Franz.Common.Serialization;
 
-/// <summary>
-/// Safe factory-based converter replacing Newtonsoft JsonCreationConverter.
-/// Explicit construction, no reflection population, no polymorphism.
-/// </summary>
 public abstract class SystemTextCreationConverter<T> : JsonConverter<T>
 {
   public override bool CanConvert(Type typeToConvert)
@@ -20,14 +16,20 @@ public abstract class SystemTextCreationConverter<T> : JsonConverter<T>
     using var document = JsonDocument.ParseValue(ref reader);
     var element = document.RootElement;
 
-    var target = Create(typeToConvert, element);
+    var target = Create(typeToConvert, element)
+        ?? throw new JsonException($"Factory returned null for {typeof(T).FullName}");
 
-    // Populate explicitly (safe)
     var json = element.GetRawText();
-    return (T)JsonSerializer.Deserialize(
+
+    var result = JsonSerializer.Deserialize(
         json,
         target.GetType(),
-        options)!;
+        options);
+
+    if (result is null)
+      throw new JsonException($"Deserialization returned null for {target.GetType().FullName}");
+
+    return (T)result;
   }
 
   public override void Write(
@@ -35,6 +37,9 @@ public abstract class SystemTextCreationConverter<T> : JsonConverter<T>
       T value,
       JsonSerializerOptions options)
   {
+    if (value is null)
+      throw new JsonException("Cannot serialize null value.");
+
     JsonSerializer.Serialize(
         writer,
         value,
@@ -42,8 +47,5 @@ public abstract class SystemTextCreationConverter<T> : JsonConverter<T>
         options);
   }
 
-  /// <summary>
-  /// Explicit factory method (NO reflection).
-  /// </summary>
   protected abstract T Create(Type typeToConvert, JsonElement json);
 }

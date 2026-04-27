@@ -5,9 +5,9 @@ namespace Franz.Common.Messaging.AzureEventGrid.Logging;
 
 internal static class AzureEventGridLogScope
 {
-  public static IDisposable BeginScope(
-      this ILogger logger,
-      EventGridEvent evt)
+  public static IDisposable? BeginScope(
+     this ILogger logger,
+     EventGridEvent evt)
   {
     return logger.BeginScope(new Dictionary<string, object?>
     {

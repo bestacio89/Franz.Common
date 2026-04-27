@@ -27,12 +27,18 @@ public sealed class KafkaSender(
 
     try
     {
-      // 🔥 HOT PATH OPTIMIZATION
+      // =========================
+      // NORMALIZE TRANSPORT VALUES
+      // =========================
+      var correlationKey =
+        message.CorrelationId?.ToString()
+        ?? message.Id.ToString();
+
       var payload = Serialize(message);
 
       var kafkaMessage = new Message<string, byte[]>
       {
-        Key = message.CorrelationId.ToString(),
+        Key = correlationKey,
         Value = payload,
         Headers = BuildHeaders(message)
       };
@@ -43,7 +49,6 @@ public sealed class KafkaSender(
           .ProduceAsync(topic, kafkaMessage, ct)
           .ConfigureAwait(false);
 
-      // 🔍 Delivery insight (VERY useful in prod)
       logger.LogDebug(
           "[Kafka] Delivered {MessageId} to {Topic} [Partition: {Partition}, Offset: {Offset}]",
           message.Id,
@@ -71,7 +76,7 @@ public sealed class KafkaSender(
   }
 
   // =========================
-  // 🔥 HOT PATH HELPERS
+  // HOT PATH HELPERS
   // =========================
 
   private byte[] Serialize(Message message)
@@ -93,9 +98,12 @@ public sealed class KafkaSender(
 
     foreach (var (key, values) in message.Headers)
     {
+      if (values is null || values.Length == 0)
+        continue;
+
       foreach (var value in values)
       {
-        if (value is not null)
+        if (!string.IsNullOrWhiteSpace(value))
         {
           headers.Add(key, Encoding.UTF8.GetBytes(value));
         }
@@ -106,7 +114,7 @@ public sealed class KafkaSender(
   }
 
   // =========================
-  // 🧹 LIFECYCLE
+  // LIFECYCLE
   // =========================
 
   public async ValueTask DisposeAsync()
@@ -116,12 +124,11 @@ public sealed class KafkaSender(
 
     try
     {
-      // 🔥 Ensure messages are flushed before shutdown
       producer.Flush(TimeSpan.FromSeconds(5));
     }
     catch
     {
-      // swallow — shutdown path
+      // ignore shutdown errors
     }
 
     producer.Dispose();
@@ -141,6 +148,7 @@ public sealed class KafkaSender(
     }
     catch
     {
+      // ignore shutdown errors
     }
 
     producer.Dispose();

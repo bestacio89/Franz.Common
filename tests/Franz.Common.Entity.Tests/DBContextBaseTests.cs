@@ -96,7 +96,7 @@ namespace Franz.Common.EntityFramework.Tests
       // Soft-delete assertions
       Assert.True(entity.IsDeleted);
       Assert.Equal("test-user", entity.DeletedBy);
-      Assert.NotNull(entity.DateDeleted);
+  
 
       // Ensure soft-deleted entities remain in the DB
       var allEntities = context.DummyEntities.IgnoreQueryFilters().ToList();

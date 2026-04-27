@@ -37,7 +37,15 @@ public class AuthorizationMessageBuilder : IMessageBuilder
     if (_headerContextAccessor is not null &&
         _headerContextAccessor.TryGetValue(HeaderConstants.Authorization, out StringValues values))
     {
-      message.Headers[HeaderConstants.Authorization] = values;
+      var array = values
+        .Where(v => !string.IsNullOrWhiteSpace(v))
+        .Select(v => v!) // remove nullable
+        .ToArray();
+
+      if (array.Length > 0)
+      {
+        message.Headers[HeaderConstants.Authorization] = array;
+      }
     }
 
     return Task.CompletedTask;

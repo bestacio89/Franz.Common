@@ -1,8 +1,8 @@
 ﻿#nullable enable
+
 using Azure.Messaging.EventHubs.Processor;
 using Franz.Common.Messaging.AzureEventHubs.Constants;
 using Franz.Common.Messaging.Messages;
-using Microsoft.Extensions.Primitives;
 
 namespace Franz.Common.Messaging.AzureEventHubs.Mapping;
 
@@ -12,35 +12,49 @@ public sealed class AzureEventHubsMessageMapper
   {
     var data = args.Data;
 
-
-    // The Message constructor handles the default Guid v7 for Id and CorrelationId.
-    var message = new Message(body);
-
-    // Attempt to parse the native EventData MessageId (string) into our native Guid
-    if (!string.IsNullOrWhiteSpace(data.MessageId) && Guid.TryParse(data.MessageId, out var messageGuid))
+    var message = new Message(body)
     {
-      message.Id = messageGuid;
-    }
+      Id = RequireGuid(data.MessageId),
+      CorrelationId = RequireGuid(data.CorrelationId)
+    };
 
-    // Attempt to parse the native EventData CorrelationId (string) into our native Guid
-    if (!string.IsNullOrWhiteSpace(data.CorrelationId) && Guid.TryParse(data.CorrelationId, out var correlationGuid))
-    {
-      message.CorrelationId = correlationGuid;
-    }
-
-    // Event Hubs → Franz transport headers
-    message.Headers[AzureEventHubsHeaders.PartitionId] =
-        new StringValues(args.Partition.PartitionId);
-
-    message.Headers[AzureEventHubsHeaders.SequenceNumber] =
-        new StringValues(data.SequenceNumber.ToString());
-
-    message.Headers[AzureEventHubsHeaders.Offset] =
-        new StringValues(data.Offset.ToString());
-
-    message.Headers[AzureEventHubsHeaders.EnqueuedTime] =
-        new StringValues(data.EnqueuedTime.ToString("O"));
+    ApplyHeaders(message, args, data);
 
     return message;
+  }
+
+  // -----------------------------
+  // Headers
+  // -----------------------------
+  private static void ApplyHeaders(
+    Message message,
+    ProcessEventArgs args,
+    Azure.Messaging.EventHubs.EventData data)
+  {
+    var headers = message.Headers;
+
+    headers[AzureEventHubsHeaders.PartitionId] =
+      new[] { args.Partition.PartitionId };
+
+    headers[AzureEventHubsHeaders.SequenceNumber] =
+      new[] { data.SequenceNumber.ToString() };
+
+    // FIX: obsolete API → OffsetString
+    headers[AzureEventHubsHeaders.Offset] =
+      new[] { data.OffsetString };
+
+    headers[AzureEventHubsHeaders.EnqueuedTime] =
+      new[] { data.EnqueuedTime.ToString("O") };
+  }
+
+  // -----------------------------
+  // Strict GUID parsing
+  // -----------------------------
+  private static Guid RequireGuid(string? value)
+  {
+    if (Guid.TryParse(value, out var guid))
+      return guid;
+
+    throw new InvalidOperationException($"Invalid GUID: '{value}'");
   }
 }

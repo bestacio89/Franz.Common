@@ -47,6 +47,12 @@ internal sealed class AzureEventGridIngress : IAzureEventGridIngress
     {
       var data = evt.Data.ToObjectFromJson<SubscriptionValidationEventData>();
 
+      if (data is null || string.IsNullOrWhiteSpace(data.ValidationCode))
+      {
+        throw new TechnicalException(
+            "Invalid subscription validation payload received from Event Grid.");
+      }
+
       _logger.LogInformation(
           "🔐 Event Grid subscription validation received. ValidationCode={ValidationCode}",
           data.ValidationCode);

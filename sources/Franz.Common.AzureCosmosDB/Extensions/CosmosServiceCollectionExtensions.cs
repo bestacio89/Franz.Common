@@ -1,4 +1,5 @@
-﻿using Franz.Common.AzureCosmosDB.Context;
+﻿#nullable enable
+using Franz.Common.AzureCosmosDB.Context;
 using Franz.Common.AzureCosmosDB.Messaging;
 using Franz.Common.AzureCosmosDB.Options;
 using Franz.Common.AzureCosmosDB.Repositories;
@@ -9,7 +10,6 @@ using Franz.Common.Business.Repositories;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Messaging.Storage;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Cosmos.Storage.Internal;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -28,6 +28,8 @@ public static class CosmosServiceCollectionExtensions
       bool validateOnStart = true)
       where TContext : CosmosDbContextBase
   {
+    ArgumentNullException.ThrowIfNull(configuration);
+
     services.ConfigureCosmosOptions(configuration, validateOnStart);
 
     services.AddDbContext<TContext>((sp, options) =>
@@ -41,9 +43,7 @@ public static class CosmosServiceCollectionExtensions
           cosmos.AccountEndpoint,
           cosmos.AccountKey,
           cosmos.DatabaseName,
-          cosmosBuilder =>
-              ConfigureCosmosProvider(cosmosBuilder, cosmos)
-
+          cosmosBuilder => ConfigureCosmosProvider(cosmosBuilder, cosmos)
       );
     });
 
@@ -55,14 +55,12 @@ public static class CosmosServiceCollectionExtensions
       IConfiguration configuration)
       where TDbContext : CosmosDbContextBase
   {
-    // 1. Core EF Options & Context
+    ArgumentNullException.ThrowIfNull(configuration);
+
     services.AddFranzCosmosDbContext<TDbContext>(configuration);
 
-    // 2. Cosmos-Native Discovery Logic
-    // Rerouted from AddEntityRepositories to avoid the Arity-2 relational crash
     services.AddCosmosEntityRepositories<TDbContext>();
 
-    // 3. Domain Infrastructure
     services.AddSingleton<IIdGenerator<Guid>, GuidV7Generator>();
     services.AddTransient(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
 
@@ -72,9 +70,11 @@ public static class CosmosServiceCollectionExtensions
   public static IServiceCollection AddFranzCosmosMessaging(
       this IServiceCollection services,
       IConfiguration configuration,
-    bool validateonstart = true)
+      bool validateOnStart = true)
   {
-    services.ConfigureCosmosOptions(configuration, validateonstart);
+    ArgumentNullException.ThrowIfNull(configuration);
+
+    services.ConfigureCosmosOptions(configuration, validateOnStart);
 
     services.AddDbContext<CosmosMessagingDbContext>((sp, options) =>
     {
@@ -85,13 +85,7 @@ public static class CosmosServiceCollectionExtensions
           cosmos.AccountEndpoint,
           cosmos.AccountKey,
           cosmos.DatabaseName,
-          cosmosBuilder =>
-          {
-            // EF Core 10 handles container mapping via ModelBuilder.ToContainer()
-            // in the DbContext, so we avoid setting a default container here
-            // to prevent mapping collisions.
-            ConfigureCosmosProvider(cosmosBuilder, cosmos);
-          }
+          cosmosBuilder => ConfigureCosmosProvider(cosmosBuilder, cosmos)
       );
     });
 
@@ -101,11 +95,17 @@ public static class CosmosServiceCollectionExtensions
     return services;
   }
 
+  // =====================================================
+  // Options
+  // =====================================================
+
   private static void ConfigureCosmosOptions(
       this IServiceCollection services,
       IConfiguration configuration,
       bool validateOnStart)
   {
+    ArgumentNullException.ThrowIfNull(configuration);
+
     var builder = services
         .AddOptions<CosmosOptions>()
         .Bind(configuration.GetSection(DefaultSection))
@@ -126,19 +126,27 @@ public static class CosmosServiceCollectionExtensions
 
         return true;
       });
+
+      builder.ValidateOnStart();
     }
   }
+
+  // =====================================================
+  // Cosmos provider configuration (FIXED EF warning)
+  // =====================================================
 
   private static void ConfigureCosmosProvider(
       Microsoft.EntityFrameworkCore.Infrastructure.CosmosDbContextOptionsBuilder builder,
       CosmosOptions settings)
   {
+    ArgumentNullException.ThrowIfNull(settings);
+
     builder.HttpClientFactory(() =>
     {
       var handler = new HttpClientHandler();
 
-      // 🔥 TEST SAFETY: allow emulator / self-signed certs
-      if (settings.Enabled && settings.ApplicationName?.Contains("Tests") == true)
+      if (settings.Enabled &&
+          settings.ApplicationName?.Contains("Tests", StringComparison.OrdinalIgnoreCase) == true)
       {
         handler.ServerCertificateCustomValidationCallback =
             HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
@@ -148,40 +156,43 @@ public static class CosmosServiceCollectionExtensions
 
       if (!string.IsNullOrWhiteSpace(settings.ApplicationName))
       {
-        client.DefaultRequestHeaders.Add(
-            "User-Agent",
-            settings.ApplicationName);
+        client.DefaultRequestHeaders.Add("User-Agent", settings.ApplicationName);
       }
 
       return client;
     });
+
     builder.ConnectionMode(Microsoft.Azure.Cosmos.ConnectionMode.Gateway);
-    builder.ExecutionStrategy(d =>
-        new CosmosExecutionStrategy(d));
+
+    // ❌ FIX: removed internal EF API usage
+    // builder.ExecutionStrategy(d => new CosmosExecutionStrategy(d));
 
     builder.LimitToEndpoint();
   }
+
+  // =====================================================
+  // Repository discovery
+  // =====================================================
 
   public static IServiceCollection AddCosmosEntityRepositories<TDbContext>(
       this IServiceCollection services)
       where TDbContext : CosmosDbContextBase
   {
-    // 1. Register the context as the base DbContext for generic use
     services.AddScoped<DbContext>(sp => sp.GetRequiredService<TDbContext>());
 
-    // 2. Reflectively discover entities
     var entityTypes = GetEfEntityTypes(typeof(TDbContext));
 
     foreach (var entityType in entityTypes)
     {
-      // Extract the TId from the Entity<TId> base
-      var idType = entityType.BaseType?.GetGenericArguments().FirstOrDefault() ?? typeof(Guid);
+      var idType =
+          entityType.BaseType?.GetGenericArguments().FirstOrDefault()
+          ?? typeof(Guid);
 
-      var serviceType = typeof(IEntityRepository<,>).MakeGenericType(entityType, idType);
+      var serviceType =
+          typeof(IEntityRepository<,>).MakeGenericType(entityType, idType);
 
-      // Cosmos-specific implementation binding (Arity-3)
-      var implementationType = typeof(CosmosEntityRepository<,,>)
-          .MakeGenericType(typeof(TDbContext), entityType, idType);
+      var implementationType =
+          typeof(CosmosEntityRepository<,,>).MakeGenericType(typeof(TDbContext), entityType, idType);
 
       services.AddNoDuplicateScoped(serviceType, implementationType);
     }
@@ -193,8 +204,9 @@ public static class CosmosServiceCollectionExtensions
   {
     return dbContextType
         .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-        .Where(p => p.PropertyType.IsGenericType &&
-                    p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
+        .Where(p =>
+            p.PropertyType.IsGenericType &&
+            p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
         .Select(p => p.PropertyType.GetGenericArguments().Single())
         .Where(t => typeof(IEntity).IsAssignableFrom(t))
         .ToList();

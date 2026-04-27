@@ -32,7 +32,7 @@ public class HeaderNamerTests
   {
     // Arrange
     var type = typeof(string);
-    var expected = "System.String, System.Private.CoreLib";
+   
 
     // Act
     var result = HeaderNamer.GetEventClassName(type);

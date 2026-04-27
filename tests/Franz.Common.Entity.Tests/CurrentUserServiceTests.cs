@@ -40,7 +40,9 @@ namespace Franz.Common.EntityFramework.Tests
     {
       // Arrange
       var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-      mockHttpContextAccessor.Setup(a => a.HttpContext).Returns((HttpContext)null);
+      mockHttpContextAccessor
+     .Setup(a => a.HttpContext)
+      .Returns((HttpContext?)null!);
 
       var service = new CurrentUserService(mockHttpContextAccessor.Object);
 

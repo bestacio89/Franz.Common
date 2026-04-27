@@ -8,36 +8,39 @@ using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fakes;
 
-/// <summary>
-/// Fake handler for integration testing.
-/// Senior Note: Updated to Task-based ProcessAsync to satisfy the refined IMessageHandler.
-/// </summary>
 public sealed class TestMessageHandler : IMessageHandler
 {
-  // Thread-static or volatile if running highly concurrent integration tests
+  // Thread-safe enough for integration tests
   public static Message? LastMessage;
 
-  public static readonly Guid TestCorrelationId = Guid.Parse("018e2f8a-9a91-7b3f-8e1f-4f2a3c4d5e6f");
+  public static readonly Guid TestCorrelationId =
+      Guid.Parse("018e2f8a-9a91-7b3f-8e1f-4f2a3c4d5e6f");
 
   public Task ProcessAsync(Message message, CancellationToken ct = default)
   {
     if (message is null)
       return Task.CompletedTask;
 
-    // ✅ Header enrichment using StringValues
-    message.Headers["X-Test-Handled"] = new StringValues("true");
+    // -----------------------------
+    // Header enrichment (null-safe)
+    // -----------------------------
+    message.Headers["X-Test-Handled"] = new[] { "true" };
 
-    // ✅ CorrelationId spine maintenance
+    // -----------------------------
+    // Correlation enforcement
+    // -----------------------------
     message.CorrelationId = TestCorrelationId;
 
-    // Atomic reference assignment
+    // -----------------------------
+    // Capture for assertions
+    // -----------------------------
     LastMessage = message;
 
     return Task.CompletedTask;
   }
 
   /// <summary>
-  /// Helper to reset state between test runs
+  /// Reset state between tests
   /// </summary>
   public static void Reset()
   {

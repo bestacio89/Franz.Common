@@ -2,7 +2,6 @@
 
    <ItemGroup>
      <!-- Refit HttpClientFactory integration (provides AddRefitClient<T> / Refit helpers) -->
-     <PackageReference Include="Microsoft.Rest.ClientRuntime" Version="2.3.24" />
      <PackageReference Include="Refit.HttpClientFactory" Version="10.1.6" />
 
      <!-- Refit core (usually optional if above includes it, but safe to include) -->

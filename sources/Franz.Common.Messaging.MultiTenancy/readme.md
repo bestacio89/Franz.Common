@@ -33,7 +33,7 @@ A library within the **Franz Framework** that adds multi-tenancy support to mess
 
 ## **Version Information**
 
-* - **Current Version**:  2.1.3
+* - **Current Version**:  2.1.4
 * Part of the private **Franz Framework** ecosystem.
 
 ---

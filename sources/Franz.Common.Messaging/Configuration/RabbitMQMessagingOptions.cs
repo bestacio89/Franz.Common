@@ -20,6 +20,5 @@ public sealed class RabbitMQMessagingOptions : MessagingOptions
   public int? RequestedHeartbeatSeconds { get; set; } = 30;
 
 
-  // --- Publisher Confirm ---
-  public int PublisherConfirmTimeoutSeconds { get; set; } = 5;
+ 
 }

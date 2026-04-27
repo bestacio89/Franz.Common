@@ -19,9 +19,8 @@ namespace Franz.Common.Messaging.Kafka.Tests.Fixtures;
 
 public sealed class KafkaContainerFixture : IAsyncLifetime
 {
-  public IConfiguration Configuration { get; }
-  private readonly KafkaContainer _container = new KafkaBuilder()
-      .WithImage("confluentinc/cp-kafka:7.4.0")
+  public IConfiguration Configuration { get; private set; } = default!;
+  private readonly KafkaContainer _container = new KafkaBuilder("confluentinc/cp-kafka:7.4.0")
       .WithCleanUp(true)
       .Build();
 

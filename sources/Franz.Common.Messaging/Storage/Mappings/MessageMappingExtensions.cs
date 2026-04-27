@@ -43,21 +43,34 @@ public static class MessageMappingExtensions
     if (stored is null)
       throw new ArgumentNullException(nameof(stored));
 
-    // Use the Message constructor that handles body initialization
     var message = new Message(stored.Body)
     {
       Id = stored.Id,
       CorrelationId = stored.CorrelationId,
       MessageType = stored.MessageType,
-      Properties = new Dictionary<string, object>(stored.Properties ?? new Dictionary<string, object>(), StringComparer.OrdinalIgnoreCase)
+      Properties = (stored.Properties ?? new Dictionary<string, object>())
+        .Where(kvp => kvp.Value is not null)
+        .ToDictionary(
+          kvp => kvp.Key,
+          kvp => kvp.Value!,
+          StringComparer.OrdinalIgnoreCase)
     };
 
-    // Restore Headers into MessageHeaders (StringValues)
-    if (stored.Headers != null)
+    if (stored.Headers is not null)
     {
       foreach (var header in stored.Headers)
       {
-        message.Headers[header.Key] = new StringValues(header.Value);
+        var values = header.Value ?? Array.Empty<string>();
+
+        var safeValues = values
+          .Where(v => !string.IsNullOrWhiteSpace(v))
+          .Select(v => v!)
+          .ToArray();
+
+        if (safeValues.Length == 0)
+          continue;
+
+        message.Headers[header.Key] = safeValues;
       }
     }
 

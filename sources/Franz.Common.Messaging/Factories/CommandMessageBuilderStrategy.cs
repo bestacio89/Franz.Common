@@ -24,9 +24,9 @@ public sealed class CommandMessageBuilderStrategy
     };
 
     message.Headers.Add(
-      MessagingConstants.ClassName,
-      new StringValues(HeaderNamer.GetEventClassName(value.GetType()))
-    );
+     MessagingConstants.ClassName,
+     new[] { HeaderNamer.GetEventClassName(value.GetType()) }
+   );
 
     return message;
   }

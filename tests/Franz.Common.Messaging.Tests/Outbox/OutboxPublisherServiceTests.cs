@@ -53,7 +53,8 @@ public class OutboxPublisherServiceTests
     _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
         .ThrowsAsync(new Exception("Network Down"));
 
-    StoredMessage updatedMessage = null;
+    StoredMessage? updatedMessage = null;
+
     _mockStore.Setup(s => s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()))
         .Callback<StoredMessage, CancellationToken>((m, _) => updatedMessage = m)
         .Returns(Task.CompletedTask);

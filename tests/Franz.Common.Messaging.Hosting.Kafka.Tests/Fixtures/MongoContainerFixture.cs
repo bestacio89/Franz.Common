@@ -8,8 +8,8 @@ namespace Franz.Common.Messaging.Hosting.Kafka.Tests.Fixtures;
 public sealed class MongoContainerFixture : IAsyncLifetime
 {
   private readonly MongoDbContainer _container =
-    new MongoDbBuilder()
-      .WithImage("mongo:7.0")
+    new MongoDbBuilder("mongo:7.0")
+      
       .WithCleanUp(true)
       .Build();
 

@@ -33,7 +33,7 @@ public class NoReplayStrategy : IReplayStrategy
     var props = new BasicProperties
     {
       DeliveryMode = (DeliveryModes)2,
-      Headers = e.BasicProperties.Headers ?? new Dictionary<string, object>()
+      Headers = e.BasicProperties.Headers ?? new Dictionary<string, object?>()
     };
 
     props.Headers[ExceptionMessageHeader] = ex.Message;

@@ -18,5 +18,5 @@ public sealed class TestEvent : Message, IEvent
 
   public string Value { get; init; } = string.Empty;
 
-  public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
+
 }

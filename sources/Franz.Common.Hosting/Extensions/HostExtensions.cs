@@ -3,9 +3,11 @@
 namespace Franz.Common.Hosting.Extensions;
 public static class HostExtensions
 {
-  public static IHost Initialize(this IHost host)
+  public static async Task<IHost> Initialize(this IHost host)
   {
-    host.Services.InitializeAsync();
+    ArgumentNullException.ThrowIfNull(host);
+
+    await host.Services.InitializeAsync().ConfigureAwait(false);
 
     return host;
   }

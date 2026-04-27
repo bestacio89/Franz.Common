@@ -41,7 +41,8 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
     _assemblyAccessor = assemblyAccessor ?? throw new ArgumentNullException(nameof(assemblyAccessor));
     _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
-    var assembly = _assemblyAccessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
+    var assembly = _assemblyAccessor.GetEntryAssembly()
+        ?? throw new InvalidOperationException("Entry assembly cannot be null.");
 
     _exchangeName = _options.ExchangeName ?? ExchangeNamer.GetEventExchangeName(assembly);
     _queueName = _options.QueueName ?? QueueNamer.GetQueueName(assembly);
@@ -73,9 +74,14 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
     }
   }
 
-  private static async ValueTask InitializeExchangeAsync(IChannel channel, string exchangeName, string type, bool durable)
+  private static async ValueTask InitializeExchangeAsync(
+      IChannel channel,
+      string exchangeName,
+      string type,
+      bool durable)
   {
-    await channel.ExchangeDeclareAsync(exchangeName, type, durable: durable, autoDelete: false).ConfigureAwait(false);
+    await channel.ExchangeDeclareAsync(exchangeName, type, durable: durable, autoDelete: false)
+        .ConfigureAwait(false);
   }
 
   private async ValueTask InitializeQueueAsync(
@@ -86,54 +92,75 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       string deadLetterQueue,
       bool durable)
   {
-    var args = new Dictionary<string, object>
-        {
-            { "x-queue-type", "quorum" },
-            { "x-dead-letter-exchange", deadLetterExchange },
-            { "x-dead-letter-routing-key", deadLetterQueue }
-        };
+    var args = new Dictionary<string, object?>
+    {
+      ["x-queue-type"] = "quorum",
+      ["x-dead-letter-exchange"] = deadLetterExchange,
+      ["x-dead-letter-routing-key"] = deadLetterQueue
+    };
 
     if (_options.RequestedHeartbeatSeconds.HasValue)
     {
       args["x-heartbeat"] = _options.RequestedHeartbeatSeconds.Value;
     }
 
-    await channel.QueueDeclareAsync(queueName, durable, exclusive: false, autoDelete: false, arguments: args);
+    await channel.QueueDeclareAsync(
+        queueName,
+        durable,
+        exclusive: false,
+        autoDelete: false,
+        arguments: args).ConfigureAwait(false);
   }
 
-  private async ValueTask InitializeDeadLetterQueueAsync(IChannel channel, string deadLetterQueueName, string deadLetterExchangeName)
+  private async ValueTask InitializeDeadLetterQueueAsync(
+      IChannel channel,
+      string deadLetterQueueName,
+      string deadLetterExchangeName)
   {
-    // Declare DLX
-    await channel.ExchangeDeclareAsync(deadLetterExchangeName, ExchangeType.Direct, durable: true, autoDelete: false).ConfigureAwait(false);
+    await channel.ExchangeDeclareAsync(
+        deadLetterExchangeName,
+        ExchangeType.Direct,
+        durable: true,
+        autoDelete: false).ConfigureAwait(false);
 
-    // Declare DLQ
     await channel.QueueDeclareAsync(
         deadLetterQueueName,
         durable: true,
         exclusive: false,
         autoDelete: false,
-        arguments: new Dictionary<string, object> { { "x-queue-type", "quorum" } }
-    ).ConfigureAwait(false);
+        arguments: new Dictionary<string, object?>
+        {
+          ["x-queue-type"] = "quorum"
+        }).ConfigureAwait(false);
 
-    // Bind DLQ to DLX
-    await channel.QueueBindAsync(deadLetterQueueName, deadLetterExchangeName, routingKey: deadLetterQueueName).ConfigureAwait(false);
+    await channel.QueueBindAsync(
+        deadLetterQueueName,
+        deadLetterExchangeName,
+        routingKey: deadLetterQueueName).ConfigureAwait(false);
   }
 
-  private async ValueTask InitializeExchangesForSubscriptionsAsync(IChannel channel, CancellationToken cancellationToken)
+  private async ValueTask InitializeExchangesForSubscriptionsAsync(
+      IChannel channel,
+      CancellationToken cancellationToken)
   {
-    var entryAssembly = _assemblyAccessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
+    var entryAssembly = _assemblyAccessor.GetEntryAssembly()
+        ?? throw new InvalidOperationException("Entry assembly cannot be null.");
+
     var companyName = entryAssembly.Name?.Split('.').FirstOrDefault() ?? string.Empty;
 
     if (_cachedIntegrationEvents is null)
     {
       _cachedIntegrationEvents = AppDomain.CurrentDomain
           .GetAssemblies()
-          .Where(a => !a.IsDynamic && a.FullName?.StartsWith(companyName, StringComparison.OrdinalIgnoreCase) == true)
+          .Where(a => !a.IsDynamic &&
+                      a.FullName?.StartsWith(companyName, StringComparison.OrdinalIgnoreCase) == true)
           .SelectMany(a => a.ExportedTypes)
           .Where(t => t.GetInterfaces().Any(ifc =>
-              ifc.IsGenericType && ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>)))
+              ifc.IsGenericType &&
+              ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>)))
           .SelectMany(t => t.GetInterfaces())
-          .Where(ifc => ifc.IsGenericType && ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
+          .Where(ifc => ifc.IsGenericType &&
+                        ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
           .Select(ifc => ifc.GetGenericArguments()[0])
           .Where(t => typeof(IIntegrationEvent).IsAssignableFrom(t))
           .Distinct()
@@ -142,11 +169,14 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
 
     foreach (var eventType in _cachedIntegrationEvents)
     {
-      await InitializeExchangeForSubscriptionAsync(channel, eventType).ConfigureAwait(false);
+      await InitializeExchangeForSubscriptionAsync(channel, eventType)
+          .ConfigureAwait(false);
     }
   }
 
-  private static async ValueTask InitializeExchangeForSubscriptionAsync(IChannel channel, Type integrationEventType)
+  private static async ValueTask InitializeExchangeForSubscriptionAsync(
+      IChannel channel,
+      Type integrationEventType)
   {
     var sourceExchange = ExchangeNamer.GetEventExchangeName(integrationEventType.Assembly);
     var eventName = HeaderNamer.GetEventClassName(integrationEventType);
@@ -155,10 +185,10 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
         queue: QueueNamer.GetQueueName(integrationEventType.Assembly),
         exchange: sourceExchange,
         routingKey: string.Empty,
-        arguments: new Dictionary<string, object>
+        arguments: new Dictionary<string, object?>
         {
-                { MessagingConstants.ClassName, eventName },
-                { "x-match", "all" }
+          [MessagingConstants.ClassName] = eventName,
+          ["x-match"] = "all"
         }).ConfigureAwait(false);
   }
 }

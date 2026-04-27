@@ -31,7 +31,7 @@ public sealed class IntegrationEventMessageBuilderStrategy
 
     message.Headers.Add(
         MessagingConstants.ClassName,
-        new StringValues(className));
+        new[] { className });
 
     return message;
   }

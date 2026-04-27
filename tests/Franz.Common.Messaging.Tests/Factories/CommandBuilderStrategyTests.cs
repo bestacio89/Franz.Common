@@ -74,7 +74,11 @@ public class CommandMessageBuilderStrategyTests
 
     // Act
     var message = _strategy.Build(command);
-    var deserialized = JsonSerializer.Deserialize<TestCommand>(message.Body, FranzJson.Default);
+
+    message.Body.Should().NotBeNull();
+
+    var deserialized =
+        JsonSerializer.Deserialize<TestCommand>(message.Body!, FranzJson.Default);
 
     // Assert
     deserialized.Should().NotBeNull();

@@ -208,7 +208,7 @@ Hosting and orchestration are handled separately in a future package:
 
 ## 📝 Version Information
 
-* - **Current Version**:  2.1.3
+* - **Current Version**:  2.1.4
 * Target Framework: **.NET 10**
 * Part of the **Franz Framework**
 

@@ -27,31 +27,27 @@ public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
   {
     var options = _options.Value;
 
-    // ✅ Preferred: URI-based connection (Testcontainers / modern usage)
     if (!string.IsNullOrWhiteSpace(options.BootStrapServers))
     {
       return new ConnectionFactory
       {
         Uri = new Uri(options.BootStrapServers),
         ClientProvidedName = GetClientProvidedName(),
-
         AutomaticRecoveryEnabled = true,
         TopologyRecoveryEnabled = true,
         RequestedHeartbeat = TimeSpan.FromSeconds(30)
       };
     }
 
-    // ⚠️ Fallback: legacy host/port configuration
     var factory = new ConnectionFactory
     {
-      HostName = options.HostName ?? "localhost",
-      UserName = options.UserName ?? "guest",
-      Password = options.Password ?? "guest",
+      HostName = Require(options.HostName, "localhost"),
+      UserName = Require(options.UserName, "guest"),
+      Password = Require(options.Password, "guest"),
       Port = options.Port ?? AmqpTcpEndpoint.UseDefaultPort,
-      VirtualHost = options.VirtualHost ?? "/",
+      VirtualHost = Require(options.VirtualHost, "/"),
 
       ClientProvidedName = GetClientProvidedName(),
-
       AutomaticRecoveryEnabled = true,
       TopologyRecoveryEnabled = true,
       RequestedHeartbeat = TimeSpan.FromSeconds(30)
@@ -62,11 +58,11 @@ public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
       factory.Ssl = new SslOption
       {
         Enabled = true,
-        ServerName = options.HostName,
+        ServerName = factory.HostName, // safer than options.HostName
         AcceptablePolicyErrors =
-              SslPolicyErrors.RemoteCertificateNotAvailable |
-              SslPolicyErrors.RemoteCertificateNameMismatch |
-              SslPolicyErrors.RemoteCertificateChainErrors,
+            SslPolicyErrors.RemoteCertificateNotAvailable |
+            SslPolicyErrors.RemoteCertificateNameMismatch |
+            SslPolicyErrors.RemoteCertificateChainErrors,
         Version = SslProtocols.Tls12 | SslProtocols.Tls13
       };
 
@@ -76,6 +72,9 @@ public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
 
     return factory;
   }
+
+  private static string Require(string? value, string fallback)
+      => string.IsNullOrWhiteSpace(value) ? fallback : value;
 
   private string? GetClientProvidedName()
   {

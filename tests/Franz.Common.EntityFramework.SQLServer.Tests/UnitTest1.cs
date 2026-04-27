@@ -13,7 +13,7 @@ namespace Franz.Common.EntityFramework.SQLServer.Tests;
 
 public class SqlServerFixture : IAsyncLifetime
 {
-  public readonly MsSqlContainer Container = new MsSqlBuilder()
+  public readonly MsSqlContainer Container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
       .WithPassword("Strong_Password_123!") // SQL Server requires complexity
       .Build();
 

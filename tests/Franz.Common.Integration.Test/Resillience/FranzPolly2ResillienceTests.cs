@@ -21,7 +21,7 @@ namespace Franz.Common.Integration.Tests.Polly
 
     private IServiceCollection BuildServiceCollectionWithConfig(out IConfiguration config)
     {
-      var inMemorySettings = new Dictionary<string, string>
+      var inMemorySettings = new Dictionary<string, string?>
             {
                 // Base policy settings
                 {"Resilience:RetryPolicy:Enabled", "true"},

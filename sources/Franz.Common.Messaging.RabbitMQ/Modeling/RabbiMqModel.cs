@@ -41,7 +41,7 @@ public sealed class RabbitMqMessageModel
       exchange: exchange,
       routingKey: routingKey,
       mandatory: true,
-      basicProperties: null, // Or pass new BasicProperties() if metadata is required
+      basicProperties: new BasicProperties(), // Or pass new BasicProperties() if metadata is required
       body: bytes,
       cancellationToken: cancellationToken);
   }

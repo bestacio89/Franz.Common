@@ -32,7 +32,7 @@ public class MessageDeserializerExtensionsTests
 
     var message = new Message(json)
     {
-      MessageType = typeof(TestCommand).AssemblyQualifiedName, // Use FullName or AssemblyQualifiedName
+      MessageType = typeof(TestCommand).FullName, // Use FullName or AssemblyQualifiedName
       CorrelationId = expectedId
     };
 
@@ -56,7 +56,7 @@ public class MessageDeserializerExtensionsTests
 
     var message = new Message(json)
     {
-      MessageType = typeof(TestEvent).AssemblyQualifiedName,
+      MessageType = typeof(TestEvent).FullName,
       CorrelationId = expectedId
     };
 

@@ -8,15 +8,13 @@ namespace Franz.Common.Messaging.Messages;
 
 public class Message : INotification, IEvent
 {
-  private Guid _correlationId;
+  private Guid? _correlationId;
 
   public const string CorrelationHeader = "x-correlation-id";
 
   public Message()
   {
     Id = Guid.CreateVersion7();
-
-    // Default: correlation starts aligned with message identity
     _correlationId = Id;
 
     SyncProjection();
@@ -27,9 +25,6 @@ public class Message : INotification, IEvent
     Body = body;
   }
 
-  /// <summary>
-  /// Explicit hydration constructor (transport -> domain)
-  /// </summary>
   public Message(string? body, IDictionary<string, string[]> headers) : this(body)
   {
     foreach (var kv in headers)
@@ -51,7 +46,7 @@ public class Message : INotification, IEvent
   public MessageKind Kind { get; set; } = MessageKind.Command;
 
   // ---------------------------
-  // METADATA LAYERS
+  // METADATA
   // ---------------------------
 
   public virtual IDictionary<string, string[]> Headers { get; set; }
@@ -61,25 +56,28 @@ public class Message : INotification, IEvent
       = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
   // ---------------------------
-  // CORRELATION (SINGLE SOURCE OF TRUTH)
+  // CORRELATION (nullable, canonical source)
   // ---------------------------
 
   [JsonIgnore]
-  public virtual Guid CorrelationId
+  public virtual Guid? CorrelationId
   {
     get => _correlationId;
     set
     {
       _correlationId = value;
 
-      Properties[nameof(CorrelationId)] = value;
+      if (value.HasValue)
+        Properties[nameof(CorrelationId)] = value.Value;
+      else
+        Properties.Remove(nameof(CorrelationId));
 
       SyncProjection();
     }
   }
 
   // ---------------------------
-  // MESSAGE TYPE (SAFE PROPERTY BACKING)
+  // MESSAGE TYPE
   // ---------------------------
 
   public virtual string? MessageType
@@ -101,12 +99,19 @@ public class Message : INotification, IEvent
       => Properties[key] = value!;
 
   // ---------------------------
-  // INTERNAL PROJECTIONS
+  // INTERNAL PROJECTION
   // ---------------------------
 
   private void SyncProjection()
   {
-    Headers[CorrelationHeader] = new[] { _correlationId.ToString() };
+    if (_correlationId.HasValue)
+    {
+      Headers[CorrelationHeader] = new[] { _correlationId.Value.ToString() };
+    }
+    else
+    {
+      Headers.Remove(CorrelationHeader);
+    }
   }
 
   private void HydrateFromHeaders(IDictionary<string, string[]> headers)

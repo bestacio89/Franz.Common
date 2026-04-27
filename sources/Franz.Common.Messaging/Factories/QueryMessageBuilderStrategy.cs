@@ -44,7 +44,7 @@ public sealed class QueryMessageBuilderStrategy : IMessageBuilderStrategy
 
     message.Headers.Add(
       MessagingConstants.ClassName,
-      new StringValues(className));
+       new[] { className });
 
     return message;
   }

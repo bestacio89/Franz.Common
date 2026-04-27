@@ -20,38 +20,35 @@ public class MediatorMessageExtensionsTests
   [Fact]
   public void ToMessage_FromCommand_ShouldPopulateRequiredFields()
   {
-    // Arrange
     var command = new TestCommand("ProcessData");
 
-    // Act
     var result = command.ToMessage();
 
-    // Assert
     result.Should().NotBeNull();
     result.MessageType.Should().Be(typeof(TestCommand).FullName);
     result.CorrelationId.Should().NotBe(Guid.Empty);
     result.GetProperty<string>("CommandType").Should().Be(nameof(TestCommand));
 
-    // Deserialize using the same options as the extension method
-    var deserialized = JsonSerializer.Deserialize<TestCommand>(result.Body, _options);
+    var deserialized =
+        JsonSerializer.Deserialize<TestCommand>(result.Body!, _options);
+
     deserialized.Should().BeEquivalentTo(command);
   }
 
   [Fact]
   public void ToMessage_FromEvent_ShouldPopulateRequiredFields()
   {
-    // Arrange
     var @event = new TestEvent("DataProcessed");
 
-    // Act
     var result = @event.ToMessage();
 
-    // Assert
     result.Should().NotBeNull();
     result.MessageType.Should().Be(typeof(TestEvent).FullName);
     result.GetProperty<string>("EventType").Should().Be(nameof(TestEvent));
 
-    var deserialized = JsonSerializer.Deserialize<TestEvent>(result.Body, _options);
+    var deserialized =
+        JsonSerializer.Deserialize<TestEvent>(result.Body!, _options);
+
     deserialized.Should().BeEquivalentTo(@event);
   }
 }

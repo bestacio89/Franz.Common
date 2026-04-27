@@ -13,8 +13,7 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
   public string QueueName { get; } = $"franz-test-{Guid.CreateVersion7():N}";
 
   public RabbitMqContainer Container { get; } =
-      new RabbitMqBuilder()
-          .WithImage("rabbitmq:4.0-management") // Using 4.0 stable as per .NET 10/2026 standards
+      new RabbitMqBuilder("rabbitmq:4.0-management")
           .WithUsername("guest")
           .WithPassword("guest")
           .WithCleanUp(true)
@@ -38,7 +37,7 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
   {
     return new Dictionary<string, string?>
     {
-      // Senior Note: Map directly to BootStrapServers to test the URI parsing logic
+      //Map directly to BootStrapServers to test the URI parsing logic
       ["Messaging:RabbitMQ:BootStrapServers"] = ConnectionString,
       ["Messaging:RabbitMQ:UserName"] = _user,
       ["Messaging:RabbitMQ:Password"] = _password,

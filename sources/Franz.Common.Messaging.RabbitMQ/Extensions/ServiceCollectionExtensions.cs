@@ -52,6 +52,9 @@ public static class ServiceCollectionExtensions
 
   private static IServiceCollection AddRabbitMQMessagingProducer(this IServiceCollection services, IConfiguration? configuration)
   {
+    if (configuration is null)
+      throw new ArgumentNullException(nameof(configuration));
+
     services
         .AddRabbitMQMessagingConfiguration(configuration)
         .AddNoDuplicateScoped<IMessageHandler, MessageBuilderDelegatingHandler>();
@@ -69,17 +72,22 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  public static IServiceCollection AddRabbitMQMessagingConfiguration(this IServiceCollection services, IConfiguration? configuration)
+  public static IServiceCollection AddRabbitMQMessagingConfiguration(
+    this IServiceCollection services,
+    IConfiguration configuration)
   {
-    
-    services.AddRabbitMqMessagingOptions(configuration)
-            .AddNoDuplicateSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>()
-            .AddNoDuplicateSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>()
-            .AddNoDuplicateSingleton<IConnectionProvider, ConnectionProvider>()
-            .AddNoDuplicateSingleton<IChannelPool, ChannelPool>()
-            .AddMessagingFactories()
-            .AddNoDuplicateScoped<IMessagingInitializer, RabbitMQMessagingInitializer>()
-            .AddNoDuplicateScoped<IMessagingTransaction, RabbitMQMessagingTransaction>();
+    if (configuration is null)
+      throw new ArgumentNullException(nameof(configuration));
+
+    services
+        .AddRabbitMqMessagingOptions(configuration)
+        .AddNoDuplicateSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>()
+        .AddNoDuplicateSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>()
+        .AddNoDuplicateSingleton<IConnectionProvider, ConnectionProvider>()
+        .AddNoDuplicateSingleton<IChannelPool, ChannelPool>()
+        .AddMessagingFactories()
+        .AddNoDuplicateScoped<IMessagingInitializer, RabbitMQMessagingInitializer>()
+        .AddNoDuplicateScoped<IMessagingTransaction, RabbitMQMessagingTransaction>();
 
     return services;
   }

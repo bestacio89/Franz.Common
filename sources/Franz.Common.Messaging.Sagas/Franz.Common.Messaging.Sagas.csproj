@@ -21,15 +21,5 @@
     <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="readme.md">
-      <PackagePath></PackagePath>
-      <Pack>true</Pack>
-    </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="NewFolder\" />
-  </ItemGroup>
 
 </Project>

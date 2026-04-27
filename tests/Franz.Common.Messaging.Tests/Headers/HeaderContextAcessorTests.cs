@@ -24,20 +24,34 @@ public class HeaderContextAccessorTests
 
   private void SetupMessageWithHeaders(Dictionary<string, StringValues> headers)
   {
-    // 1. Constructor runs and auto-populates CorrelationId/Headers
     var message = new Message("{}");
+
+    if (message.Headers is null)
+    {
+      throw new InvalidOperationException(
+          "Message.Headers must be initialized by Message constructor.");
+    }
 
     foreach (var header in headers)
     {
-      // FIX: Use the indexer [key] instead of .Add()
-      // This overwrites the auto-generated correlation ID with your test value
-      message.Headers[header.Key] = header.Value;
+      // Normalize StringValues -> string[] safely
+      var values = header.Value
+          .Where(v => v is not null)
+          .Select(v => v!)
+          .ToArray();
+
+      message.Headers[header.Key] = values;
     }
 
     var mockContext = new Mock<IMessageContext>();
-    mockContext.Setup(c => c.Message).Returns(message);
 
-    _mockAccessor.Setup(a => a.Current).Returns(mockContext.Object);
+    mockContext
+        .Setup(c => c.Message)
+        .Returns(message);
+
+    _mockAccessor
+        .Setup(a => a.Current)
+        .Returns(mockContext.Object);
   }
 
   [Fact]

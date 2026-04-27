@@ -68,9 +68,9 @@ public sealed class OutboxMessageListener : IListener
           // Deserialize domain object for internal dispatch
           object? domainObject = TryDeserializeDomainObject(message);
 
-          using var scope = _logger.BeginScope(new Dictionary<string, object>
+          using var scope = _logger.BeginScope(new Dictionary<string, object?>
           {
-            ["FranzCorrelationId"] = message.CorrelationId,
+            ["FranzCorrelationId"] = message.CorrelationId ?? Guid.Empty,
             ["FranzMessageId"] = message.Id
           });
 

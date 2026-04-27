@@ -20,10 +20,13 @@ public class DatabaseOptionsTests
   [InlineData(null)]
   [InlineData("")]
   [InlineData("   ")]
-  public void SettingInvalidDatabaseName_ShouldThrow(string invalidName)
+  public void SettingInvalidDatabaseName_ShouldThrow(string? invalidName)
   {
     var options = new DatabaseOptions();
-    var ex = Assert.Throws<ArgumentException>(() => options.DatabaseName = invalidName);
+
+    var ex = Assert.Throws<ArgumentException>(() =>
+        options.DatabaseName = invalidName!); // safe: we EXPECT it to throw
+
     Assert.Contains("DatabaseName cannot be null or empty", ex.Message);
   }
 

@@ -41,8 +41,7 @@ public sealed class KafkaHostingFixture : IAsyncLifetime
       .WithCleanUp(true)
       .Build();
 
-    _mongo = new MongoDbBuilder()
-      .WithImage("mongo:7.0")
+    _mongo = new MongoDbBuilder("mongo:7.0")
       .WithCleanUp(true)
       .Build();
   }

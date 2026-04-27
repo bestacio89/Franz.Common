@@ -15,7 +15,7 @@ public class ServiceCollectionExtensionsTests
   public void AddDatabaseOptions_ConfiguresOptions()
   {
     var config = new ConfigurationBuilder()
-        .AddInMemoryCollection(new[] { new KeyValuePair<string, string>("Database:DatabaseName", "TestDb") })
+        .AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("Database:DatabaseName", "TestDb") })
         .Build();
 
     var services = new ServiceCollection();

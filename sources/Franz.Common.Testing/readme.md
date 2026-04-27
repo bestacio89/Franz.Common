@@ -20,7 +20,7 @@ A library within the **Franz Framework** designed to enhance unit testing in .NE
 
 ## **Version Information**
 
--- **Current Version**:  2.1.3
+-- **Current Version**:  2.1.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
