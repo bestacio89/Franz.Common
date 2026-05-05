@@ -2,14 +2,11 @@
 using Franz.Common.Business.Domain.Factories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace Franz.Common.AzureCosmosDB.Tests;
 
-
-
-[Collection("Cosmos")]
-[Trait("SkipInCI", "true")]
-public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
+public sealed class CosmosIntegrationTests : IClassFixture<CosmosFixture>
 {
   private readonly CosmosFixture _fixture;
 
@@ -21,52 +18,48 @@ public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
   [Fact]
   public async Task AddAsync_ShouldPersistJsonDocument_WithAuditMetadata()
   {
-    using var scope = _fixture.CreateScope();
+    var testContext = await _fixture.CreateIsolatedDatabaseContextAsync();
 
-    var db =
-        scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
-
-    var factory =
-        scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
-
-    var entity = factory.Create();
-    entity.Label = $"Cosmos Item {Guid.NewGuid():N}";
-
+    Guid entityId;
     var beforeSave = DateTimeOffset.UtcNow;
 
-    db.Items.Add(entity);
-    await db.SaveChangesAsync();
+    using (var scope = testContext.CreateScope())
+    {
+      var db = scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+      var factory = scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
 
-    db.ChangeTracker.Clear();
+      var entity = factory.Create();
+      entity.Label = $"Cosmos Item {Guid.NewGuid():N}";
+      entityId = entity.Id;
 
-    using var verifyScope = _fixture.CreateScope();
+      db.Items.Add(entity);
+      await db.SaveChangesAsync();
+    }
 
-    var verifyDb =
-        verifyScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+    // Fresh tracking isolation context
+    using (var verifyScope = testContext.CreateScope())
+    {
+      var verifyDb = verifyScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+      var saved = await verifyDb.Items.FirstOrDefaultAsync(x => x.Id == entityId);
 
-    var saved =
-        await verifyDb.Items.FirstOrDefaultAsync(x => x.Id == entity.Id);
+      saved.Should().NotBeNull();
+      saved!.DateCreated.Should().BeCloseTo(beforeSave, TimeSpan.FromSeconds(5));
+      saved.CreatedBy.Should().Be("system");
+    }
 
-    saved.Should().NotBeNull();
-
-    saved!.DateCreated.Should()
-        .BeCloseTo(beforeSave, TimeSpan.FromSeconds(5));
-
-    saved.CreatedBy.Should().Be("system");
+    await testContext.CleanUpAsync();
   }
 
   [Fact]
   public async Task SoftDelete_ShouldApplyGlobalFilter()
   {
+    var testContext = await _fixture.CreateIsolatedDatabaseContextAsync();
     Guid id;
 
-    using (var scope = _fixture.CreateScope())
+    using (var scope = testContext.CreateScope())
     {
-      var db =
-          scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
-
-      var factory =
-          scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
+      var db = scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+      var factory = scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
 
       var entity = factory.Create();
       entity.Label = $"Disposable {Guid.NewGuid():N}";
@@ -78,73 +71,64 @@ public class CosmosIntegrationTests : IClassFixture<CosmosFixture>
 
       db.Items.Remove(entity);
       await db.SaveChangesAsync();
-
-      db.ChangeTracker.Clear();
     }
 
-    using var verifyScope = _fixture.CreateScope();
+    using (var verifyScope = testContext.CreateScope())
+    {
+      var verifyDb = verifyScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
-    var verifyDb =
-        verifyScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+      var filtered = await verifyDb.Items.FirstOrDefaultAsync(x => x.Id == id);
+      var raw = await verifyDb.Items
+          .IgnoreQueryFilters()
+          .FirstOrDefaultAsync(x => x.Id == id);
 
-    var filtered =
-        await verifyDb.Items.FirstOrDefaultAsync(x => x.Id == id);
+      filtered.Should().BeNull();
+      raw.Should().NotBeNull();
+      raw!.IsDeleted.Should().BeTrue();
+    }
 
-    var raw =
-        await verifyDb.Items
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.Id == id);
-
-    filtered.Should().BeNull();
-
-    raw.Should().NotBeNull();
-    raw!.IsDeleted.Should().BeTrue();
+    await testContext.CleanUpAsync();
   }
 
   [Fact]
   public async Task GlobalFilter_ShouldExcludeSoftDeleted()
   {
-    using var scope = _fixture.CreateScope();
+    var testContext = await _fixture.CreateIsolatedDatabaseContextAsync();
+    Guid activeId;
+    Guid deletedId;
 
-    var db =
-        scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+    using (var scope = testContext.CreateScope())
+    {
+      var db = scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+      var factory = scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
 
-    var factory =
-        scope.ServiceProvider.GetRequiredService<IEntityFactory<Guid, CosmosEntity>>();
+      var active = factory.Create();
+      active.Label = $"Active {Guid.NewGuid():N}";
+      activeId = active.Id;
 
-    var active = factory.Create();
-    active.Label = $"Active {Guid.NewGuid():N}";
+      var deleted = factory.Create();
+      deleted.Label = $"Deleted {Guid.NewGuid():N}";
+      deletedId = deleted.Id;
 
-    var deleted = factory.Create();
-    deleted.Label = $"Deleted {Guid.NewGuid():N}";
+      db.Items.AddRange(active, deleted);
+      await db.SaveChangesAsync();
 
-    db.Items.AddRange(active, deleted);
-    await db.SaveChangesAsync();
+      db.Items.Remove(deleted);
+      await db.SaveChangesAsync();
+    }
 
-    db.Items.Remove(deleted);
-    await db.SaveChangesAsync();
+    using (var verifyScope = testContext.CreateScope())
+    {
+      var verifyDb = verifyScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
 
-    db.ChangeTracker.Clear();
+      var visible = await verifyDb.Items.ToListAsync();
+      visible.Should().ContainSingle(x => x.Id == activeId);
 
-    using var verifyScope = _fixture.CreateScope();
+      var all = await verifyDb.Items.IgnoreQueryFilters().ToListAsync();
+      all.Should().HaveCount(2);
+      all.Should().Contain(x => x.Id == deletedId && x.IsDeleted);
+    }
 
-    var verifyDb =
-        verifyScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
-
-    var visible =
-        await verifyDb.Items.ToListAsync();
-
-    visible.Should()
-        .ContainSingle(x => x.Id == active.Id);
-
-    var all =
-        await verifyDb.Items.IgnoreQueryFilters().ToListAsync();
-
-    all.Should().HaveCount(2);
-
-    all.Should()
-        .Contain(x =>
-            x.Id == deleted.Id &&
-            x.IsDeleted);
+    await testContext.CleanUpAsync();
   }
 }

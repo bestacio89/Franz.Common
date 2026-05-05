@@ -1,17 +1,21 @@
-﻿using Franz.Common.AzureCosmosDB.Extensions;
-using Franz.Common.AzureCosmosDB.Tests;
+﻿using System.Collections.Concurrent;
+using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.Business.Domain.Factories;
 using Franz.Common.Business.Domain.IdGenerators;
 using Franz.Common.Mediator.Dispatchers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Testcontainers.CosmosDb;
+using Xunit;
+
+namespace Franz.Common.AzureCosmosDB.Tests;
 
 public sealed class CosmosFixture : IAsyncLifetime
 {
-  private IServiceProvider _provider = default!;
-  private TestCosmosDbContext _db = default!;
+  private string _endpoint = default!;
+  private readonly ConcurrentBag<IServiceProvider> _allocatedProviders = new();
 
   public CosmosDbContainer Container { get; } =
       new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
@@ -22,65 +26,85 @@ public sealed class CosmosFixture : IAsyncLifetime
   {
     await Container.StartAsync();
 
-    var services = new ServiceCollection();
-
-    var databaseName = $"FranzTest_{Guid.NewGuid():N}";
     var port = Container.GetMappedPublicPort(8081);
-    var endpoint = $"https://localhost:{port}/";
+    _endpoint = $"https://localhost:{port}/";
 
-    var configuration =
-        new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-              ["Cosmos:Enabled"] = "true",
-              ["Cosmos:AccountEndpoint"] = endpoint,
-              ["Cosmos:AccountKey"] = CosmosDbBuilder.DefaultAccountKey,
-              ["Cosmos:DatabaseName"] = databaseName,
-              ["Cosmos:ApplicationName"] = "Franz.Tests.Cosmos"
-            })
-            .Build();
+    AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+  }
+
+  /// <summary>
+  /// Builds a unique, ephemeral logical database context bound to the shared emulator container.
+  /// </summary>
+  public async Task<IsolatedCosmosContext> CreateIsolatedDatabaseContextAsync()
+  {
+    var services = new ServiceCollection();
+    var databaseName = $"FranzTest_{Guid.NewGuid():N}";
+
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+          ["Cosmos:Enabled"] = "true",
+          ["Cosmos:AccountEndpoint"] = _endpoint,
+          ["Cosmos:AccountKey"] = CosmosDbBuilder.DefaultAccountKey,
+          ["Cosmos:DatabaseName"] = databaseName,
+          ["Cosmos:ApplicationName"] = $"Franz.Tests.Cosmos.{databaseName}"
+        })
+        .Build();
 
     services.AddSingleton<IDispatcher>(Substitute.For<IDispatcher>());
-
     services.AddLogging();
-
-    AppContext.SetSwitch(
-        "System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport",
-        true);
-
-    // IMPORTANT: factories should behave consistently
     services.AddSingleton(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
     services.AddSingleton<IIdGenerator<Guid>, GuidV7Generator>();
 
-    services.AddFranzCosmosDbContext<TestCosmosDbContext>(
-        configuration,
-        validateOnStart: false);
-
+    services.AddFranzCosmosDbContext<TestCosmosDbContext>(configuration, validateOnStart: false);
     services.AddCosmosInfrastructure<TestCosmosDbContext>(configuration);
 
-    _provider = services.BuildServiceProvider();
+    var provider = services.BuildServiceProvider();
+    _allocatedProviders.Add(provider);
 
-    // 🔥 SINGLE INITIALIZATION POINT
-    using var scope = _provider.CreateScope();
+    // Provision the schema using an isolated database admin instance
+    using (var initScope = provider.CreateScope())
+    {
+      var initDb = initScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+      await initDb.Database.EnsureCreatedAsync();
+    }
 
-    _db = scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
-
-    await _db.Database.EnsureCreatedAsync();
+    return new IsolatedCosmosContext(provider);
   }
-
-  public IServiceScope CreateScope() => _provider.CreateScope();
-
-  public TestCosmosDbContext CreateDb() => _provider.GetRequiredService<TestCosmosDbContext>();
 
   public async Task DisposeAsync()
   {
-    if (_provider is IDisposable d)
-      d.Dispose();
+    foreach (var provider in _allocatedProviders)
+    {
+      if (provider is IDisposable disposable)
+      {
+        disposable.Dispose();
+      }
+    }
 
     await Container.DisposeAsync();
   }
 }
 
+/// <summary>
+/// Encapsulates the runtime scope boundaries of an individual execution thread.
+/// </summary>
+public sealed class IsolatedCosmosContext
+{
+  private readonly IServiceProvider _provider;
 
-[CollectionDefinition("Cosmos", DisableParallelization = true)]
-public class CosmosCollection { }
+  public IsolatedCosmosContext(IServiceProvider provider)
+  {
+    _provider = provider;
+  }
+
+  public IServiceScope CreateScope() => _provider.CreateScope();
+
+  public async Task CleanUpAsync()
+  {
+    // Resolve a clean, standalone instance solely tasked with tearing down this isolated database topology
+    using var cleanupScope = _provider.CreateScope();
+    var cleanupDb = cleanupScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+    await cleanupDb.Database.EnsureDeletedAsync();
+  }
+}
