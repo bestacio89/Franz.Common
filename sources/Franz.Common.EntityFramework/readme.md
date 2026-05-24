@@ -1,370 +1,368 @@
+# 📦 Franz.Common.EntityFramework v2.2.1
 
-# 📦 Franz.Common.EntityFramework
+## 🚀 Version
 
-A core infrastructure library of the **Franz Framework**, designed to extend and simplify **Entity Framework Core** integration in .NET systems.
-
-It provides a **pragmatic persistence layer**, supporting:
-
-* Domain-Driven Design (selectively applied)
-* CQRS architectures
-* Soft deletes + auditing
-* Event-driven persistence patterns
-* DI-driven modular design
-
-Unlike strict DDD implementations, this library follows a **system-first pragmatic architecture**, where domain purity is preserved only where it adds value.
+**v2.2.1**
 
 ---
 
-# 🚀 Version
+# 🧠 Architectural Evolution (IMPORTANT CHANGE)
 
-**v2.1.4**
+## ❌ Before (v2.1.4)
 
----
+> “Pragmatic EF Core persistence library”
 
-# 🧠 Architectural Philosophy
+## ✅ Now (v2.2.1)
 
-This library is built on a **pragmatic DDD enforcement model**:
-
-> DDD is applied where it improves domain correctness, not as a global constraint.
-
-## Core principles:
-
-* Persistence is **EF-native**, not domain-driven
-* Repositories are **identity-agnostic (`IEntity`)**
-* Domain identity (`Entity<TId>`) is isolated from persistence contracts
-* DI is **explicit and convention-based**
-* Infrastructure is optimized for **scalability over theoretical purity**
+> **Framework-managed transactional persistence engine with opt-in orchestration**
 
 ---
 
-# 🧱 Core Concepts
+# 🧠 Core Philosophy (NEW)
+
+> Persistence is no longer a repository responsibility — it is a **framework-controlled consistency boundary**.
+
+### Key shift:
+
+* Repositories = mutation intent
+* UnitOfWork = commit boundary
+* Pipeline = implicit transaction scope
+* DbContext = execution engine
 
 ---
 
-# 1. DbContextBase (Canonical EF Context)
+# ⚖️ Transaction Model (NEW CORE CONCEPT)
 
-The base DbContext provides:
-
-## ✔ Built-in Features
-
-* Auditing (`CreatedBy`, `CreatedOn`, etc.)
-* Soft deletes (`IsDeleted`, `DeletedOn`, `DeletedBy`)
-* Global query filters
-* Domain event dispatching via `IDispatcher`
-* Current user tracking integration
+## Franz now supports 3 execution modes:
 
 ---
 
-## 📌 Example
+## 🟢 1. Auto-Commit Mode (Simple Operations)
+
+Repositories may persist immediately for isolated operations:
+
+* CRUD endpoints
+* single aggregate updates
+* simple queries
+
+⚠️ Not intended for multi-aggregate consistency
+
+---
+
+## 🔵 2. Orchestrated Mode (UnitOfWork)
+
+Explicit transactional boundary:
 
 ```csharp
-public class AppDbContext : DbContextBase
-{
-    public AppDbContext(
-        DbContextOptions<AppDbContext> options,
-        IDispatcher dispatcher,
-        ICurrentUserService currentUser)
-        : base(options, dispatcher, currentUser)
-    {
-    }
+await repo.AddAsync(entity);
+await repo.AddRangeAsync(entities);
 
-    public DbSet<Order> Orders => Set<Order>();
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        base.OnModelCreating(modelBuilder);
-        modelBuilder.ApplyConfigurationsFromAssembly(GetType().Assembly);
-    }
-}
+await unitOfWork.SaveChangesAsync();
 ```
 
----
+Used for:
 
-## 🧠 Behavior Summary
-
-* Automatically applies auditing on `SaveChanges`
-* Converts deletes into **soft deletes**
-* Filters deleted entities globally
-* Dispatches domain events after persistence
+* Skill creation
+* Hero creation
+* snapshot generation pipelines
+* multi-aggregate consistency flows
 
 ---
 
-# 2. Repository System (Pragmatic Model)
+## 🟣 3. Pipeline Mode (Implicit Transaction)
 
-The repository system is intentionally simplified for scalability.
+```text
+Command → PipelineBehavior → Transaction Scope → Commit
+```
+
+Used for:
+
+* CQRS commands
+* application layer operations
+* validated workflows
 
 ---
 
-## 📦 EntityRepository (CRUD)
+# 🧱 Core Architecture Concepts (UPDATED)
+
+---
+
+# 1. DbContextBase (Execution Engine)
+
+DbContextBase is now explicitly:
+
+> **The transactional execution engine of the framework**
+
+## Responsibilities:
+
+* Change tracking
+* audit lifecycle
+* soft delete enforcement
+* domain event dispatching
+* transaction coordination
+* unit-of-work execution target
+
+---
+
+## Key behavior change:
+
+### BEFORE:
+
+“DbContext applies behavior”
+
+### NOW:
+
+“DbContext executes framework-defined transactional rules”
+
+---
+
+# 2. Repository System (REFINED MODEL)
+
+---
+
+## 📦 EntityRepository (Intent-Based Persistence)
 
 ```csharp
 public class EntityRepository<TDbContext, TEntity>
-    where TDbContext : DbContext
-    where TEntity : class, IEntity
 ```
 
 ### ✔ Responsibilities:
 
-* CRUD operations
-* EF Core persistence
-* Soft delete compliance
-* No domain logic
-* No identity assumptions
+* Express persistence intent
+* Track entity state
+* Support batch operations
+* NO transaction ownership
 
 ---
 
-### 📌 Example
+### ❌ Removed responsibility:
+
+* SaveChanges ownership
+* transactional guarantees
+
+---
+
+## 🔥 NEW ADDITIONS (v2.2.1)
+
+### Batch operations added:
+
+* `AddRangeAsync`
+* `UpdateRangeAsync`
+* `DeleteRangeAsync`
+* `SoftDeleteRangeAsync`
+
+---
+
+## 🧠 New rule:
+
+> Repositories describe *what changes*, not *when changes are committed*
+
+---
+
+# 3. Unit of Work (NEW CORE COMPONENT)
+
+## 📦 IUnitOfWork
 
 ```csharp
-public class OrderRepository 
-    : EntityRepository<AppDbContext, Order>
+public interface IUnitOfWork
 {
-    public OrderRepository(AppDbContext dbContext) 
-        : base(dbContext) { }
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 ```
 
 ---
 
-## 🧠 Key Design Rule
+## ✔ Role:
 
-> Repositories do NOT manage identity.
-
-Identity is handled by:
-
-* `IEntity.GetId()`
-* EF Core key resolution
-* Domain layer (`Entity<TId>`)
+* Defines explicit transaction boundary
+* Ensures atomic multi-repository operations
+* Guarantees deterministic state commits
 
 ---
 
-## 📦 AggregateRepository (Event-Sourced)
+## 🧠 Key principle:
 
-Used for event-driven aggregates.
-
-```csharp
-public class AggregateRepository<TDbContext, TAggregateRoot, TEvent>
-```
-
-### ✔ Responsibilities:
-
-* Event sourcing persistence
-* Aggregate rehydration
-* Event storage coordination
-* Domain event consistency
+> If multiple aggregates are involved, UnitOfWork is mandatory.
 
 ---
 
-# 3. Auditing System
+# 4. Soft Delete System (UNCHANGED BUT REINFORCED)
 
-All entities implementing `Entity<TId>` automatically support:
-
-* `CreatedOn`, `CreatedBy`
-* `LastModifiedOn`, `LastModifiedBy`
-* `DeletedOn`, `DeletedBy`
-* `IsDeleted` soft delete flag
-
----
-
-## ✔ Behavior
-
-* Automatically applied on `SaveChanges`
-* Fully transparent to application layer
-* No manual intervention required
-
----
-
-# 4. Soft Delete System
-
-Instead of physical deletion:
+Still applies globally:
 
 ```text
-DELETE → UPDATE IsDeleted = true
+DELETE → IsDeleted = true
 ```
 
-### ✔ Features:
+### ✔ Now enforced at framework level only
 
-* Global EF query filter
-* Automatic exclusion of deleted entities
-* Audit trail preserved
+* repositories no longer handle delete semantics
+* DbContext enforces policy
 
 ---
 
-# 5. Domain Events Integration
+# 5. Domain Events System (ENHANCED CLARITY)
 
-DbContext automatically dispatches domain events via:
+### Lifecycle:
+
+1. entities modified
+2. DbContext tracks changes
+3. commit executed
+4. events dispatched AFTER transaction completion
+
+---
+
+### 🧠 NEW RULE:
+
+> Events are emitted only after UnitOfWork commit success OR pipeline completion.
+
+---
+
+# 6. Entity Model (UNCHANGED BUT REINFORCED)
+
+Still:
 
 ```csharp
-IDispatcher
+public abstract class Entity<TId>
 ```
 
-### ✔ Lifecycle:
+### ✔ Guarantees:
 
-1. Entity changes tracked
-2. SaveChanges executed
-3. Events collected
-4. Dispatcher publishes after commit
+* identity ownership stays in domain
+* audit is framework-managed
+* soft delete is universal
 
 ---
 
-# 6. Entity Framework Conventions
+# 7. Dependency Injection System (UPDATED SEMANTICS)
 
-### ✔ Supported entity model
+## Auto-discovery now explicitly scoped:
+
+* repositories → persistence layer
+* behaviors → pipeline layer
+* unit of work → opt-in transactional layer
+
+---
+
+## NEW ADDITION:
 
 ```csharp
-public abstract class Entity<TId> : IEntity
+services.AddUnitOfWork<TDbContext>();
 ```
 
-### ✔ Characteristics:
+### Meaning:
 
-* Strongly typed identity (`TId`)
-* EF-compatible mapping
-* Audit support (via DbContext)
-* Soft delete support
+> “Enable explicit transactional orchestration mode”
 
 ---
 
-### ✔ Identity rules
+# 8. EF Entity Discovery (UNCHANGED)
 
-* Identity is defined in the domain (`Entity<TId>`)
-* Repositories are identity-agnostic
-* EF resolves identity via `object[]` keys
+Still:
 
----
-
-# 7. Dependency Injection Model
-
-This framework uses **explicit DI discovery**.
+* DbSet scanning
+* IEntity filtering
+* aggregate exclusion
 
 ---
 
-## ✔ Auto-registration rules
+# ⚠️ DESIGN RULES (UPDATED)
 
-Only services implementing:
+## ❌ FORBIDDEN
 
-* `IScopedDependency`
-* `ISingletonDependency`
-
-are automatically registered.
-
----
-
-## ✔ Benefits
-
-* No hidden service locator
-* Fully deterministic composition
-* Explicit module boundaries
-* Scalable modular architecture
+* repositories calling SaveChanges
+* implicit multi-aggregate persistence
+* mixing transaction boundaries inside domain logic
 
 ---
 
-# 8. Configuration Extensions
+## ✔ REQUIRED
 
-## ✔ Register EF Infrastructure
-
-```csharp
-services.AddEntityFrameworkFranz();
-```
-
-Includes:
-
-* DbContextBase support
-* repositories
-* auditing pipeline
-* DI wiring
+* UnitOfWork for multi-entity consistency
+* batch operations for performance
+* pipeline for CQRS safety
+* DbContext as only persistence executor
 
 ---
 
-# ⚠️ Design Constraints
-
-## ❌ Do NOT
-
-* Inject identity logic into repositories
-* Use repository-level `TId` constraints
-* Bypass `Entity<TId>` model
-* Perform manual auditing
-
----
-
-## ✔ Always
-
-* Let EF handle persistence
-* Let domain handle identity
-* Use repositories as orchestration layer only
-* Use DI markers for registration
-
----
-
-# 🧭 Architecture Overview
+# 🧭 Updated Architecture Overview
 
 ```
-Domain Layer
+DOMAIN LAYER
  ├── Entity<TId>
- ├── Domain Events
  ├── Aggregates
+ ├── Domain Events
 
-Application Layer
- ├── CQRS / Mediator
+APPLICATION LAYER
+ ├── CQRS
+ ├── SnapshotResolver
+ ├── Orchestration Services
 
-Infrastructure Layer
- ├── DbContextBase
- ├── EntityRepository
- ├── AggregateRepository
+FRAMEWORK LAYER (Franz 2.2.1)
+ ├── EntityRepository (intent-only)
+ ├── AddRange / UpdateRange / DeleteRange
+ ├── UnitOfWork (transaction boundary)
+ ├── PersistenceBehavior (pipeline transaction scope)
 
-EF Core Layer
- ├── DbSet<TEntity>
+INFRASTRUCTURE LAYER
+ ├── DbContextBase (execution engine)
  ├── ChangeTracker
- ├── Global Filters
+ ├── Soft Delete filter
+ ├── Event dispatcher
 
-DI Layer
- ├── IScopedDependency
- ├── IServiceCollection extensions
+EF CORE LAYER
+ ├── DbSet<TEntity>
+ ├── SQL translation
+ ├── transaction execution
 ```
 
 ---
 
-# 🧪 Version History
+# 🧪 VERSION HISTORY (UPGRADED)
 
-## v2.0.3 – Pragmatic Architecture Alignment
+## v2.2.1 — Transactional Framework Evolution
 
 ### 🧠 Major Changes
 
-* Replaced identity-coupled repositories with `IEntity`-based model
-* Removed `TId` dependency from repository contracts
-* Standardized EF Core identity resolution via `object`
-* Introduced explicit DI-based service discovery model
-* Reinforced pragmatic DDD enforcement strategy
+* Removed “repository owns persistence” model
+* Introduced UnitOfWork as explicit transaction boundary
+* Added batch operations (AddRange / UpdateRange / SoftDeleteRange)
+* Redefined DbContext as execution engine
+* Formalized pipeline-based transactional safety model
+
+---
 
 ### ⚙️ Improvements
 
-* Reduced repository complexity
-* Simplified DI wiring
-* Improved EF Core compatibility
-* Strengthened infrastructure scalability
-
-### ⚠️ Design Trade-off
-
-* Reduced compile-time identity enforcement in repositories
-* Identity safety moved to domain layer (`Entity<TId>`)
+* deterministic multi-aggregate consistency
+* improved snapshot safety
+* reduced hidden side effects
+* clearer orchestration boundaries
+* scalable for simulation-heavy systems
 
 ---
 
-# 📌 Summary
+### ⚠️ Breaking Change Conceptually
 
-Franz.Common.EntityFramework v2.0.3 provides:
-
-✔ EF-native persistence layer
-✔ Pragmatic DDD enforcement
-✔ Scalable repository abstraction
-✔ Auditing + soft delete system
-✔ Event-driven persistence support
-✔ DI-driven modular architecture
+* SaveChanges is no longer repository-owned
+* transaction ownership is now explicit or pipeline-driven
 
 ---
 
-# 🧠 Final Statement
+# 📌 FINAL SUMMARY
 
-> This library prioritizes system scalability and architectural clarity over theoretical purity, applying DDD only where it improves correctness, not as a global constraint.
+Franz.Common.EntityFramework v2.2.1 is now:
+
+> ✔ not just EF abstraction
+> ✔ not just repository simplification
+> ❌ not CRUD wrapper anymore
+> ✔ a transactional orchestration framework
+
+---
+
+# 🧠 Closing Statement (matches your philosophy)
+
+> This framework no longer abstracts Entity Framework — it formalizes deterministic persistence boundaries over it, ensuring consistency across complex domain simulations and multi-aggregate workflows.
 
 ---
 
