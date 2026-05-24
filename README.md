@@ -309,11 +309,94 @@ dotnet test --filter Category=Integration
 ```
 
 ---
-🔹 Latest Release:  v2.1.0 – Hardening and busines Evolution
+🔹 Latest Release: v2.2.1 – Transactional Persistence Evolution (Franz EF Core Framework)
 
-- Creation of entity Factories for Type safety and cleaner Id Management
-- Overhaul of Persistence systems to include TId to avoid mazy identity management
-- Tests, listeners, and pipeline components modernized.
+## 🧠 Core Architectural Upgrade
+
+- Reframed the entire persistence layer into a **transactional execution framework**
+- Introduced explicit separation between:
+  - Repository intent (mutation)
+  - Unit of Work (transaction boundary)
+  - Pipeline behaviors (implicit transaction scope)
+  - DbContext (execution engine)
+
+---
+
+## 🧱 Persistence System Overhaul
+
+- Removed repository-owned transaction responsibility
+- Introduced **framework-controlled commit model**
+- Standardized persistence as:
+  - Add / Update / Delete = intent only
+  - SaveChanges = UnitOfWork or pipeline responsibility
+
+---
+
+## ⚙️ Batch & Efficiency Enhancements
+
+- Added support for:
+  - AddRangeAsync
+  - UpdateRangeAsync
+  - DeleteRangeAsync
+  - SoftDeleteRangeAsync
+
+Enables:
+- high-performance bulk operations
+- snapshot generation pipelines
+- multi-aggregate consistency workflows
+
+---
+
+## 🧩 Unit of Work Introduction (Opt-in Architecture)
+
+- Introduced explicit `IUnitOfWork`
+- Enables deterministic multi-repository transactions
+- Required for:
+  - snapshot generation flows
+  - hero/skill creation orchestration
+  - CQRS command consistency
+
+---
+
+## 🏗 Entity System Improvements
+
+- Strengthened `Entity<TId>` identity model
+- Unified audit + soft delete across all entities
+- Standardized identity handling at domain level (not repository level)
+- Improved factory-based entity creation for safer ID initialization
+
+---
+
+## 🔄 Pipeline & Listener Modernization
+
+- Updated persistence pipeline behaviors to align with transaction model
+- Improved domain event dispatch timing (post-commit guarantee)
+- Hardened EF Core change tracking integration
+
+---
+
+## 🧪 System Hardening
+
+- Improved testability of persistence flows
+- Reduced hidden side effects in repository operations
+- Increased determinism in multi-aggregate workflows
+
+---
+
+## ⚠️ Breaking Conceptual Change
+
+- Repositories no longer own persistence boundaries
+- SaveChanges is no longer implicitly executed per repository operation
+- Transaction control is now explicitly managed or pipeline-driven
+
+---
+
+## 🧠 Architectural Outcome
+
+Franz EF Core now operates as:
+
+> A deterministic, transaction-aware persistence framework designed for multi-aggregate systems, simulation engines, and CQRS-driven architectures.
+
 ---
 
 # 🛣️ Roadmap
