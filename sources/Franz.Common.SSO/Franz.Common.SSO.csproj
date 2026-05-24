@@ -6,7 +6,7 @@
 
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.7" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.8" />
   </ItemGroup>
 
   <ItemGroup>
@@ -15,7 +15,7 @@
     <ProjectReference Include="..\Franz.Common.Logging\Franz.Common.Logging.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.3" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.8" />
   </ItemGroup>
 
 </Project>

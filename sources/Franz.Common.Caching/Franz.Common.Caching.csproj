@@ -4,12 +4,12 @@
   </PropertyGroup>
   <Import Project="..\..\common.targets" />
   <ItemGroup>
-    <PackageReference Include="EPPlus" Version="8.5.3" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.7" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.7" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.7" />
-    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.7" />
-    <PackageReference Include="StackExchange.Redis" Version="2.12.14" />
+    <PackageReference Include="EPPlus" Version="8.5.4" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.8" />
+    <PackageReference Include="StackExchange.Redis" Version="2.13.1" />
   </ItemGroup>
 
   <ItemGroup>
