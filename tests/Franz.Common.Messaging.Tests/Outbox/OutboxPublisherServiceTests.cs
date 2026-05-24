@@ -20,32 +20,42 @@ public class OutboxPublisherServiceTests
       new(_mockStore.Object, _mockSender.Object, Options.Create(_options), _mockLogger.Object);
 
   [Fact]
-  public async Task ExecuteAsync_WhenMessagesPending_ShouldSendAndMarkAsSent()
+  public async Task ProcessOutboxOnce_ShouldSendAndMarkAsSent()
   {
     // Arrange
-    var cts = new CancellationTokenSource();
-    var storedMessage = new StoredMessage { Id = Guid.CreateVersion7(), MessageType = "Test" };
+    var storedMessage = new StoredMessage
+    {
+      Id = Guid.CreateVersion7(),
+      MessageType = "Test"
+    };
 
     _mockStore.Setup(s => s.GetPendingAsync(It.IsAny<CancellationToken>()))
         .ReturnsAsync(new List<StoredMessage> { storedMessage });
 
-    // Act: We run the loop once and then cancel
     var service = CreateService();
-    var task = service.StartAsync(cts.Token);
 
-    await Task.Delay(50); // Let one loop iteration run
-    await cts.CancelAsync();
+    // Act
+    await service.ProcessOutboxOnceAsync(CancellationToken.None);
 
     // Assert
-    _mockSender.Verify(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
-    _mockStore.Verify(s => s.MarkAsSentAsync(storedMessage.Id, It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+    _mockSender.Verify(s =>
+        s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()),
+        Times.Once);
+
+    _mockStore.Verify(s =>
+        s.MarkAsSentAsync(storedMessage.Id, It.IsAny<CancellationToken>()),
+        Times.Once);
   }
 
   [Fact]
-  public async Task ExecuteAsync_WhenSenderFails_ShouldIncrementRetryCount()
+  public async Task ProcessOutboxOnce_WhenSenderFails_ShouldIncrementRetryCount()
   {
-    var cts = new CancellationTokenSource();
-    var storedMessage = new StoredMessage { Id = Guid.NewGuid(), RetryCount = 0 };
+    // Arrange
+    var storedMessage = new StoredMessage
+    {
+      Id = Guid.CreateVersion7(),
+      RetryCount = 0
+    };
 
     _mockStore.Setup(s => s.GetPendingAsync(It.IsAny<CancellationToken>()))
         .ReturnsAsync(new List<StoredMessage> { storedMessage });
@@ -53,36 +63,35 @@ public class OutboxPublisherServiceTests
     _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
         .ThrowsAsync(new Exception("Network Down"));
 
-    StoredMessage? updatedMessage = null;
+    StoredMessage? captured = null;
 
     _mockStore.Setup(s => s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()))
-        .Callback<StoredMessage, CancellationToken>((m, _) => updatedMessage = m)
+        .Callback<StoredMessage, CancellationToken>((m, _) => captured = m)
         .Returns(Task.CompletedTask);
 
     var service = CreateService();
-    _ = service.StartAsync(cts.Token);
 
-    // Poll until the update happens or timeout
-    var timeout = DateTime.UtcNow.AddSeconds(2);
-    while (updatedMessage == null && DateTime.UtcNow < timeout)
-    {
-      await Task.Delay(20);
-    }
+    // Act
+    await service.ProcessOutboxOnceAsync(CancellationToken.None);
 
-    cts.Cancel();
+    // Assert
+    captured.Should().NotBeNull();
+    captured!.RetryCount.Should().Be(1);
 
-    updatedMessage.Should().NotBeNull("UpdateRetryAsync should have been called at least once");
-    updatedMessage.RetryCount.Should().BeGreaterThan(0);
-    _mockStore.Verify(s => s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+    _mockStore.Verify(s =>
+        s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()),
+        Times.Once);
   }
 
   [Fact]
-  public async Task ExecuteAsync_WhenMaxRetriesExceeded_ShouldMoveToDeadLetter()
+  public async Task ProcessOutboxOnce_WhenMaxRetriesExceeded_ShouldMoveToDeadLetter()
   {
     // Arrange
-    var cts = new CancellationTokenSource();
-    // Start at 1 retry, Max is 2. Next failure should trigger DLQ
-    var storedMessage = new StoredMessage { Id = Guid.CreateVersion7(), RetryCount = 1 };
+    var storedMessage = new StoredMessage
+    {
+      Id = Guid.CreateVersion7(),
+      RetryCount = 2 // already at limit (MaxRetries = 2)
+    };
 
     _mockStore.Setup(s => s.GetPendingAsync(It.IsAny<CancellationToken>()))
         .ReturnsAsync(new List<StoredMessage> { storedMessage });
@@ -90,15 +99,18 @@ public class OutboxPublisherServiceTests
     _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
         .ThrowsAsync(new Exception("Permanent Failure"));
 
-    // Act
     var service = CreateService();
-    _ = service.StartAsync(cts.Token);
 
-    await Task.Delay(50);
-    await cts.CancelAsync();
+    // Act
+    await service.ProcessOutboxOnceAsync(CancellationToken.None);
 
     // Assert
-    _mockStore.Verify(s => s.MoveToDeadLetterAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
-    _mockStore.Verify(s => s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+    _mockStore.Verify(s =>
+        s.MoveToDeadLetterAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()),
+        Times.Once);
+
+    _mockStore.Verify(s =>
+        s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()),
+        Times.Never);
   }
 }
