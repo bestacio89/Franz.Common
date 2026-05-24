@@ -4,6 +4,7 @@ using FluentAssertions;
 using Franz.Common.Business.Domain;
 using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.EntityFramework.Repositories;
+using Franz.Common.EntityFramework.Extensions;
 using Franz.Common.Mediator.Dispatchers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

@@ -9,7 +9,7 @@ using Franz.Common.MongoDB.Extensions;
 using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.MongoDB;
 using Franz.Common.AzureCosmosDB.Context;
-
+using Franz.Common.EntityFramework.Extensions;
 namespace Franz.Common.Messaging.EntityFramework.Extensions;
 
 public static class ServiceCollectionExtensions

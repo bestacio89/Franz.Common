@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.MultiTenancy;
 using Npgsql;
-
+using Franz.Common.EntityFramework.Extensions;
 namespace Franz.Common.EntityFramework.Postgres.Extensions;
 
 public static class ServiceCollectionExtensions

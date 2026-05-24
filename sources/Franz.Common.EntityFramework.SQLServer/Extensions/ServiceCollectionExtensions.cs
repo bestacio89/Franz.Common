@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-
+using Franz.Common.EntityFramework.Extensions;
 namespace Franz.Common.EntityFramework.SQLServer.Extensions;
 
 public static class ServiceCollectionExtensions

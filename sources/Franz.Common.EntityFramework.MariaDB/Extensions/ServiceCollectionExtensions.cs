@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MySqlConnector;
 using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
+using Franz.Common.EntityFramework.Extensions;
 
 namespace Franz.Common.EntityFramework.MariaDB.Extensions;
 

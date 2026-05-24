@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Text;
-
+using Franz.Common.EntityFramework.Extensions;
 namespace Franz.Common.EntityFramework.Tests.Extensions;
 
 public class ServiceCollectionExtensionsTests

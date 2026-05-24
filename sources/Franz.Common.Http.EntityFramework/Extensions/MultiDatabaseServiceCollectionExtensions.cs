@@ -15,7 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Reflection;
 using CosmosServiceCollectionExtensions = Franz.Common.AzureCosmosDB.Extensions.CosmosServiceCollectionExtensions;
-
+using Franz.Common.EntityFramework.Extensions;
 
 public static class MultiDatabaseServiceCollectionExtensions
 {
