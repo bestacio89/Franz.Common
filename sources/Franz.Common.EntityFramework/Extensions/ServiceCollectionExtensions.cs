@@ -14,7 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System.Reflection;
 
-namespace Franz.Common.EntityFramework;
+namespace Franz.Common.EntityFramework.Extensions;
 
 public static class ServiceCollectionExtensions
 {
@@ -130,6 +130,17 @@ public static class ServiceCollectionExtensions
   public static IServiceCollection AddBehaviors(this IServiceCollection services)
   {
     services.AddScoped(typeof(IPipeline<,>), typeof(PersistenceBehavior<,>));
+    return services;
+  }
+
+  #endregion
+
+  #region Unit of Work Registarion
+  public static IServiceCollection AddUnitOfWork<TDbContext>(
+      this IServiceCollection services)
+      where TDbContext : DbContextBase
+  {
+    services.AddScoped<IUnitOfWork, EfUnitOfWork<TDbContext>>();
     return services;
   }
 
