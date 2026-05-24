@@ -1,6 +1,6 @@
 ﻿# 📦 **Franz.Common.Messaging.Sagas**
 
-### **Version 1.7.5 — Distributed Orchestration Engine for the Franz Framework**
+### **Version 2.2.1 — Distributed Orchestration Engine for the Franz Framework**
 
 `Franz.Common.Messaging.Sagas` provides **long-running workflow orchestration**, **distributed coordination**, and **deterministic state machines** fully integrated into the Franz architecture.
 
@@ -25,7 +25,7 @@ They operate transport-agnostically and integrate seamlessly with:
 
 ---
 
-## 🔖 **Current Version**: 2.1.4
+## 🔖 **Current Version**: 2.2.1
 
 ---
 

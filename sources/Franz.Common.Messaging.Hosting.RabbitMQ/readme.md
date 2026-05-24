@@ -123,7 +123,7 @@ public class OutboxHostedService : BackgroundService
 
 ## 📝 Version Information
 
-* - **Current Version**:  2.1.4
+* - **Current Version**:  2.2.1
 * Part of the private **Franz Framework** ecosystem.
 
 ---

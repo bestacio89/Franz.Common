@@ -9,7 +9,7 @@ Provides **unified cache abstractions**, **hybrid caching (L1 + L2)**, Mediator 
 
 ---
 
-* - **Current Version**:  2.1.4
+* - **Current Version**:  2.2.1
 * **Target Framework**: **.NET 10.0**
 
 ---
