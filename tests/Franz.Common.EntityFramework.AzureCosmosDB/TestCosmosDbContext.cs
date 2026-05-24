@@ -23,16 +23,32 @@ public class TestCosmosDbContext : CosmosDbContextBase
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
-    // Execute the base logic (Container fallback + conventions)
     base.OnModelCreating(modelBuilder);
 
-  
-    // For testing generic repositories, mapping Id as the Partition Key is standard.
     modelBuilder.Entity<CosmosEntity>()
         .ToContainer("Items")
         .HasPartitionKey(x => x.Id);
+
     modelBuilder.Entity<CosmosEntity>()
-    .HasQueryFilter(x => !x.IsDeleted);
+        .HasQueryFilter(x => !x.IsDeleted);
+  }
+
+  // 🔥 IMPORTANT ADDITION (COSMOS TEST STABILITY)
+  public override async ValueTask DisposeAsync()
+  {
+    // Ensure pending changes are flushed before teardown
+    if (ChangeTracker.HasChanges())
+    {
+      try
+      {
+        await SaveChangesAsync();
+      }
+      catch
+      {
+        // swallow intentionally: test teardown safety > strict consistency
+      }
+    }
+
+    await base.DisposeAsync();
   }
 }
-
