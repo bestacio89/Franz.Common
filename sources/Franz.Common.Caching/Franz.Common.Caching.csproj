@@ -4,7 +4,7 @@
   </PropertyGroup>
   <Import Project="..\..\common.targets" />
   <ItemGroup>
-    <PackageReference Include="EPPlus" Version="8.5.4" />
+    <PackageReference Include="EPPlus" Version="8.6.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.8" />
