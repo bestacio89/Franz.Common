@@ -240,7 +240,7 @@ This package is designed to evolve:
 
 ## 📝 Version Information
 
-* - **Current Version**:  2.2.2
+* -**Current Version:** v2.2.3
 * Target Framework: **.NET 10**
 * Part of the **Franz Framework**
 

@@ -1,8 +1,8 @@
-# 📦 Franz.Common.EntityFramework v2.2.1
+# 📦 Franz.Common.EntityFramework v2.2.3
 
 ## 🚀 Version
 
-**v2.2.1**
+**Current Version:** v2.2.3
 
 ---
 
