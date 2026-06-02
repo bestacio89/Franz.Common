@@ -169,7 +169,7 @@ await messageStore.SaveAsync(msg);
 
 ---
 
-- **Current Version**:  2.2.1
+- **Current Version**:  2.2.2
 
 ## **Changelog**
 

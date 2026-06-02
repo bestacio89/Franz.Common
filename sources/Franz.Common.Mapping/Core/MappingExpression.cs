@@ -1,57 +1,76 @@
 using System.Linq.Expressions;
+using Franz.Common.Mapping.Abstractions;
 
-public class MappingExpression<TSource, TDestination>
+namespace Franz.Common.Mapping.Core;
+
+public class MappingExpression<TSource, TDestination> : IMappingExpression
 {
-  private readonly Dictionary<string, string> _memberBindings = [];
-  private readonly HashSet<string> _ignored = [];
+  private readonly Dictionary<string, string> _memberBindings = new();
+  private readonly HashSet<string> _ignored = new();
 
-  // source-aware constructor
-  internal Func<TSource, TDestination>? Constructor { get; private set; }
+  private Func<TSource, TDestination>? _constructor;
+  private Func<TDestination, TSource>? _reverseConstructor;
+  private bool _isStrict;
 
-  // reverse constructor (optional)
-  internal Func<TDestination, TSource>? ReverseConstructor { get; private set; }
+  // =========================================================
+  // CONTRACT
+  // =========================================================
+  public Type SourceType => typeof(TSource);
+  public Type DestinationType => typeof(TDestination);
 
-  // expose bindings + ignored members
   public IReadOnlyDictionary<string, string> MemberBindings => _memberBindings;
   public IReadOnlyCollection<string> IgnoredMembers => _ignored;
 
-  public MappingExpression<TSource, TDestination> ForMember(
-      Expression<Func<TDestination, object>> destMember,
-      Expression<Func<TSource, object>> srcMember)
-  {
-    var destName = GetMemberName(destMember);
-    var srcName = GetMemberName(srcMember);
+  public bool IsStrict => _isStrict;
 
-    _memberBindings[destName] = srcName;
+  public bool HasConstructor => _constructor != null;
+
+  public Delegate? Constructor => _constructor;
+  public Delegate? ReverseConstructor => _reverseConstructor;
+
+  // =========================================================
+  // FLUENT API
+  // =========================================================
+  public MappingExpression<TSource, TDestination> Strict()
+  {
+    _isStrict = true;
+    return this;
+  }
+
+  public MappingExpression<TSource, TDestination> ForMember(
+      Expression<Func<TDestination, object>> dest,
+      Expression<Func<TSource, object>> src)
+  {
+    _memberBindings[GetName(dest)] = GetName(src);
     return this;
   }
 
   public MappingExpression<TSource, TDestination> Ignore(
-      Expression<Func<TDestination, object>> destMember)
+      Expression<Func<TDestination, object>> dest)
   {
-    var destName = GetMemberName(destMember);
-    _ignored.Add(destName);
+    _ignored.Add(GetName(dest));
     return this;
   }
 
-  // Forward constructor
   public MappingExpression<TSource, TDestination> ConstructUsing(Func<TSource, TDestination> ctor)
   {
-    Constructor = ctor;
+    _constructor = ctor;
     return this;
   }
 
-  // Reverse constructor
   public MappingExpression<TSource, TDestination> ReverseConstructUsing(Func<TDestination, TSource> ctor)
   {
-    ReverseConstructor = ctor;
+    _reverseConstructor = ctor;
     return this;
   }
 
-  private string GetMemberName(LambdaExpression expr)
+  private static string GetName(LambdaExpression expr)
   {
-    if (expr.Body is MemberExpression m) return m.Member.Name;
-    if (expr.Body is UnaryExpression u && u.Operand is MemberExpression um) return um.Member.Name;
-    throw new InvalidOperationException("Invalid member expression");
+    return expr.Body switch
+    {
+      MemberExpression m => m.Member.Name,
+      UnaryExpression { Operand: MemberExpression um } => um.Member.Name,
+      _ => throw new InvalidOperationException("Invalid expression")
+    };
   }
 }

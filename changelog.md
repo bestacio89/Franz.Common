@@ -1192,3 +1192,125 @@ Franz EF Core now operates as:
 > A deterministic, transaction-aware persistence framework designed for multi-aggregate systems, simulation engines, and CQRS-driven architectures.
 
 ---
+#  Latest Release: v2.2.2 – Mapping Engine Formalization (Franz Mapping Framework)
+
+## 🧠 Core Architectural Upgrade
+
+* Reframed the entire mapping system into a **deterministic mapping execution engine**
+* Introduced a strict separation between:
+
+  * **Mapping configuration (declarative intent via profiles / expressions)**
+  * **Mapping execution engine (FranzMapper)**
+  * **Application boundary layer (MappingService via DI)**
+
+---
+
+## ⚙️ Mapping Engine Overhaul (FranzMapper)
+
+* Introduced a unified `MapInternal<TSource, TDestination>` execution pipeline
+
+* Standardized resolution order:
+
+  1. Circular reference detection (execution guard)
+  2. Scalar / value-object unwrapping (`Value` pattern support)
+  3. Collection mapping (generic enumerable handling)
+  4. Configured mappings (MappingConfiguration lookup)
+  5. Constructor-based projections (`ConstructUsing`)
+  6. Reflection fallback mapping
+
+* Introduced **safe circular reference tracking** using a reference-equality visitation context
+
+---
+
+## 🧾 Configuration System Stabilization
+
+* Replaced implicit mapping behavior with **explicit registration model**
+* Introduced deterministic mapping registration via:
+
+  * `MappingConfiguration.Register<TSource, TDestination>()`
+* Ensured thread-safe mapping storage using concurrent dictionary
+* Defined strict override semantics:
+
+  * **Last write wins**
+
+---
+
+## 🧩 Expression-Based Mapping Model
+
+* Introduced `MappingExpression<TSource, TDestination>` as the single source of mapping truth
+* Enabled:
+
+  * Constructor projection via `ConstructUsing`
+  * Member binding overrides
+  * Ignored member definitions
+  * Strict vs non-strict mapping enforcement
+
+---
+
+## 🚀 Performance & Runtime Optimization
+
+* Introduced caching layers for:
+
+  * Writable property resolution
+  * Constructor selection
+  * Delegate-based fast dispatch (`InvokeMap`)
+* Reduced reflection overhead in hot paths via compiled delegate caching
+* Optimized collection mapping using generic cached invocation delegates
+
+---
+
+## 🔁 Value Object & Scalar Handling
+
+* Introduced deterministic **Value unwrapping pipeline**
+* Supported patterns:
+
+  * `T.Value → primitive type`
+  * automatic scalar extraction before mapping resolution
+* Fixed critical regression where wrapped primitives resolved to default values (0/null)
+
+---
+
+## 🧠 Circular Dependency Safety
+
+* Implemented strict graph traversal guard
+* Prevents infinite recursion in:
+
+  * self-referencing objects
+  * cyclic DTO graphs
+* Standardized exception behavior:
+
+  * `TechnicalException: Circular mapping detected`
+
+---
+
+## 🧱 Service Layer Stabilization (MappingService)
+
+* Introduced lightweight DI wrapper over `IFranzMapper`
+* Ensured:
+
+  * Thread-safe disposal state management
+  * Cancellation-aware async mapping API
+  * Optional async execution without altering mapping semantics
+
+---
+
+## ⚖️ Architectural Guarantees
+
+* Mapping is now:
+
+  * Deterministic
+  * Side-effect free
+  * Thread-safe under concurrent execution
+* Strict separation between:
+
+  * mapping intent
+  * mapping execution
+  * service orchestration
+
+---
+
+## 🧭 Design Principle Established
+
+> “Mapping is not transformation magic — it is a deterministic execution graph over declared intent.”
+
+

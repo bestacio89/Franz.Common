@@ -1,259 +1,332 @@
 using Franz.Common.Errors;
 using Franz.Common.Mapping.Abstractions;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace Franz.Common.Mapping.Core;
 
 public class FranzMapper(MappingConfiguration config) : IFranzMapper
 {
-  private readonly MappingConfiguration _config = config ?? throw new ArgumentNullException(nameof(config));
+  private readonly MappingConfiguration _config = config;
 
-  [return: NotNull]
+  // =========================================================
+  // CACHES
+  // =========================================================
+  private static readonly ConcurrentDictionary<Type, PropertyInfo[]> WritablePropsCache = new();
+  private static readonly ConcurrentDictionary<Type, ConstructorInfo?> ConstructorCache = new();
+  private static readonly ConcurrentDictionary<(Type, Type), Func<FranzMapper, object, MappingContext, object>> DelegateCache = new();
+
+  // =========================================================
+  // CONTEXT
+  // =========================================================
+  private sealed class MappingContext
+  {
+    public HashSet<object> Visited { get; } = new(ReferenceEqualityComparer.Instance);
+
+    public void Enter(object obj)
+    {
+      if (obj == null) return;
+      if (!Visited.Add(obj))
+        throw new TechnicalException("Circular mapping detected.");
+    }
+  }
+
+  // =========================================================
+  // PUBLIC API
+  // =========================================================
   public TDestination Map<TSource, TDestination>([DisallowNull] TSource source)
   {
     if (source == null)
       throw new ArgumentNullException(nameof(source));
 
-    // 🧩 Handle collection interface mappings dynamically
-    if (IsCollectionInterface(typeof(TDestination)))
-    {
-      var mapped = MapCollection(typeof(TSource), typeof(TDestination), source);
-      if (mapped is null)
-      {
-        throw new TechnicalException(
-            $"Failed to map collection from {typeof(TSource).Name} to {typeof(TDestination).Name}.");
-      }
-
-      return (TDestination)mapped;
-    }
-
-    // 🧱 Handle explicitly configured mappings
-    if (_config.TryGetMapping<TSource, TDestination>(out var expression))
-    {
-      if (expression == null)
-      {
-        throw new TechnicalException(
-            $"Mapping expression for {typeof(TSource).Name} → {typeof(TDestination).Name} is null.");
-      }
-
-      TDestination destination;
-      if (expression.Constructor != null)
-      {
-        // 🧩 Explicit constructor delegate provided
-        var constructed = expression.Constructor(source);
-        destination = constructed ?? throw new TechnicalException(
-            $"The constructor delegate for {typeof(TDestination).Name} returned null.");
-      }
-      else
-      {
-        // 🧠 NEW LOGIC: record-aware instantiation (constructor-matching)
-        destination = (TDestination)CreateInstanceSmart(typeof(TSource), typeof(TDestination), source);
-      }
-
-      ApplyMapping(source, destination, expression);
-      return destination;
-    }
-
-    // 🧱 Fallback default mapping (also record-aware now)
-    var fallback = DefaultMap<TSource, TDestination>(source);
-    if (fallback == null)
-    {
-      throw new TechnicalException(
-          $"Default mapping from {typeof(TSource).Name} to {typeof(TDestination).Name} failed. " +
-          "Ensure both types have compatible public properties.");
-    }
-
-    return fallback;
+    var ctx = new MappingContext();
+    return MapInternal<TSource, TDestination>(source, ctx);
   }
 
-  // 🔧 Centralized smart constructor logic
-  private static object CreateInstanceSmart(Type sourceType, Type destType, object source)
+  // =========================================================
+  // CORE ENGINE
+  // =========================================================
+  private TDestination MapInternal<TSource, TDestination>(
+      TSource source,
+      MappingContext ctx)
   {
-    // Prefer the "richest" constructor (record positional or full-parameterized)
-    var ctor = destType
-        .GetConstructors()
-        .OrderByDescending(c => c.GetParameters().Length)
-        .FirstOrDefault();
-
-    if (ctor != null && ctor.GetParameters().Length > 0)
-    {
-      var parameters = ctor.GetParameters()
-          .Select(p =>
-          {
-            var srcProp = sourceType
-                .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)
-                .FirstOrDefault(prop => prop.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase));
-
-            return srcProp?.GetValue(source);
-          })
-          .ToArray();
-
-      try
-      {
-        return ctor.Invoke(parameters);
-      }
-      catch (Exception ex)
-      {
-        throw new TechnicalException(
-            $"⚠️ Failed to invoke {destType.Name} constructor. Parameter mismatch possible. Details: {ex.Message}", ex);
-      }
-    }
-
-    // 🪃 Fallback: Activator for legacy mutable types
-    return Activator.CreateInstance(destType)
-        ?? throw new TechnicalException(
-            $"Could not create instance of {destType.Name}. Ensure it has a suitable constructor.");
-  }
-
-  private void ApplyMapping<TSource, TDestination>(
-    [DisallowNull] TSource source,
-    [DisallowNull] TDestination destination,
-    [DisallowNull] MappingExpression<TSource, TDestination> expression)
-  {
-    if (source == null || destination == null || expression == null) return;
+    ctx.Enter(source!);
 
     var srcType = typeof(TSource);
     var destType = typeof(TDestination);
 
-    foreach (var destProp in destType.GetProperties(BindingFlags.Instance | BindingFlags.Public))
+    // =========================================================
+    // 0. VALUE UNWRAP REWRITE STEP (CRITICAL FOR INLINE ROOT VALS)
+    // =========================================================
+    var valueProp = source!.GetType().GetProperty("Value");
+    if (valueProp != null)
     {
-      if (expression.IgnoredMembers.Contains(destProp.Name))
-        continue;
+      var inner = valueProp.GetValue(source);
+      if (inner != null)
+        return (TDestination)ResolveValue(inner.GetType(), destType, inner, ctx)!;
+    }
 
-      var srcName = expression.MemberBindings.TryGetValue(destProp.Name, out var boundName)
-          ? boundName
-          : destProp.Name;
+    // =========================================================
+    // 1. COLLECTIONS
+    // =========================================================
+    if (IsCollection(destType))
+    {
+      return (TDestination)MapCollection(srcType, destType, source!, ctx);
+    }
 
-      var srcProp = srcType
-          .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)
-          .FirstOrDefault(p => p.Name.Equals(srcName, StringComparison.OrdinalIgnoreCase));
+    // =========================================================
+    // 2. CONFIGURED MAPPING
+    // =========================================================
+    if (_config.TryGetMapping<TSource, TDestination>(out var expr))
+    {
+      var typed = expr!;
 
-      if (srcProp == null) continue;
+      // 2A. ConstructUsing (terminal)
+      if (typed.Constructor is Func<TSource, TDestination> ctor)
+        return ctor(source!);
 
-      var srcValue = srcProp.GetValue(source);
+      // 2B. Constructor binding
+      var destination = CreateInstanceSmart(source!, typed);
 
-      if (srcValue == null)
-      {
-        if (!destProp.PropertyType.IsValueType || Nullable.GetUnderlyingType(destProp.PropertyType) != null)
-          destProp.SetValue(destination, null);
-        continue;
-      }
+      ApplyMapping(source!, destination, typed, ctx);
 
-      // 🔍 Value object unwrapping (e.g. ISBN.Value → string)
-      var valueProp = srcValue.GetType().GetProperty("Value", BindingFlags.Instance | BindingFlags.Public);
-      if (valueProp != null && destProp.PropertyType.IsAssignableFrom(valueProp.PropertyType))
-      {
-        var unwrapped = valueProp.GetValue(srcValue);
-        destProp.SetValue(destination, unwrapped);
-        continue;
-      }
+      return (TDestination)destination;
+    }
 
-      // 🔁 Handle collections recursively
-      if (typeof(IEnumerable).IsAssignableFrom(destProp.PropertyType) && destProp.PropertyType != typeof(string))
-      {
-        var mappedCollection = MapCollection(srcProp.PropertyType, destProp.PropertyType, srcValue);
-        destProp.SetValue(destination, mappedCollection);
-        continue;
-      }
+    // =========================================================
+    // 3. FALLBACK
+    // =========================================================
+    return DefaultMap<TSource, TDestination>(source!);
+  }
 
-      // 🧩 Handle nested complex objects recursively
-      if (!destProp.PropertyType.IsAssignableFrom(srcProp.PropertyType))
-      {
-        var mapMethod = typeof(FranzMapper)
-            .GetMethod(nameof(Map), BindingFlags.Instance | BindingFlags.Public)?
-            .MakeGenericMethod(srcProp.PropertyType, destProp.PropertyType);
+  // =========================================================
+  // CONSTRUCTOR ENGINE
+  // =========================================================
+  private object CreateInstanceSmart<TSource, TDestination>(
+      TSource source,
+      MappingExpression<TSource, TDestination> expr)
+  {
+    var srcType = typeof(TSource);
+    var destType = typeof(TDestination);
 
-        if (mapMethod != null)
+    var ctor = GetCtor(destType);
+
+    if (ctor == null)
+      return Activator.CreateInstance(destType)
+          ?? throw new TechnicalException($"Cannot create {destType.Name}");
+
+    var parameters = ctor.GetParameters()
+        .Select(p =>
         {
-          var nested = mapMethod.Invoke(this, [srcValue]);
-          destProp.SetValue(destination, nested);
-        }
-      }
-      else
+          var srcName =
+              expr.MemberBindings.TryGetValue(p.Name!, out var mapped)
+                  ? mapped
+                  : p.Name;
+
+          var prop = srcType.GetProperty(srcName!,
+              BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+
+          if (prop == null)
+          {
+            if (expr.IsStrict)
+              throw new TechnicalException($"Missing constructor binding: {p.Name}");
+
+            return GetDefault(p.ParameterType);
+          }
+
+          return prop.GetValue(source) ?? GetDefault(p.ParameterType);
+        })
+        .ToArray();
+
+    return ctor.Invoke(parameters);
+  }
+
+  // =========================================================
+  // PROPERTY MAPPING
+  // =========================================================
+  private void ApplyMapping<TSource, TDestination>(
+      TSource source,
+      object destination,
+      MappingExpression<TSource, TDestination> expr,
+      MappingContext ctx)
+  {
+    var srcType = typeof(TSource);
+    var destType = destination.GetType();
+
+    var props = WritablePropsCache.GetOrAdd(destType,
+        t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+              .Where(p => p.CanWrite)
+              .ToArray());
+
+    foreach (var destProp in props)
+    {
+      if (expr.IgnoredMembers.Contains(destProp.Name))
+        continue;
+
+      var srcName =
+          expr.MemberBindings.TryGetValue(destProp.Name, out var mapped)
+              ? mapped
+              : destProp.Name;
+
+      var srcProp = srcType.GetProperty(srcName,
+          BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+
+      if (srcProp == null)
       {
-        destProp.SetValue(destination, srcValue);
+        if (expr.IsStrict)
+          throw new TechnicalException($"Missing mapping: {destProp.Name}");
+        continue;
       }
+
+      var value = ResolveValue(
+          srcProp.PropertyType,
+          destProp.PropertyType,
+          srcProp.GetValue(source),
+          ctx);
+
+      destProp.SetValue(destination, value);
     }
   }
 
-  private static TDestination DefaultMap<TSource, TDestination>([DisallowNull] TSource source)
+  // =========================================================
+  // VALUE RESOLUTION
+  // =========================================================
+  private object? ResolveValue(
+    Type srcType,
+    Type destType,
+    object? value,
+    MappingContext ctx)
   {
-    if (source == null)
-      throw new ArgumentNullException(nameof(source));
+    if (value == null)
+      return null;
 
-    // 🔧 Use smart constructor for fallback as well
-    var dest = (TDestination)CreateInstanceSmart(typeof(TSource), typeof(TDestination), source);
+    // =========================================================
+    // 1. UNWRAP REWRITE STEP
+    // =========================================================
+    var valueProp = value.GetType().GetProperty("Value");
 
-    foreach (var prop in typeof(TDestination).GetProperties().Where(p => p.CanWrite))
+    if (valueProp != null)
     {
-      var sourceProp = typeof(TSource).GetProperty(prop.Name);
-      if (sourceProp != null)
-        prop.SetValue(dest, sourceProp.GetValue(source));
+      var inner = valueProp.GetValue(value);
+
+      if (inner != null)
+      {
+        value = inner;
+        srcType = inner.GetType();
+      }
+    }
+
+    // =========================================================
+    // 2. NOW APPLY NORMAL RULES ON THE NEW VALUE
+    // =========================================================
+    if (destType.IsInstanceOfType(value))
+      return value;
+
+    if (IsCollection(destType))
+      return MapCollection(srcType, destType, value!, ctx);
+
+    if (destType.IsAssignableFrom(srcType))
+      return value;
+
+    return InvokeMap(srcType, destType, value!, ctx);
+  }
+
+  // =========================================================
+  // FAST DISPATCH (NO REFLECTION INVOKE)
+  // =========================================================
+  private object InvokeMap(Type srcType, Type destType, object value, MappingContext ctx)
+  {
+    var key = (srcType, destType);
+
+    var del = DelegateCache.GetOrAdd(key, _ =>
+        CreateDelegate(srcType, destType));
+
+    return del(this, value, ctx);
+  }
+
+  private static Func<FranzMapper, object, MappingContext, object> CreateDelegate(Type src, Type dest)
+  {
+    var mapper = Expression.Parameter(typeof(FranzMapper), "m");
+    var source = Expression.Parameter(typeof(object), "s");
+    var ctx = Expression.Parameter(typeof(MappingContext), "c");
+
+    var method = typeof(FranzMapper)
+        .GetMethod(nameof(MapInternal), BindingFlags.NonPublic | BindingFlags.Instance)!
+        .MakeGenericMethod(src, dest);
+
+    var body = Expression.Call(
+        mapper,
+        method,
+        Expression.Convert(source, src),
+        ctx
+    );
+
+    return Expression.Lambda<Func<FranzMapper, object, MappingContext, object>>(
+        Expression.Convert(body, typeof(object)),
+        mapper, source, ctx
+    ).Compile();
+  }
+
+  // =========================================================
+  // COLLECTIONS
+  // =========================================================
+  private object MapCollection(Type srcType, Type destType, object source, MappingContext ctx)
+  {
+    var srcElem = GetElementType(srcType);
+    var destElem = GetElementType(destType);
+
+    var listType = typeof(List<>).MakeGenericType(destElem);
+    var list = (IList)Activator.CreateInstance(listType)!;
+
+    var del = DelegateCache.GetOrAdd((srcElem, destElem),
+        _ => CreateDelegate(srcElem, destElem));
+
+    foreach (var item in (IEnumerable)source)
+    {
+      list.Add(del(this, item!, ctx));
+    }
+
+    return list;
+  }
+
+  // =========================================================
+  // FALLBACK
+  // =========================================================
+  private static TDestination DefaultMap<TSource, TDestination>(TSource source)
+  {
+    var dest = Activator.CreateInstance<TDestination>();
+
+    foreach (var p in typeof(TDestination).GetProperties())
+    {
+      var src = typeof(TSource).GetProperty(p.Name);
+      if (src == null) continue;
+
+      p.SetValue(dest, src.GetValue(source));
     }
 
     return dest;
   }
 
-  private static bool IsCollectionInterface(Type type)
-  {
-    if (!type.IsGenericType) return false;
+  // =========================================================
+  // HELPERS
+  // =========================================================
+  private static ConstructorInfo? GetCtor(Type t)
+      => ConstructorCache.GetOrAdd(t,
+          _ => t.GetConstructors()
+                .OrderByDescending(c => c.GetParameters().Length)
+                .FirstOrDefault());
 
-    var def = type.GetGenericTypeDefinition();
-    return def == typeof(IEnumerable<>) ||
-           def == typeof(ICollection<>) ||
-           def == typeof(IReadOnlyCollection<>) ||
-           def == typeof(IList<>);
-  }
+  private static bool IsCollection(Type t)
+      => typeof(IEnumerable).IsAssignableFrom(t) && t != typeof(string);
 
-  private object MapCollection(Type sourceType, Type destType, object source)
-  {
-    if (source == null)
-      throw new ArgumentNullException(nameof(source));
-
-    var srcElemType = GetElementType(sourceType);
-    var destElemType = GetElementType(destType);
-
-    var listType = typeof(List<>).MakeGenericType(destElemType);
-    var result = (IList)(Activator.CreateInstance(listType)
-        ?? throw new TechnicalException($"Could not instantiate List<{destElemType.Name}>."));
-
-    var mapMethod = typeof(FranzMapper)
-        .GetMethod(nameof(Map), BindingFlags.Instance | BindingFlags.Public)!
-        .MakeGenericMethod(srcElemType, destElemType);
-
-    foreach (var item in (IEnumerable)source)
-    {
-      if (item == null)
-      {
-        result.Add(null);
-        continue;
-      }
-
-      try
-      {
-        var mapped = mapMethod.Invoke(this, [item]);
-        result.Add(mapped);
-      }
-      catch (TargetInvocationException ex)
-      {
-        throw ex.InnerException ?? ex;
-      }
-    }
-
-    if (destType.IsArray)
-    {
-      var arr = Array.CreateInstance(destElemType, result.Count);
-      result.CopyTo(arr, 0);
-      return arr;
-    }
-
-    return result;
-  }
-
-  private static Type GetElementType(Type seqType)
-      => seqType.IsArray ? seqType.GetElementType()! :
-         seqType.IsGenericType ? seqType.GetGenericArguments()[0] :
+  private static Type GetElementType(Type t)
+      => t.IsArray ? t.GetElementType()! :
+         t.IsGenericType ? t.GetGenericArguments()[0] :
          typeof(object);
+
+  private static object? GetDefault(Type type)
+      => type.IsValueType ? Activator.CreateInstance(type) : null;
 }

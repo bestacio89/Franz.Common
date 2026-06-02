@@ -1,4 +1,5 @@
 ﻿using Franz.Common.Mapping.Core;
+using Franz.Common.Mapping.Profiles;
 using Franz.Common.Messaging.AzureEventBus.Contracts;
 
 namespace Franz.Common.Messaging.AzureEventBus.Mapping;

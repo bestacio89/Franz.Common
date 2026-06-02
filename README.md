@@ -309,93 +309,70 @@ dotnet test --filter Category=Integration
 ```
 
 ---
-🔹 Latest Release: v2.2.1 – Transactional Persistence Evolution (Franz EF Core Framework)
+Latest Release: v2.2.2 – Mapping Engine Formalization (Franz Mapping Framework - Franz.Common.Mapping)
 
 ## 🧠 Core Architectural Upgrade
 
-- Reframed the entire persistence layer into a **transactional execution framework**
-- Introduced explicit separation between:
-  - Repository intent (mutation)
-  - Unit of Work (transaction boundary)
-  - Pipeline behaviors (implicit transaction scope)
-  - DbContext (execution engine)
+* Reframed the entire mapping system into a **deterministic mapping execution engine**
+* Introduced a strict separation between:
+
+  * **Mapping configuration (declarative intent via profiles / expressions)**
+  * **Mapping execution engine (FranzMapper)**
+  * **Application boundary layer (MappingService via DI)**
 
 ---
 
-## 🧱 Persistence System Overhaul
+## ⚙️ Mapping Engine Overhaul (FranzMapper)
 
-- Removed repository-owned transaction responsibility
-- Introduced **framework-controlled commit model**
-- Standardized persistence as:
-  - Add / Update / Delete = intent only
-  - SaveChanges = UnitOfWork or pipeline responsibility
+* Introduced a unified `MapInternal<TSource, TDestination>` execution pipeline
 
----
+* Standardized resolution order:
 
-## ⚙️ Batch & Efficiency Enhancements
+  1. Circular reference detection (execution guard)
+  2. Scalar / value-object unwrapping (`Value` pattern support)
+  3. Collection mapping (generic enumerable handling)
+  4. Configured mappings (MappingConfiguration lookup)
+  5. Constructor-based projections (`ConstructUsing`)
+  6. Reflection fallback mapping
 
-- Added support for:
-  - AddRangeAsync
-  - UpdateRangeAsync
-  - DeleteRangeAsync
-  - SoftDeleteRangeAsync
-
-Enables:
-- high-performance bulk operations
-- snapshot generation pipelines
-- multi-aggregate consistency workflows
+* Introduced **safe circular reference tracking** using a reference-equality visitation context
 
 ---
 
-## 🧩 Unit of Work Introduction (Opt-in Architecture)
+## 🧾 Configuration System Stabilization
 
-- Introduced explicit `IUnitOfWork`
-- Enables deterministic multi-repository transactions
-- Required for:
-  - snapshot generation flows
-  - hero/skill creation orchestration
-  - CQRS command consistency
+* Replaced implicit mapping behavior with **explicit registration model**
+* Introduced deterministic mapping registration via:
 
----
+  * `MappingConfiguration.Register<TSource, TDestination>()`
+* Ensured thread-safe mapping storage using concurrent dictionary
+* Defined strict override semantics:
 
-## 🏗 Entity System Improvements
-
-- Strengthened `Entity<TId>` identity model
-- Unified audit + soft delete across all entities
-- Standardized identity handling at domain level (not repository level)
-- Improved factory-based entity creation for safer ID initialization
+  * **Last write wins**
 
 ---
 
-## 🔄 Pipeline & Listener Modernization
+## 🧩 Expression-Based Mapping Model
 
-- Updated persistence pipeline behaviors to align with transaction model
-- Improved domain event dispatch timing (post-commit guarantee)
-- Hardened EF Core change tracking integration
+* Introduced `MappingExpression<TSource, TDestination>` as the single source of mapping truth
+* Enabled:
 
----
-
-## 🧪 System Hardening
-
-- Improved testability of persistence flows
-- Reduced hidden side effects in repository operations
-- Increased determinism in multi-aggregate workflows
+  * Constructor projection via `ConstructUsing`
+  * Member binding overrides
+  * Ignored member definitions
+  * Strict vs non-strict mapping enforcement
 
 ---
 
-## ⚠️ Breaking Conceptual Change
+## 🚀 Performance & Runtime Optimization
 
-- Repositories no longer own persistence boundaries
-- SaveChanges is no longer implicitly executed per repository operation
-- Transaction control is now explicitly managed or pipeline-driven
+* Introduced caching layers for:
 
----
-
-## 🧠 Architectural Outcome
-
-Franz EF Core now operates as:
-
-> A deterministic, transaction-aware persistence framework designed for multi-aggregate systems, simulation engines, and CQRS-driven architectures.
+  * Writable property resolution
+  * Constructor selection
+  * Delegate-based fast dispatch (`InvokeMap`)
+* Reduced reflection overhead in hot paths via compiled delegate caching
+* Optimized collection mapping using generic cached invocation delegates
 
 ---
 

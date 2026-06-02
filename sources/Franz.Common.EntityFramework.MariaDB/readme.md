@@ -17,7 +17,7 @@ A library within the **Franz Framework** designed to extend **Entity Framework C
 
 ## **Version Information**
 
-- **Current Version**:  2.2.1
+- **Current Version**:  2.2.2
 - Part of the private **Franz Framework** ecosystem.
 
 ---

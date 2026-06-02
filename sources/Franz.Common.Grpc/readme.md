@@ -6,7 +6,7 @@
 High-performance, pipeline-driven gRPC for distributed microservices
 
 ---
-- **Current Version**:  2.2.1
+- **Current Version**:  2.2.2
 
 ---
 
