@@ -29,7 +29,6 @@ steps:
 # ------------------------------------------------------------
 # Checkout (full history required for tags + sync integrity)
 # ------------------------------------------------------------
-
 - checkout: self
   persistCredentials: true
   fetchDepth: 0
@@ -37,7 +36,6 @@ steps:
 # ------------------------------------------------------------
 # Auth + SDK
 # ------------------------------------------------------------
-
 - task: NuGetAuthenticate@1
   displayName: 'Authenticate Azure Artifacts'
 
@@ -50,7 +48,6 @@ steps:
 # ------------------------------------------------------------
 # Restore
 # ------------------------------------------------------------
-
 - script: |
     set -euo pipefail
     dotnet restore
@@ -59,7 +56,6 @@ steps:
 # ------------------------------------------------------------
 # Build
 # ------------------------------------------------------------
-
 - script: |
     set -euo pipefail
     dotnet build \
@@ -94,13 +90,11 @@ steps:
       --configuration $(buildConfiguration) \
       --no-build \
       --output $(outputDir)
-
   displayName: 'Pack'
 
 # ------------------------------------------------------------
 # Publish to Azure Artifacts
 # ------------------------------------------------------------
-
 - script: |
     set -euo pipefail
 
@@ -108,9 +102,7 @@ steps:
       --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/V3/index.json" \
       --api-key $(System.AccessToken) \
       --skip-duplicate
-
   displayName: 'Publish to Azure Feed'
-
   condition: and(
     succeeded(),
     eq(variables['Build.SourceBranch'], 'refs/heads/main')
@@ -119,7 +111,6 @@ steps:
 # ------------------------------------------------------------
 # Sync GitHub Develop
 # ------------------------------------------------------------
-
 - script: |
     set -euo pipefail
 
@@ -129,9 +120,7 @@ steps:
       "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
 
     git push --force github origin/Develop:refs/heads/develop
-
   displayName: 'Sync GitHub: Develop'
-
   env:
     GITHUB_USER: $(GITHUB_USER)
     GITHUB_TOKEN: $(GITHUB_TOKEN)
@@ -139,7 +128,6 @@ steps:
 # ------------------------------------------------------------
 # Sync GitHub Main + Tags
 # ------------------------------------------------------------
-
 - script: |
     set -euo pipefail
 
@@ -158,14 +146,11 @@ steps:
     if [ -n "$LATEST_TAG" ]; then
       git push github "$LATEST_TAG"
     fi
-
   displayName: 'Sync GitHub: Main + Tags'
-
   condition: and(
     succeeded(),
     eq(variables['Build.SourceBranch'], 'refs/heads/main')
     )
-
   env:
     GITHUB_USER: $(GITHUB_USER)
     GITHUB_TOKEN: $(GITHUB_TOKEN)
