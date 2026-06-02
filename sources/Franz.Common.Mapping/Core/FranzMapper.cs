@@ -1,8 +1,10 @@
 using Franz.Common.Errors;
 using Franz.Common.Mapping.Abstractions;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -15,7 +17,7 @@ public class FranzMapper(MappingConfiguration config) : IFranzMapper
   // =========================================================
   // CACHES
   // =========================================================
-  private static readonly ConcurrentDictionary<Type, PropertyInfo[]> WritablePropsCache = new();
+  private static readonly ConcurrentDictionary<Type, PropertyInfo[]> AssignablePropsCache = new();
   private static readonly ConcurrentDictionary<Type, ConstructorInfo?> ConstructorCache = new();
   private static readonly ConcurrentDictionary<(Type, Type), Func<FranzMapper, object, MappingContext, object>> DelegateCache = new();
 
@@ -99,7 +101,7 @@ public class FranzMapper(MappingConfiguration config) : IFranzMapper
     // =========================================================
     // 3. FALLBACK
     // =========================================================
-    return DefaultMap<TSource, TDestination>(source!);
+    return DefaultMap<TSource, TDestination>(source!, ctx);
   }
 
   // =========================================================
@@ -114,7 +116,7 @@ public class FranzMapper(MappingConfiguration config) : IFranzMapper
 
     var ctor = GetCtor(destType);
 
-    if (ctor == null)
+    if (ctor == null || ctor.GetParameters().Length == 0)
       return Activator.CreateInstance(destType)
           ?? throw new TechnicalException($"Cannot create {destType.Name}");
 
@@ -156,13 +158,22 @@ public class FranzMapper(MappingConfiguration config) : IFranzMapper
     var srcType = typeof(TSource);
     var destType = destination.GetType();
 
-    var props = WritablePropsCache.GetOrAdd(destType,
+    // Cache structural queries containing standard setters AND init-only properties
+    var props = AssignablePropsCache.GetOrAdd(destType,
         t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-              .Where(p => p.CanWrite)
+              .Where(p => p.CanWrite || IsInitOnly(p))
               .ToArray());
+
+    var ctor = GetCtor(destType);
+    var ctorParams = ctor?.GetParameters().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase)
+                     ?? [];
 
     foreach (var destProp in props)
     {
+      // Shielding: Skip fields that were already mutated during constructor invocation
+      if (ctorParams.Contains(destProp.Name))
+        continue;
+
       if (expr.IgnoredMembers.Contains(destProp.Name))
         continue;
 
@@ -203,9 +214,6 @@ public class FranzMapper(MappingConfiguration config) : IFranzMapper
     if (value == null)
       return null;
 
-    // =========================================================
-    // 1. UNWRAP REWRITE STEP
-    // =========================================================
     var valueProp = value.GetType().GetProperty("Value");
 
     if (valueProp != null)
@@ -219,9 +227,6 @@ public class FranzMapper(MappingConfiguration config) : IFranzMapper
       }
     }
 
-    // =========================================================
-    // 2. NOW APPLY NORMAL RULES ON THE NEW VALUE
-    // =========================================================
     if (destType.IsInstanceOfType(value))
       return value;
 
@@ -295,19 +300,50 @@ public class FranzMapper(MappingConfiguration config) : IFranzMapper
   // =========================================================
   // FALLBACK
   // =========================================================
-  private static TDestination DefaultMap<TSource, TDestination>(TSource source)
+  private TDestination DefaultMap<TSource, TDestination>(TSource source, MappingContext ctx)
   {
-    var dest = Activator.CreateInstance<TDestination>();
+    var srcType = typeof(TSource);
+    var destType = typeof(TDestination);
+    var ctor = GetCtor(destType);
 
-    foreach (var p in typeof(TDestination).GetProperties())
+    object dest;
+
+    // Hardening: Handle parameter-heavy records inside unconfigured paths safely
+    if (ctor != null && ctor.GetParameters().Length > 0)
     {
-      var src = typeof(TSource).GetProperty(p.Name);
-      if (src == null) continue;
+      var parameters = ctor.GetParameters().Select(p =>
+      {
+        var srcProp = srcType.GetProperty(p.Name!, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+        if (srcProp == null) return GetDefault(p.ParameterType);
 
-      p.SetValue(dest, src.GetValue(source));
+        return ResolveValue(srcProp.PropertyType, p.ParameterType, srcProp.GetValue(source), ctx) ?? GetDefault(p.ParameterType);
+      }).ToArray();
+
+      dest = ctor.Invoke(parameters);
+    }
+    else
+    {
+      dest = Activator.CreateInstance<TDestination>()!;
     }
 
-    return dest;
+    var ctorParams = ctor?.GetParameters().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+    var props = AssignablePropsCache.GetOrAdd(destType,
+        t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+              .Where(p => p.CanWrite || IsInitOnly(p))
+              .ToArray());
+
+    foreach (var p in props)
+    {
+      if (ctorParams.Contains(p.Name)) continue;
+
+      var src = srcType.GetProperty(p.Name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+      if (src == null) continue;
+
+      var val = ResolveValue(src.PropertyType, p.PropertyType, src.GetValue(source), ctx);
+      p.SetValue(dest, val);
+    }
+
+    return (TDestination)dest;
   }
 
   // =========================================================
@@ -329,4 +365,14 @@ public class FranzMapper(MappingConfiguration config) : IFranzMapper
 
   private static object? GetDefault(Type type)
       => type.IsValueType ? Activator.CreateInstance(type) : null;
+
+  private static bool IsInitOnly(PropertyInfo propertyInfo)
+  {
+    var setMethod = propertyInfo.GetSetMethod(nonPublic: true);
+    if (setMethod == null) return false;
+
+    // Detects System.Runtime.CompilerServices.IsExternalInit runtime modifiers
+    return setMethod.ReturnParameter.GetRequiredCustomModifiers()
+        .Any(m => m.FullName == "System.Runtime.CompilerServices.IsExternalInit");
+  }
 }
