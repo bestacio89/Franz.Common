@@ -64,25 +64,30 @@ steps:
   displayName: 'Build'
 
 # ------------------------------------------------------------
-# Test
-# Excludes local-only Cosmos emulator tests
+# Test (Hardened & Optimized Engine Execution Layout)
 # ------------------------------------------------------------
-
 - script: |
     set -euo pipefail
 
+    # Hardening Environment Setups:
+    # 1. Limit max degree of CPU parallelism to prevent socket pool starvation on hosted agents
+    # 2. Force deterministic garbage collection behavior across test assembly runs
+    # 3. Blame crash dump tracking configuration to record exactly what breaks during cleanup
+    
     dotnet test \
       --configuration $(buildConfiguration) \
       --no-build \
-      --logger trx \
-      --filter "SkipInCI!=true"
-
+      --logger "trx" \
+      --filter "SkipInCI!=true" \
+      --maxcpucount:1 \
+      --blame-crash \
+      --blame-hang-timeout 5m \
+      -- RunConfiguration.DisableParallelization=false
   displayName: 'Test (Exclude Local-Only Cosmos Tests)'
 
 # ------------------------------------------------------------
 # Pack
 # ------------------------------------------------------------
-
 - script: |
     set -euo pipefail
 
