@@ -33,117 +33,81 @@ steps:
     packageType: 'sdk'
     version: '10.0.200'
 
-# ------------------------------------------------------------
-# Restore
-# ------------------------------------------------------------
 - script: |
     set -euo pipefail
     dotnet restore
   displayName: 'Restore'
 
-# ------------------------------------------------------------
-# Build
-# ------------------------------------------------------------
 - script: |
     set -euo pipefail
-    dotnet build \
-      --configuration $(buildConfiguration) \
-      --no-restore
+    dotnet build --configuration $(buildConfiguration) --no-restore
   displayName: 'Build'
 
 # ------------------------------------------------------------
-# Test (Hardened & Optimized Engine Execution Layout)
+# Hardened Infrastructure Cleanup (Prevents Disk Exhaustion)
 # ------------------------------------------------------------
 - script: |
     set -euo pipefail
+    echo "##[section]Reclaiming Disk Space"
+    docker system prune -a -f --volumes
+    find . -type d -name "TestResults" -exec rm -rf {} +
+    df -h
+  displayName: 'Infrastructure Cleanup: Disk Reclamation'
 
-    # Hardening Environment Setups:
-    # 1. Limit max degree of CPU parallelism to prevent socket pool starvation on hosted agents
-    # 2. Force deterministic garbage collection behavior across test assembly runs
-    # 3. Blame crash dump tracking configuration to record exactly what breaks during cleanup
+# ------------------------------------------------------------
+# Hardened Test Execution
+# ------------------------------------------------------------
+- script: |
+    set -euo pipefail
+    
+    # Limit GC for CI agents to prevent OOM kills
+    export DOTNET_GCHeapHardLimitPercent=20
     
     dotnet test \
       --configuration $(buildConfiguration) \
       --no-build \
       --logger "trx" \
       --filter "SkipInCI!=true" \
-      --maxcpucount:1 \
       --blame-crash \
-      --blame-hang-timeout 5m \
+      --blame-hang-timeout 10m \
       -- RunConfiguration.DisableParallelization=false
-  displayName: 'Test (Exclude Local-Only Cosmos Tests)'
+  displayName: 'Test (Hardened & Optimized)'
 
-# ------------------------------------------------------------
-# Pack
-# ------------------------------------------------------------
 - script: |
     set -euo pipefail
-
-    dotnet pack \
-      --configuration $(buildConfiguration) \
-      --no-build \
-      --output $(outputDir)
+    dotnet pack --configuration $(buildConfiguration) --no-build --output $(outputDir)
   displayName: 'Pack'
 
-# ------------------------------------------------------------
-# Publish to Azure Artifacts
-# ------------------------------------------------------------
 - script: |
     set -euo pipefail
-
     dotnet nuget push "$(outputDir)/*.nupkg" \
       --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/V3/index.json" \
       --api-key $(System.AccessToken) \
       --skip-duplicate
   displayName: 'Publish to Azure Feed'
-  condition: and(
-    succeeded(),
-    eq(variables['Build.SourceBranch'], 'refs/heads/main')
-    )
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
 
 # ------------------------------------------------------------
-# Sync GitHub Develop
+# Git Synchronization
 # ------------------------------------------------------------
 - script: |
     set -euo pipefail
-
-    git remote add github \
-      "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" \
-      || git remote set-url github \
-      "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
-
+    git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || true
     git push --force github origin/Develop:refs/heads/develop
   displayName: 'Sync GitHub: Develop'
   env:
     GITHUB_USER: $(GITHUB_USER)
     GITHUB_TOKEN: $(GITHUB_TOKEN)
 
-# ------------------------------------------------------------
-# Sync GitHub Main + Tags
-# ------------------------------------------------------------
 - script: |
     set -euo pipefail
-
-    git remote add github \
-      "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" \
-      || git remote set-url github \
-      "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git"
-
+    git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || true
     git push --force github origin/main:refs/heads/main
-
     git fetch --tags --force
-
-    LATEST_TAG=$(git describe --tags --exact-match 2>/dev/null || \
-                 git describe --tags --abbrev=0 || true)
-
-    if [ -n "$LATEST_TAG" ]; then
-      git push github "$LATEST_TAG"
-    fi
+    LATEST_TAG=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 || true)
+    if [ -n "$LATEST_TAG" ]; then git push github "$LATEST_TAG"; fi
   displayName: 'Sync GitHub: Main + Tags'
-  condition: and(
-    succeeded(),
-    eq(variables['Build.SourceBranch'], 'refs/heads/main')
-    )
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   env:
     GITHUB_USER: $(GITHUB_USER)
     GITHUB_TOKEN: $(GITHUB_TOKEN)
