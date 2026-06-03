@@ -17,9 +17,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <ProjectReference Include="..\Franz.Common.Messaging.Hosting.Kafka\Franz.Common.Messaging.Hosting.Kafka.csproj" />
 	  <ProjectReference Include="..\Franz.Common.Messaging.Identity\Franz.Common.Messaging.Identity.csproj" />
 	  <ProjectReference Include="..\Franz.Common.Messaging.MultiTenancy\Franz.Common.Messaging.MultiTenancy.csproj" />
-	  <ProjectReference Include="..\Franz.Common.Messaging.Kafka\Franz.Common.Messaging.Kafka.csproj" />
 	  <ProjectReference Include="..\Franz.Common.Messaging.RabbitMQ\Franz.Common.Messaging.RabbitMQ.csproj" />
 	  <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
 	</ItemGroup>

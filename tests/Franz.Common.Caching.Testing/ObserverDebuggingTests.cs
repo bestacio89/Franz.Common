@@ -1,5 +1,5 @@
 ﻿using FluentAssertions;
-using Franz.Common.AzureCosmosDB.Extensions; // Assuming this contains AddObservableCaching
+// Assuming this contains AddObservableCaching
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Extensions; // Assuming this contains your AddFranzMemoryCaching
 using Franz.Common.Caching.Observability;

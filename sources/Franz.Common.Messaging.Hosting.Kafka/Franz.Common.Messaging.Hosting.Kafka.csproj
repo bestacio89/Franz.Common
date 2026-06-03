@@ -3,6 +3,10 @@
   <Import Project="..\..\common.targets" />
 
   <ItemGroup>
+    <PackageReference Include="SharpCompress" Version="0.49.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.Kafka\Franz.Common.Messaging.Kafka.csproj" />
   </ItemGroup>

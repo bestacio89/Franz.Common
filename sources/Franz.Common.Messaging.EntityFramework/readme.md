@@ -28,7 +28,7 @@ This package ensures **transactional consistency** for outbox patterns in relati
 
 ## **Version Information**
 
-* -**Current Version:** v2.2.3
+* -**Current Version:** v2.2.4
 * Part of the private **Franz Framework** ecosystem.
 
 ---

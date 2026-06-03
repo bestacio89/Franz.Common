@@ -6,7 +6,9 @@
   
   <Import Project="..\..\common.targets" />  <PropertyGroup>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-  </PropertyGroup>
+  </PropertyGroup>  <ItemGroup>
+  <PackageReference Include="SharpCompress" Version="0.49.1" />
+</ItemGroup>
 
 
   <ItemGroup>
@@ -16,7 +18,6 @@
     <ProjectReference Include="..\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
     <ProjectReference Include="..\Franz.Common.Errors\Franz.Common.Errors.csproj" />
     <ProjectReference Include="..\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
-    <ProjectReference Include="..\Franz.Common.Messaging.Kafka\Franz.Common.Messaging.Kafka.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.RabbitMQ\Franz.Common.Messaging.RabbitMQ.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
   </ItemGroup>

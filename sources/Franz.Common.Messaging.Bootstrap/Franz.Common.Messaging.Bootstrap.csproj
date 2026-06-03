@@ -6,13 +6,16 @@
 
   <Import Project="..\..\common.targets" />
 
+  <ItemGroup>
+    <PackageReference Include="SharpCompress" Version="0.49.1" />
+  </ItemGroup>
+
 	<ItemGroup>
     <ProjectReference Include="..\Franz.Common.Bootstrap\Franz.Common.Bootstrap.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.Hosting.MediatR\Franz.Common.Messaging.Hosting.Mediator.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.Identity\Franz.Common.Messaging.Identity.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.MultiTenancy\Franz.Common.Messaging.MultiTenancy.csproj" />
-    <ProjectReference Include="..\Franz.Common.Messaging.Kafka\Franz.Common.Messaging.Kafka.csproj" />
   
   </ItemGroup>
 

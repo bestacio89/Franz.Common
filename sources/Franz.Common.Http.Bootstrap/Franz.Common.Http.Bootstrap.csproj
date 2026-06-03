@@ -6,6 +6,10 @@
 	<Import Project="..\..\common.targets" />
 
 	<ItemGroup>
+	  <PackageReference Include="SharpCompress" Version="0.49.1" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <ProjectReference Include="..\Franz.Common.Bootstrap\Franz.Common.Bootstrap.csproj" />
 	  <ProjectReference Include="..\Franz.Common.Http.Authentication\Franz.Common.Http.Authentication.csproj" />
 	  <ProjectReference Include="..\Franz.Common.Http.Documentation\Franz.Common.Http.Documentation.csproj" />

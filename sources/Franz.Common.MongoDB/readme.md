@@ -135,7 +135,7 @@ if (!await _inboxStore.HasProcessedAsync(message.Id))
 
 ## 📝 Version Information
 
-* -**Current Version:** v2.2.3
+* -**Current Version:** v2.2.4
 * Part of the private **Franz Framework** ecosystem.
 
 ---

@@ -16,7 +16,6 @@
     <ProjectReference Include="..\..\sources\Franz.Common.Errors\Franz.Common.Errors.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.Kafka\Franz.Common.Messaging.Hosting.Kafka.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />
-    <ProjectReference Include="..\..\sources\Franz.Common.Http.Bootstrap\Franz.Common.Http.Bootstrap.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Http.EntityFramework\Franz.Common.Http.EntityFramework.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Http.Headers\Franz.Common.Http.Headers.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Http.Identity\Franz.Common.Http.Identity.csproj" />
@@ -32,7 +31,6 @@
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.MediatR\Franz.Common.Messaging.Hosting.Mediator.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Identity\Franz.Common.Messaging.Identity.csproj" />
-    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Kafka\Franz.Common.Messaging.Kafka.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.MongoDB\Franz.Common.MongoDB.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Reflection\Franz.Common.Reflection.csproj" />
@@ -47,6 +45,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="Ocelot" Version="24.1.0" />
+    <PackageReference Include="SharpCompress" Version="0.49.1" />
     <PackageReference Include="Testcontainers" Version="4.12.0" />
     <PackageReference Include="Testcontainers.MariaDb" Version="4.12.0" />
     <PackageReference Include="Testcontainers.MsSql" Version="4.12.0" />

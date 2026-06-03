@@ -1,7 +1,6 @@
 ﻿using FluentAssertions;
-using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.Caching.Abstractions;
-using Franz.Common.Caching.Extensions; // Assuming your extensions are here
+using Franz.Common.Caching.Extensions; 
 using Franz.Common.Caching.Providers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;

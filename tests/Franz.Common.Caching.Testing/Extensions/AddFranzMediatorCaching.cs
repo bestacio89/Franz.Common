@@ -1,6 +1,4 @@
 ﻿using FluentAssertions;
-using Franz.Common.AzureCosmosDB.Extensions;
-using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Extensions; // Assuming your AddFranz... extensions are here
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Pipelines;

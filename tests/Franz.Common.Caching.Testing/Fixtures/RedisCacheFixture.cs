@@ -1,4 +1,4 @@
-﻿using Franz.Common.AzureCosmosDB.Extensions;
+﻿using Franz.Common.Caching.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.Redis;
 

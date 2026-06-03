@@ -14,7 +14,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
-namespace Franz.Common.AzureCosmosDB.Extensions;
+namespace Franz.Common.Caching.Extensions;
 
 public static class FranzCachingServiceCollectionExtensions
 {

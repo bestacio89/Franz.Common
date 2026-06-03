@@ -1,9 +1,8 @@
 ﻿using FluentAssertions;
-using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Extensions;
-using Franz.Common.Caching.Providers; // Corrected namespace for the Provider
+
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
