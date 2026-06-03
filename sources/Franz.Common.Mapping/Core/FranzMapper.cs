@@ -91,7 +91,7 @@ public class FranzMapper(MappingConfiguration config) : IFranzMapper
         return ctor(source!);
 
       // 2B. Constructor binding
-      var destination = CreateInstanceSmart(source!, typed);
+      var destination = CreateInstanceSmart(source!, typed, ctx);
 
       ApplyMapping(source!, destination, typed, ctx);
 
@@ -107,9 +107,13 @@ public class FranzMapper(MappingConfiguration config) : IFranzMapper
   // =========================================================
   // CONSTRUCTOR ENGINE
   // =========================================================
+  // =========================================================
+  // CONSTRUCTOR ENGINE
+  // =========================================================
   private object CreateInstanceSmart<TSource, TDestination>(
       TSource source,
-      MappingExpression<TSource, TDestination> expr)
+      MappingExpression<TSource, TDestination> expr,
+      MappingContext ctx)
   {
     var srcType = typeof(TSource);
     var destType = typeof(TDestination);
@@ -117,29 +121,46 @@ public class FranzMapper(MappingConfiguration config) : IFranzMapper
     var ctor = GetCtor(destType);
 
     if (ctor == null || ctor.GetParameters().Length == 0)
+    {
       return Activator.CreateInstance(destType)
-          ?? throw new TechnicalException($"Cannot create {destType.Name}");
+          ?? throw new TechnicalException(
+              $"Cannot create instance of {destType.FullName}");
+    }
 
     var parameters = ctor.GetParameters()
-        .Select(p =>
+        .Select(parameter =>
         {
-          var srcName =
-              expr.MemberBindings.TryGetValue(p.Name!, out var mapped)
+          var sourceMemberName =
+              expr.MemberBindings.TryGetValue(parameter.Name!, out var mapped)
                   ? mapped
-                  : p.Name;
+                  : parameter.Name;
 
-          var prop = srcType.GetProperty(srcName!,
-              BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+          var sourceProperty = srcType.GetProperty(
+              sourceMemberName!,
+              BindingFlags.Public |
+              BindingFlags.Instance |
+              BindingFlags.IgnoreCase);
 
-          if (prop == null)
+          if (sourceProperty == null)
           {
             if (expr.IsStrict)
-              throw new TechnicalException($"Missing constructor binding: {p.Name}");
+            {
+              throw new TechnicalException(
+                  $"Missing constructor binding for parameter '{parameter.Name}' " +
+                  $"when mapping {srcType.Name} -> {destType.Name}");
+            }
 
-            return GetDefault(p.ParameterType);
+            return GetDefault(parameter.ParameterType);
           }
 
-          return prop.GetValue(source) ?? GetDefault(p.ParameterType);
+          var rawValue = sourceProperty.GetValue(source);
+
+          return ResolveValue(
+                     sourceProperty.PropertyType,
+                     parameter.ParameterType,
+                     rawValue,
+                     ctx)
+                 ?? GetDefault(parameter.ParameterType);
         })
         .ToArray();
 
