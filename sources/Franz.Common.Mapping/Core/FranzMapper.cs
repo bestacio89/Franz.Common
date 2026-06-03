@@ -1,8 +1,9 @@
-using Franz.Common.Errors;
+﻿using Franz.Common.Errors;
 using Franz.Common.Mapping.Abstractions;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
@@ -10,42 +11,101 @@ using System.Reflection;
 
 namespace Franz.Common.Mapping.Core;
 
-public class FranzMapper(MappingConfiguration config) : IFranzMapper
+// =========================================================
+// ATTRIBUTES
+// =========================================================
+
+/// <summary>
+/// Marks a class or struct as a value object whose inner <c>Value</c> property
+/// should be transparently unwrapped during mapping. Without this attribute,
+/// a property named "Value" is treated as a regular property.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
+public sealed class ValueObjectAttribute : Attribute { }
+
+/// <summary>
+/// When a type has multiple constructors, marks the one FranzMapper should
+/// prefer for construction. Without this attribute, the longest constructor wins.
+/// </summary>
+[AttributeUsage(AttributeTargets.Constructor)]
+public sealed class MapConstructorAttribute : Attribute { }
+
+// =========================================================
+// MAPPER
+// =========================================================
+
+/// <summary>
+/// Production-grade, zero-dependency object mapper for .NET.
+///
+/// Features:
+///   • Immutable records (primary constructors)
+///   • init-only properties
+///   • Value object transparent unwrapping (opt-in via [ValueObject])
+///   • Nested object graphs with circular-reference detection
+///   • Collections: IEnumerable, List, arrays, IReadOnlyCollection,
+///     IReadOnlyList, HashSet, ICollection
+///   • Configured mappings: ConstructUsing, ForMember, Ignore, IsStrict
+///   • Fallback convention-based mapping (name + case-insensitive)
+///   • Compiled expression delegate cache (no repeated reflection invoke)
+///   • Thread-safe static caches
+/// </summary>
+public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
 {
   private readonly MappingConfiguration _config = config;
 
   // =========================================================
-  // CACHES
+  // STATIC CACHES  (shared across all mapper instances)
   // =========================================================
-  private static readonly ConcurrentDictionary<Type, PropertyInfo[]> AssignablePropsCache = new();
-  private static readonly ConcurrentDictionary<Type, ConstructorInfo?> ConstructorCache = new();
-  private static readonly ConcurrentDictionary<(Type, Type), Func<FranzMapper, object, MappingContext, object>> DelegateCache = new();
+  private static readonly ConcurrentDictionary<Type, PropertyInfo[]>
+      AssignablePropsCache = new();
+
+  private static readonly ConcurrentDictionary<Type, ConstructorInfo?>
+      ConstructorCache = new();
+
+  private static readonly ConcurrentDictionary<(Type Src, Type Dest),
+      Func<FranzMapper, object, MappingContext, object>>
+      DelegateCache = new();
+
+  private static readonly ConcurrentDictionary<Type, bool>
+      IsValueObjectCache = new();
+
+  private static readonly ConcurrentDictionary<Type, PropertyInfo?>
+      ValuePropertyCache = new();
 
   // =========================================================
-  // CONTEXT
+  // MAPPING CONTEXT  (per-call, tracks visited references)
   // =========================================================
   private sealed class MappingContext
   {
-    public HashSet<object> Visited { get; } = new(ReferenceEqualityComparer.Instance);
+    // Reference equality: safe for class instances, intentionally skipped
+    // for value types (they cannot form reference cycles).
+    private readonly HashSet<object> _visited =
+        new(ReferenceEqualityComparer.Instance);
 
     public void Enter(object obj)
     {
-      if (obj == null) return;
-      if (!Visited.Add(obj))
-        throw new TechnicalException("Circular mapping detected.");
+      // Value types are stack-allocated copies; they cannot form cycles.
+      if (obj.GetType().IsValueType) return;
+
+      if (!_visited.Add(obj))
+        throw new TechnicalException(
+            $"[FranzMapper] Circular reference detected while mapping " +
+            $"an instance of '{obj.GetType().FullName}'. " +
+            $"Consider breaking the cycle or using ConstructUsing.");
     }
   }
 
   // =========================================================
   // PUBLIC API
   // =========================================================
+
+  /// <summary>Maps <typeparamref name="TSource"/> to a new <typeparamref name="TDestination"/>.</summary>
+  /// <exception cref="ArgumentNullException">When <paramref name="source"/> is null.</exception>
+  /// <exception cref="TechnicalException">On mapping failure, missing binding (strict mode), or circular reference.</exception>
   public TDestination Map<TSource, TDestination>([DisallowNull] TSource source)
   {
-    if (source == null)
-      throw new ArgumentNullException(nameof(source));
-
-    var ctx = new MappingContext();
-    return MapInternal<TSource, TDestination>(source, ctx);
+    ArgumentNullException.ThrowIfNull(source);
+    return MapInternal<TSource, TDestination>(source, new MappingContext());
   }
 
   // =========================================================

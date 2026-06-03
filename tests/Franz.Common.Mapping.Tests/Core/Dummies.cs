@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Franz.Common.Mapping.Core;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -46,6 +47,7 @@ public class NodeDto
   public NodeDto Child { get; set; }
 }
 
+[ValueObject]
 public class WrappedInt
 {
   public int Value { get; set; }
