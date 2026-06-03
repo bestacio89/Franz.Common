@@ -1192,7 +1192,7 @@ Franz EF Core now operates as:
 > A deterministic, transaction-aware persistence framework designed for multi-aggregate systems, simulation engines, and CQRS-driven architectures.
 
 ---
-#  Latest Release: v2.2.2 – Mapping Engine Formalization (Franz Mapping Framework)
+#  Latest Release: v2.2.5 – Mapping Engine Formalization (Franz Mapping Framework)
 
 ## 🧠 Core Architectural Upgrade
 

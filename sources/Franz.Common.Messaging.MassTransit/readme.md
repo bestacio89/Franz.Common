@@ -19,7 +19,7 @@ A library within the **Franz Framework** that integrates **MassTransit** with me
 
 ## **Version Information**
 
--**Current Version:** v2.2.4
+-**Current Version:** v2.2.5
 - Part of the private **Franz Framework** ecosystem.
 
 ---

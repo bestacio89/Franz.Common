@@ -309,7 +309,7 @@ dotnet test --filter Category=Integration
 ```
 
 ---
-Latest Release: v2.2.4 – Mapping Engine Formalization (Franz Mapping Framework - Franz.Common.Mapping)
+Latest Release: v2.2.5 – Mapping Engine Formalization (Franz Mapping Framework - Franz.Common.Mapping)
 
 ## 🧠 Core Architectural Upgrade
 

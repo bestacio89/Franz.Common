@@ -221,7 +221,7 @@ Future enhancements include:
 
 ## 📝 Version Information
 
-* -**Current Version:** v2.2.4
+* -**Current Version:** v2.2.5
 * **Target Framework:** **.NET 10**
 * Part of the **Franz Framework**
 
