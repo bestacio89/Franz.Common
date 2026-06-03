@@ -14,7 +14,10 @@ namespace Franz.Common.EntityFramework.Oracle.Tests;
 public class OracleFixture : IAsyncLifetime
 {
   public readonly OracleContainer Container = new OracleBuilder("gvenzl/oracle-free:23-slim-faststart")
-      .Build();
+        .WithWaitStrategy(Wait.ForUnixContainer()
+            .UntilMessageIsLogged(".*DATABASE IS READY TO USE.*") // Wait for Oracle's internal readiness signal
+            .UntilCommandIsCompleted("sqlplus -S system/oracle@//localhost:1521/FREEPDB1 <<EOF\nEXIT;\nEOF", 0)) // Verify SQL can actually execute
+        .Build();
 
   public async Task InitializeAsync() => await Container.StartAsync();
   public async Task DisposeAsync() => await Container.DisposeAsync();
