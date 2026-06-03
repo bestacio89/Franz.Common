@@ -186,38 +186,18 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
     return ctor.Invoke(ctorArgs);
   }
 
-  private object? ResolveSourceValue(
-    Type srcType,
-    string? sourceName,
-    object source,
-    MappingContext ctx)
-  {
-    if (string.IsNullOrWhiteSpace(sourceName))
-      return null;
-
-    var prop = srcType.GetProperty(
-        sourceName,
-        BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-
-    if (prop == null)
-      return null;
-
-    return prop.GetValue(source);
-  }
   // Shared by both configured and fallback paths.
   private object?[] ResolveConstructorArguments(
-   object source,
-   ConstructorInfo ctor,
-   Type srcType,
-   Type destType,
-   IReadOnlyDictionary<string, string>? memberBindings,
-   bool isStrict,
-   MappingContext ctx)
+     object source,
+     ConstructorInfo ctor,
+     Type srcType,
+     Type destType,
+     IReadOnlyDictionary<string, string>? memberBindings,
+     bool isStrict,
+     MappingContext ctx)
   {
     var parameters = ctor.GetParameters();
     var args = new object?[parameters.Length];
-
-    var sourceProps = srcType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
     for (var i = 0; i < parameters.Length; i++)
     {
@@ -230,26 +210,17 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
               ? mapped
               : param.Name;
 
-      PropertyInfo? srcProp = null;
+      // 2. find source property (case insensitive)
+      var srcProp = srcType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+          .FirstOrDefault(p =>
+              string.Equals(p.Name, sourceName, StringComparison.OrdinalIgnoreCase));
 
-      // 2. primary match: name (case-insensitive)
-      if (!string.IsNullOrWhiteSpace(sourceName))
-      {
-        srcProp = sourceProps.FirstOrDefault(p =>
-            string.Equals(p.Name, sourceName, StringComparison.OrdinalIgnoreCase));
-      }
-
-      // 3. secondary match: exact type match (ONLY if unambiguous)
+      // ❗ NEW FIX: fallback to "best match by type"
       if (srcProp == null)
       {
-        var candidates = sourceProps
-            .Where(p => p.PropertyType == param.ParameterType)
-            .ToList();
-
-        if (candidates.Count == 1)
-        {
-          srcProp = candidates[0];
-        }
+        srcProp = srcType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(p =>
+                p.PropertyType == param.ParameterType);
       }
 
       if (srcProp == null)
@@ -325,13 +296,7 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
           raw,
           ctx);
 
-      // 🔥 CRITICAL FIX:
-      // If property is init-only, we ONLY skip assignment
-      // BUT ctor already consumed the same resolved value via ResolveConstructorArguments
-      if (IsInitOnly(destProp))
-      {
-        continue;
-      }
+ 
 
       destProp.SetValue(destination, value);
     }
