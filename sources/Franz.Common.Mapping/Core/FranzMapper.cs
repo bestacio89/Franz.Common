@@ -504,30 +504,81 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
   // =========================================================
   // HELPERS
   // =========================================================
+
+  /// <summary>
+  /// Prefers a constructor marked with [MapConstructor]; otherwise picks
+  /// the public constructor with the most parameters (primary ctor convention).
+  /// </summary>
   private static ConstructorInfo? GetCtor(Type t)
-      => ConstructorCache.GetOrAdd(t,
-          _ => t.GetConstructors()
-                .OrderByDescending(c => c.GetParameters().Length)
-                .FirstOrDefault());
+      => ConstructorCache.GetOrAdd(t, static type =>
+      {
+        var ctors = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
+        return ctors.FirstOrDefault(c => c.IsDefined(typeof(MapConstructorAttribute), false))
+              ?? ctors.OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
+      });
+
+  private static HashSet<string> BuildCtorParamSet(ConstructorInfo? ctor)
+      => ctor?.GetParameters()
+             .Select(p => p.Name!)
+             .ToHashSet(StringComparer.OrdinalIgnoreCase)
+         ?? [];
+
+  private static PropertyInfo[] GetAssignableProps(Type t)
+      => AssignablePropsCache.GetOrAdd(t, static type =>
+          type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+              .Where(p => p.CanWrite || IsInitOnly(p))
+              .ToArray());
+
+  /// <summary>
+  /// Returns true only when the type itself is decorated with [ValueObject].
+  /// This prevents accidental unwrapping of types like Task&lt;T&gt; or KeyValuePair
+  /// that happen to expose a "Value" property.
+  /// </summary>
+  private static bool IsValueObject(Type t)
+      => IsValueObjectCache.GetOrAdd(t,
+          static type => type.IsDefined(typeof(ValueObjectAttribute), inherit: false));
+
+  private static PropertyInfo? GetValueProperty(Type t)
+      => ValuePropertyCache.GetOrAdd(t,
+          static type => type.GetProperty("Value",
+              BindingFlags.Public | BindingFlags.Instance));
 
   private static bool IsCollection(Type t)
-      => typeof(IEnumerable).IsAssignableFrom(t) && t != typeof(string);
+      => t != typeof(string) && typeof(IEnumerable).IsAssignableFrom(t);
 
   private static Type GetElementType(Type t)
-      => t.IsArray ? t.GetElementType()! :
-         t.IsGenericType ? t.GetGenericArguments()[0] :
-         typeof(object);
+  {
+    if (t.IsArray)
+      return t.GetElementType()!;
+
+    if (!t.IsGenericType)
+      return typeof(object);
+
+    var args = t.GetGenericArguments();
+
+    // IDictionary<K,V> / Dictionary<K,V> → element is KeyValuePair<K,V>
+    var def = t.GetGenericTypeDefinition();
+    if (def == typeof(IDictionary<,>) || def == typeof(Dictionary<,>))
+      return typeof(KeyValuePair<,>).MakeGenericType(args[0], args[1]);
+
+    return args[0];
+  }
 
   private static object? GetDefault(Type type)
       => type.IsValueType ? Activator.CreateInstance(type) : null;
 
-  private static bool IsInitOnly(PropertyInfo propertyInfo)
+  /// <summary>
+  /// Detects C# init-only setters by checking for the
+  /// <c>System.Runtime.CompilerServices.IsExternalInit</c> required modifier.
+  /// </summary>
+  private static bool IsInitOnly(PropertyInfo p)
   {
-    var setMethod = propertyInfo.GetSetMethod(nonPublic: true);
-    if (setMethod == null) return false;
-
-    // Detects System.Runtime.CompilerServices.IsExternalInit runtime modifiers
-    return setMethod.ReturnParameter.GetRequiredCustomModifiers()
-        .Any(m => m.FullName == "System.Runtime.CompilerServices.IsExternalInit");
+    var setter = p.GetSetMethod(nonPublic: true);
+    if (setter == null) return false;
+    return setter.ReturnParameter
+                 .GetRequiredCustomModifiers()
+                 .Any(static m =>
+                     m.FullName ==
+                     "System.Runtime.CompilerServices.IsExternalInit");
   }
 }
