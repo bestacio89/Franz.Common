@@ -250,39 +250,49 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
       MappingContext ctx)
   {
     var srcType = typeof(TSource);
-    var destType = destination.GetType();
+    var destType = destination.GetType(); // always runtime type
 
-    // Cache structural queries containing standard setters AND init-only properties
-    var props = AssignablePropsCache.GetOrAdd(destType,
-        t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-              .Where(p => p.CanWrite || IsInitOnly(p))
-              .ToArray());
+    var props = GetAssignableProps(destType);
 
+    // Build the set of params already handled by the constructor so we
+    // don't attempt a double-write (which would throw on init-only props).
     var ctor = GetCtor(destType);
-    var ctorParams = ctor?.GetParameters().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase)
-                     ?? [];
+    var ctorParams = BuildCtorParamSet(ctor);
 
     foreach (var destProp in props)
     {
-      // Shielding: Skip fields that were already mutated during constructor invocation
-      if (ctorParams.Contains(destProp.Name))
+      if (ctorParams.Contains(destProp.Name)) continue;
+      if (expr.IgnoredMembers.Contains(destProp.Name)) continue;
+
+      // init-only properties NOT covered by the ctor cannot be set
+      // after construction — guard here rather than letting SetValue
+      // silently succeed today but potentially break on future runtimes.
+      if (IsInitOnly(destProp))
+      {
+        if (expr.IsStrict)
+          throw new TechnicalException(
+              $"[FranzMapper] Strict mode: init-only property '{destProp.Name}' " +
+              $"on '{destType.FullName}' is not covered by any constructor parameter " +
+              $"and cannot be set after construction.");
         continue;
+      }
 
-      if (expr.IgnoredMembers.Contains(destProp.Name))
-        continue;
+      var srcName = expr.MemberBindings != null
+          && expr.MemberBindings.TryGetValue(destProp.Name, out var mapped)
+          ? mapped
+          : destProp.Name;
 
-      var srcName =
-          expr.MemberBindings.TryGetValue(destProp.Name, out var mapped)
-              ? mapped
-              : destProp.Name;
-
-      var srcProp = srcType.GetProperty(srcName,
+      var srcProp = srcType.GetProperty(
+          srcName,
           BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 
       if (srcProp == null)
       {
         if (expr.IsStrict)
-          throw new TechnicalException($"Missing mapping: {destProp.Name}");
+          throw new TechnicalException(
+              $"[FranzMapper] Strict mode: no source property '{srcName}' " +
+              $"found on '{srcType.FullName}' " +
+              $"for destination property '{destProp.Name}' on '{destType.FullName}'.");
         continue;
       }
 
@@ -300,20 +310,17 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
   // VALUE RESOLUTION
   // =========================================================
   private object? ResolveValue(
-    Type srcType,
-    Type destType,
-    object? value,
-    MappingContext ctx)
+      Type srcType,
+      Type destType,
+      object? value,
+      MappingContext ctx)
   {
-    if (value == null)
-      return null;
+    if (value == null) return null;
 
-    var valueProp = value.GetType().GetProperty("Value");
-
-    if (valueProp != null)
+    // Unwrap value objects (opt-in only)
+    if (IsValueObject(value.GetType()))
     {
-      var inner = valueProp.GetValue(value);
-
+      var inner = GetValueProperty(value.GetType())?.GetValue(value);
       if (inner != null)
       {
         value = inner;
