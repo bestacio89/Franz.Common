@@ -328,78 +328,128 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
       }
     }
 
+    // Already the right type — no work needed
     if (destType.IsInstanceOfType(value))
       return value;
 
+    // Collection mapping
     if (IsCollection(destType))
-      return MapCollection(srcType, destType, value!, ctx);
+      return MapCollection(srcType, destType, value, ctx);
 
+    // Assignable without conversion
     if (destType.IsAssignableFrom(srcType))
       return value;
 
-    return InvokeMap(srcType, destType, value!, ctx);
+    // Recurse via compiled delegate
+    return InvokeMap(srcType, destType, value, ctx);
   }
 
   // =========================================================
-  // FAST DISPATCH (NO REFLECTION INVOKE)
+  // FAST DISPATCH  (compiled expression delegates, no MethodInfo.Invoke)
   // =========================================================
   private object InvokeMap(Type srcType, Type destType, object value, MappingContext ctx)
   {
-    var key = (srcType, destType);
-
-    var del = DelegateCache.GetOrAdd(key, _ =>
-        CreateDelegate(srcType, destType));
+    var del = DelegateCache.GetOrAdd(
+        (srcType, destType),
+        _ => CreateDelegate(srcType, destType));
 
     return del(this, value, ctx);
   }
 
-  private static Func<FranzMapper, object, MappingContext, object> CreateDelegate(Type src, Type dest)
+  private static Func<FranzMapper, object, MappingContext, object>
+      CreateDelegate(Type src, Type dest)
   {
-    var mapper = Expression.Parameter(typeof(FranzMapper), "m");
-    var source = Expression.Parameter(typeof(object), "s");
-    var ctx = Expression.Parameter(typeof(MappingContext), "c");
+    var mapperParam = Expression.Parameter(typeof(FranzMapper), "m");
+    var sourceParam = Expression.Parameter(typeof(object), "s");
+    var ctxParam = Expression.Parameter(typeof(MappingContext), "c");
 
     var method = typeof(FranzMapper)
         .GetMethod(nameof(MapInternal), BindingFlags.NonPublic | BindingFlags.Instance)!
         .MakeGenericMethod(src, dest);
 
-    var body = Expression.Call(
-        mapper,
+    var call = Expression.Call(
+        mapperParam,
         method,
-        Expression.Convert(source, src),
-        ctx
-    );
+        Expression.Convert(sourceParam, src),
+        ctxParam);
 
     return Expression.Lambda<Func<FranzMapper, object, MappingContext, object>>(
-        Expression.Convert(body, typeof(object)),
-        mapper, source, ctx
+        Expression.Convert(call, typeof(object)),
+        mapperParam, sourceParam, ctxParam
     ).Compile();
   }
 
   // =========================================================
-  // COLLECTIONS
+  // COLLECTION MAPPING
   // =========================================================
-  private object MapCollection(Type srcType, Type destType, object source, MappingContext ctx)
+  private object MapCollection(
+      Type srcType,
+      Type destType,
+      object source,
+      MappingContext ctx)
   {
+    if (source is not IEnumerable enumerable)
+      throw new TechnicalException(
+          $"[FranzMapper] Cannot map '{srcType.FullName}' as a collection: " +
+          $"it does not implement IEnumerable.");
+
     var srcElem = GetElementType(srcType);
     var destElem = GetElementType(destType);
 
+    // Build into List<TDest> as the universal intermediate
     var listType = typeof(List<>).MakeGenericType(destElem);
     var list = (IList)Activator.CreateInstance(listType)!;
 
-    var del = DelegateCache.GetOrAdd((srcElem, destElem),
+    var del = DelegateCache.GetOrAdd(
+        (srcElem, destElem),
         _ => CreateDelegate(srcElem, destElem));
 
-    foreach (var item in (IEnumerable)source)
+    foreach (var item in enumerable)
     {
-      list.Add(del(this, item!, ctx));
+      if (item == null)
+      {
+        list.Add(null);
+        continue;
+      }
+      list.Add(del(this, item, ctx));
     }
 
+    return CoerceCollection(list, destType, destElem);
+  }
+
+  /// <summary>
+  /// Converts the intermediate List&lt;T&gt; into whatever concrete collection
+  /// type the destination property actually expects.
+  /// </summary>
+  private static object CoerceCollection(IList list, Type destType, Type elemType)
+  {
+    // T[]
+    if (destType.IsArray)
+    {
+      var arr = Array.CreateInstance(elemType, list.Count);
+      list.CopyTo(arr, 0);
+      return arr;
+    }
+
+    var def = destType.IsGenericType ? destType.GetGenericTypeDefinition() : null;
+
+    // HashSet<T>
+    if (def == typeof(HashSet<>))
+    {
+      var setType = typeof(HashSet<>).MakeGenericType(elemType);
+      var set = Activator.CreateInstance(setType)!;
+      var addMeth = setType.GetMethod("Add")!;
+      foreach (var item in list) addMeth.Invoke(set, [item]);
+      return set;
+    }
+
+    // IReadOnlyList<T>, IReadOnlyCollection<T>, ICollection<T>,
+    // IList<T>, IEnumerable<T>, List<T>  → List<T> satisfies all of these
     return list;
   }
 
   // =========================================================
-  // FALLBACK
+  // CONVENTION FALLBACK
   // =========================================================
   private TDestination DefaultMap<TSource, TDestination>(TSource source, MappingContext ctx)
   {
