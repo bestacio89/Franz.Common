@@ -409,39 +409,43 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
 
     object dest;
 
-    // Hardening: Handle parameter-heavy records inside unconfigured paths safely
     if (ctor != null && ctor.GetParameters().Length > 0)
     {
-      var parameters = ctor.GetParameters().Select(p =>
-      {
-        var srcProp = srcType.GetProperty(p.Name!, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-        if (srcProp == null) return GetDefault(p.ParameterType);
-
-        return ResolveValue(srcProp.PropertyType, p.ParameterType, srcProp.GetValue(source), ctx) ?? GetDefault(p.ParameterType);
-      }).ToArray();
-
-      dest = ctor.Invoke(parameters);
+      var args = ResolveConstructorArguments(
+          source!, ctor, srcType, destType,
+          memberBindings: null,
+          isStrict: false,
+          ctx);
+      dest = ctor.Invoke(args);
     }
     else
     {
-      dest = Activator.CreateInstance<TDestination>()!;
+      dest = Activator.CreateInstance<TDestination>()
+          ?? throw new TechnicalException(
+              $"[FranzMapper] Cannot create instance of '{destType.FullName}'.");
     }
 
-    var ctorParams = ctor?.GetParameters().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
-    var props = AssignablePropsCache.GetOrAdd(destType,
-        t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-              .Where(p => p.CanWrite || IsInitOnly(p))
-              .ToArray());
+    var ctorParams = BuildCtorParamSet(ctor);
+    var props = GetAssignableProps(destType);
 
-    foreach (var p in props)
+    foreach (var destProp in props)
     {
-      if (ctorParams.Contains(p.Name)) continue;
+      if (ctorParams.Contains(destProp.Name)) continue;
+      if (IsInitOnly(destProp)) continue; // can't set after ctor
 
-      var src = srcType.GetProperty(p.Name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-      if (src == null) continue;
+      var srcProp = srcType.GetProperty(
+          destProp.Name,
+          BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 
-      var val = ResolveValue(src.PropertyType, p.PropertyType, src.GetValue(source), ctx);
-      p.SetValue(dest, val);
+      if (srcProp == null) continue;
+
+      var val = ResolveValue(
+          srcProp.PropertyType,
+          destProp.PropertyType,
+          srcProp.GetValue(source),
+          ctx);
+
+      destProp.SetValue(dest, val);
     }
 
     return (TDestination)dest;
