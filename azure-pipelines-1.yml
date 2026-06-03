@@ -8,34 +8,22 @@ pool:
 
 variables:
 - group: 'Secrets and variables'
-
 - name: buildConfiguration
   value: 'Release'
-
 - name: projectName
   value: 'Franz.Common'
-
 - name: outputDir
   value: '$(Build.ArtifactStagingDirectory)/packages'
-
 - name: azureOrg
   value: 'EntelekheiaSystems'
-
 - name: feedName
   value: 'AjnaTellus'
 
 steps:
-
-# ------------------------------------------------------------
-# Checkout (full history required for tags + sync integrity)
-# ------------------------------------------------------------
 - checkout: self
   persistCredentials: true
   fetchDepth: 0
 
-# ------------------------------------------------------------
-# Auth + SDK
-# ------------------------------------------------------------
 - task: NuGetAuthenticate@1
   displayName: 'Authenticate Azure Artifacts'
 
