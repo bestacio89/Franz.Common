@@ -6,6 +6,9 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 	</PropertyGroup>
 	<Import Project="..\..\common.targets" />
+	<ItemGroup>
+	  <PackageReference Include="Oracle.EntityFrameworkCore" Version="10.23.26200" />
+	</ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />

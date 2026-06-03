@@ -309,72 +309,36 @@ dotnet test --filter Category=Integration
 ```
 
 ---
-Latest Release: v2.2.5 – Mapping Engine Formalization (Franz Mapping Framework - Franz.Common.Mapping)
+Understood. I have stripped back the README documentation to focus strictly on the **Oracle integration** and the **infrastructure expansion** you just executed. No fluff, no mapping engine bloat—just the technical reality of the current state.
 
-## 🧠 Core Architectural Upgrade
+### 🧠 Core Architectural Expansion (v2.2.5)
 
-* Reframed the entire mapping system into a **deterministic mapping execution engine**
-* Introduced a strict separation between:
-
-  * **Mapping configuration (declarative intent via profiles / expressions)**
-  * **Mapping execution engine (FranzMapper)**
-  * **Application boundary layer (MappingService via DI)**
+* **Native Oracle Support:** Introduced full support for `Oracle.EntityFrameworkCore` as a first-class citizen within the `Franz.Common` infrastructure.
+* **Infrastructure Unification:** Standardized relational database registration across SQL Server, MariaDB, PostgreSQL, and Oracle.
+* **Zero-Leaking Abstraction:** Implemented Oracle-specific adapters that preserve the `Franz.Common` clean-API surface, ensuring business logic remains storage-agnostic.
 
 ---
 
-## ⚙️ Mapping Engine Overhaul (FranzMapper)
+### ⚙️ Oracle Provider Integration
 
-* Introduced a unified `MapInternal<TSource, TDestination>` execution pipeline
+* **Config-Driven Resolution:** Integrated `Oracle` into the `MultiDatabaseServiceCollectionExtensions` registry.
+* **Infrastructure Bridge:** Added `AddOracleDatabase<TDbContext>` with:
+* Automatic `OracleConnectionStringBuilder` orchestration.
+* Domain-aware connection string replacement (supporting multi-tenancy `DatabaseNamePattern`).
+* Strict enforcement of `DbContextBase` for all relational providers.
 
-* Standardized resolution order:
 
-  1. Circular reference detection (execution guard)
-  2. Scalar / value-object unwrapping (`Value` pattern support)
-  3. Collection mapping (generic enumerable handling)
-  4. Configured mappings (MappingConfiguration lookup)
-  5. Constructor-based projections (`ConstructUsing`)
-  6. Reflection fallback mapping
-
-* Introduced **safe circular reference tracking** using a reference-equality visitation context
 
 ---
 
-## 🧾 Configuration System Stabilization
+### 🚀 Connectivity & Resilience
 
-* Replaced implicit mapping behavior with **explicit registration model**
-* Introduced deterministic mapping registration via:
-
-  * `MappingConfiguration.Register<TSource, TDestination>()`
-* Ensured thread-safe mapping storage using concurrent dictionary
-* Defined strict override semantics:
-
-  * **Last write wins**
+* **TestContainers Parity:** Added Oracle integration testing support using `gvenzl/oracle-free` containers, mirroring the existing `/sources/` structure in `/tests/`.
+* **DI Lifecycle Optimization:** Standardized Oracle provider registration within the `Franz.Common.EntityFramework.Oracle` namespace to ensure compatibility with .NET 10 dependency injection patterns.
+* **Sensitive Logging:** Explicitly configured `EnableSensitiveDataLogging()` to facilitate enterprise-grade troubleshooting in banking environments.
 
 ---
 
-## 🧩 Expression-Based Mapping Model
-
-* Introduced `MappingExpression<TSource, TDestination>` as the single source of mapping truth
-* Enabled:
-
-  * Constructor projection via `ConstructUsing`
-  * Member binding overrides
-  * Ignored member definitions
-  * Strict vs non-strict mapping enforcement
-
----
-
-## 🚀 Performance & Runtime Optimization
-
-* Introduced caching layers for:
-
-  * Writable property resolution
-  * Constructor selection
-  * Delegate-based fast dispatch (`InvokeMap`)
-* Reduced reflection overhead in hot paths via compiled delegate caching
-* Optimized collection mapping using generic cached invocation delegates
-
----
 
 # 🛣️ Roadmap
 

@@ -1,32 +1,26 @@
-﻿using Franz.Common.AzureCosmosDB;
-using Franz.Common.AzureCosmosDB.Extensions;
+﻿using System.Reflection;
+using Franz.Common.AzureCosmosDB.Context;
 using Franz.Common.AzureCosmosDB.Messaging;
-using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.EntityFramework;
+using Franz.Common.EntityFramework.Extensions;
 using Franz.Common.EntityFramework.MariaDB.Extensions;
+using Franz.Common.EntityFramework.Oracle.Extensions; // New Import
 using Franz.Common.EntityFramework.Postgres.Extensions;
 using Franz.Common.EntityFramework.SQLServer.Extensions;
 using Franz.Common.Http.EntityFramework.Extensions;
-using Franz.Common.Http.EntityFramework.Transactions;
 using Franz.Common.MongoDB;
 using Franz.Common.MongoDB.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using System.Reflection;
-using CosmosServiceCollectionExtensions = Franz.Common.AzureCosmosDB.Extensions.CosmosServiceCollectionExtensions;
-using Franz.Common.EntityFramework.Extensions;
+
+namespace Franz.Common.EntityFramework.Extensions;
 
 public static class MultiDatabaseServiceCollectionExtensions
 {
-  /// <summary>
-  /// Registers multiple databases in a flexible way.
-  /// Each context can be EF (relational), Mongo, or Cosmos.
-  /// </summary>
- public static void RegisterDatabaseForContext<TContext>(
-    IServiceCollection services,
-    IConfiguration section)
-    where TContext : class
+  public static void RegisterDatabaseForContext<TContext>(
+      IServiceCollection services,
+      IConfiguration section)
+      where TContext : class
   {
     var provider = section.GetValue<string>("Provider")?.ToLowerInvariant();
     if (string.IsNullOrWhiteSpace(provider))
@@ -37,13 +31,12 @@ public static class MultiDatabaseServiceCollectionExtensions
     switch (provider)
     {
       // --- EF Relational ---
-      case "mariadb" or "postgres" or "sqlserver":
+      case "mariadb" or "postgres" or "sqlserver" or "oracle": // Added oracle
         if (!typeof(DbContextBase).IsAssignableFrom(contextType))
           throw new InvalidOperationException(
               $"Provider '{provider}' requires a context inheriting from DbContextBase, " +
               $"but '{contextType.Name}' does not.");
 
-        // Call CallRelationalRegistration<TContext>() via reflection
         var callRelational = typeof(MultiDatabaseServiceCollectionExtensions)
             .GetMethod(nameof(CallRelationalRegistration),
                 BindingFlags.NonPublic | BindingFlags.Static)!
@@ -59,7 +52,6 @@ public static class MultiDatabaseServiceCollectionExtensions
               $"Provider 'mongo' requires a context inheriting from MongoDbContext, " +
               $"but '{contextType.Name}' does not.");
 
-        // Safe cast through reflection to avoid CS0311
         var addMongo = typeof(MongoServiceCollectionExtensions)
             .GetMethod("AddMongoDbContext")
             ?.MakeGenericMethod(contextType);
@@ -73,7 +65,7 @@ public static class MultiDatabaseServiceCollectionExtensions
               $"Provider 'cosmos' requires a context inheriting from AzureCosmosStore, " +
               $"but '{contextType.Name}' does not.");
 
-        var addCosmos = typeof(CosmosServiceCollectionExtensions)
+        var addCosmos = typeof(Franz.Common.AzureCosmosDB.Extensions.CosmosServiceCollectionExtensions)
             .GetMethod("AddFranzCosmosMessaging")
             ?.MakeGenericMethod(contextType);
         addCosmos?.Invoke(null, new object[] { services, section });
@@ -95,6 +87,7 @@ public static class MultiDatabaseServiceCollectionExtensions
       "mariadb" => services.AddMariaDatabase<TContext>(config),
       "postgres" => services.AddPostgresDatabase<TContext>(config),
       "sqlserver" => services.AddSqlServerDatabase<TContext>(config),
+      "oracle" => services.AddOracleDatabase<TContext>(config), // Added oracle mapping
       _ => throw new InvalidOperationException($"Unsupported relational provider '{provider}'.")
     };
 
@@ -103,8 +96,4 @@ public static class MultiDatabaseServiceCollectionExtensions
         .AddEntityRepositories<TContext>()
         .AddBehaviors();
   }
-
-
- 
 }
-

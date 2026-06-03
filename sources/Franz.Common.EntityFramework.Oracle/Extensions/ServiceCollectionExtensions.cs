@@ -1,4 +1,5 @@
 using Franz.Common.EntityFramework.Configuration;
+using Franz.Common.EntityFramework.Extensions;
 using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

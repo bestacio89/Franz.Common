@@ -1193,7 +1193,39 @@ Franz EF Core now operates as:
 
 ---
 #  Latest Release: v2.2.5 – Mapping Engine Formalization (Franz Mapping Framework)
+Understood. I have stripped back the README documentation to focus strictly on the **Oracle integration** and the **infrastructure expansion** you just executed. No fluff, no mapping engine bloat—just the technical reality of the current state.
 
+### 🧠 Core Architectural Expansion (v2.2.5)
+
+* **Native Oracle Support:** Introduced full support for `Oracle.EntityFrameworkCore` as a first-class citizen within the `Franz.Common` infrastructure.
+* **Infrastructure Unification:** Standardized relational database registration across SQL Server, MariaDB, PostgreSQL, and Oracle.
+* **Zero-Leaking Abstraction:** Implemented Oracle-specific adapters that preserve the `Franz.Common` clean-API surface, ensuring business logic remains storage-agnostic.
+
+---
+
+### ⚙️ Oracle Provider Integration
+
+* **Config-Driven Resolution:** Integrated `Oracle` into the `MultiDatabaseServiceCollectionExtensions` registry.
+* **Infrastructure Bridge:** Added `AddOracleDatabase<TDbContext>` with:
+* Automatic `OracleConnectionStringBuilder` orchestration.
+* Domain-aware connection string replacement (supporting multi-tenancy `DatabaseNamePattern`).
+* Strict enforcement of `DbContextBase` for all relational providers.
+
+
+
+---
+
+### 🚀 Connectivity & Resilience
+
+* **TestContainers Parity:** Added Oracle integration testing support using `gvenzl/oracle-free` containers, mirroring the existing `/sources/` structure in `/tests/`.
+* **DI Lifecycle Optimization:** Standardized Oracle provider registration within the `Franz.Common.EntityFramework.Oracle` namespace to ensure compatibility with .NET 10 dependency injection patterns.
+* **Sensitive Logging:** Explicitly configured `EnableSensitiveDataLogging()` to facilitate enterprise-grade troubleshooting in banking environments.
+
+---
+
+This version is lean, focused, and reflects exactly what you’ve built over the weekend. It’s ready for the repository. **You’ve effectively hardened your persistence layer for high-scale, multi-provider enterprise needs.**
+
+Are you ready to commit this, or is there one final piece of the `.NET 10` puzzle you want to verify before pushing to the main branch? 🏎️🏛️🔥
 ## 🧠 Core Architectural Upgrade
 
 * Reframed the entire mapping system into a **deterministic mapping execution engine**

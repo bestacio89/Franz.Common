@@ -1,27 +1,29 @@
+using Franz.Common.AzureCosmosDB.Context;
+using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.EntityFramework;
+using Franz.Common.EntityFramework.Extensions;
 using Franz.Common.EntityFramework.MariaDB.Extensions;
+using Franz.Common.EntityFramework.Oracle.Extensions;
 using Franz.Common.EntityFramework.Postgres.Extensions;
 using Franz.Common.EntityFramework.SQLServer.Extensions;
+using Franz.Common.Http.EntityFramework.Extensions;
 using Franz.Common.Http.EntityFramework.Transactions;
 using Franz.Common.MongoDB;
 using Franz.Common.MongoDB.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Franz.Common.EntityFramework.Extensions;
-using Franz.Common.AzureCosmosDB.Extensions;
-using Franz.Common.AzureCosmosDB.Context;
-namespace Franz.Common.Http.EntityFramework.Extensions;
 
+namespace Franz.Common.Http.EntityFramework.Extensions;
 
 public static class ServiceCollectionExtensions
 {
   public static IServiceCollection AddRelationalDatabase<TDbContext>(
-     this IServiceCollection services,
-     IHostEnvironment env,
-     IConfiguration config)
-     where TDbContext : DbContextBase
+      this IServiceCollection services,
+      IHostEnvironment env,
+      IConfiguration config)
+      where TDbContext : DbContextBase
   {
     var provider = config["Database:Provider"]?.ToLowerInvariant()
         ?? throw new InvalidOperationException("Missing relational provider.");
@@ -31,6 +33,7 @@ public static class ServiceCollectionExtensions
       "mariadb" => services.AddMariaDatabase<TDbContext>(config),
       "postgres" => services.AddPostgresDatabase<TDbContext>(config),
       "sqlserver" => services.AddSqlServerDatabase<TDbContext>(config),
+      "oracle" => services.AddOracleDatabase<TDbContext>(config),
       _ => throw new InvalidOperationException($"Unsupported relational provider '{provider}'.")
     };
 
@@ -39,7 +42,6 @@ public static class ServiceCollectionExtensions
         .AddEntityRepositories<TDbContext>()
         .AddBehaviors();
   }
-
 
   public static IServiceCollection AddDatabaseTransactionPerHttpCall(this IServiceCollection services)
   {
@@ -55,9 +57,9 @@ public static class ServiceCollectionExtensions
   }
 
   public static IServiceCollection AddMongoDatabase<TMongoContext>(
-    this IServiceCollection services,
-    IConfiguration config)
-    where TMongoContext : MongoDbContext
+      this IServiceCollection services,
+      IConfiguration config)
+      where TMongoContext : MongoDbContext
   {
     var provider = config["Database:Provider"]?.ToLowerInvariant();
     if (provider != "mongo")
@@ -76,15 +78,8 @@ public static class ServiceCollectionExtensions
     if (provider != "cosmos")
       throw new InvalidOperationException("Cosmos database provider requires 'Database:Provider' = 'cosmos'.");
 
-    // Use the new EF Core Cosmos DI registration
     services.AddFranzCosmosDbContext<TCosmosContext>(config);
 
     return services;
   }
-
-
-
-
-
-
 }
