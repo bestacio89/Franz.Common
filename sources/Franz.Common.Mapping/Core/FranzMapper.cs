@@ -177,54 +177,67 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
   {
     var srcType = typeof(TSource);
     var destType = typeof(TDestination);
-
     var ctor = GetCtor(destType);
 
+    // Parameterless / no ctor found → plain Activator
     if (ctor == null || ctor.GetParameters().Length == 0)
     {
       return Activator.CreateInstance(destType)
           ?? throw new TechnicalException(
-              $"Cannot create instance of {destType.FullName}");
+              $"[FranzMapper] Cannot create an instance of '{destType.FullName}'. " +
+              $"Ensure it has a public constructor.");
     }
 
-    var parameters = ctor.GetParameters()
-        .Select(parameter =>
-        {
-          var sourceMemberName =
-              expr.MemberBindings.TryGetValue(parameter.Name!, out var mapped)
-                  ? mapped
-                  : parameter.Name;
+    var ctorArgs = ResolveConstructorArguments(
+        source!, ctor, srcType, destType, expr.MemberBindings, expr.IsStrict, ctx);
 
-          var sourceProperty = srcType.GetProperty(
-              sourceMemberName!,
-              BindingFlags.Public |
-              BindingFlags.Instance |
-              BindingFlags.IgnoreCase);
+    return ctor.Invoke(ctorArgs);
+  }
 
-          if (sourceProperty == null)
-          {
-            if (expr.IsStrict)
-            {
-              throw new TechnicalException(
-                  $"Missing constructor binding for parameter '{parameter.Name}' " +
-                  $"when mapping {srcType.Name} -> {destType.Name}");
-            }
+  // Shared by both configured and fallback paths.
+  private object?[] ResolveConstructorArguments(
+      object source,
+      ConstructorInfo ctor,
+      Type srcType,
+      Type destType,
+      IReadOnlyDictionary<string, string>? memberBindings,
+      bool isStrict,
+      MappingContext ctx)
+  {
+    var parameters = ctor.GetParameters();
+    var args = new object?[parameters.Length];
 
-            return GetDefault(parameter.ParameterType);
-          }
+    for (var i = 0; i < parameters.Length; i++)
+    {
+      var param = parameters[i];
 
-          var rawValue = sourceProperty.GetValue(source);
+      var sourceName = memberBindings != null
+          && memberBindings.TryGetValue(param.Name!, out var mapped)
+          ? mapped
+          : param.Name;
 
-          return ResolveValue(
-                     sourceProperty.PropertyType,
-                     parameter.ParameterType,
-                     rawValue,
-                     ctx)
-                 ?? GetDefault(parameter.ParameterType);
-        })
-        .ToArray();
+      var srcProp = srcType.GetProperty(
+          sourceName!,
+          BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 
-    return ctor.Invoke(parameters);
+      if (srcProp == null)
+      {
+        if (isStrict)
+          throw new TechnicalException(
+              $"[FranzMapper] Strict mode: no source property found for " +
+              $"constructor parameter '{param.Name}' " +
+              $"when mapping {srcType.Name} → {destType.Name}.");
+
+        args[i] = GetDefault(param.ParameterType);
+        continue;
+      }
+
+      var raw = srcProp.GetValue(source);
+      args[i] = ResolveValue(srcProp.PropertyType, param.ParameterType, raw, ctx)
+                ?? GetDefault(param.ParameterType);
+    }
+
+    return args;
   }
 
   // =========================================================
