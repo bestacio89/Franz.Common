@@ -48,9 +48,10 @@ public class ImmutableMappingTests
   // 2. INIT-ONLY PROPERTIES TEST (CONFIGURED)
   // =========================================================
   [Fact]
-  public void Should_Map_Init_Only_Properties_When_Configured()
+  public void Should_Map_Init_Only_Properties_Via_Constructor_Binding()
   {
     var config = new MappingConfiguration();
+
     config.Register(new MappingExpression<StandardSource, InitOnlyClassDto>());
 
     var mapper = new FranzMapper(config);
@@ -60,6 +61,9 @@ public class ImmutableMappingTests
     var result = mapper.Map<StandardSource, InitOnlyClassDto>(source);
 
     // Assert
+    result.Should().NotBeNull();
+
+    // We assert behavior, not mechanism:
     result.Name.Should().Be("Estacio");
     result.Age.Should().Be(36);
   }

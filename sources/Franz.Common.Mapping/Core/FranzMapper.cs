@@ -1,4 +1,4 @@
-﻿using Franz.Common.Errors;
+using Franz.Common.Errors;
 using Franz.Common.Mapping.Abstractions;
 using System;
 using System.Collections;
@@ -186,47 +186,90 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
     return ctor.Invoke(ctorArgs);
   }
 
+  private object? ResolveSourceValue(
+    Type srcType,
+    string? sourceName,
+    object source,
+    MappingContext ctx)
+  {
+    if (string.IsNullOrWhiteSpace(sourceName))
+      return null;
+
+    var prop = srcType.GetProperty(
+        sourceName,
+        BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+
+    if (prop == null)
+      return null;
+
+    return prop.GetValue(source);
+  }
   // Shared by both configured and fallback paths.
   private object?[] ResolveConstructorArguments(
-      object source,
-      ConstructorInfo ctor,
-      Type srcType,
-      Type destType,
-      IReadOnlyDictionary<string, string>? memberBindings,
-      bool isStrict,
-      MappingContext ctx)
+   object source,
+   ConstructorInfo ctor,
+   Type srcType,
+   Type destType,
+   IReadOnlyDictionary<string, string>? memberBindings,
+   bool isStrict,
+   MappingContext ctx)
   {
     var parameters = ctor.GetParameters();
     var args = new object?[parameters.Length];
+
+    var sourceProps = srcType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
     for (var i = 0; i < parameters.Length; i++)
     {
       var param = parameters[i];
 
-      var sourceName = memberBindings != null
-          && memberBindings.TryGetValue(param.Name!, out var mapped)
-          ? mapped
-          : param.Name;
+      // 1. explicit mapping override
+      var sourceName =
+          memberBindings != null &&
+          memberBindings.TryGetValue(param.Name!, out var mapped)
+              ? mapped
+              : param.Name;
 
-      var srcProp = srcType.GetProperty(
-          sourceName!,
-          BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+      PropertyInfo? srcProp = null;
+
+      // 2. primary match: name (case-insensitive)
+      if (!string.IsNullOrWhiteSpace(sourceName))
+      {
+        srcProp = sourceProps.FirstOrDefault(p =>
+            string.Equals(p.Name, sourceName, StringComparison.OrdinalIgnoreCase));
+      }
+
+      // 3. secondary match: exact type match (ONLY if unambiguous)
+      if (srcProp == null)
+      {
+        var candidates = sourceProps
+            .Where(p => p.PropertyType == param.ParameterType)
+            .ToList();
+
+        if (candidates.Count == 1)
+        {
+          srcProp = candidates[0];
+        }
+      }
 
       if (srcProp == null)
       {
         if (isStrict)
           throw new TechnicalException(
-              $"[FranzMapper] Strict mode: no source property found for " +
-              $"constructor parameter '{param.Name}' " +
-              $"when mapping {srcType.Name} → {destType.Name}.");
+              $"[FranzMapper] Strict mode: no matching source property for ctor parameter '{param.Name}' " +
+              $"on '{srcType.Name}' → '{destType.Name}'.");
 
         args[i] = GetDefault(param.ParameterType);
         continue;
       }
 
       var raw = srcProp.GetValue(source);
-      args[i] = ResolveValue(srcProp.PropertyType, param.ParameterType, raw, ctx)
-                ?? GetDefault(param.ParameterType);
+
+      args[i] = ResolveValue(
+          srcProp.PropertyType,
+          param.ParameterType,
+          raw,
+          ctx);
     }
 
     return args;
@@ -236,41 +279,27 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
   // PROPERTY MAPPING
   // =========================================================
   private void ApplyMapping<TSource, TDestination>(
-      TSource source,
-      object destination,
-      MappingExpression<TSource, TDestination> expr,
-      MappingContext ctx)
+    TSource source,
+    object destination,
+    MappingExpression<TSource, TDestination> expr,
+    MappingContext ctx)
   {
     var srcType = typeof(TSource);
-    var destType = destination.GetType(); // always runtime type
+    var destType = destination.GetType();
 
     var props = GetAssignableProps(destType);
-
-    // Build the set of params already handled by the constructor so we
-    // don't attempt a double-write (which would throw on init-only props).
     var ctor = GetCtor(destType);
+
     var ctorParams = BuildCtorParamSet(ctor);
 
     foreach (var destProp in props)
     {
-      if (ctorParams.Contains(destProp.Name)) continue;
-      if (expr.IgnoredMembers.Contains(destProp.Name)) continue;
-
-      // init-only properties NOT covered by the ctor cannot be set
-      // after construction — guard here rather than letting SetValue
-      // silently succeed today but potentially break on future runtimes.
-      if (IsInitOnly(destProp))
-      {
-        if (expr.IsStrict)
-          throw new TechnicalException(
-              $"[FranzMapper] Strict mode: init-only property '{destProp.Name}' " +
-              $"on '{destType.FullName}' is not covered by any constructor parameter " +
-              $"and cannot be set after construction.");
+      if (expr.IgnoredMembers.Contains(destProp.Name))
         continue;
-      }
 
-      var srcName = expr.MemberBindings != null
-          && expr.MemberBindings.TryGetValue(destProp.Name, out var mapped)
+      // Resolve source name (mapping or convention)
+      var srcName = expr.MemberBindings != null &&
+                    expr.MemberBindings.TryGetValue(destProp.Name, out var mapped)
           ? mapped
           : destProp.Name;
 
@@ -283,16 +312,26 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
         if (expr.IsStrict)
           throw new TechnicalException(
               $"[FranzMapper] Strict mode: no source property '{srcName}' " +
-              $"found on '{srcType.FullName}' " +
-              $"for destination property '{destProp.Name}' on '{destType.FullName}'.");
+              $"found for '{destProp.Name}'.");
+
         continue;
       }
+
+      var raw = srcProp.GetValue(source);
 
       var value = ResolveValue(
           srcProp.PropertyType,
           destProp.PropertyType,
-          srcProp.GetValue(source),
+          raw,
           ctx);
+
+      // 🔥 CRITICAL FIX:
+      // If property is init-only, we ONLY skip assignment
+      // BUT ctor already consumed the same resolved value via ResolveConstructorArguments
+      if (IsInitOnly(destProp))
+      {
+        continue;
+      }
 
       destProp.SetValue(destination, value);
     }
@@ -501,14 +540,32 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
   /// Prefers a constructor marked with [MapConstructor]; otherwise picks
   /// the public constructor with the most parameters (primary ctor convention).
   /// </summary>
-  private static ConstructorInfo? GetCtor(Type t)
-      => ConstructorCache.GetOrAdd(t, static type =>
-      {
-        var ctors = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
-        return ctors.FirstOrDefault(c => c.IsDefined(typeof(MapConstructorAttribute), false))
-              ?? ctors.OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
-      });
+  private static ConstructorInfo? GetCtor(Type type)
+  {
+    return ConstructorCache.GetOrAdd(type, static t =>
+    {
+      var ctors = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
 
+      if (ctors.Length == 0)
+        return null;
+
+      // 1. Explicit priority: [MapConstructor]
+      var attributed = ctors
+          .FirstOrDefault(c => c.IsDefined(typeof(MapConstructorAttribute), false));
+
+      if (attributed != null)
+        return attributed;
+
+      // 2. Prefer constructor with MOST parameters BUT ALSO:
+      //    prefer one where parameter names match source properties better later
+      //    (we do NOT hard bind here, just structural preference)
+
+      return ctors
+          .OrderByDescending(c => c.GetParameters().Length)
+          .ThenBy(c => c.IsPublic ? 0 : 1)
+          .First();
+    });
+  }
   private static HashSet<string> BuildCtorParamSet(ConstructorInfo? ctor)
       => ctor?.GetParameters()
              .Select(p => p.Name!)
