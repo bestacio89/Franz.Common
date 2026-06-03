@@ -120,53 +120,45 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
     var srcType = typeof(TSource);
     var destType = typeof(TDestination);
 
-    // =========================================================
-    // 0. VALUE UNWRAP REWRITE STEP (CRITICAL FOR INLINE ROOT VALS)
-    // =========================================================
-    var valueProp = source!.GetType().GetProperty("Value");
-    if (valueProp != null)
+    // ---------------------------------------------------------
+    // 1. VALUE OBJECT UNWRAP  (opt-in via [ValueObject])
+    //    Only fires when the SOURCE TYPE is decorated, not any
+    //    type that happens to have a "Value" property.
+    // ---------------------------------------------------------
+    if (IsValueObject(source!.GetType()))
     {
-      var inner = valueProp.GetValue(source);
+      var inner = GetValueProperty(source.GetType())?.GetValue(source);
       if (inner != null)
         return (TDestination)ResolveValue(inner.GetType(), destType, inner, ctx)!;
     }
 
-    // =========================================================
-    // 1. COLLECTIONS
-    // =========================================================
+    // ---------------------------------------------------------
+    // 2. COLLECTIONS
+    // ---------------------------------------------------------
     if (IsCollection(destType))
-    {
       return (TDestination)MapCollection(srcType, destType, source!, ctx);
-    }
 
-    // =========================================================
-    // 2. CONFIGURED MAPPING
-    // =========================================================
+    // ---------------------------------------------------------
+    // 3. CONFIGURED MAPPING
+    // ---------------------------------------------------------
     if (_config.TryGetMapping<TSource, TDestination>(out var expr))
     {
-      var typed = expr!;
-
-      // 2A. ConstructUsing (terminal)
-      if (typed.Constructor is Func<TSource, TDestination> ctor)
+      // 3A. ConstructUsing (terminal — caller owns the whole object)
+      if (expr!.Constructor is Func<TSource, TDestination> ctor)
         return ctor(source!);
 
-      // 2B. Constructor binding
-      var destination = CreateInstanceSmart(source!, typed, ctx);
-
-      ApplyMapping(source!, destination, typed, ctx);
-
+      // 3B. Constructor + property binding
+      var destination = CreateInstanceSmart(source!, expr, ctx);
+      ApplyMapping(source!, destination, expr, ctx);
       return (TDestination)destination;
     }
 
-    // =========================================================
-    // 3. FALLBACK
-    // =========================================================
+    // ---------------------------------------------------------
+    // 4. CONVENTION FALLBACK
+    // ---------------------------------------------------------
     return DefaultMap<TSource, TDestination>(source!, ctx);
   }
 
-  // =========================================================
-  // CONSTRUCTOR ENGINE
-  // =========================================================
   // =========================================================
   // CONSTRUCTOR ENGINE
   // =========================================================
