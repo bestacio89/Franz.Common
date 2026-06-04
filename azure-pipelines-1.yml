@@ -274,7 +274,7 @@ stages:
 
 
 # ============================================================
-# PACKAGE — downloads validated build artifact and publishes NuGet
+# PACKAGE — downloads same artifact, no restore needed
 # ============================================================
 - stage: Package
   displayName: Package
@@ -286,62 +286,36 @@ stages:
     displayName: Pack and Publish NuGet
 
     steps:
-    # ------------------------------------------------------------
-    # 1. Download build artifact
-    # ------------------------------------------------------------
-    - download: current
-      artifact: built-sources
-      displayName: Download build artifact
+    - checkout: self
 
-    # ------------------------------------------------------------
-    # 2. Install .NET SDK
-    # ------------------------------------------------------------
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
 
-    # ------------------------------------------------------------
-    # 3. Authenticate Azure Artifacts feed
-    # ------------------------------------------------------------
     - task: NuGetAuthenticate@1
 
-    # ------------------------------------------------------------
-    # 4. RESTORE (required for dotnet pack correctness)
-    # ------------------------------------------------------------
+    # 🔥 SINGLE SOURCE OF TRUTH: solution
     - script: |
         set -euo pipefail
 
-        echo "Restoring dependencies for packaging..."
+        echo "Restoring solution..."
+        dotnet restore Franz.Common.sln
 
-        dotnet restore $(Pipeline.Workspace)/built-sources/sources \
-          --disable-parallel
+        echo "Packing solution..."
+        dotnet pack Franz.Common.sln \
+          --configuration Release \
+          --output $(Build.ArtifactStagingDirectory)/packages
 
-      displayName: Restore for Packaging
+      displayName: Restore + Pack
 
-    # ------------------------------------------------------------
-    # 5. PACK
-    # ------------------------------------------------------------
-    - script: |
-        set -euo pipefail
-
-        dotnet pack $(Pipeline.Workspace)/built-sources/Franz.Common.sln \
-          --configuration $(buildConfiguration) \
-          --no-build \
-          --output $(outputDir)
-
-      displayName: Pack NuGet
-
-    # ------------------------------------------------------------
-    # 6. PUBLISH (CORRECT Azure Artifacts method)
-    # ------------------------------------------------------------
+    # 🔥 Publish safely (NO feed confusion)
     - task: NuGetCommand@2
-      displayName: Publish NuGet
       inputs:
         command: push
-        packagesToPush: '$(outputDir)/*.nupkg'
+        packagesToPush: '$(Build.ArtifactStagingDirectory)/packages/*.nupkg'
         publishVstsFeed: 'AjnaTellus'
-
+        allowPackageConflicts: true
 
 # ============================================================
 # SYNC
