@@ -303,9 +303,7 @@ stages:
         dotnet restore Franz.Common.sln
 
         echo "Packing solution..."
-        dotnet pack Franz.Common.sln \
-          --configuration Release \
-          --output $(Build.ArtifactStagingDirectory)/packages
+        dotnet pack Franz.Common.sln --configuration Release --output packages
 
       displayName: Restore + Pack
 
