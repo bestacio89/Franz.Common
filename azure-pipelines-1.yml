@@ -325,7 +325,7 @@ stages:
     - script: |
         set -euo pipefail
 
-        dotnet pack $(Pipeline.Workspace)/built-sources/sources \
+        dotnet pack $(Pipeline.Workspace)/built-sources/Franz.Common.sln \
           --configuration $(buildConfiguration) \
           --no-build \
           --output $(outputDir)
