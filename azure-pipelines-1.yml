@@ -274,7 +274,7 @@ stages:
 
 
 # ============================================================
-# PACKAGE — downloads same artifact, no restore needed
+# PACKAGE — fully deterministic NuGet publish
 # ============================================================
 - stage: Package
   displayName: Package
@@ -286,7 +286,9 @@ stages:
     displayName: Pack and Publish NuGet
 
     steps:
-    - checkout: self
+    - download: current
+      artifact: built-sources
+      displayName: Download build artifact
 
     - task: UseDotNet@2
       inputs:
@@ -295,25 +297,42 @@ stages:
 
     - task: NuGetAuthenticate@1
 
-    # 🔥 SINGLE SOURCE OF TRUTH: solution
+    # ------------------------------------------------------------
+    # 🔒 HARD RULE: reuse EXACT restore from Build stage
+    # ------------------------------------------------------------
     - script: |
         set -euo pipefail
 
-        echo "Restoring solution..."
-        dotnet restore Franz.Common.sln
+        echo "Reusing already restored assets (NO RESTORE HERE)"
 
-        echo "Packing solution..."
-        dotnet pack Franz.Common.sln --configuration Release --output packages
+        # ensure no accidental restore happens
+        export DOTNET_NOLOGO=1
+        export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+        export NUGET_XMLDOC_MODE=skip
 
-      displayName: Restore + Pack
+        # pack ONLY from known project roots, not solution
+        find $(Pipeline.Workspace)/built-sources/sources \
+          -name "*.csproj" \
+          -exec dotnet pack {} \
+            --configuration $(buildConfiguration) \
+            --no-restore \
+            --no-build \
+            --output $(outputDir) \;
 
-    # 🔥 Publish safely (NO feed confusion)
-    - task: NuGetCommand@2
-      inputs:
-        command: push
-        packagesToPush: '$(Build.ArtifactStagingDirectory)/packages/*.nupkg'
-        publishVstsFeed: 'AjnaTellus'
-        allowPackageConflicts: true
+      displayName: Pack NuGet (Deterministic Project-Level)
+
+    # ------------------------------------------------------------
+    # Publish (fully deterministic artifacts only)
+    # ------------------------------------------------------------
+    - script: |
+        set -euo pipefail
+
+        dotnet nuget push "$(outputDir)/*.nupkg" \
+          --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/V3/index.json" \
+          --api-key $(System.AccessToken) \
+          --skip-duplicate
+
+      displayName: Publish NuGete
 
 # ============================================================
 # SYNC
