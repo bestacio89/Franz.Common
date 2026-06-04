@@ -274,7 +274,7 @@ stages:
 
 
 # ============================================================
-# PACKAGE — downloads same artifact, no restore needed
+# PACKAGE — deterministic NuGet build from validated sources
 # ============================================================
 - stage: Package
   displayName: Package
@@ -286,32 +286,64 @@ stages:
     displayName: Pack and Publish NuGet
 
     steps:
+    # ------------------------------------------------------------
+    # 1. Get validated build output
+    # ------------------------------------------------------------
     - download: current
       artifact: built-sources
-      displayName: Download built sources
+      displayName: Download build artifact
 
+    # ------------------------------------------------------------
+    # 2. Install SDK
+    # ------------------------------------------------------------
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
 
+    # ------------------------------------------------------------
+    # 3. Authenticate NuGet feeds
+    # ------------------------------------------------------------
     - task: NuGetAuthenticate@1
 
+    # ------------------------------------------------------------
+    # 4. RESTORE (CRITICAL FIX)
+    #    Required because pack still needs resolved dependency graph
+    # ------------------------------------------------------------
     - script: |
         set -euo pipefail
-        dotnet pack $(Pipeline.Workspace)/built-sources \
+
+        echo "Restoring projects for packaging only..."
+
+        dotnet restore $(Pipeline.Workspace)/built-sources/sources/**/*.csproj \
+          --disable-parallel \
+          --no-cache
+
+      displayName: Restore for Packaging
+
+    # ------------------------------------------------------------
+    # 5. PACK
+    # ------------------------------------------------------------
+    - script: |
+        set -euo pipefail
+
+        dotnet pack $(Pipeline.Workspace)/built-sources/sources \
           --configuration $(buildConfiguration) \
           --no-build \
           --output $(outputDir)
+
       displayName: Pack NuGet
 
-    - script: |
-        set -euo pipefail
-        dotnet nuget push "$(outputDir)/*.nupkg" \
-          --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/V3/index.json" \
-          --api-key $(System.AccessToken) \
-          --skip-duplicate
+    # ------------------------------------------------------------
+    # 6. PUSH (FIXED AUTH MODEL)
+    # ------------------------------------------------------------
+    - task: DotNetCoreCLI@2
       displayName: Publish NuGet
+      inputs:
+        command: push
+        packagesToPush: '$(outputDir)/*.nupkg'
+        nuGetFeedType: external
+        publishFeedCredentials: '$(feedName)'
 
 
 # ============================================================
