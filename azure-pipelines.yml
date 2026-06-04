@@ -6,32 +6,214 @@ pool:
 variables:
   buildConfiguration: 'Release'
 
-steps:
-# Checkout with full history + credentials
-- checkout: self
-  persistCredentials: 'true'
-  fetchDepth: '0'
+stages:
 
-# Install .NET 10 SDK
-- task: UseDotNet@2
-  displayName: 'Install .NET 10 SDK'
-  inputs:
-    packageType: 'sdk'
-    version: '10.0.200'
-    includePreviewVersions: true
+# ------------------------------------------------------------
+# BUILD STAGE (single build for all test jobs)
+# ------------------------------------------------------------
+- stage: Build
+  displayName: Build
+  jobs:
+  - job: build
+    displayName: Build Solution
+    steps:
 
-# Authenticate to Azure Artifacts (optional if needed)
-- task: NuGetAuthenticate@1
-  displayName: 'Authenticate to Azure Artifacts'
+    - checkout: self
+      persistCredentials: 'true'
+      fetchDepth: '0'
 
-# Restore
-- script: dotnet restore
-  displayName: 'Restore NuGet packages'
+    - task: UseDotNet@2
+      displayName: Install .NET 10 SDK
+      inputs:
+        packageType: sdk
+        version: '10.0.200'
+        includePreviewVersions: true
 
-# Build
-- script: dotnet build --configuration $(buildConfiguration) --no-restore
-  displayName: 'Build solution'
+    - task: NuGetAuthenticate@1
+      displayName: Authenticate to Azure Artifacts
 
-# Run all tests (unit + integration)
-- script: dotnet test --configuration $(buildConfiguration) --no-build --logger trx --filter "SkipInCI!=true"
-  displayName: 'Run all tests'
+    - script: dotnet restore
+      displayName: Restore
+
+    - script: dotnet build --configuration $(buildConfiguration) --no-restore
+      displayName: Build
+
+    - publish: .
+      artifact: drop
+
+
+# ------------------------------------------------------------
+# TEST STAGE (FULL FAN-OUT)
+# ------------------------------------------------------------
+- stage: Tests
+  displayName: Tests
+  dependsOn: Build
+  jobs:
+
+  # ---------------- UNIT / CORE ----------------
+  - job: business_tests
+    displayName: Business Tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.Business.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx \
+          --filter "SkipInCI!=true"
+      displayName: Run Business Tests
+
+  # ---------------- CACHE ----------------
+  - job: cache_tests
+    displayName: Cache Tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.Caching.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx
+      displayName: Run Cache Tests
+
+  # ---------------- MAPPING ----------------
+  - job: mapping_tests
+    displayName: Mapping Tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.Mapping.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx
+      displayName: Run Mapping Tests
+
+  # ---------------- MESSAGING CORE ----------------
+  - job: messaging_tests
+    displayName: Messaging Core Tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.Messaging.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx
+      displayName: Run Messaging Core Tests
+
+  # ---------------- KAFKA ----------------
+  - job: kafka_tests
+    displayName: Kafka Tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.Messaging.Kafka.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx
+      displayName: Run Kafka Tests
+
+  # ---------------- RABBITMQ ----------------
+  - job: rabbitmq_tests
+    displayName: RabbitMQ Tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.Messaging.RabbitMQ.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx
+      displayName: Run RabbitMQ Tests
+
+  # ---------------- HOSTING ----------------
+  - job: kafka_hosting_tests
+    displayName: Kafka Hosting Tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.Messaging.Hosting.Kafka.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx
+      displayName: Run Kafka Hosting Tests
+
+  - job: rabbitmq_hosting_tests
+    displayName: RabbitMQ Hosting Tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.Messaging.Hosting.RabbitMQ.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx
+      displayName: Run RabbitMQ Hosting Tests
+
+  # ---------------- EF CORE ----------------
+  - job: ef_sqlserver
+    displayName: EF SQL Server Tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.EntityFramework.SQLServer.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx
+      displayName: Run SQL Server Tests
+
+  - job: ef_postgres
+    displayName: EF Postgres Tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.EntityFramework.Postgres.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx
+      displayName: Run Postgres Tests
+
+  - job: ef_oracle
+    displayName: EF Oracle Tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.EntityFramework.Oracle.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx
+      displayName: Run Oracle Tests
+
+  # ---------------- COSMOS (HEAVY ISOLATED) ----------------
+  - job: cosmos_tests
+    displayName: Cosmos DB Tests
+    timeoutInMinutes: '30'
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        dotnet test Franz.Common.AzureCosmosDB.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger trx \
+          --blame-hang-timeout 10m
+      displayName: Run Cosmos Tests

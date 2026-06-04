@@ -19,95 +19,310 @@ variables:
 - name: feedName
   value: 'AjnaTellus'
 
-steps:
-- checkout: self
-  persistCredentials: true
-  fetchDepth: 0
+# ------------------------------------------------------------
+# BUILD STAGE (single source of truth)
+# ------------------------------------------------------------
+stages:
 
-- task: NuGetAuthenticate@1
-  displayName: 'Authenticate Azure Artifacts'
+- stage: Build
+  displayName: Build
+  jobs:
+  - job: build
+    displayName: Build Solution
+    steps:
 
-- task: UseDotNet@2
-  displayName: 'Use .NET SDK 10.x'
-  inputs:
-    packageType: 'sdk'
-    version: '10.0.200'
+    - checkout: self
+      persistCredentials: true
+      fetchDepth: 0
 
-- script: |
-    set -euo pipefail
-    dotnet restore
-  displayName: 'Restore'
+    - task: NuGetAuthenticate@1
+      displayName: Authenticate Azure Artifacts
 
-- script: |
-    set -euo pipefail
-    dotnet build --configuration $(buildConfiguration) --no-restore
-  displayName: 'Build'
+    - task: UseDotNet@2
+      displayName: Use .NET SDK 10.x
+      inputs:
+        packageType: sdk
+        version: '10.0.200'
+
+    - script: |
+        set -euo pipefail
+        dotnet restore
+      displayName: Restore
+
+    - script: |
+        set -euo pipefail
+        dotnet build --configuration $(buildConfiguration) --no-restore
+      displayName: Build
+
+    - publish: .
+      artifact: drop
+
 
 # ------------------------------------------------------------
-# Hardened Infrastructure Cleanup (Prevents Disk Exhaustion)
+# TEST STAGE (FULL FAN-OUT PARALLEL MATRIX)
 # ------------------------------------------------------------
-- script: |
-    set -euo pipefail
-    echo "##[section]Reclaiming Disk Space"
-    docker system prune -a -f --volumes
-    find . -type d -name "TestResults" -exec rm -rf {} +
-    df -h
-  displayName: 'Infrastructure Cleanup: Disk Reclamation'
+- stage: Tests
+  displayName: Tests
+  dependsOn: Build
+  jobs:
+
+  # ---------------- CORE (FAST FEEDBACK GATE) ----------------
+  - job: unit_tests
+    displayName: Unit Tests (Fast Gate)
+    steps:
+    - download: current
+      artifact: drop
+
+    - task: UseDotNet@2
+      inputs:
+        packageType: sdk
+        version: '10.0.200'
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.Business.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx"
+      displayName: Run Unit Tests
+
+  # ---------------- CACHE ----------------
+  - job: cache_tests
+    displayName: Cache Tests
+    dependsOn: unit_tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.Caching.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx"
+      displayName: Run Cache Tests
+
+  # ---------------- MAPPING ----------------
+  - job: mapping_tests
+    displayName: Mapping Tests
+    dependsOn: unit_tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.Mapping.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx"
+      displayName: Run Mapping Tests
+
+  # ---------------- MESSAGING CORE ----------------
+  - job: messaging_core
+    displayName: Messaging Core Tests
+    dependsOn: unit_tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.Messaging.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx"
+      displayName: Run Messaging Core Tests
+
+  # ---------------- KAFKA ----------------
+  - job: kafka_tests
+    displayName: Kafka Tests
+    dependsOn: unit_tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.Messaging.Kafka.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx"
+      displayName: Run Kafka Tests
+
+  # ---------------- RABBITMQ ----------------
+  - job: rabbitmq_tests
+    displayName: RabbitMQ Tests
+    dependsOn: unit_tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.Messaging.RabbitMQ.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx"
+      displayName: Run RabbitMQ Tests
+
+  # ---------------- HOSTING (KAFKA) ----------------
+  - job: kafka_hosting_tests
+    displayName: Kafka Hosting Tests
+    dependsOn: unit_tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.Messaging.Hosting.Kafka.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx"
+      displayName: Run Kafka Hosting Tests
+
+  # ---------------- HOSTING (RABBITMQ) ----------------
+  - job: rabbitmq_hosting_tests
+    displayName: RabbitMQ Hosting Tests
+    dependsOn: unit_tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.Messaging.Hosting.RabbitMQ.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx"
+      displayName: Run RabbitMQ Hosting Tests
+
+  # ---------------- EF CORE ----------------
+  - job: ef_sqlserver
+    displayName: EF SQLServer Tests
+    dependsOn: unit_tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.EntityFramework.SQLServer.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx"
+      displayName: Run SQLServer Tests
+
+  - job: ef_postgres
+    displayName: EF Postgres Tests
+    dependsOn: unit_tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.EntityFramework.Postgres.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx"
+      displayName: Run Postgres Tests
+
+  - job: ef_oracle
+    displayName: EF Oracle Tests
+    dependsOn: unit_tests
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.EntityFramework.Oracle.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx"
+      displayName: Run Oracle Tests
+
+  # ---------------- COSMOS (HEAVY ISOLATED JOB) ----------------
+  - job: cosmos_tests
+    displayName: Cosmos DB Tests
+    dependsOn: unit_tests
+    timeoutInMinutes: 30
+    steps:
+    - download: current
+      artifact: drop
+
+    - script: |
+        set -euo pipefail
+        dotnet test Franz.Common.AzureCosmosDB.Tests \
+          --configuration $(buildConfiguration) \
+          --no-build \
+          --logger "trx" \
+          --blame-hang-timeout 10m
+      displayName: Run Cosmos Tests
+
 
 # ------------------------------------------------------------
-# Hardened Test Execution
+# PACKAGING STAGE
 # ------------------------------------------------------------
-- script: |
-    set -euo pipefail
-    
-    # Limit GC for CI agents to prevent OOM kills
-    export DOTNET_GCHeapHardLimitPercent=20
-    
-    dotnet test \
-      --configuration $(buildConfiguration) \
-      --no-build \
-      --logger "trx" \
-      --filter "SkipInCI!=true" \
-      --blame-crash \
-      --blame-hang-timeout 10m \
-      -- RunConfiguration.DisableParallelization=false
-  displayName: 'Test (Hardened & Optimized)'
+- stage: Package
+  displayName: Package
+  dependsOn: Tests
+  condition: succeeded()
 
-- script: |
-    set -euo pipefail
-    dotnet pack --configuration $(buildConfiguration) --no-build --output $(outputDir)
-  displayName: 'Pack'
+  jobs:
+  - job: pack
+    steps:
+    - download: current
+      artifact: drop
 
-- script: |
-    set -euo pipefail
-    dotnet nuget push "$(outputDir)/*.nupkg" \
-      --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/V3/index.json" \
-      --api-key $(System.AccessToken) \
-      --skip-duplicate
-  displayName: 'Publish to Azure Feed'
+    - script: |
+        set -euo pipefail
+        dotnet pack --configuration $(buildConfiguration) --no-build --output $(outputDir)
+      displayName: Pack NuGet
+
+    - task: NuGetAuthenticate@1
+
+    - script: |
+        set -euo pipefail
+        dotnet nuget push "$(outputDir)/*.nupkg" \
+          --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/V3/index.json" \
+          --api-key $(System.AccessToken) \
+          --skip-duplicate
+      displayName: Publish NuGet
+
+
+# ------------------------------------------------------------
+# GIT SYNC (separated from build/test pressure)
+# ------------------------------------------------------------
+- stage: Sync
+  displayName: Sync Repos
+  dependsOn: Package
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
 
-# ------------------------------------------------------------
-# Git Synchronization
-# ------------------------------------------------------------
-- script: |
-    set -euo pipefail
-    git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || true
-    git push --force github origin/Develop:refs/heads/develop
-  displayName: 'Sync GitHub: Develop'
-  env:
-    GITHUB_USER: $(GITHUB_USER)
-    GITHUB_TOKEN: $(GITHUB_TOKEN)
+  jobs:
+  - job: github_sync
+    steps:
 
-- script: |
-    set -euo pipefail
-    git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || true
-    git push --force github origin/main:refs/heads/main
-    git fetch --tags --force
-    LATEST_TAG=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 || true)
-    if [ -n "$LATEST_TAG" ]; then git push github "$LATEST_TAG"; fi
-  displayName: 'Sync GitHub: Main + Tags'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  env:
-    GITHUB_USER: $(GITHUB_USER)
-    GITHUB_TOKEN: $(GITHUB_TOKEN)
+    - checkout: self
+      persistCredentials: true
+      fetchDepth: 0
+
+    - script: |
+        set -euo pipefail
+        git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || true
+        git push --force github origin/Develop:refs/heads/develop
+      displayName: Sync Develop
+
+    - script: |
+        set -euo pipefail
+        git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || true
+        git push --force github origin/main:refs/heads/main
+        git fetch --tags --force
+
+        LATEST_TAG=$(git describe --tags --abbrev=0 || true)
+        if [ -n "$LATEST_TAG" ]; then
+          git push github "$LATEST_TAG"
+        fi
+      displayName: Sync Main + Tags
