@@ -58,7 +58,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.Business.Tests \
+        dotnet test Franz.Common.Business.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx \
@@ -73,7 +73,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.Caching.Tests \
+        dotnet test Franz.Common.Caching.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx
@@ -87,7 +87,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.Mapping.Tests \
+        dotnet test Franz.Common.Mapping.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx
@@ -101,7 +101,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.Messaging.Tests \
+        dotnet test Franz.Common.Messaging.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx
@@ -115,7 +115,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.Messaging.Kafka.Tests \
+        dotnet test Franz.Common.Messaging.Kafka.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx
@@ -129,7 +129,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.Messaging.RabbitMQ.Tests \
+        dotnet test Franz.Common.Messaging.RabbitMQ.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx
@@ -143,7 +143,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.Messaging.Hosting.Kafka.Tests \
+        dotnet test Franz.Common.Messaging.Hosting.Kafka.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx
@@ -156,7 +156,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.Messaging.Hosting.RabbitMQ.Tests \
+        dotnet test Franz.Common.Messaging.Hosting.RabbitMQ.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx
@@ -170,7 +170,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.EntityFramework.SQLServer.Tests \
+        dotnet test Franz.Common.EntityFramework.SQLServer.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx
@@ -183,7 +183,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.EntityFramework.Postgres.Tests \
+        dotnet test Franz.Common.EntityFramework.Postgres.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx
@@ -196,7 +196,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.EntityFramework.Oracle.Tests \
+        dotnet test Franz.Common.EntityFramework.Oracle.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx
@@ -211,7 +211,7 @@ stages:
       artifact: drop
 
     - script: |
-        dotnet test Franz.Common.AzureCosmosDB.Tests \
+        dotnet test Franz.Common.AzureCosmosDB.Tests.csproj \
           --configuration $(buildConfiguration) \
           --no-build \
           --logger trx \
