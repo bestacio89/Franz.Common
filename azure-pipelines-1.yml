@@ -20,7 +20,7 @@ variables:
 stages:
 
 # ============================================================
-# BUILD (single source of truth)
+# BUILD — single restore + build, publish binaries as artifact
 # ============================================================
 - stage: Build
   displayName: Build
@@ -51,9 +51,14 @@ stages:
         dotnet build --configuration $(buildConfiguration) --no-restore
       displayName: Build
 
+    # Publish the entire repo + build outputs so test jobs never rebuild
+    - publish: $(System.DefaultWorkingDirectory)
+      artifact: built-sources
+      displayName: Publish built sources
+
 
 # ============================================================
-# TESTS 
+# TESTS — all jobs download the same artifact, run in parallel
 # ============================================================
 - stage: Tests
   displayName: Tests
@@ -61,11 +66,17 @@ stages:
 
   jobs:
 
+  # Shared step template anchor — keeps each job DRY
+  # Each job downloads the pre-built artifact and runs its test project.
+  # No checkout, no restore, no rebuild.
+
   # ---------------- CORE ----------------
   - job: unit_tests
     displayName: Unit Tests (Fast Gate)
     steps:
-    - checkout: self
+    - download: current
+      artifact: built-sources
+      displayName: Download built sources
 
     - task: UseDotNet@2
       inputs:
@@ -74,214 +85,196 @@ stages:
 
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.Business.Tests.csproj \
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Business.Tests.csproj \
           --configuration $(buildConfiguration) \
+          --no-build \
           --logger trx
       displayName: Run Unit Tests
 
-  # ---------------- CACHE ----------------
+  # ---------------- PARALLEL BATCH (all independent of each other) ----------------
+  # These all depend on unit_tests passing first, then run concurrently.
+
   - job: cache_tests
+    displayName: Cache Tests
     dependsOn: unit_tests
     steps:
-    - checkout: self
-
+    - download: current
+      artifact: built-sources
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
-
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.Caching.Tests.csproj \
-          --configuration $(buildConfiguration) \
-          --logger trx
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Caching.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
       displayName: Cache Tests
 
-  # ---------------- MAPPING ----------------
   - job: mapping_tests
+    displayName: Mapping Tests
     dependsOn: unit_tests
     steps:
-    - checkout: self
-
+    - download: current
+      artifact: built-sources
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
-
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.Mapping.Tests.csproj \
-          --configuration $(buildConfiguration) \
-          --logger trx
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Mapping.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
       displayName: Mapping Tests
 
-  # ---------------- MESSAGING CORE ----------------
   - job: messaging_core
+    displayName: Messaging Core Tests
     dependsOn: unit_tests
     steps:
-    - checkout: self
-
+    - download: current
+      artifact: built-sources
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
-
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.Messaging.Tests.csproj \
-          --configuration $(buildConfiguration) \
-          --logger trx
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
       displayName: Messaging Core Tests
 
-  # ---------------- KAFKA ----------------
   - job: kafka_tests
+    displayName: Kafka Tests
     dependsOn: unit_tests
     steps:
-    - checkout: self
-
+    - download: current
+      artifact: built-sources
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
-
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.Messaging.Kafka.Tests.csproj \
-          --configuration $(buildConfiguration) \
-          --logger trx
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Kafka.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
       displayName: Kafka Tests
 
-  # ---------------- RABBITMQ ----------------
   - job: rabbitmq_tests
+    displayName: RabbitMQ Tests
     dependsOn: unit_tests
     steps:
-    - checkout: self
-
+    - download: current
+      artifact: built-sources
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
-
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.Messaging.RabbitMQ.Tests.csproj \
-          --configuration $(buildConfiguration) \
-          --logger trx
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.RabbitMQ.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
       displayName: RabbitMQ Tests
 
-  # ---------------- HOSTING KAFKA ----------------
   - job: kafka_hosting_tests
+    displayName: Kafka Hosting Tests
     dependsOn: unit_tests
     steps:
-    - checkout: self
-
+    - download: current
+      artifact: built-sources
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
-
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.Messaging.Hosting.Kafka.Tests.csproj \
-          --configuration $(buildConfiguration) \
-          --logger trx
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Hosting.Kafka.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
       displayName: Kafka Hosting Tests
 
-  # ---------------- HOSTING RABBITMQ ----------------
   - job: rabbitmq_hosting_tests
+    displayName: RabbitMQ Hosting Tests
     dependsOn: unit_tests
     steps:
-    - checkout: self
-
+    - download: current
+      artifact: built-sources
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
-
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.Messaging.Hosting.RabbitMQ.Tests.csproj \
-          --configuration $(buildConfiguration) \
-          --logger trx
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Hosting.RabbitMQ.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
       displayName: RabbitMQ Hosting Tests
 
-  # ---------------- EF SQLSERVER ----------------
   - job: ef_sqlserver
+    displayName: SQLServer Tests
     dependsOn: unit_tests
     steps:
-    - checkout: self
-
+    - download: current
+      artifact: built-sources
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
-
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.EntityFramework.SQLServer.Tests.csproj \
-          --configuration $(buildConfiguration) \
-          --logger trx
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.EntityFramework.SQLServer.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
       displayName: SQLServer Tests
 
-  # ---------------- EF POSTGRES ----------------
   - job: ef_postgres
+    displayName: Postgres Tests
     dependsOn: unit_tests
     steps:
-    - checkout: self
-
+    - download: current
+      artifact: built-sources
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
-
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.EntityFramework.Postgres.Tests.csproj \
-          --configuration $(buildConfiguration) \
-          --logger trx
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.EntityFramework.Postgres.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
       displayName: Postgres Tests
 
-  # ---------------- EF ORACLE ----------------
   - job: ef_oracle
+    displayName: Oracle Tests
     dependsOn: unit_tests
     steps:
-    - checkout: self
-
+    - download: current
+      artifact: built-sources
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
-
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.EntityFramework.Oracle.Tests.csproj \
-          --configuration $(buildConfiguration) \
-          --logger trx
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.EntityFramework.Oracle.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
       displayName: Oracle Tests
 
-  # ---------------- COSMOS ----------------
   - job: cosmos_tests
+    displayName: Cosmos Tests
     dependsOn: unit_tests
     timeoutInMinutes: 30
     steps:
-    - checkout: self
-
+    - download: current
+      artifact: built-sources
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: '10.0.200'
-
     - script: |
         set -euo pipefail
-        dotnet test tests/*/Franz.Common.AzureCosmosDB.Tests.csproj \
-          --configuration $(buildConfiguration) \
-          --logger trx \
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.AzureCosmosDB.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx \
           --blame-hang-timeout 10m
       displayName: Cosmos Tests
 
 
 # ============================================================
-# PACKAGE
+# PACKAGE — downloads same artifact, no restore needed
 # ============================================================
 - stage: Package
   displayName: Package
@@ -290,10 +283,12 @@ stages:
 
   jobs:
   - job: pack
-    steps:
+    displayName: Pack and Publish NuGet
 
-    - checkout: self
-      fetchDepth: 0
+    steps:
+    - download: current
+      artifact: built-sources
+      displayName: Download built sources
 
     - task: UseDotNet@2
       inputs:
@@ -302,17 +297,11 @@ stages:
 
     - task: NuGetAuthenticate@1
 
-    # CRITICAL FIX: restore solution BEFORE pack
     - script: |
         set -euo pipefail
-        dotnet restore
-      displayName: Restore (required for pack)
-
-    - script: |
-        set -euo pipefail
-        dotnet pack \
+        dotnet pack $(Pipeline.Workspace)/built-sources \
           --configuration $(buildConfiguration) \
-          --no-restore \
+          --no-build \
           --output $(outputDir)
       displayName: Pack NuGet
 
@@ -335,8 +324,9 @@ stages:
 
   jobs:
   - job: github_sync
-    steps:
+    displayName: Sync to GitHub
 
+    steps:
     - checkout: self
       fetchDepth: 0
       persistCredentials: true
@@ -345,4 +335,5 @@ stages:
         set -euo pipefail
         git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || true
         git push --force github origin/main:refs/heads/main
-      displayName: Sync Main
+        git push --force github origin/develop:refs/heads/develop
+      displayName: Sync main and develop
