@@ -20,29 +20,24 @@ variables:
   value: 'AjnaTellus'
 
 # ------------------------------------------------------------
-# BUILD STAGE (single source of truth)
+# BUILD
 # ------------------------------------------------------------
-stages:
-
 - stage: Build
   displayName: Build
   jobs:
   - job: build
-    displayName: Build Solution
     steps:
 
     - checkout: self
-      persistCredentials: true
       fetchDepth: 0
-
-    - task: NuGetAuthenticate@1
-      displayName: Authenticate Azure Artifacts
+      persistCredentials: true
 
     - task: UseDotNet@2
-      displayName: Use .NET SDK 10.x
       inputs:
         packageType: sdk
         version: '10.0.200'
+
+    - task: NuGetAuthenticate@1
 
     - script: |
         set -euo pipefail
@@ -54,8 +49,16 @@ stages:
         dotnet build --configuration $(buildConfiguration) --no-restore
       displayName: Build
 
-    - publish: .
-      artifact: drop
+    # 🔥 IMPORTANT: persist build outputs properly
+    - script: |
+        mkdir -p $(Build.ArtifactStagingDirectory)/build
+        cp -r **/bin $(Build.ArtifactStagingDirectory)/build || true
+        cp -r **/obj $(Build.ArtifactStagingDirectory)/build || true
+      displayName: Stage Build Outputs
+
+    - publish: $(Build.ArtifactStagingDirectory)/build
+      artifact: build_outputs
+
 
 
 # ------------------------------------------------------------
@@ -264,25 +267,37 @@ stages:
 
 
 # ------------------------------------------------------------
-# PACKAGING STAGE
+# PACKAGE (GATED BY TEST SUCCESS)
 # ------------------------------------------------------------
 - stage: Package
   displayName: Package
-  dependsOn: Tests
+  dependsOn: Test
   condition: succeeded()
 
   jobs:
   - job: pack
     steps:
-    - download: current
-      artifact: drop
+
+    - checkout: self
+      fetchDepth: 0
+
+    - task: UseDotNet@2
+      inputs:
+        packageType: sdk
+        version: '10.0.200'
+
+    - task: NuGetAuthenticate@1
+
+    # 🔥 SAFE: restore again (this is intentional)
+    - script: |
+        set -euo pipefail
+        dotnet restore
+      displayName: Restore
 
     - script: |
         set -euo pipefail
-        dotnet pack --configuration $(buildConfiguration) --no-build --output $(outputDir)
+        dotnet pack --configuration $(buildConfiguration) --no-restore --output $(outputDir)
       displayName: Pack NuGet
-
-    - task: NuGetAuthenticate@1
 
     - script: |
         set -euo pipefail
