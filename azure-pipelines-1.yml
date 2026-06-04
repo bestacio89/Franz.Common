@@ -321,6 +321,52 @@ stages:
 
       displayName: Restore for Packaging
 
+   # ============================================================
+# PACKAGE — downloads validated build artifact and publishes NuGet
+# ============================================================
+- stage: Package
+  displayName: Package
+  dependsOn: Tests
+  condition: succeeded()
+
+  jobs:
+  - job: pack
+    displayName: Pack and Publish NuGet
+
+    steps:
+    # ------------------------------------------------------------
+    # 1. Download build artifact
+    # ------------------------------------------------------------
+    - download: current
+      artifact: built-sources
+      displayName: Download build artifact
+
+    # ------------------------------------------------------------
+    # 2. Install .NET SDK
+    # ------------------------------------------------------------
+    - task: UseDotNet@2
+      inputs:
+        packageType: sdk
+        version: '10.0.200'
+
+    # ------------------------------------------------------------
+    # 3. Authenticate Azure Artifacts feed
+    # ------------------------------------------------------------
+    - task: NuGetAuthenticate@1
+
+    # ------------------------------------------------------------
+    # 4. RESTORE (required for dotnet pack correctness)
+    # ------------------------------------------------------------
+    - script: |
+        set -euo pipefail
+
+        echo "Restoring dependencies for packaging..."
+
+        dotnet restore $(Pipeline.Workspace)/built-sources/sources \
+          --disable-parallel
+
+      displayName: Restore for Packaging
+
     # ------------------------------------------------------------
     # 5. PACK
     # ------------------------------------------------------------
@@ -335,15 +381,14 @@ stages:
       displayName: Pack NuGet
 
     # ------------------------------------------------------------
-    # 6. PUSH (FIXED AUTH MODEL)
+    # 6. PUBLISH (CORRECT Azure Artifacts method)
     # ------------------------------------------------------------
-    - task: DotNetCoreCLI@2
+    - task: NuGetCommand@2
       displayName: Publish NuGet
       inputs:
         command: push
         packagesToPush: '$(outputDir)/*.nupkg'
-        nuGetFeedType: external
-        publishFeedCredentials: '$(feedName)'
+        publishVstsFeed: 'AjnaTellus'
 
 
 # ============================================================
