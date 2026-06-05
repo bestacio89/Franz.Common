@@ -5,10 +5,7 @@ project.lock.json
 *.pyc
 nupkg/
 *.nupkg
-*.ps1
-!renamesolution.ps1
-!franzartifactpublisher.ps1
-!nugetpublish.ps1
+
 # Visual Studio Code
 .vscode
 
@@ -43,5 +40,5 @@ TestResults
 
 # Visual Studio
 .vs/
-*.ps1
 *.config
+legacyscripts/
