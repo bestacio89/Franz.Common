@@ -299,7 +299,12 @@ stages:
 
     - script: |
         set -euo pipefail
-        dotnet pack           --configuration $(buildConfiguration)           --no-restore           --output $(outputDir)
+        dotnet build --configuration $(buildConfiguration) --no-restore
+      displayName: Build
+
+    - script: |
+        set -euo pipefail
+        dotnet pack           --configuration $(buildConfiguration)           --no-restore           --no-build           --output $(outputDir)
       displayName: Pack NuGet
 
     # PowerShell@2 uses pwsh on Linux — correct runtime for .ps1 files.
