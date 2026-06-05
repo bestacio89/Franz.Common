@@ -51,7 +51,6 @@ stages:
         dotnet build --configuration $(buildConfiguration) --no-restore
       displayName: Build
 
-    # Publish the entire repo + build outputs so test jobs never rebuild
     - publish: $(System.DefaultWorkingDirectory)
       artifact: built-sources
       displayName: Publish built sources
@@ -65,10 +64,6 @@ stages:
   dependsOn: Build
 
   jobs:
-
-  # Shared step template anchor — keeps each job DRY
-  # Each job downloads the pre-built artifact and runs its test project.
-  # No checkout, no restore, no rebuild.
 
   # ---------------- CORE ----------------
   - job: unit_tests
@@ -91,8 +86,7 @@ stages:
           --logger trx
       displayName: Run Unit Tests
 
-  # ---------------- PARALLEL BATCH (all independent of each other) ----------------
-  # These all depend on unit_tests passing first, then run concurrently.
+  # ---------------- PARALLEL BATCH ----------------
 
   - job: cache_tests
     displayName: Cache Tests
@@ -274,7 +268,7 @@ stages:
 
 
 # ============================================================
-# PACKAGE — calling the disciplined .ps1 publishers
+# PACKAGE — PowerShell@2 invokes .ps1 correctly on Linux runners
 # ============================================================
 - stage: Package
   displayName: Package
@@ -294,23 +288,26 @@ stages:
         packageType: sdk
         version: '10.0.200'
 
-    # Ensure scripts are executable
-    - script: chmod +x Publish-Azure.ps1 Publish-NuGet.ps1
-      displayName: Make scripts executable
+    # PowerShell@2 uses pwsh on Linux — correct runtime for .ps1 files.
+    # chmod +x is irrelevant for PowerShell scripts and has been removed.
 
-    # 1. Publish to Franz Artifact (Azure)
-    - script: |
-        ./Publish-Azure.ps1
+    - task: PowerShell@2
       displayName: Publish to Franz Artifact
+      inputs:
+        filePath: '$(Pipeline.Workspace)/built-sources/AzureArtifactPublisher.ps1'
+        pwsh: true
       env:
-        AZURE_DEVOPS_PAT: $(PAT) # Using pipeline token
+        PAT: $(PAT)
 
-    # 2. Publish to NuGet.org
-    - script: |
-        ./Publish-NuGet.ps1
+    - task: PowerShell@2
       displayName: Publish to NuGet.org
+      inputs:
+        filePath: '$(Pipeline.Workspace)/built-sources/nugetpublish.ps1'
+        pwsh: true
       env:
-        NUGET_API_KEY: $(API_Key) # Defined in your Pipeline Secrets
+        API_KEY: $(API_Key)
+
+
 # ============================================================
 # SYNC
 # ============================================================
