@@ -6,6 +6,9 @@ project.lock.json
 nupkg/
 *.nupkg
 *.ps1
+!renamesolution.ps1
+!franzartifactpublisher.ps1
+!nugetpublish.ps1
 # Visual Studio Code
 .vscode
 

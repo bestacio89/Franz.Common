@@ -274,7 +274,7 @@ stages:
 
 
 # ============================================================
-# PACKAGE — fully deterministic NuGet publish
+# PACKAGE — calling the disciplined .ps1 publishers
 # ============================================================
 - stage: Package
   displayName: Package
@@ -283,8 +283,7 @@ stages:
 
   jobs:
   - job: pack
-    displayName: Pack and Publish NuGet
-
+    displayName: Pack and Publish
     steps:
     - download: current
       artifact: built-sources
@@ -295,45 +294,23 @@ stages:
         packageType: sdk
         version: '10.0.200'
 
-    - task: NuGetAuthenticate@1
+    # Ensure scripts are executable
+    - script: chmod +x Publish-Azure.ps1 Publish-NuGet.ps1
+      displayName: Make scripts executable
 
-    # ------------------------------------------------------------
-    # 🔒 HARD RULE: reuse EXACT restore from Build stage
-    # ------------------------------------------------------------
+    # 1. Publish to Franz Artifact (Azure)
     - script: |
-        set -euo pipefail
+        ./Publish-Azure.ps1
+      displayName: Publish to Franz Artifact
+      env:
+        AZURE_DEVOPS_PAT: $(PAT) # Using pipeline token
 
-        echo "Reusing already restored assets (NO RESTORE HERE)"
-
-        # ensure no accidental restore happens
-        export DOTNET_NOLOGO=1
-        export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
-        export NUGET_XMLDOC_MODE=skip
-
-        # pack ONLY from known project roots, not solution
-        find $(Pipeline.Workspace)/built-sources/sources \
-          -name "*.csproj" \
-          -exec dotnet pack {} \
-            --configuration $(buildConfiguration) \
-            --no-restore \
-            --no-build \
-            --output $(outputDir) \;
-
-      displayName: Pack NuGet (Deterministic Project-Level)
-
-    # ------------------------------------------------------------
-    # Publish (fully deterministic artifacts only)
-    # ------------------------------------------------------------
+    # 2. Publish to NuGet.org
     - script: |
-        set -euo pipefail
-
-        dotnet nuget push "$(outputDir)/*.nupkg" \
-          --source "https://pkgs.dev.azure.com/$(azureOrg)/_packaging/$(feedName)/nuget/V3/index.json" \
-          --api-key $(System.AccessToken) \
-          --skip-duplicate
-
-      displayName: Publish NuGete
-
+        ./Publish-NuGet.ps1
+      displayName: Publish to NuGet.org
+      env:
+        NUGET_API_KEY: $(API_Key) # Defined in your Pipeline Secrets
 # ============================================================
 # SYNC
 # ============================================================
