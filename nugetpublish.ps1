@@ -1,41 +1,47 @@
-# Specify the NuGet repository URL
-$FEED_URL = "https://api.nuget.org/v3/index.json"
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$PackagesDirectory
+)
 
-# SECURE: Pull API Key from Environment Variable
-# Set this in your terminal with: $env:NUGET_API_KEY = "your-key-here"
+$FEED_URL = "https://api.nuget.org/v3/index.json"
 $API_KEY = $env:NUGET_API_KEY
 
 if ([string]::IsNullOrWhiteSpace($API_KEY)) {
-    Write-Host "Error: NUGET_API_KEY environment variable is not set." -ForegroundColor Red
+    Write-Error "NUGET_API_KEY environment variable is not set."
     exit 1
 }
 
-$PACKAGES_DIRECTORY = "NuGetPackages"
-
-if (-Not (Test-Path -Path $PACKAGES_DIRECTORY)) {
-    Write-Host "Packages directory does not exist: $PACKAGES_DIRECTORY" -ForegroundColor Red
+if (-not (Test-Path $PackagesDirectory)) {
+    Write-Error "Package directory not found: $PackagesDirectory"
     exit 1
 }
 
-Write-Host "Packaging projects into NuGet packages..."
-# Added explicit clean to ensure we don't pick up 'ghost' files
-dotnet clean
-dotnet pack -c Release -o $PACKAGES_DIRECTORY
+$packages = Get-ChildItem `
+    -Path $PackagesDirectory `
+    -Filter "*.nupkg" `
+    -File |
+    Sort-Object Name
 
-Write-Host "Publishing packages to NuGet feed..."
-$packages = Get-ChildItem -Path $PACKAGES_DIRECTORY -Filter *.nupkg
+if ($packages.Count -eq 0) {
+    Write-Error "No packages found in $PackagesDirectory"
+    exit 1
+}
+
+Write-Host "Found $($packages.Count) package(s)"
 
 foreach ($package in $packages) {
-    # Using 'dotnet nuget push' directly is safer than listing/checking via CLI
-    # --skip-duplicate handles the 'already exists' check automatically on the server side
-    Write-Host "Pushing $($package.Name)..."
+
+    Write-Host "Publishing $($package.Name)..."
+
     dotnet nuget push $package.FullName `
         --source $FEED_URL `
         --api-key $API_KEY `
         --skip-duplicate
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed publishing $($package.Name)"
+        exit $LASTEXITCODE
+    }
 }
 
-Write-Host "Cleaning up package directory..."
-Remove-Item -Path "$PACKAGES_DIRECTORY\*" -Force
-
-Write-Host "Publishing complete."
+Write-Host "NuGet publishing complete."
