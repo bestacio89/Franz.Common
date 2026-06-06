@@ -348,5 +348,5 @@ stages:
         set -euo pipefail
         git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || true
         git push --force github origin/main:refs/heads/main
-        git push --force github origin/develop:refs/heads/develop
+        git push --force github origin/Develop:refs/heads/develop
       displayName: Sync main and develop
