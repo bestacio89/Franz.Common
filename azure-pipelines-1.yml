@@ -313,11 +313,10 @@ stages:
     - task: PowerShell@2
       displayName: Publish to Franz Artifact
       inputs:
-        filePath: '$(System.DefaultWorkingDirectory)/FranzArtifactPublisher.ps1'
-        pwsh: true
-      env:
-        AZURE_DEVOPS_PAT: $(PAT)
-
+          filePath: '$(System.DefaultWorkingDirectory)/FranzArtifactPublisher.ps1'
+          arguments: '-PackagesDirectory "$(outputDir)"'
+          pwsh: true
+    
     - task: PowerShell@2
       displayName: Publish to NuGet.org
       inputs:
