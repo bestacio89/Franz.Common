@@ -8,7 +8,7 @@ $PROJECT_PATH = "sources/Franz.Common.Business/Franz.Common.Business.csproj"
 
 # 1. Clean Room Setup
 Write-Host "Cleaning workspace..."
-Remove-Item -Path $PACKAGES_DIRECTORY -Recurse -ErrorAction SilentlyIgnore
+Remove-Item -Path $PACKAGES_DIRECTORY -Recurse -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $PACKAGES_DIRECTORY | Out-Null
 
 # 2. Strict Build & Pack
