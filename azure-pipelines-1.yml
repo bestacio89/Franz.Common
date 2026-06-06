@@ -321,6 +321,7 @@ stages:
       displayName: Publish to NuGet.org
       inputs:
         filePath: '$(System.DefaultWorkingDirectory)/nugetpublish.ps1'
+        arguments: '-PackagesDirectory "$(outputDir)"'
         pwsh: true
       env:
         NUGET_API_KEY: $(API_Key)
