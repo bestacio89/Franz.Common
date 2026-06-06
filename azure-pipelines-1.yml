@@ -313,7 +313,7 @@ stages:
     - task: PowerShell@2
       displayName: Publish to Franz Artifact
       inputs:
-        filePath: '$(System.DefaultWorkingDirectory)/AzureArtifactPublisher.ps1'
+        filePath: '$(System.DefaultWorkingDirectory)/FranzArtifactPublisher.ps1'
         pwsh: true
       env:
         AZURE_DEVOPS_PAT: $(PAT)
