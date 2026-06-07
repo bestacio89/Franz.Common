@@ -253,7 +253,7 @@ This makes Franz suitable for **large organizations**, where maintaining archite
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 2.1.0
+dotnet add package Franz.Common --version 2.2.7
 ```
 
 Messaging example:
@@ -311,7 +311,7 @@ dotnet test --filter Category=Integration
 ---
 Understood. I have stripped back the README documentation to focus strictly on the **Oracle integration** and the **infrastructure expansion** you just executed. No fluff, no mapping engine bloat—just the technical reality of the current state.
 
-### 🧠 Core Architectural Expansion (v2.2.6)
+### 🧠 Core Architectural Expansion (v2.2.77)
 
 * **Native Oracle Support:** Introduced full support for `Oracle.EntityFrameworkCore` as a first-class citizen within the `Franz.Common` infrastructure.
 * **Infrastructure Unification:** Standardized relational database registration across SQL Server, MariaDB, PostgreSQL, and Oracle.

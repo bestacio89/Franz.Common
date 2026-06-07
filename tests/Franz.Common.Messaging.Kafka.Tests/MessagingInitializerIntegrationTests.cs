@@ -10,7 +10,6 @@ using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
 using Moq;
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -27,11 +26,16 @@ public sealed class KafkaMessagingInitializerIntegrationTests
     _fixture = fixture ?? throw new ArgumentNullException(nameof(fixture));
   }
 
+  // =========================================================
+  // FACTORY HELPERS
+  // =========================================================
+
   private KafkaMessagingInitializer CreateSut(
-    IAssemblyAccessor? accessor = null,
-    KafkaMessagingOptions? optionsOverride = null)
+      IAssemblyAccessor? accessor = null,
+      KafkaMessagingOptions? options = null,
+      bool perEvent = false)
   {
-    var options = Options.Create(optionsOverride ?? new KafkaMessagingOptions
+    var opts = Options.Create(options ?? new KafkaMessagingOptions
     {
       GroupId = "test-group",
       BootstrapServers = _fixture.BootstrapServers,
@@ -39,14 +43,16 @@ public sealed class KafkaMessagingInitializerIntegrationTests
       Failure = { DeadLetterTopic = "dead-letter-topic" }
     });
 
-    var assemblyAccessor = accessor ?? BuildDefaultAccessor();
-
     var adminClient = new AdminClientBuilder(new AdminClientConfig
     {
       BootstrapServers = _fixture.BootstrapServers
     }).Build();
 
-    return new KafkaMessagingInitializer(adminClient, assemblyAccessor, options);
+    return new KafkaMessagingInitializer(
+        adminClient,
+        accessor ?? BuildDefaultAccessor(),
+        opts,
+        perEvent);
   }
 
   private static IAssemblyAccessor BuildDefaultAccessor()
@@ -56,26 +62,50 @@ public sealed class KafkaMessagingInitializerIntegrationTests
 
     mockAssembly.Setup(a => a.Name).Returns("Franz.TestProject.Api");
     mockAssembly.Setup(a => a.Assembly)
-      .Returns(typeof(KafkaMessagingInitializer).Assembly);
+        .Returns(typeof(KafkaMessagingInitializer).Assembly);
 
     accessorMock.Setup(a => a.GetEntryAssembly())
-      .Returns(mockAssembly.Object);
+        .Returns(mockAssembly.Object);
 
     return accessorMock.Object;
   }
 
+  // Accessor that returns the TEST assembly as entry assembly.
+  // Company prefix = "Franz" which matches Franz.Common.Messaging.Kafka.Tests
+  // so DiscoverIntegrationEventTopics() finds TestIntegrationEventHandler.
+  private static IAssemblyAccessor BuildIntegrationAccessor()
+  {
+    var accessorMock = new Mock<IAssemblyAccessor>();
+    var mockAssembly = new Mock<IAssembly>();
+
+    // Use "Franz.TestProject.Api" — prefix "Franz" matches the test assembly
+    mockAssembly.Setup(a => a.Name).Returns("Franz.TestProject.Api");
+    mockAssembly.Setup(a => a.Assembly)
+        .Returns(typeof(TestIntegrationEventHandler).Assembly);
+
+    accessorMock.Setup(a => a.GetEntryAssembly())
+        .Returns(mockAssembly.Object);
+
+    return accessorMock.Object;
+  }
+
+  private IAdminClient BuildAdminClient()
+      => new AdminClientBuilder(new AdminClientConfig
+      {
+        BootstrapServers = _fixture.BootstrapServers
+      }).Build();
+
+  // =========================================================
+  // SYSTEM MODE TESTS
+  // =========================================================
+
   [Fact]
   public async Task InitializeAsync_ShouldCreateConfiguredTopics()
   {
-    var sut = CreateSut();
-
+    var sut = CreateSut(perEvent: false);
     await sut.InitializeAsync();
 
-    using var admin = new AdminClientBuilder(new AdminClientConfig
-    {
-      BootstrapServers = _fixture.BootstrapServers
-    }).Build();
-
+    using var admin = BuildAdminClient();
     var metadata = admin.GetMetadata(TimeSpan.FromSeconds(10));
 
     metadata.Topics.Should().Contain(t => t.Topic == "main-topic");
@@ -85,56 +115,87 @@ public sealed class KafkaMessagingInitializerIntegrationTests
   [Fact]
   public async Task InitializeAsync_ShouldBeIdempotent()
   {
-    var sut = CreateSut();
+    var sut = CreateSut(perEvent: false);
 
     await sut.InitializeAsync();
     await sut.InitializeAsync();
 
-    true.Should().BeTrue(); // idempotency verified via no exception + stable broker state
+    true.Should().BeTrue();
   }
 
   [Fact]
-  public async Task InitializeAsync_ShouldCreateIntegrationEventTopic()
+  public async Task InitializeAsync_SystemMode_ShouldCreateAssemblyBasedIntegrationEventTopic()
   {
-    var accessor = BuildIntegrationAccessor();
-
-    var sut = CreateSut(accessor);
-
+    var sut = CreateSut(BuildIntegrationAccessor(), perEvent: false);
     await sut.InitializeAsync();
 
-    var expectedTopic =
-      TopicNamer.GetTopicName(new AssemblyWrapper(typeof(TestIntegrationEventHandler).Assembly));
+    var expectedTopic = TopicNamer.GetTopicName(
+        new AssemblyWrapper(typeof(TestIntegrationEventHandler).Assembly));
 
-    using var admin = new AdminClientBuilder(new AdminClientConfig
-    {
-      BootstrapServers = _fixture.BootstrapServers
-    }).Build();
-
+    using var admin = BuildAdminClient();
     var metadata = admin.GetMetadata(TimeSpan.FromSeconds(10));
 
     metadata.Topics.Should().Contain(t => t.Topic == expectedTopic);
   }
 
-  private static IAssemblyAccessor BuildIntegrationAccessor()
+  // =========================================================
+  // EVENT MODE TESTS
+  // =========================================================
+
+  [Fact]
+  public async Task InitializeAsync_EventMode_ShouldCreateEventTypeBasedTopic()
   {
-    var accessorMock = new Mock<IAssemblyAccessor>();
-    var mockAssembly = new Mock<IAssembly>();
+    var sut = CreateSut(BuildIntegrationAccessor(), perEvent: true);
+    await sut.InitializeAsync();
 
-    mockAssembly.Setup(a => a.Name).Returns("Franz.TestProject.Api");
-    mockAssembly.Setup(a => a.Assembly)
-      .Returns(typeof(TestIntegrationEventHandler).Assembly);
+    // TestIntegrationEvent → "test-integration-in"
+    var expectedTopic = TopicNamer.GetTopicName(typeof(TestIntegrationEvent));
+    var expectedDlt = TopicNamer.GetDeadLetterTopicName(typeof(TestIntegrationEvent));
 
-    accessorMock.Setup(a => a.GetEntryAssembly())
-      .Returns(mockAssembly.Object);
+    using var admin = BuildAdminClient();
+    var metadata = admin.GetMetadata(TimeSpan.FromSeconds(10));
 
-    return accessorMock.Object;
+    metadata.Topics.Should().Contain(t => t.Topic == expectedTopic,
+        because: $"event mode must create topic '{expectedTopic}' for TestIntegrationEvent");
+
+    metadata.Topics.Should().Contain(t => t.Topic == expectedDlt,
+        because: $"event mode must create DLT '{expectedDlt}' for TestIntegrationEvent");
   }
+
+  [Fact]
+  public async Task InitializeAsync_EventMode_TopicNameDiffersFromSystemMode()
+  {
+    var systemTopic = TopicNamer.GetTopicName(
+        new AssemblyWrapper(typeof(TestIntegrationEventHandler).Assembly));
+
+    var eventTopic = TopicNamer.GetTopicName(typeof(TestIntegrationEvent));
+
+    systemTopic.Should().NotBe(eventTopic,
+        because: "system and event modes must produce distinct topic names");
+  }
+
+  [Fact]
+  public async Task InitializeAsync_EventMode_ShouldBeIdempotent()
+  {
+    var sut = CreateSut(BuildIntegrationAccessor(), perEvent: true);
+
+    await sut.InitializeAsync();
+    await sut.InitializeAsync();
+
+    true.Should().BeTrue();
+  }
+
+  // =========================================================
+  // TEST DOMAIN TYPES
+  // =========================================================
 
   public class TestIntegrationEvent : IIntegrationEvent { }
 
   public class TestIntegrationEventHandler : INotificationHandler<TestIntegrationEvent>
   {
-    public Task Handle(TestIntegrationEvent notification, CancellationToken cancellationToken)
-      => Task.CompletedTask;
+    public Task Handle(
+        TestIntegrationEvent notification,
+        CancellationToken cancellationToken)
+        => Task.CompletedTask;
   }
 }

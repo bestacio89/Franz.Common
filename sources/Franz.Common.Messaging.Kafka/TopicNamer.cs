@@ -3,6 +3,7 @@ using Franz.Common.Annotations;
 using Franz.Common.Reflection;
 using Microsoft.AspNetCore.Mvc;
 using System.Reflection;
+using System.Text.RegularExpressions;
 
 namespace Franz.Common.Messaging.Kafka;
 
@@ -11,14 +12,16 @@ public static class TopicNamer
   private const string TopicSuffixName = "-in";
   private const string DeadLetterTopicSuffixName = "-in-dlt";
 
+  // =========================================================
+  // SYSTEM MODE — assembly-based (one topic per service)
+  // =========================================================
+
   public static string GetTopicName(IAssembly assembly)
   {
     ArgumentNullException.ThrowIfNull(assembly);
 
     var reflectionAssembly = assembly.Assembly;
 
-    // Senior Note: Scan for a controller that explicitly has our attribute first.
-    // This prevents picking up random controllers in shared assemblies or test projects.
     var controllerType = reflectionAssembly
         .GetTypes()
         .FirstOrDefault(t =>
@@ -45,7 +48,8 @@ public static class TopicNamer
 
     var assemblyName = reflectionAssembly.GetName().Name;
     if (string.IsNullOrWhiteSpace(assemblyName))
-      throw new InvalidOperationException($"Assembly {reflectionAssembly.FullName} has no valid name.");
+      throw new InvalidOperationException(
+          $"Assembly {reflectionAssembly.FullName} has no valid name.");
 
     return GetServiceName(assemblyName) + TopicSuffixName;
   }
@@ -56,7 +60,6 @@ public static class TopicNamer
 
     var reflectionAssembly = assembly.Assembly;
 
-    // Try to find the attribute for explicit DLT naming
     var controllerWithAttribute = reflectionAssembly
         .GetTypes()
         .FirstOrDefault(t =>
@@ -70,9 +73,31 @@ public static class TopicNamer
       return attribute!.DeadLetterTopic!;
     }
 
-    // Fallback to standard convention
     return GetTopicName(assembly) + DeadLetterTopicSuffixName;
   }
+
+  // =========================================================
+  // EVENT MODE — event type-based (one topic per event type)
+  // Derives topic name from the event type name using kebab-case.
+  // HeroCreatedEvent   → hero-created-in
+  // SkillAssignedEvent → skill-assigned-in
+  // =========================================================
+
+  public static string GetTopicName(Type eventType)
+  {
+    ArgumentNullException.ThrowIfNull(eventType);
+    return ToKebabCase(StripEventSuffix(eventType.Name)) + TopicSuffixName;
+  }
+
+  public static string GetDeadLetterTopicName(Type eventType)
+  {
+    ArgumentNullException.ThrowIfNull(eventType);
+    return ToKebabCase(StripEventSuffix(eventType.Name)) + TopicSuffixName + "-dlt";
+  }
+
+  // =========================================================
+  // HELPERS
+  // =========================================================
 
   private static string GetEntityNameFromController(Type controllerType)
       => controllerType.Name.Replace("Controller", "", StringComparison.Ordinal);
@@ -87,10 +112,26 @@ public static class TopicNamer
 
     var parts = assemblyName.Split('.');
     if (parts.Length >= 2)
-    {
       return parts[1].ToLowerInvariant();
-    }
 
     return assemblyName.ToLowerInvariant();
   }
+
+  /// <summary>
+  /// Strips the "Event" suffix from an event type name if present.
+  /// HeroCreatedEvent → HeroCreated
+  /// HeroCreated      → HeroCreated (unchanged)
+  /// </summary>
+  private static string StripEventSuffix(string name)
+      => name.EndsWith("Event", StringComparison.Ordinal)
+          ? name[..^5]
+          : name;
+
+  /// <summary>
+  /// Converts PascalCase to kebab-case.
+  /// HeroCreated  → hero-created
+  /// SkillAssigned → skill-assigned
+  /// </summary>
+  private static string ToKebabCase(string input)
+      => Regex.Replace(input, "(?<!^)([A-Z])", "-$1").ToLowerInvariant();
 }

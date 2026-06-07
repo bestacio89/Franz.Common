@@ -11,36 +11,29 @@ namespace Franz.Common.Messaging.Kafka.Tests;
 
 public class TopicNamerTests
 {
+  // =========================================================
+  // SYSTEM MODE — assembly-based (existing behaviour)
+  // =========================================================
+
   [Fact]
   public void GetTopicName_WithControllerAndRequiredKafkaTopicAttribute_ReturnsFormattedTopic()
   {
-    // Arrange
     var mockAssembly = new Mock<IAssembly>();
-    // Using an assembly that ONLY contains the types we want to scan is hard, 
-    // so we verify TopicNamer logic correctly identifies the attribute.
     mockAssembly.Setup(a => a.Assembly).Returns(typeof(UserController).Assembly);
 
-    // Act
     var topic = TopicNamer.GetTopicName(mockAssembly.Object);
 
-    // Assert
-    // Logic: UserController -> "User" + "{0}-formatted-topic"
     topic.Should().Be("User-formatted-topic");
   }
 
   [Fact]
   public void GetTopicName_WithExplicitTopicAttribute_ReturnsCorrectTopic()
   {
-    // Arrange
     var mockAssembly = new Mock<IAssembly>();
     mockAssembly.Setup(a => a.Assembly).Returns(typeof(LegacyController).Assembly);
 
-    // Act
     var topic = TopicNamer.GetTopicName(mockAssembly.Object);
 
-    // Assert
-    // In this specific test project, TopicNamer might find UserController first 
-    // if we don't isolate. The hardened TopicNamer now filters better.
     topic.Should().BeOneOf("User-formatted-topic", "legacy-explicit-topic");
   }
 
@@ -49,47 +42,101 @@ public class TopicNamerTests
   [InlineData("testhost", "franz-test-in")]
   public void GetTopicName_Fallbacks_ShouldMatchLogic(string assemblyName, string expected)
   {
-    // Arrange
-    // Using System.String's assembly ensures NO controllers are found.
     var mockReflectionAssembly = new Mock<Assembly>();
-    var name = new AssemblyName(assemblyName);
-    mockReflectionAssembly.Setup(a => a.GetName()).Returns(name);
-    // Ensure GetTypes returns empty to force the fallback branch
+    mockReflectionAssembly.Setup(a => a.GetName()).Returns(new AssemblyName(assemblyName));
     mockReflectionAssembly.Setup(a => a.GetTypes()).Returns(Array.Empty<Type>());
 
     var mockAssembly = new Mock<IAssembly>();
     mockAssembly.Setup(a => a.Assembly).Returns(mockReflectionAssembly.Object);
 
-    // Act
     var topic = TopicNamer.GetTopicName(mockAssembly.Object);
 
-    // Assert
     topic.Should().Be(expected);
   }
 
   [Fact]
   public void GetDeadLetterTopicName_WithoutController_ReturnsDefaultDLQSuffix()
   {
-    // Arrange
     var mockReflectionAssembly = new Mock<Assembly>();
-    mockReflectionAssembly.Setup(a => a.GetName()).Returns(new AssemblyName("Company.Identity.Api"));
+    mockReflectionAssembly.Setup(a => a.GetName())
+        .Returns(new AssemblyName("Company.Identity.Api"));
     mockReflectionAssembly.Setup(a => a.GetTypes()).Returns(Array.Empty<Type>());
 
     var mockAssembly = new Mock<IAssembly>();
     mockAssembly.Setup(a => a.Assembly).Returns(mockReflectionAssembly.Object);
 
-    // Act
     var dlt = TopicNamer.GetDeadLetterTopicName(mockAssembly.Object);
 
-    // Assert
-    // identity-in + -in-dlt
     dlt.Should().Be("identity-in-in-dlt");
   }
 
-  // --- DUMMY CONTROLLERS ---
+  // =========================================================
+  // EVENT MODE — type-based (new behaviour)
+  // =========================================================
+
+  [Theory]
+  [InlineData(typeof(HeroCreatedEvent), "hero-created-in")]
+  [InlineData(typeof(SkillAssignedEvent), "skill-assigned-in")]
+  [InlineData(typeof(OrderPlaced), "order-placed-in")]   // no Event suffix
+  [InlineData(typeof(UserRegisteredEvent), "user-registered-in")]
+  public void GetTopicName_FromEventType_ReturnsKebabCaseTopic(Type eventType, string expected)
+  {
+    var topic = TopicNamer.GetTopicName(eventType);
+    topic.Should().Be(expected);
+  }
+
+  [Theory]
+  [InlineData(typeof(HeroCreatedEvent), "hero-created-in-dlt")]
+  [InlineData(typeof(SkillAssignedEvent), "skill-assigned-in-dlt")]
+  public void GetDeadLetterTopicName_FromEventType_ReturnsKebabCaseDlt(Type eventType, string expected)
+  {
+    var dlt = TopicNamer.GetDeadLetterTopicName(eventType);
+    dlt.Should().Be(expected);
+  }
+
+  [Fact]
+  public void GetTopicName_FromEventType_NullThrows()
+  {
+    var act = () => TopicNamer.GetTopicName((Type)null!);
+    act.Should().Throw<ArgumentNullException>();
+  }
+
+  [Fact]
+  public void GetTopicName_SystemAndEventMode_ProduceDifferentTopicsForSameService()
+  {
+    // System mode → service assembly name
+    var mockReflectionAssembly = new Mock<Assembly>();
+    mockReflectionAssembly.Setup(a => a.GetName())
+        .Returns(new AssemblyName("Acme.HeroService.Api"));
+    mockReflectionAssembly.Setup(a => a.GetTypes()).Returns(Array.Empty<Type>());
+
+    var mockAssembly = new Mock<IAssembly>();
+    mockAssembly.Setup(a => a.Assembly).Returns(mockReflectionAssembly.Object);
+
+    var systemTopic = TopicNamer.GetTopicName(mockAssembly.Object);  // heroservice-in
+    var eventTopic = TopicNamer.GetTopicName(typeof(HeroCreatedEvent)); // hero-created-in
+
+    systemTopic.Should().Be("heroservice-in");
+    eventTopic.Should().Be("hero-created-in");
+    systemTopic.Should().NotBe(eventTopic);
+  }
+
+  // =========================================================
+  // DUMMY CONTROLLERS
+  // =========================================================
+
   [RequiredKafkaTopic("{0}-formatted-topic", "users", DeadLetterTopic = "users-dlt-topic")]
   internal class UserController : ControllerBase { }
 
   [RequiredKafkaTopic(Topic = "legacy-explicit-topic")]
   internal class LegacyController : ControllerBase { }
+
+  // =========================================================
+  // DUMMY EVENT TYPES
+  // =========================================================
+
+  private class HeroCreatedEvent { }
+  private class SkillAssignedEvent { }
+  private class OrderPlaced { }  // no Event suffix — still valid
+  private class UserRegisteredEvent { }
 }

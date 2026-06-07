@@ -17,7 +17,7 @@ A lightweight library within the **Franz Framework** designed to enable multi-te
 
 ## **Version Information**
 
--**Current Version:** v2.2.6
+-**Current Version:** v2.2.7
 - Part of the private **Franz Framework** ecosystem.
 
 ---

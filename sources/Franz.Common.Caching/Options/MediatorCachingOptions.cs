@@ -6,7 +6,7 @@ namespace Franz.Common.Caching.Options;
 
 public sealed record MediatorCachingOptions
 {
-  public const string SectionName = "Franz:Mediator:Caching";
+  public const string SectionName = "Mediator:Caching";
 
   [SetsRequiredMembers]
   public MediatorCachingOptions() { }

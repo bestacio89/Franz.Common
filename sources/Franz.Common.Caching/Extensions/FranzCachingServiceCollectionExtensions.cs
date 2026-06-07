@@ -18,8 +18,8 @@ namespace Franz.Common.Caching.Extensions;
 
 public static class FranzCachingServiceCollectionExtensions
 {
-  private const string CachingSection = "Franz:Caching";
-  private const string MediatorCachingSection = "Franz:Mediator:Caching";
+  private const string CachingSection = "Caching";
+
 
   /// <summary>
   /// Configures the core Caching Options with Fail-Fast Validation and IOptionsMonitor support.

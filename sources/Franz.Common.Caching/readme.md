@@ -9,7 +9,7 @@ Provides **unified cache abstractions**, **hybrid caching (L1 + L2)**, Mediator 
 
 ---
 
-* -**Current Version:** v2.2.6
+* -**Current Version:** v2.2.7
 * **Target Framework**: **.NET 10.0**
 
 ---
@@ -160,6 +160,8 @@ Exports relevant stats only (hits/misses/size) to Excel for **offline analysis**
 ---
 
 ## 📝 Changelog
+### V2.2.7 - Enhanced Configuration 
+- Configuration section is now Caching instea "Franz:Caching" for clarity and consistency.
 
 ### v2.0.1 – Internal Modernization
 

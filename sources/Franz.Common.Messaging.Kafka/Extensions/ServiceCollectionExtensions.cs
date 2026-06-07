@@ -1,7 +1,9 @@
 ﻿#nullable enable
 using Confluent.Kafka;
 using Franz.Common.DependencyInjection.Extensions;
+using Franz.Common.Mediator;
 using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Delegating;
@@ -23,22 +25,68 @@ namespace Franz.Common.Messaging.Kafka.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-  public static IServiceCollection AddKafkaMessaging(this IServiceCollection services, IConfiguration configuration, object? serviceKey = null)
+  // =========================================================
+  // SYSTEM MODE — one topic per service (existing behaviour, unchanged)
+  // =========================================================
+
+  public static IServiceCollection AddKafkaMessaging(
+      this IServiceCollection services,
+      IConfiguration configuration,
+      object? serviceKey = null)
   {
     services
-      .AddKafkaMessagingOptions(configuration)
-      .AddKafkaCore(configuration, serviceKey)
-      .AddKafkaProducerLayer(serviceKey)
-      .AddKafkaMessagingConsumer(serviceKey);
+        .AddKafkaMessagingOptions(configuration)
+        .AddKafkaCore(configuration, serviceKey, perEvent: false)
+        .AddKafkaProducerLayer(serviceKey, sharedInitializer: false)
+        .AddKafkaMessagingConsumer(serviceKey);
 
     return services;
   }
 
-  // =========================
-  // 🔧 OPTIONS
-  // =========================
+  // =========================================================
+  // EVENT MODE — one topic per aggregate event type
+  //
+  // Core infra (admin, serializer, factories, initializer) registers once
+  // without a service key — shared across all event registrations.
+  //
+  // Producer + consumer register per event type using the event type name
+  // as the service key. The shared initializer is resolved without a key
+  // inside MessagingPublisher construction.
+  //
+  // AddFranzMediator MUST be called before this method so that
+  // DiscoverHandledEventTypes() finds registered handlers.
+  // =========================================================
 
-  public static IServiceCollection AddKafkaMessagingOptions(this IServiceCollection services, IConfiguration configuration)
+  public static IServiceCollection AddEventBasedKafkaMessaging(
+      this IServiceCollection services,
+      IConfiguration configuration)
+  {
+    services
+        .AddKafkaMessagingOptions(configuration)
+        .AddKafkaCore(configuration, serviceKey: null, perEvent: true);
+
+    var eventTypes = DiscoverHandledEventTypes();
+
+    foreach (var eventType in eventTypes)
+    {
+      var serviceKey = eventType.Name;
+
+      services
+          // sharedInitializer: true — initializer is unkeyed, shared across all events
+          .AddKafkaProducerLayer(serviceKey, sharedInitializer: true)
+          .AddKafkaMessagingConsumer(serviceKey);
+    }
+
+    return services;
+  }
+
+  // =========================================================
+  // OPTIONS
+  // =========================================================
+
+  public static IServiceCollection AddKafkaMessagingOptions(
+      this IServiceCollection services,
+      IConfiguration configuration)
   {
     services.AddOptions<KafkaMessagingOptions>()
         .BindConfiguration(KafkaMessagingOptions.SectionName)
@@ -48,19 +96,20 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  // =========================
-  // ⚙️ CORE INFRA (ONCE)
-  // =========================
+  // =========================================================
+  // CORE INFRA (registers once regardless of mode)
+  // =========================================================
 
-  private static IServiceCollection AddKafkaCore(this IServiceCollection services, IConfiguration configuration, object? serviceKey)
+  private static IServiceCollection AddKafkaCore(
+      this IServiceCollection services,
+      IConfiguration configuration,
+      object? serviceKey,
+      bool perEvent)
   {
     services.AddNoDuplicateScoped<IAssemblyAccessor, AssemblyAccessorWrapper>();
 
-    // 🔹 Producer
     services.AddKafkaProducer(configuration, serviceKey);
-
-    // 🔹 Admin
-    services.AddKafkaAdmin(configuration, serviceKey);
+    services.AddKafkaAdmin(configuration, serviceKey, perEvent);
 
     return services
         .AddDefaultMessageSerializer()
@@ -70,11 +119,14 @@ public static class ServiceCollectionExtensions
         .AddNoDuplicateSingleton<IConnectionProvider, ConnectionProvider>();
   }
 
-  // =========================
-  // 📤 PRODUCER CONFIG
-  // =========================
+  // =========================================================
+  // PRODUCER CONFIG
+  // =========================================================
 
-  private static IServiceCollection AddKafkaProducer(this IServiceCollection services, IConfiguration _, object? serviceKey)
+  private static IServiceCollection AddKafkaProducer(
+      this IServiceCollection services,
+      IConfiguration _,
+      object? serviceKey)
   {
     Func<IServiceProvider, ProducerConfig> configBuilder = sp =>
     {
@@ -84,52 +136,52 @@ public static class ServiceCollectionExtensions
       {
         BootstrapServers = o.BootstrapServers,
         ClientId = o.ClientId,
-
-        // Security
         SecurityProtocol = MapSecurityProtocol(o.Security.SecurityProtocol),
         SaslMechanism = MapSaslMechanism(o.Security.SaslMechanism),
         SaslUsername = o.Security.SaslUsername,
         SaslPassword = o.Security.SaslPassword,
-
-        // Producer
         Acks = MapAcks(o.Producer.Acks),
         EnableIdempotence = o.Producer.EnableIdempotence,
         MessageMaxBytes = o.Producer.MessageMaxBytes,
         LingerMs = o.Producer.LingerMs,
         BatchSize = o.Producer.BatchSize,
         CompressionType = MapCompression(o.Producer.CompressionType),
-
-        // Reliability
         MessageSendMaxRetries = o.Producer.MessageSendMaxRetries,
         RetryBackoffMs = o.Producer.RetryBackoffMs,
-       };
+      };
     };
 
     if (serviceKey != null)
     {
-      services.AddKeyedSingleton<IProducer<string, byte[]>>(serviceKey, (sp, key) =>
-        new ProducerBuilder<string, byte[]>(configBuilder(sp))
-          .SetKeySerializer(Serializers.Utf8)
-          .SetValueSerializer(Serializers.ByteArray)
-          .Build());
+      services.AddKeyedSingleton<IProducer<string, byte[]>>(serviceKey, (sp, _) =>
+          new ProducerBuilder<string, byte[]>(configBuilder(sp))
+              .SetKeySerializer(Serializers.Utf8)
+              .SetValueSerializer(Serializers.ByteArray)
+              .Build());
     }
     else
     {
       services.AddNoDuplicateSingleton<IProducer<string, byte[]>>(sp =>
-        new ProducerBuilder<string, byte[]>(configBuilder(sp))
-          .SetKeySerializer(Serializers.Utf8)
-          .SetValueSerializer(Serializers.ByteArray)
-          .Build());
+          new ProducerBuilder<string, byte[]>(configBuilder(sp))
+              .SetKeySerializer(Serializers.Utf8)
+              .SetValueSerializer(Serializers.ByteArray)
+              .Build());
     }
 
     return services;
   }
 
-  // =========================
-  // 🧾 ADMIN CONFIG
-  // =========================
+  // =========================================================
+  // ADMIN + INITIALIZER
+  // perEvent flag passed into KafkaMessagingInitializer so it
+  // knows which topic derivation strategy to use at runtime.
+  // =========================================================
 
-  private static IServiceCollection AddKafkaAdmin(this IServiceCollection services, IConfiguration _, object? serviceKey)
+  private static IServiceCollection AddKafkaAdmin(
+      this IServiceCollection services,
+      IConfiguration _,
+      object? serviceKey,
+      bool perEvent)
   {
     Func<IServiceProvider, AdminClientConfig> configBuilder = sp =>
     {
@@ -142,49 +194,70 @@ public static class ServiceCollectionExtensions
         SecurityProtocol = MapSecurityProtocol(o.Security.SecurityProtocol),
         SaslMechanism = MapSaslMechanism(o.Security.SaslMechanism),
         SaslUsername = o.Security.SaslUsername,
-        SaslPassword = o.Security.SaslPassword
+        SaslPassword = o.Security.SaslPassword,
       };
     };
 
     if (serviceKey != null)
     {
-      services.AddKeyedSingleton<IAdminClient>(serviceKey, (sp, key) =>
-        new AdminClientBuilder(configBuilder(sp)).Build());
+      services.AddKeyedSingleton<IAdminClient>(serviceKey, (sp, _) =>
+          new AdminClientBuilder(configBuilder(sp)).Build());
 
       services.AddKeyedScoped<IMessagingInitializer>(serviceKey, (sp, key) =>
       {
         var admin = sp.GetRequiredKeyedService<IAdminClient>(key);
-        return ActivatorUtilities.CreateInstance<KafkaMessagingInitializer>(sp, admin);
+        return ActivatorUtilities.CreateInstance<KafkaMessagingInitializer>(
+            sp, admin, perEvent);
       });
     }
     else
     {
       services.AddNoDuplicateSingleton<IAdminClient>(sp =>
-        new AdminClientBuilder(configBuilder(sp)).Build());
+          new AdminClientBuilder(configBuilder(sp)).Build());
 
-      services.AddNoDuplicateScoped<IMessagingInitializer, KafkaMessagingInitializer>();
+      // Unkeyed — shared across all event mode registrations
+      services.AddNoDuplicateScoped<IMessagingInitializer>(sp =>
+          ActivatorUtilities.CreateInstance<KafkaMessagingInitializer>(
+              sp,
+              sp.GetRequiredService<IAdminClient>(),
+              perEvent));
     }
 
     return services;
   }
 
-  // =========================
-  // 📤 PRODUCER LAYER
-  // =========================
+  // =========================================================
+  // PRODUCER LAYER
+  //
+  // sharedInitializer: false (system mode)
+  //   → IMessagingInitializer resolved by the same serviceKey
+  //     as the producer/sender (keyed registration per tenant/instance)
+  //
+  // sharedInitializer: true (event mode)
+  //   → IMessagingInitializer resolved without a key
+  //     (one shared initializer handles all event topics)
+  // =========================================================
 
-  private static IServiceCollection AddKafkaProducerLayer(this IServiceCollection services, object? serviceKey)
+  private static IServiceCollection AddKafkaProducerLayer(
+      this IServiceCollection services,
+      object? serviceKey,
+      bool sharedInitializer = false)
   {
     if (serviceKey != null)
     {
       services.AddKeyedScoped<IMessagingSender, KafkaSender>(serviceKey);
 
       services.AddKeyedScoped<IMessagingPublisher>(serviceKey, (sp, key) =>
-        new MessagingPublisher(
-          sp.GetRequiredKeyedService<IMessagingInitializer>(key),
-          sp.GetRequiredService<IMessageFactory>(),
-          sp.GetRequiredService<IDispatcher>(),
-          sp.GetRequiredKeyedService<IMessagingSender>(key)
-        ));
+          new MessagingPublisher(
+              sharedInitializer
+                  // Event mode — shared unkeyed initializer
+                  ? sp.GetRequiredService<IMessagingInitializer>()
+                  // System mode — keyed initializer per instance
+                  : sp.GetRequiredKeyedService<IMessagingInitializer>(key),
+              sp.GetRequiredService<IMessageFactory>(),
+              sp.GetRequiredService<IDispatcher>(),
+              sp.GetRequiredKeyedService<IMessagingSender>(key)
+          ));
 
       services.AddKeyedScoped<IMessagingTransaction, MessagingTransaction>(serviceKey);
       services.AddKeyedScoped<IMessageHandler, MessageBuilderDelegatingHandler>(serviceKey);
@@ -200,33 +273,86 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
-  // =========================
-  // 📥 CONSUMER LAYER
-  // =========================
+  // =========================================================
+  // CONSUMER LAYER (unchanged)
+  // =========================================================
 
-  private static IServiceCollection AddKafkaMessagingConsumer(this IServiceCollection services, object? serviceKey)
+  private static IServiceCollection AddKafkaMessagingConsumer(
+      this IServiceCollection services,
+      object? serviceKey)
   {
     if (serviceKey != null)
     {
       services.AddKeyedScoped<MessageContextAccessor>(serviceKey);
-      services.AddKeyedScoped<IMessageContextAccessor>(serviceKey, (sp, key) => sp.GetRequiredKeyedService<MessageContextAccessor>(key));
+      services.AddKeyedScoped<IMessageContextAccessor>(serviceKey,
+          (sp, key) => sp.GetRequiredKeyedService<MessageContextAccessor>(key));
       services.AddKeyedSingleton<IKafkaConsumerFactory, KafkaConsumerFactory>(serviceKey);
-      services.AddKeyedSingleton<IConsumer<string, string>>(serviceKey, (sp, key) => sp.GetRequiredKeyedService<IKafkaConsumerFactory>(key).Build());
+      services.AddKeyedSingleton<IConsumer<string, string>>(serviceKey,
+          (sp, key) => sp.GetRequiredKeyedService<IKafkaConsumerFactory>(key).Build());
     }
     else
     {
       services.AddNoDuplicateScoped<MessageContextAccessor>();
-      services.AddNoDuplicateScoped<IMessageContextAccessor>(sp => sp.GetRequiredService<MessageContextAccessor>());
+      services.AddNoDuplicateScoped<IMessageContextAccessor>(
+          sp => sp.GetRequiredService<MessageContextAccessor>());
       services.AddNoDuplicateSingleton<IKafkaConsumerFactory, KafkaConsumerFactory>();
-      services.AddNoDuplicateSingleton<IConsumer<string, string>>(sp => sp.GetRequiredService<IKafkaConsumerFactory>().Build());
+      services.AddNoDuplicateSingleton<IConsumer<string, string>>(
+          sp => sp.GetRequiredService<IKafkaConsumerFactory>().Build());
     }
 
     return services;
   }
 
-  // =========================
-  // 🔁 MAPPERS
-  // =========================
+  // =========================================================
+  // EVENT TYPE DISCOVERY
+  // =========================================================
+
+  private static IEnumerable<Type> DiscoverHandledEventTypes()
+      => AppDomain.CurrentDomain
+          .GetAssemblies()
+          .SelectMany(a =>
+          {
+            try { return a.ExportedTypes; }
+            catch { return Array.Empty<Type>(); }
+          })
+          .SelectMany(t => t.GetInterfaces())
+          .Where(i => i.IsGenericType &&
+                      i.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
+          .SelectMany(i => i.GenericTypeArguments)
+          .Where(t => typeof(IIntegrationEvent).IsAssignableFrom(t))
+          .Distinct();
+
+  // =========================================================
+  // MODEL PROVIDER (unchanged)
+  // =========================================================
+
+  public static IServiceCollection AddOnlyHighLifetimeModelProvider(
+      this IServiceCollection services,
+      ServiceLifetime lifetime)
+  {
+    var existing = services.SingleOrDefault(x => x.ServiceType == typeof(IModelProvider));
+
+    if (existing != null)
+    {
+      if (existing.Lifetime != lifetime && lifetime == ServiceLifetime.Singleton)
+      {
+        services.Remove(existing);
+        services.Add(new ServiceDescriptor(
+            typeof(IModelProvider), typeof(ModelProvider), lifetime));
+      }
+    }
+    else
+    {
+      services.Add(new ServiceDescriptor(
+          typeof(IModelProvider), typeof(ModelProvider), lifetime));
+    }
+
+    return services;
+  }
+
+  // =========================================================
+  // MAPPERS (unchanged)
+  // =========================================================
 
   private static Acks MapAcks(KafkaAcks a) => a switch
   {
@@ -261,28 +387,4 @@ public static class ServiceCollectionExtensions
     KafkaSaslMechanism.OAuthBearer => SaslMechanism.OAuthBearer,
     _ => null
   };
-
-  // =========================
-  // 🧠 MODEL PROVIDER
-  // =========================
-
-  public static IServiceCollection AddOnlyHighLifetimeModelProvider(this IServiceCollection services, ServiceLifetime lifetime)
-  {
-    var existing = services.SingleOrDefault(x => x.ServiceType == typeof(IModelProvider));
-
-    if (existing != null)
-    {
-      if (existing.Lifetime != lifetime && lifetime == ServiceLifetime.Singleton)
-      {
-        services.Remove(existing);
-        services.Add(new ServiceDescriptor(typeof(IModelProvider), typeof(ModelProvider), lifetime));
-      }
-    }
-    else
-    {
-      services.Add(new ServiceDescriptor(typeof(IModelProvider), typeof(ModelProvider), lifetime));
-    }
-
-    return services;
-  }
 }

@@ -59,8 +59,8 @@ public sealed class AddFranzMediatorCachingTests
     var configuration = new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
-          ["Franz:Mediator:Caching:Enabled"] = "false",
-          ["Franz:Mediator:Caching:DefaultTtl"] = "00:10:00"
+          ["Mediator:Caching:Enabled"] = "false",
+          ["Mediator:Caching:DefaultTtl"] = "00:10:00"
         })
         .Build();
 
