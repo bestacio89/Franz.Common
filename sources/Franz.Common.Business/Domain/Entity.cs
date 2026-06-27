@@ -1,31 +1,38 @@
+using System;
+using System.Collections.Generic;
+
 namespace Franz.Common.Business.Domain;
 
-public abstract class Entity<TId> : IEntity
+public abstract class Entity<TKey> : IEntity<TKey>
 {
   private int? _requestedHashCode;
 
-  public TId Id { get; private set; } = default!;
+  // =========================================================
+  // Identity
+  // =========================================================
+  public TKey Id { get; private set; } = default!;
 
   protected Entity() { }
 
-  protected Entity(TId id)
+  protected Entity(TKey id)
   {
     Id = id;
   }
 
-  // ONLY infrastructure access (Factory / EF)
-  internal void SetId(TId id)
+  // Only infrastructure access (Factories / EF)
+  internal void SetId(TKey id)
   {
     Id = id;
   }
 
   public object GetId() => Id!;
 
-  // -------------------------
+  // =========================================================
   // Audit
-  // -------------------------
+  // =========================================================
   public DateTimeOffset DateCreated { get; private set; }
   public DateTimeOffset LastModifiedDate { get; private set; }
+
   public string CreatedBy { get; private set; } = string.Empty;
   public string? LastModifiedBy { get; private set; }
 
@@ -33,31 +40,40 @@ public abstract class Entity<TId> : IEntity
   public DateTimeOffset DateDeleted { get; private set; }
   public string? DeletedBy { get; private set; }
 
+  // =========================================================
+  // Lifecycle management
+  // =========================================================
   public void MarkCreated(string createdBy)
   {
-    DateCreated = DateTime.UtcNow;
+    DateCreated = DateTimeOffset.UtcNow;
     CreatedBy = createdBy;
   }
 
   public void MarkUpdated(string modifiedBy)
   {
-    LastModifiedDate = DateTime.UtcNow;
+    LastModifiedDate = DateTimeOffset.UtcNow;
     LastModifiedBy = modifiedBy;
   }
 
   public void MarkDeleted(string deletedBy)
   {
     IsDeleted = true;
-    DateDeleted = DateTime.UtcNow;
+    DateDeleted = DateTimeOffset.UtcNow;
     DeletedBy = deletedBy;
   }
 
+  // =========================================================
+  // Transience
+  // =========================================================
   public bool IsTransient()
-      => EqualityComparer<TId>.Default.Equals(Id, default!);
+    => EqualityComparer<TKey>.Default.Equals(Id, default!);
 
+  // =========================================================
+  // Equality
+  // =========================================================
   public override bool Equals(object? obj)
   {
-    if (obj is not Entity<TId> other)
+    if (obj is not Entity<TKey> other)
       return false;
 
     if (ReferenceEquals(this, other))
@@ -69,7 +85,7 @@ public abstract class Entity<TId> : IEntity
     if (IsTransient() || other.IsTransient())
       return false;
 
-    return EqualityComparer<TId>.Default.Equals(Id, other.Id);
+    return EqualityComparer<TKey>.Default.Equals(Id, other.Id);
   }
 
   public override int GetHashCode()
@@ -83,11 +99,9 @@ public abstract class Entity<TId> : IEntity
     return base.GetHashCode();
   }
 
-  public static bool operator ==(Entity<TId>? left, Entity<TId>? right)
-      => left is null ? right is null : left.Equals(right);
+  public static bool operator ==(Entity<TKey>? left, Entity<TKey>? right)
+    => left is null ? right is null : left.Equals(right);
 
-  public static bool operator !=(Entity<TId>? left, Entity<TId>? right)
-      => !(left == right);
+  public static bool operator !=(Entity<TKey>? left, Entity<TKey>? right)
+    => !(left == right);
 }
-
-public abstract class Entity : Entity<int> { }

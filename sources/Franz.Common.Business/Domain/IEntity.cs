@@ -1,6 +1,7 @@
 namespace Franz.Common.Business.Domain;
-public interface IEntity
+public interface IEntity<TKey>
 {
+  TKey Id { get; }
   object GetId();
 
   // Technical Railguards for Auditing & Persistence
