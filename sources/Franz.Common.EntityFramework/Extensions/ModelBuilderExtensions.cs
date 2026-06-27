@@ -6,42 +6,54 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Franz.Common.EntityFramework.Extensions;
 public static class ModelBuilderExtensions
 {
+  private static bool ImplementsIEntity(Type type)
+  {
+    return type.GetInterfaces()
+        .Any(i =>
+            i.IsGenericType &&
+            i.GetGenericTypeDefinition() == typeof(IEntity<>));
+  }
   public static ModelBuilder ConvertEnumeration(this ModelBuilder modelBuilder)
   {
     foreach (var entity in modelBuilder.Model.GetEntityTypes())
     {
-      // 1. Guard against Shadow Entities (where ClrType is null)
-      if (entity.ClrType == null || !entity.ClrType.IsAssignableTo(typeof(Entity)))
+      var clrType = entity.ClrType;
+
+      // =========================================================
+      // 1. Skip shadow or non-domain entities
+      // =========================================================
+      if (clrType == null || !ImplementsIEntity(clrType))
         continue;
 
-      foreach (var property in entity.ClrType.GetProperties())
+      foreach (var property in clrType.GetProperties())
       {
-        if (property.PropertyType.IsEnumerationClass(out var genericTypeBase))
-        {
-          // 2. Guard against genericTypeBase being null despite IsEnumerationClass returning true
-          if (genericTypeBase == null) continue;
+        if (!property.PropertyType.IsEnumerationClass(out var genericTypeBase))
+          continue;
 
-          var keyType = genericTypeBase.GetGenericArguments().FirstOrDefault();
-          if (keyType == null) continue;
+        if (genericTypeBase is null)
+          continue;
 
-          // 3. Construct the Converter type
-          var converterType = typeof(EnumerationConverter<,>)
-              .MakeGenericType(property.PropertyType, keyType);
+        var keyType = genericTypeBase.GetGenericArguments().FirstOrDefault();
+        if (keyType is null)
+          continue;
 
-          // 4. Safely get the constructor
-          var constructor = converterType.GetConstructor(Type.EmptyTypes);
+        // =========================================================
+        // 2. Create converter safely
+        // =========================================================
+        var converterType = typeof(EnumerationConverter<,>)
+            .MakeGenericType(property.PropertyType, keyType);
 
-          // If constructor is null here, calling .Invoke() would throw the NRE
-          if (constructor == null) continue;
+        if (Activator.CreateInstance(converterType) is not ValueConverter valueConverter)
+          continue;
 
-          var valueConverter = (ValueConverter)constructor.Invoke(null);
-
-          modelBuilder
-              .Entity(entity.ClrType)
-              .Property(property.Name)
-              .HasConversion(valueConverter)
-              .HasColumnName($"{property.Name}Id");
-        }
+        // =========================================================
+        // 3. Apply EF conversion
+        // =========================================================
+        modelBuilder
+            .Entity(clrType)
+            .Property(property.Name)
+            .HasConversion(valueConverter)
+            .HasColumnName($"{property.Name}Id");
       }
     }
 

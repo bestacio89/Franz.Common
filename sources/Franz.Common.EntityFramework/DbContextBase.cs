@@ -37,47 +37,61 @@ public abstract class DbContextBase : DbContext
   {
     var userId = _currentUser?.UserId ?? "system";
 
-    foreach (var entry in ChangeTracker.Entries<IEntity>())
+    foreach (var entry in ChangeTracker.Entries())
     {
+      if (entry.Entity is not IEntity<object> &&
+          !ImplementsIEntity(entry.Entity.GetType()))
+      {
+        continue;
+      }
+
       switch (entry.State)
       {
         case EntityState.Added:
-          entry.Entity.MarkCreated(userId);
+          ((dynamic)entry.Entity).MarkCreated(userId);
           break;
 
         case EntityState.Modified:
-          entry.Entity.MarkUpdated(userId);
+          ((dynamic)entry.Entity).MarkUpdated(userId);
           break;
 
         case EntityState.Deleted:
-          entry.Entity.MarkDeleted(userId);
+          ((dynamic)entry.Entity).MarkDeleted(userId);
 
-          // soft delete enforcement
           entry.State = EntityState.Modified;
           break;
       }
     }
   }
 
+  private static bool ImplementsIEntity(Type type)
+  {
+    return type.GetInterfaces()
+        .Any(i =>
+            i.IsGenericType &&
+            i.GetGenericTypeDefinition() == typeof(IEntity<>));
+  }
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
 
     foreach (var entityType in modelBuilder.Model.GetEntityTypes())
     {
-      if (typeof(Entity).IsAssignableFrom(entityType.ClrType))
-      {
-        var parameter = Expression.Parameter(entityType.ClrType, "e");
-        var isDeleted = Expression.Property(parameter, nameof(Entity.IsDeleted));
+      var clrType = entityType.ClrType;
 
-        var filter = Expression.Lambda(
-          Expression.Equal(isDeleted, Expression.Constant(false)),
-          parameter);
+      if (!ImplementsIEntity(clrType))
+        continue;
 
-        modelBuilder
-          .Entity(entityType.ClrType)
-          .HasQueryFilter(filter);
-      }
+      var parameter = Expression.Parameter(clrType, "e");
+      var isDeleted = Expression.Property(parameter, nameof(IEntity<object>.IsDeleted));
+
+      var filter = Expression.Lambda(
+        Expression.Equal(isDeleted, Expression.Constant(false)),
+        parameter);
+
+      modelBuilder
+        .Entity(clrType)
+        .HasQueryFilter(filter);
     }
   }
 }

@@ -45,13 +45,13 @@ public static class ServiceCollectionExtensions
 
   #endregion
 
- 
+
 
   #region ENTITY REPOSITORIES (FULL CRUD MODEL)
 
   public static IServiceCollection AddEntityRepositories<TDbContext>(
-      this IServiceCollection services)
-      where TDbContext : DbContextBase
+    this IServiceCollection services)
+    where TDbContext : DbContextBase
   {
     services.AddScoped<DbContext>(sp => sp.GetRequiredService<TDbContext>());
 
@@ -59,10 +59,33 @@ public static class ServiceCollectionExtensions
 
     foreach (var entityType in entityTypes)
     {
-      var serviceType = typeof(IEntityRepository<,>).MakeGenericType(entityType);
-      var implementationType = typeof(EntityRepository<,,>)
-          .MakeGenericType(typeof(TDbContext), entityType);
+      // =========================================================
+      // 1. Resolve IEntity<TKey>
+      // =========================================================
+      var entityInterface = entityType
+          .GetInterfaces()
+          .FirstOrDefault(i =>
+              i.IsGenericType &&
+              i.GetGenericTypeDefinition() == typeof(IEntity<>));
 
+      if (entityInterface is null)
+        throw new InvalidOperationException(
+            $"Entity {entityType.Name} does not implement IEntity<TKey>");
+
+      var keyType = entityInterface.GetGenericArguments()[0];
+
+      // =========================================================
+      // 2. Build repository types (FIXED ARITY)
+      // =========================================================
+      var serviceType = typeof(IEntityRepository<,>)
+          .MakeGenericType(entityType, keyType);
+
+      var implementationType = typeof(EntityRepository<,,>)
+          .MakeGenericType(typeof(TDbContext), entityType, keyType);
+
+      // =========================================================
+      // 3. Register safely
+      // =========================================================
       services.AddNoDuplicateScoped(serviceType, implementationType);
     }
 
@@ -99,7 +122,13 @@ public static class ServiceCollectionExtensions
   #endregion
 
   #region EF ENTITY DISCOVERY (HARDENED)
-
+  private static bool ImplementsEntityInterface(Type type)
+  {
+    return type.GetInterfaces()
+        .Any(i =>
+            i.IsGenericType &&
+            i.GetGenericTypeDefinition() == typeof(IEntity<>));
+  }
   private static IEnumerable<Type> GetEfEntityTypes(Type dbContextType)
   {
     return dbContextType
@@ -108,10 +137,15 @@ public static class ServiceCollectionExtensions
       .Where(p => p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
       .Select(p => p.PropertyType.GetGenericArguments().Single())
 
-      // IMPORTANT: only persistence entities
-      .Where(t =>
-          typeof(IEntity).IsAssignableFrom(t) &&
-          !IsAggregateRoot(t))
+      // =========================================================
+      // Only persistence entities implementing IEntity<TKey>
+      // =========================================================
+      .Where(t => ImplementsEntityInterface(t))
+
+      // =========================================================
+      // Exclude aggregates explicitly
+      // =========================================================
+      .Where(t => !IsAggregateRoot(t))
 
       .ToList();
   }
