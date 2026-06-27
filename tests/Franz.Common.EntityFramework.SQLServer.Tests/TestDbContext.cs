@@ -1,8 +1,8 @@
-﻿using Franz.Common.Business.Domain;
+﻿using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.Auditing;
+using Franz.Common.EntityFramework.SQLServer.Tests;
 using Franz.Common.Mediator.Dispatchers;
 using Microsoft.EntityFrameworkCore;
-using System.Linq.Expressions;
 
 namespace Franz.Common.EntityFramework.SQLServer.Tests;
 
@@ -15,29 +15,15 @@ public class TestDbContext : DbContextBase
       : base(options, dispatcher, currentUser)
   {
   }
+
+  // Only domain sets
+  public DbSet<TestEntity> TestEntities => Set<TestEntity>();
+
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
 
-    foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-    {
-      // FIX: Check against IEntity interface
-      if (typeof(IEntity).IsAssignableFrom(entityType.ClrType))
-      {
-        var parameter = Expression.Parameter(entityType.ClrType, "e");
-
-        // FIX: Access "IsDeleted" by string name since it's on the generic base
-        var isDeletedProperty = Expression.Property(parameter, "IsDeleted");
-
-        var filter = Expression.Lambda(
-            Expression.Equal(isDeletedProperty, Expression.Constant(false)),
-            parameter);
-
-        modelBuilder
-          .Entity(entityType.ClrType)
-          .HasQueryFilter(filter);
-      }
-    }
+    // Only test-specific configuration (if any)
+    // ❌ DO NOT reapply soft delete logic here anymore
   }
-  public DbSet<TestEntity> TestEntities => Set<TestEntity>();
 }

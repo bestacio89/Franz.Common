@@ -200,15 +200,29 @@ public static class CosmosServiceCollectionExtensions
     return services;
   }
 
+  private static bool ImplementsEntityInterface(Type type)
+  {
+    return type.GetInterfaces()
+        .Any(i =>
+            i.IsGenericType &&
+            i.GetGenericTypeDefinition() == typeof(IEntity<>));
+  }
   private static IEnumerable<Type> GetEfEntityTypes(Type dbContextType)
   {
     return dbContextType
-        .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-        .Where(p =>
-            p.PropertyType.IsGenericType &&
-            p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
-        .Select(p => p.PropertyType.GetGenericArguments().Single())
-        .Where(t => typeof(IEntity).IsAssignableFrom(t))
-        .ToList();
+      .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+      .Where(p => p.PropertyType.IsGenericType)
+      .Where(p => p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
+      .Select(p => p.PropertyType.GetGenericArguments().Single())
+
+      // =========================================================
+      // Only persistence entities implementing IEntity<TKey>
+      // =========================================================
+      .Where(t => ImplementsEntityInterface(t))
+
+      // =========================================================
+      // Exclude aggregates explicitly
+      // =========================================================
+      .ToList();
   }
 }
