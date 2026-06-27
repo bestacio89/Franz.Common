@@ -12,7 +12,7 @@ namespace Franz.Common.EntityFramework.Tests
   // =========================
   // Dummy Entity
   // =========================
-  public class DummyEntity2 : Entity
+  public class DummyEntity2 : Entity<int>
   {
     public string Name { get; set; } = default!;
   }

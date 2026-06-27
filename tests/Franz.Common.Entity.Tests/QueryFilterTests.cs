@@ -14,7 +14,7 @@ using Xunit;
 namespace Franz.Common.EntityFramework.Tests;
 public class QueryFilterTests
 {
-  private sealed class Item : Entity
+  private sealed class Item : Entity<int>
   {
     public string Label { get; set; } = "";
   }
