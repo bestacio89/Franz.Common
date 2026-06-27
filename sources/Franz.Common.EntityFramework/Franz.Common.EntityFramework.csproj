@@ -7,12 +7,12 @@
 	<Import Project="..\..\common.targets" />
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Cosmos" Version="10.0.8" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.8" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.8" />
-		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
-		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.8" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Cosmos" Version="10.0.9" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
+		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.9" />
 	</ItemGroup>
 
 	<ItemGroup>
