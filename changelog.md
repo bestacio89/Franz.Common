@@ -1454,7 +1454,7 @@ public class OrderAggregate : AggregateRoot<OrderEvent>
 > every delegate compiled once, and runtime is pure execution — no discovery, no reflection,
 > no surprises.
 
-### v2.2.10 — Native OpenAPI + Scalar Migration
+### v2.2.11 — Native OpenAPI + Scalar Migration
 
 **Breaking changes:**
 

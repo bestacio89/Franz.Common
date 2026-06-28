@@ -305,7 +305,7 @@ dotnet test --filter Category=Integration
 
 # 🧠 Core Architectural Expansions
 
-### v2.2.10 — Native OpenAPI + Scalar Migration
+### v2.2.11 — Native OpenAPI + Scalar Migration
 
 * **`Franz.Common.Http.Documentation` — Swashbuckle removed entirely:**
   * Replaced `Swashbuckle.AspNetCore` with `Microsoft.AspNetCore.OpenApi` (native .NET 10 pipeline).

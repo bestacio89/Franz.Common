@@ -8,7 +8,7 @@ It provides a **clean, deterministic, and production-grade foundation** for buil
 
 ## 🚀 Version
 
-**Current Version:** v2.2.10
+**Current Version:** v2.2.11
 
 ---
 
@@ -366,7 +366,7 @@ Bootstrap Layer
 
 ## 🧪 Version History
 
-### v2.2.10 – Factory Hardening
+### v2.2.11 – Factory Hardening
 
 * Replaced reflection-on-every-call pattern with **compiled expression tree delegates** in both `EntityFactory` and `AggregateFactory`
 * Delegates are compiled **once per closed generic type** and cached in a static field for the application lifetime — near-native instantiation performance
@@ -391,7 +391,7 @@ Bootstrap Layer
 
 ## 📌 Summary
 
-Franz.Common.Business v2.2.10 provides a:
+Franz.Common.Business v2.2.11 provides a:
 
 > ✔ deterministic
 > ✔ factory-driven
