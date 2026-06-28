@@ -1453,3 +1453,36 @@ public class OrderAggregate : AggregateRoot<OrderEvent>
 > applied across the rest of the framework. Every construction path is validated at startup,
 > every delegate compiled once, and runtime is pure execution — no discovery, no reflection,
 > no surprises.
+
+### v2.2.10 — Native OpenAPI + Scalar Migration
+
+**Breaking changes:**
+
+- `ConfigureSwagger()` renamed to `ConfigureOpenApi()` — update all call sites.
+- `ConfigureSwaggerOptions` removed — replaced by `ConfigureVersionedOpenApiOptions`.
+- `SwaggerGenOptionsExtensions` removed — replaced by `OpenApiSchemaExtensions`.
+- `UseSwagger()` / `UseSwaggerUI()` removed from `UseDocumentation()`.
+- Swagger UI at `/swagger/index.html` replaced by Scalar UI at `/scalar/v1`.
+- OpenAPI spec moved from `/swagger/v1/swagger.json` to `/openapi/v1/openapi.json`.
+
+**Added:**
+
+- `Microsoft.AspNetCore.OpenApi` native pipeline — one document per API version.
+- `Scalar.AspNetCore` — replaces Swagger UI entirely.
+- `ConfigureVersionedOpenApiOptions` — `IConfigureOptions<OpenApiOptions>` document transformer
+  replacing `IConfigureNamedOptions<SwaggerGenOptions>`.
+- `OpenApiSchemaExtensions.ConvertEnumeration()` — document transformer replacing
+  `SwaggerGenOptions.MapType()` overrides.
+- `OpenApiSchema.Type` now uses `JsonSchemaType` enum (aligned with `Microsoft.OpenApi 2.x`).
+
+**Removed:**
+
+- `Swashbuckle.AspNetCore.SwaggerGen`
+- `Swashbuckle.AspNetCore.SwaggerUI`
+- `Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer` (legacy, unmaintained)
+- `Microsoft.OpenApi` explicit version pin (no longer needed — SDK manages it)
+
+**Root cause resolved:**
+`Microsoft.OpenApi 3.x` breaks `IOpenApiRequestBody.Content` which Swashbuckle 10.x
+depends on, causing `MissingMethodException` at `/swagger/v1/swagger.json` generation.
+Native OpenAPI eliminates this entire class of version conflict permanently.

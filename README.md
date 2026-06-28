@@ -305,38 +305,34 @@ dotnet test --filter Category=Integration
 
 # 🧠 Core Architectural Expansions
 
-### v2.2.9 — Factory Hardening
+### v2.2.10 — Native OpenAPI + Scalar Migration
 
-`EntityFactory` and `AggregateFactory` have been completely hardened against CLR type constraint failures at DI registration time:
+* **`Franz.Common.Http.Documentation` — Swashbuckle removed entirely:**
+  * Replaced `Swashbuckle.AspNetCore` with `Microsoft.AspNetCore.OpenApi` (native .NET 10 pipeline).
+  * Replaced `Swagger UI` with `Scalar.AspNetCore` — cleaner UI, better auth support, version switcher.
+  * Replaced `Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer` (legacy, unmaintained) with
+    `Asp.Versioning.Mvc.ApiExplorer` — the official maintained successor.
+  * `AddVersionedApiExplorer()` replaced by `.AddApiExplorer()` chained on `AddApiVersioning()`.
+  * `ConfigureSwagger()` renamed to `ConfigureOpenApi()` — update call sites in `AddHttpArchitecture`.
+  * `ConfigureSwaggerOptions` class removed — replaced by `ConfigureVersionedOpenApiOptions`
+    using native `OpenApiOptions.AddDocumentTransformer`.
+  * `SwaggerGenOptionsExtensions.ConvertEnumeration` replaced by
+    `OpenApiSchemaExtensions.ConvertEnumeration` using document transformers.
+  * `OpenApiSchema.Type` now uses `JsonSchemaType` enum (not strings) — aligned with `Microsoft.OpenApi 2.x`.
+  * `UseDocumentation()` middleware updated — `UseSwagger()` / `UseSwaggerUI()` replaced by
+    `MapOpenApi()` + `MapScalarApiReference()`.
+  * OpenAPI documents served at `/openapi/{groupName}/openapi.json`.
+  * Scalar UI served at `/scalar/{documentName}`.
 
-- **Compiled expression tree delegates** replace all runtime reflection — delegates are compiled once per closed generic type and cached statically for the application lifetime, giving near-native instantiation performance.
-- **Injected `Func<Guid, TAggregate>` activator removed** from `AggregateFactory` — the factory now owns constructor resolution entirely, eliminating the class of CLR access failures that occurred when a lambda crossed `internal` visibility boundaries at DI registration.
-- **`TypeInitializationException`** with a descriptive actionable inner message replaces opaque CLR failures when the required single-parameter constructor is absent.
-- **`ArgumentNullException.ThrowIfNull`** guards on all injected dependencies.
-- **`Validate()` static method** added to both factories — triggers the static constructor eagerly so misconfigured types are caught at startup rather than on first `Create()` call.
+* **Root cause:** `Microsoft.OpenApi 3.x` breaks `IOpenApiRequestBody.Content` which
+  Swashbuckle 10.x depends on, causing `MissingMethodException` at `/swagger/v1/swagger.json`.
+  Native OpenAPI eliminates this entire class of version conflict permanently.
 
-```csharp
-// Catch misconfiguration at startup, not at runtime
-services.AddSingleton<IEntityFactory<Guid, Order>, EntityFactory<Guid, Order>>();
-EntityFactory<Guid, Order>.Validate();
+* **`Franz.Common.EntityFramework` dependency alignment:**
+  * All EF Core packages updated to `10.0.9`.
+  * `Microsoft.AspNetCore.Mvc` dependency removed — no longer needed at this layer.
 
-services.AddSingleton<IAggregateFactory<OrderAggregate>, AggregateFactory<OrderAggregate, OrderEvent>>();
-AggregateFactory<OrderAggregate, OrderEvent>.Validate();
-```
 
-Every entity and aggregate must expose a single-parameter constructor accepting its key type:
-
-```csharp
-// Entity
-protected Order(Guid id) : base(id) { }
-
-// Aggregate
-protected OrderAggregate(Guid id) : base(id) { }
-```
-
-### v2.2.8 — Entity Repository Resolution
-
-- Bug fixes in the automatic resolution of Entity Repositories.
 
 ---
 
