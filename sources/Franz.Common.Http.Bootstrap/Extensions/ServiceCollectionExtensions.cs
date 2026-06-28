@@ -47,7 +47,7 @@ public static class ServiceCollectionExtensions
     services
         .AddFranzDocumentation()
         .ConfigureApiVersioning()
-        .ConfigureSwagger();
+        .ConfigureOpenApi();
 
 
     services
