@@ -4,8 +4,11 @@ using Asp.Versioning.ApiExplorer;
 using Franz.Common.Http.Documentation.Configuration;
 using Franz.Common.Http.Documentation.Extensions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
+
+using System.Reflection;
 
 namespace Franz.Common.Http.Documentation.Extensions;
 
@@ -31,27 +34,8 @@ public static class ServiceCollectionExtensions
   }
 
   /// <summary>
-  /// Registers one native OpenAPI document per discovered API version.
-  /// Replaces AddSwaggerGen entirely — no Swashbuckle dependency.
-  /// </summary>
-  public static FranzDocumentationBuilder ConfigureOpenApi(
-      this FranzDocumentationBuilder builder)
-  {
-    // Register the versioned document transformer
-    builder.Services.ConfigureOptions<ConfigureVersionedOpenApiOptions>();
-
-    // Defer document registration until versioning is configured
-    // so IApiVersionDescriptionProvider is available
-    builder.Services.AddSingleton<IConfigureOptions<Microsoft.AspNetCore.OpenApi.OpenApiOptions>,
-        ConfigureVersionedOpenApiOptions>();
-
-    return builder;
-  }
-
-  /// <summary>
-  /// Configures API versioning using Asp.Versioning (replaces legacy
-  /// Microsoft.AspNetCore.Mvc.Versioning). Registers one OpenAPI document
-  /// per version immediately after version discovery.
+  /// Configures API versioning using Asp.Versioning — replaces legacy
+  /// Microsoft.AspNetCore.Mvc.Versioning. Must be called before ConfigureOpenApi.
   /// </summary>
   public static FranzDocumentationBuilder ConfigureApiVersioning(
       this FranzDocumentationBuilder builder)
@@ -79,38 +63,48 @@ public static class ServiceCollectionExtensions
           setup.SubstituteApiVersionInUrl = true;
         });
 
-    // Register one OpenAPI document per version
-    // Versions are discovered at startup via IApiVersionDescriptionProvider
-    builder.Services.AddSingleton<IPostConfigureOptions<
-        Microsoft.AspNetCore.OpenApi.OpenApiOptions>,
-        RegisterVersionedOpenApiDocuments>();
-
     return builder;
   }
-}
 
-/// <summary>
-/// Post-configure step that registers one AddOpenApi() call per
-/// discovered API version after versioning has been fully configured.
-/// </summary>
-internal sealed class RegisterVersionedOpenApiDocuments
-    : IPostConfigureOptions<Microsoft.AspNetCore.OpenApi.OpenApiOptions>
-{
-  private readonly IApiVersionDescriptionProvider _provider;
-  private readonly IServiceCollection _services;
-
-  public RegisterVersionedOpenApiDocuments(
-      IApiVersionDescriptionProvider provider,
-      IServiceCollection services)
+  /// <summary>
+  /// Registers one native OpenAPI document per discovered API version.
+  /// Uses a temporary service provider to resolve IApiVersionDescriptionProvider
+  /// at registration time — the correct pattern for design-time version discovery.
+  /// Replaces AddSwaggerGen entirely — no Swashbuckle dependency.
+  /// </summary>
+  public static FranzDocumentationBuilder ConfigureOpenApi(
+      this FranzDocumentationBuilder builder)
   {
-    _provider = provider;
-    _services = services;
-  }
+    // Build temporary provider to discover registered versions at registration time
+    var tempProvider = builder.Services.BuildServiceProvider();
+    var versionProvider = tempProvider
+        .GetRequiredService<IApiVersionDescriptionProvider>();
 
-  public void PostConfigure(string? name,
-      Microsoft.AspNetCore.OpenApi.OpenApiOptions options)
-  {
-    foreach (var description in _provider.ApiVersionDescriptions)
-      _services.AddOpenApi(description.GroupName);
+    // Register one OpenAPI document per version with its own document transformer
+    foreach (var description in versionProvider.ApiVersionDescriptions)
+    {
+      var desc = description; // capture for closure
+
+      builder.Services.AddOpenApi(desc.GroupName, options =>
+      {
+        options.AddDocumentTransformer((document, context, ct) =>
+        {
+          var apiName = Assembly.GetEntryAssembly()!.GetName().Name;
+
+          document.Info = new OpenApiInfo
+          {
+            Title = apiName,
+            Version = desc.ApiVersion.ToString(),
+            Description = desc.IsDeprecated
+                  ? "This API version has been deprecated. Please use one of the new APIs available from the explorer."
+                  : null
+          };
+
+          return Task.CompletedTask;
+        });
+      });
+    }
+
+    return builder;
   }
 }
