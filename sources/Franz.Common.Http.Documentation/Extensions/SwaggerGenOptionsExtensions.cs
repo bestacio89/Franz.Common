@@ -1,42 +1,56 @@
 #nullable enable
 using Franz.Common.Business.Extensions;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 
-using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace Franz.Common.Http.Documentation.Extensions;
 
-public static class SwaggerGenOptionsExtensions
+/// <summary>
+/// Native OpenAPI schema extensions replacing the Swashbuckle
+/// SwaggerGenOptions.ConvertEnumeration pattern.
+/// Registers EnumerationClass types as OpenAPI-friendly schemas
+/// via document transformers instead of SwaggerGen map overrides.
+/// </summary>
+public static class OpenApiSchemaExtensions
 {
   /// <summary>
-  /// Converts all EnumerationClass types from Contracts assemblies to OpenAPI-friendly types.
+  /// Adds a document transformer that maps EnumerationClass types
+  /// from all Contracts assemblies to their correct OpenAPI scalar types.
   /// </summary>
-  public static SwaggerGenOptions ConvertEnumeration(this SwaggerGenOptions options)
+  public static OpenApiOptions ConvertEnumeration(this OpenApiOptions options)
   {
-    var types = AppDomain.CurrentDomain.GetAssemblies()
-        .Where(a => !a.IsDynamic)
-        .Where(a => a.GetName().Name?.EndsWith("Contracts") == true)
-        .SelectMany(a => a.DefinedTypes)
-        .ToList();
-
-    foreach (var type in types)
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
     {
-      if (type.IsEnumerationClass(out var genericType) && genericType != null)
+      var enumerationTypes = AppDomain.CurrentDomain
+          .GetAssemblies()
+          .Where(a => !a.IsDynamic)
+          .Where(a => a.GetName().Name?.EndsWith("Contracts") == true)
+          .SelectMany(a => a.DefinedTypes)
+          .ToList();
+
+      foreach (var type in enumerationTypes)
       {
+        if (!type.IsEnumerationClass(out var genericType) || genericType is null)
+          continue;
+
         var elementType = genericType.GenericTypeArguments.FirstOrDefault();
-        if (elementType != null)
-        {
-          var capturedType = elementType; // avoid closure capture of loop variable
-          options.MapType(type, () => GenerateOpenApiSchema(capturedType));
-        }
+        if (elementType is null)
+          continue;
+
+        var schemaKey = type.Name;
+
+        if (document.Components?.Schemas?.ContainsKey(schemaKey) == true)
+          document.Components.Schemas[schemaKey] = BuildSchema(elementType);
       }
-    }
+
+      return Task.CompletedTask;
+    });
 
     return options;
   }
 
-  private static OpenApiSchema GenerateOpenApiSchema(Type type)
+  private static OpenApiSchema BuildSchema(Type type)
   {
     if (type == typeof(short) || type == typeof(int))
       return new OpenApiSchema

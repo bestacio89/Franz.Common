@@ -1,46 +1,46 @@
-using Microsoft.AspNetCore.Mvc.ApiExplorer;
-using Microsoft.Extensions.DependencyInjection;
+#nullable enable
+using Asp.Versioning.ApiExplorer;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
-using Swashbuckle.AspNetCore.SwaggerGen;
+
 using System.Reflection;
 
 namespace Franz.Common.Http.Documentation.Configuration;
 
-public class ConfigureSwaggerOptions : IConfigureNamedOptions<SwaggerGenOptions>
+/// <summary>
+/// Configures one OpenAPI document per API version using the native
+/// Microsoft.AspNetCore.OpenApi pipeline.
+/// Replaces the Swashbuckle ConfigureSwaggerOptions pattern entirely.
+/// </summary>
+public sealed class ConfigureVersionedOpenApiOptions : IConfigureOptions<OpenApiOptions>
 {
-  private readonly IApiVersionDescriptionProvider apiVersionDescriptionProvider;
+  private readonly IApiVersionDescriptionProvider _provider;
 
-  public ConfigureSwaggerOptions(IApiVersionDescriptionProvider apiVersionDescriptionProvider)
+  public ConfigureVersionedOpenApiOptions(IApiVersionDescriptionProvider provider)
   {
-    this.apiVersionDescriptionProvider = apiVersionDescriptionProvider;
+    _provider = provider;
   }
 
-  public void Configure(SwaggerGenOptions options)
+  public void Configure(OpenApiOptions options)
   {
-    foreach (var apiVersionDescriptions in apiVersionDescriptionProvider.ApiVersionDescriptions)
-      options.SwaggerDoc(apiVersionDescriptions.GroupName, CreateVersionInfo(apiVersionDescriptions));
-  }
-
-#pragma warning disable CS8767 // Nullability of reference types in type of parameter doesn't match implicitly implemented member (possibly because of nullability attributes).
-  public void Configure(string name, SwaggerGenOptions options)
-#pragma warning restore CS8767 // Nullability of reference types in type of parameter doesn't match implicitly implemented member (possibly because of nullability attributes).
-  {
-  }
-
-  private OpenApiInfo CreateVersionInfo(ApiVersionDescription desc)
-  {
-    var apiName = Assembly.GetEntryAssembly()!.GetName().Name;
-
-    var result = new OpenApiInfo
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
     {
-      Title = apiName,
-      Version = desc.ApiVersion.ToString()
-    };
+      var apiName = Assembly.GetEntryAssembly()!.GetName().Name;
 
-    if (desc.IsDeprecated)
-      result.Description += " This API version has been deprecated. Please use one of the new APIs available from the explorer.";
+      var versionDescription = _provider.ApiVersionDescriptions
+          .FirstOrDefault(d => d.GroupName == context.DocumentName);
 
-    return result;
+      document.Info = new OpenApiInfo
+      {
+        Title = apiName,
+        Version = versionDescription?.ApiVersion.ToString() ?? context.DocumentName,
+        Description = versionDescription?.IsDeprecated == true
+              ? "This API version has been deprecated. Please use one of the new APIs available from the explorer."
+              : null
+      };
+
+      return Task.CompletedTask;
+    });
   }
 }
