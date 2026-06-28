@@ -53,7 +53,7 @@ Choose **Kafka** or **RabbitMQ** — your application code does not change.
 
 ---
 
-**Current Version:** v2.2.11
+**Current Version:** v2.2.12
 
 ---
 

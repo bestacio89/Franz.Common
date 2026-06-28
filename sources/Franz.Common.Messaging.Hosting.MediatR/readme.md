@@ -17,7 +17,7 @@ An extension library within the **Franz Framework** that integrates **MediatR** 
 
 ## **Version Information**
 
-**Current Version:** v2.2.11
+**Current Version:** v2.2.12
 - Part of the private **Franz Framework** ecosystem.
 
 ---
