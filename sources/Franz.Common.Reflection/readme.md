@@ -20,7 +20,7 @@ A utility library within the **Franz Framework** that provides reflection-based 
 
 ## **Version Information**
 
-**Current Version:** v2.2.9
+**Current Version:** v2.2.10
 - Part of the private **Franz Framework** ecosystem.
 
 ---

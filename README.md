@@ -274,7 +274,7 @@ SQL, MongoDB, CosmosDB with unified abstractions.
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 2.2.9
+dotnet add package Franz.Common --version 2.2.10
 ```
 
 Messaging example:
