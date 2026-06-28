@@ -73,38 +73,25 @@ public static class ServiceCollectionExtensions
   /// Replaces AddSwaggerGen entirely — no Swashbuckle dependency.
   /// </summary>
   public static FranzDocumentationBuilder ConfigureOpenApi(
-      this FranzDocumentationBuilder builder)
+     this FranzDocumentationBuilder builder)
   {
-    // Build temporary provider to discover registered versions at registration time
-    var tempProvider = builder.Services.BuildServiceProvider();
-    var versionProvider = tempProvider
-        .GetRequiredService<IApiVersionDescriptionProvider>();
-
-    // Register one OpenAPI document per version with its own document transformer
-    foreach (var description in versionProvider.ApiVersionDescriptions)
+    builder.Services.AddOpenApi("v1", options =>
     {
-      var desc = description; // capture for closure
-
-      builder.Services.AddOpenApi(desc.GroupName, options =>
+      options.AddDocumentTransformer((document, context, ct) =>
       {
-        options.AddDocumentTransformer((document, context, ct) =>
+        var apiName = Assembly.GetEntryAssembly()!.GetName().Name;
+
+        document.Info = new OpenApiInfo
         {
-          var apiName = Assembly.GetEntryAssembly()!.GetName().Name;
+          Title = apiName,
+          Version = "1.0"
+        };
 
-          document.Info = new OpenApiInfo
-          {
-            Title = apiName,
-            Version = desc.ApiVersion.ToString(),
-            Description = desc.IsDeprecated
-                  ? "This API version has been deprecated. Please use one of the new APIs available from the explorer."
-                  : null
-          };
-
-          return Task.CompletedTask;
-        });
+        return Task.CompletedTask;
       });
-    }
+    });
 
     return builder;
   }
+
 }
