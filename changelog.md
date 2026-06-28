@@ -1346,3 +1346,110 @@ Are you ready to commit this, or is there one final piece of the `.NET 10` puzzl
 > “Mapping is not transformation magic — it is a deterministic execution graph over declared intent.”
 
 
+## v2.2.9 — Factory Hardening 🏭
+
+### 🧠 Overview
+
+A targeted hardening release for `Franz.Common.Business`, eliminating a class of CLR type constraint failures
+that surfaced during DI registration of `EntityFactory` and `AggregateFactory` — particularly in environments
+with incomplete or constrained infrastructure (cross-assembly access, hostile DI containers, restricted IL emit).
+
+The root cause was a combination of loose constructor resolution at runtime and an injected
+`Func<Guid, TAggregate>` activator in `AggregateFactory` that forced callers to reach into
+protected constructors across assembly boundaries — legal in C# but rejected by the CLR at JIT time
+in certain hosting contexts.
+
+---
+
+### ✨ Added
+
+#### `EntityFactory<TKey, TEntity>`
+
+- **Compiled expression tree delegate** — `Expression.New(ctor, param).Compile()` replaces all
+  per-call reflection. The delegate is stored in a `static readonly` field, compiled exactly once
+  per closed generic type and shared for the application lifetime.
+- **`Validate()` static method** — calls `RuntimeHelpers.RunClassConstructor()` to trigger the
+  static constructor eagerly. Call from your DI registration extension to surface misconfigured
+  entity types at startup rather than on first `Create()` call.
+- **`ArgumentNullException.ThrowIfNull`** guard on the injected `IIdGenerator<TKey>`.
+
+#### `AggregateFactory<TAggregate, TEvent>`
+
+- **Compiled expression tree delegate** — same pattern as `EntityFactory`, scoped to
+  `AggregateRoot<TEvent>` with `Guid` identity.
+- **Removed injected `Func<Guid, TAggregate>` activator** — the factory now owns constructor
+  resolution entirely via `ConstructorInfo` and expression compilation. This eliminates the
+  primary cause of CLR `MethodAccessException` failures: a lambda compiled in a caller assembly
+  attempting to invoke a `protected` constructor across the `internal` boundary.
+- **`Validate()` static method** — same eager startup validation as `EntityFactory`.
+- **`ArgumentNullException.ThrowIfNull`** guard on the injected `IIdGenerator<Guid>`.
+
+---
+
+### 🔧 Changed
+
+- `AggregateFactory` constructor signature simplified — `IIdGenerator<Guid>` is now the only
+  injected dependency. The `Func<Guid, TAggregate> activator` parameter has been removed entirely.
+- Both factories now fail with **`TypeInitializationException`** (wrapping a descriptive
+  `InvalidOperationException`) when the required single-parameter constructor is absent, replacing
+  the previous opaque CLR failure with an actionable message:
+  ```
+  Order must define a constructor that accepts a single Guid parameter.
+  Add: protected Order(Guid id) { }
+  ```
+
+---
+
+### 🐛 Fixed
+
+- CLR `MethodAccessException` / `TypeInitializationException` failures during DI registration
+  of `AggregateFactory` caused by a `Func<>` activator lambda crossing `internal` visibility
+  boundaries at JIT compile time.
+- Silent first-use failures when entity or aggregate types lacked the required constructor —
+  now surfaced deterministically at startup via `Validate()`.
+
+---
+
+### ⚠️ Breaking Change
+
+`AggregateFactory<TAggregate, TEvent>` constructor signature has changed:
+
+```csharp
+// Before (v2.2.8)
+new AggregateFactory<OrderAggregate, OrderEvent>(idGenerator, id => new OrderAggregate(id));
+
+// After (v2.2.9)
+new AggregateFactory<OrderAggregate, OrderEvent>(idGenerator);
+```
+
+Update any manual instantiation or DI registrations accordingly. The factory now derives the
+constructor automatically — the lambda is no longer needed or accepted.
+
+---
+
+### 🧪 Required Entity / Aggregate Constructor
+
+All entities and aggregates must expose a protected or public single-parameter constructor:
+
+```csharp
+// Entity
+public class Order : Entity<Guid>
+{
+    protected Order(Guid id) : base(id) { }
+}
+
+// Aggregate
+public class OrderAggregate : AggregateRoot<OrderEvent>
+{
+    protected OrderAggregate(Guid id) : base(id) { }
+}
+```
+
+---
+
+### 🏁 Architectural Impact
+
+> Franz factories now follow the same **fail-at-the-seam, not-in-the-stream** principle
+> applied across the rest of the framework. Every construction path is validated at startup,
+> every delegate compiled once, and runtime is pure execution — no discovery, no reflection,
+> no surprises.

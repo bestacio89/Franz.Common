@@ -17,7 +17,7 @@ A specialized library within the **Franz Framework** that provides streamlined c
 
 ## **Version Information**
 
--**Current Version:** v2.2.8
+**Current Version:** v2.2.9
 - Part of the private **Franz Framework** ecosystem.
 
 ---

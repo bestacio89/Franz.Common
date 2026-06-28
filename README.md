@@ -1,24 +1,20 @@
-<p align="center">
-  <img width="180" src="Docs/assets/FranzLogo.png" alt="Franz Logo"/>
-</p>
+![Franz Logo](https://github.com/bestacio89/Franz.Common/raw/main/Docs/assets/FranzLogo.png)
 
-<h1 align="center">Franz.Common</h1>
-<p align="center"><b>Deterministic Architecture for Event-Driven .NET Microservices</b></p>
+# Franz.Common
 
-<p align="center">
-  <img src="https://img.shields.io/badge/.NET-10%2B-blueviolet" />
-  <img src="https://img.shields.io/badge/Architecture-Clean%20%7C%20DDD%20%7C%20CQRS-brightgreen" />
-  <img src="https://img.shields.io/badge/Messaging-Kafka-231f20?logo=apachekafka&logoColor=white" />
-  <img src="https://img.shields.io/badge/Messaging-RabbitMQ-ff6600?logo=rabbitmq&logoColor=white" />
-  <img src="https://img.shields.io/badge/Messaging-AzureServiceBus-0078d4?logo=microsoftazure&logoColor=white" />
-  <img src="https://img.shields.io/badge/Persistence-SQL%20%7C%20MongoDB%20%7C%20CosmosDB-blue" />
-  <img src="https://img.shields.io/badge/Resilience-Polly-blue" />
-  <img src="https://img.shields.io/badge/Observability-OpenTelemetry-yellow" />
-  <img src="https://img.shields.io/badge/Multi--Tenancy-Built--In-9cf" />
-  <img src="https://img.shields.io/badge/License-MIT-lightgrey" />
-  <img src="https://img.shields.io/badge/NuGet-400k%2B%20downloads-success" />
-</p>
+**Deterministic Architecture for Event-Driven .NET Microservices**
 
+[![.NET](https://img.shields.io/badge/.NET-10%2B-blueviolet)](https://dotnet.microsoft.com)
+[![Architecture](https://img.shields.io/badge/Architecture-Clean%20%7C%20DDD%20%7C%20CQRS-brightgreen)](https://github.com/bestacio89/Franz.Common)
+[![Messaging-Kafka](https://img.shields.io/badge/Messaging-Kafka-231f20?logo=apachekafka&logoColor=white)](https://kafka.apache.org)
+[![Messaging-RabbitMQ](https://img.shields.io/badge/Messaging-RabbitMQ-ff6600?logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com)
+[![Messaging-AzureServiceBus](https://img.shields.io/badge/Messaging-AzureServiceBus-0078d4?logo=microsoftazure&logoColor=white)](https://azure.microsoft.com/en-us/products/service-bus)
+[![Persistence](https://img.shields.io/badge/Persistence-SQL%20%7C%20MongoDB%20%7C%20CosmosDB-blue)](https://github.com/bestacio89/Franz.Common)
+[![Resilience-Polly](https://img.shields.io/badge/Resilience-Polly-blue)](https://github.com/App-vNext/Polly)
+[![Observability-OpenTelemetry](https://img.shields.io/badge/Observability-OpenTelemetry-yellow)](https://opentelemetry.io)
+[![Multi--Tenancy-Built--In](https://img.shields.io/badge/Multi--Tenancy-Built--In-9cf)](https://github.com/bestacio89/Franz.Common)
+[![License-MIT](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE.MD)
+[![NuGet](https://img.shields.io/badge/NuGet-400k%2B%20downloads-success)](https://www.nuget.org/packages?q=Franz.Common)
 
 ---
 
@@ -38,12 +34,12 @@ Franz is **Kafka-first**, but also supports **RabbitMQ, Azure Service Bus, Mongo
 
 Franz was created to bring **predictability, maintainability, and governance** to distributed .NET systems:
 
-* Reduces **80%+** of architectural boilerplate.
-* Enforces **structural correctness** at build time.
-* Provides **consistent architecture** across microservices.
-* Offers **first-class resilience**, **observability**, and **messaging** patterns.
-* Minimizes cognitive load through **unified abstractions**.
-* Designed for **enterprise requirements** (multi-tenancy, identity, auditability).
+- Reduces **80%+** of architectural boilerplate.
+- Enforces **structural correctness** at build time.
+- Provides **consistent architecture** across microservices.
+- Offers **first-class resilience**, **observability**, and **messaging** patterns.
+- Minimizes cognitive load through **unified abstractions**.
+- Designed for **enterprise requirements** (multi-tenancy, identity, auditability).
 
 ---
 
@@ -53,37 +49,37 @@ Franz follows a **"batteries-included but modular"** philosophy.
 
 ### **Core**
 
-* `Franz.Common` → Core primitives, serialization, DI, functional utilities.
+- `Franz.Common` → Core primitives, serialization, DI, functional utilities.
 
 ### **Domain & Application**
 
-* `Franz.Common.Business` → DDD aggregates, domain events, pipelines.
-* `Franz.Common.Mediator` → Lightweight CQRS mediator with pipelines.
+- `Franz.Common.Business` → DDD aggregates, domain events, factories, pipelines.
+- `Franz.Common.Mediator` → Lightweight CQRS mediator with pipelines.
 
 ### **Infrastructure**
 
-* `Franz.Common.EntityFramework` → Auditing, soft deletes, domain event dispatching.
-* `Franz.Common.MongoDB` → Mongo outbox/inbox.
-* `Franz.Common.AzureCosmosDB` → Cosmos outbox/inbox.
+- `Franz.Common.EntityFramework` → Auditing, soft deletes, domain event dispatching.
+- `Franz.Common.MongoDB` → Mongo outbox/inbox.
+- `Franz.Common.AzureCosmosDB` → Cosmos outbox/inbox.
 
 ### **Messaging**
 
-* `Franz.Common.Messaging` → Messaging contracts, envelopes, options.
-* `Franz.Common.Messaging.Hosting` → Hosted async listeners.
-* `Franz.Common.Messaging.Kafka`
-* `Franz.Common.Messaging.RabbitMQ`
+- `Franz.Common.Messaging` → Messaging contracts, envelopes, options.
+- `Franz.Common.Messaging.Hosting` → Hosted async listeners.
+- `Franz.Common.Messaging.Kafka`
+- `Franz.Common.Messaging.RabbitMQ`
 
 ### **HTTP**
 
-* `Franz.Common.Http.Bootstrap`
-* `Franz.Common.Http.Refit`
-* `Franz.Common.Http.Identity`
-* `Franz.Common.Http.Messaging`
+- `Franz.Common.Http.Bootstrap`
+- `Franz.Common.Http.Refit`
+- `Franz.Common.Http.Identity`
+- `Franz.Common.Http.Messaging`
 
 ### **Identity**
 
-* `Franz.Common.Identity`
-* `Franz.Common.SSO` → Keycloak, OIDC, SAML2, WS-Fed integrations.
+- `Franz.Common.Identity`
+- `Franz.Common.SSO` → Keycloak, OIDC, SAML2, WS-Fed integrations.
 
 ---
 
@@ -91,15 +87,14 @@ Franz follows a **"batteries-included but modular"** philosophy.
 
 Franz enforces strict, deterministic security patterns:
 
-* Mandatory **CorrelationId**, **TraceId**, and **TenantId** propagation.
-* Deterministic error filters (no sensitive data leakage).
-* Centralized **authentication & claims enrichment pipelines**.
-* Optional strict mode:
-
+- Mandatory **CorrelationId**, **TraceId**, and **TenantId** propagation.
+- Deterministic error filters (no sensitive data leakage).
+- Centralized **authentication & claims enrichment pipelines**.
+- Optional strict mode:
   * no unregistered controllers
   * no unregistered message handlers
   * validation-first execution
-* Standardized identity flows across **OIDC, SAML2, Keycloak, WS-Fed**.
+- Standardized identity flows across **OIDC, SAML2, Keycloak, WS-Fed**.
 
 These principles make Franz suitable for **regulated environments**, including public institutions and financial sectors.
 
@@ -131,10 +126,8 @@ end
 subgraph Messaging Layer
     I --> K[[Kafka Broker]]
     J --> L[[RabbitMQ Broker]]
-
     K --> M[[Kafka Consumer]]
     L --> N[[Rabbit Consumer]]
-
     M --> E
     N --> E
 end
@@ -233,34 +226,14 @@ Core --> Cosmos
 
 Franz includes an optional **architecture test suite** based on ArchUnitNET:
 
-* Enforces **layer boundaries** (Domain → Application → Infrastructure).
-* Forbids **circular dependencies**.
-* Enforces **immutable DTOs**.
-* Validates naming conventions:
-
-  * Commands, Queries, Events
-  * Handlers
-  * Controllers
-* Ensures no domain leakage into infrastructure and vice-versa.
-* Ensures messaging boundaries are respected.
+- Enforces **layer boundaries** (Domain → Application → Infrastructure).
+- Forbids **circular dependencies**.
+- Enforces **immutable DTOs**.
+- Validates naming conventions: Commands, Queries, Events, Handlers, Controllers.
+- Ensures no domain leakage into infrastructure and vice-versa.
+- Ensures messaging boundaries are respected.
 
 This makes Franz suitable for **large organizations**, where maintaining architectural discipline is critical.
-
----
-
-# 🚀 Getting Started
-
-### Install the core package:
-
-```bash
-dotnet add package Franz.Common --version 2.2.7
-```
-
-Messaging example:
-
-```bash
-dotnet add package Franz.Common.Messaging.Kafka
-```
 
 ---
 
@@ -268,7 +241,11 @@ dotnet add package Franz.Common.Messaging.Kafka
 
 ### ✔ DDD/CQRS First-Class
 
-Entities, value objects, aggregates, events.
+Entities, value objects, aggregates, events — all factory-controlled, identity-safe, and persistence-agnostic.
+
+### ✔ High-Performance Entity & Aggregate Factories
+
+`EntityFactory<TKey, TEntity>` and `AggregateFactory<TAggregate, TEvent>` use **compiled expression tree delegates** cached statically per closed generic type. Constructor resolution happens once at startup — runtime creation is near-native with zero reflection overhead. Misconfigured types are caught at DI registration time via `Validate()`, not at first use.
 
 ### ✔ Mediator with Pipelines
 
@@ -292,6 +269,22 @@ SQL, MongoDB, CosmosDB with unified abstractions.
 
 ---
 
+# 🚀 Getting Started
+
+### Install the core package:
+
+```bash
+dotnet add package Franz.Common --version 2.2.9
+```
+
+Messaging example:
+
+```bash
+dotnet add package Franz.Common.Messaging.Kafka
+```
+
+---
+
 # 🛠️ Build & Test
 
 ```bash
@@ -309,18 +302,49 @@ dotnet test --filter Category=Integration
 ```
 
 ---
-Understood. I have stripped back the README documentation to focus strictly on the **Oracle integration** and the **infrastructure expansion** you just executed. No fluff, no mapping engine bloat—just the technical reality of the current state.
 
-### 🧠 Core Architectural Expansion (v2.2.8)
+# 🧠 Core Architectural Expansions
 
-* Bug fixes in the automatic resolution of Entity Repositories
+### v2.2.9 — Factory Hardening
+
+`EntityFactory` and `AggregateFactory` have been completely hardened against CLR type constraint failures at DI registration time:
+
+- **Compiled expression tree delegates** replace all runtime reflection — delegates are compiled once per closed generic type and cached statically for the application lifetime, giving near-native instantiation performance.
+- **Injected `Func<Guid, TAggregate>` activator removed** from `AggregateFactory` — the factory now owns constructor resolution entirely, eliminating the class of CLR access failures that occurred when a lambda crossed `internal` visibility boundaries at DI registration.
+- **`TypeInitializationException`** with a descriptive actionable inner message replaces opaque CLR failures when the required single-parameter constructor is absent.
+- **`ArgumentNullException.ThrowIfNull`** guards on all injected dependencies.
+- **`Validate()` static method** added to both factories — triggers the static constructor eagerly so misconfigured types are caught at startup rather than on first `Create()` call.
+
+```csharp
+// Catch misconfiguration at startup, not at runtime
+services.AddSingleton<IEntityFactory<Guid, Order>, EntityFactory<Guid, Order>>();
+EntityFactory<Guid, Order>.Validate();
+
+services.AddSingleton<IAggregateFactory<OrderAggregate>, AggregateFactory<OrderAggregate, OrderEvent>>();
+AggregateFactory<OrderAggregate, OrderEvent>.Validate();
+```
+
+Every entity and aggregate must expose a single-parameter constructor accepting its key type:
+
+```csharp
+// Entity
+protected Order(Guid id) : base(id) { }
+
+// Aggregate
+protected OrderAggregate(Guid id) : base(id) { }
+```
+
+### v2.2.8 — Entity Repository Resolution
+
+- Bug fixes in the automatic resolution of Entity Repositories.
+
 ---
-
 
 # 🛣️ Roadmap
 
-* Graphql Adapters and Implementations
-* SignalR adapters and Implementations
+- GraphQL Adapters and Implementations
+- SignalR Adapters and Implementations
+
 ---
 
 # 🏢 Enterprise Adoption & Support

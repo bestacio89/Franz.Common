@@ -21,7 +21,7 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 
 ## **Version Information**
 
--**Current Version:** v2.2.8
+**Current Version:** v2.2.9
 - Part of the private **Franz Framework** ecosystem.
 
 ---

@@ -183,7 +183,7 @@ This ensures:
 
 ## 🧾 Version Information
 
-* -**Current Version:** v2.2.8
+* **Current Version:** v2.2.9
 * **Target Framework**: **.NET 10.0**
 * Part of the **Franz Framework**
 
