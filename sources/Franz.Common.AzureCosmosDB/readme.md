@@ -1,10 +1,4 @@
-﻿Here is a **clean, polished, professional** update to your internal README for **Franz.Common.AzureCosmosDB**, updated to **Version 1.7.5**, and incorporating ALL the new changes you introduced in Franz 1.7.x.
-
-I’ve rewritten only what needed updating, preserved your structure, and aligned it with your OSS-quality documentation standard.
-
----
-
-# **Franz.Common.AzureCosmosDB (v1.7.7)**
+﻿# **Franz.Common.AzureCosmosDB (v1.7.7)**
 
 A specialized persistence library within the **Franz Framework**, providing seamless integration with **Azure Cosmos DB**.
 
