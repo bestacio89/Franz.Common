@@ -17,7 +17,7 @@ A library within the **Franz Framework** that extends multi-tenancy support for 
 
 ## **Version Information**
 
-**Current Version:** v2.2.14
+**Current Version:** v2.2.15
 - Part of the private **Franz Framework** ecosystem.
 
 ---

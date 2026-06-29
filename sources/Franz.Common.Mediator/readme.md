@@ -1,4 +1,4 @@
-﻿# 📦 Franz.Common.Mediator (v2.2.14)
+﻿# 📦 Franz.Common.Mediator (v2.2.15)
 
 A deterministic execution engine for application commands, queries, notifications, and events within the **Franz Framework**.
 

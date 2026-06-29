@@ -20,7 +20,7 @@ A library within the **Franz Framework** designed to streamline the management, 
 
 ## **Version Information**
 
-**Current Version:** v2.2.14
+**Current Version:** v2.2.15
 - Part of the private **Franz Framework** ecosystem.
 
 ---

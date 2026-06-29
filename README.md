@@ -305,7 +305,7 @@ dotnet test --filter Category=Integration
 
 # 🧠 Core Architectural Expansions
 
-## v2.2.14 — Unit of Work Consolidation
+## v2.2.15 — Unit of Work Consolidation
 
 ### Fixed
 - `TransactionPipeline` now correctly backed by real EF transactions — 

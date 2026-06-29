@@ -1489,7 +1489,7 @@ Native OpenAPI eliminates this entire class of version conflict permanently.
 
 ---
 
-## v2.2.14 — Unit of Work Consolidation
+## v2.2.15 — Unit of Work Consolidation
 
 ### Fixed
 - `TransactionPipeline` now correctly backed by real EF transactions — 
