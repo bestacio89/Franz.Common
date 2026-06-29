@@ -7,7 +7,7 @@ Provides **typed Refit clients** pre-wired with **correlation and tenant propaga
 
 ---
 
-* **Current Version:** v2.2.12
+* **Current Version:** v2.2.13
 - Part of the private **Franz Framework** ecosystem.
 ---
 

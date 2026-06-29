@@ -140,7 +140,7 @@ public class CustomMessagingStrategyExecuter : IMessagingStrategyExecuter
 
 ## 📝 Version Information
 
-* **Current Version:** v2.2.12
+* **Current Version:** v2.2.13
 * Part of the private **Franz Framework** ecosystem.
 ---
 
