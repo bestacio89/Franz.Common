@@ -6,12 +6,12 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 
 ## **Features**
 
-- **Native OpenAPI Integration** *(since 2.2.12)*:
+- **Native OpenAPI Integration** *(since 2.2.13)*:
   - Uses `Microsoft.AspNetCore.OpenApi` — the official .NET 10 OpenAPI pipeline.
   - No Swashbuckle dependency — eliminates `Microsoft.OpenApi` version conflict hell permanently.
   - One OpenAPI document per API version, served at `/openapi/{version}/openapi.json`.
 
-- **Scalar UI** *(since 2.2.12)*:
+- **Scalar UI** *(since 2.2.13)*:
   - Replaces Swagger UI with `Scalar.AspNetCore` — cleaner interface, better auth support, multi-version switcher.
   - Available at `/scalar/{documentName}` (e.g. `/scalar/v1`).
 
@@ -34,7 +34,7 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 
 ## **Version Information**
 
-**Current Version:** v2.2.12
+**Current Version:** v2.2.13
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -47,10 +47,10 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 | `Microsoft.AspNetCore.OpenApi` | 10.0.9 |
 | `Microsoft.Extensions.DependencyInjection.Abstractions` | 10.0.9 |
 | `Scalar.AspNetCore` | 2.16.6 |
-| `Franz.Common.Business` | 2.2.12 |
-| `Franz.Common.Reflection` | 2.2.12 |
+| `Franz.Common.Business` | 2.2.13 |
+| `Franz.Common.Reflection` | 2.2.13 |
 
-> **Removed since v2.2.12:**
+> **Removed since v2.2.13:**
 > `Swashbuckle.AspNetCore.SwaggerGen`, `Swashbuckle.AspNetCore.SwaggerUI`,
 > `Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer`, `Microsoft.OpenApi` (explicit pin no longer needed).
 
@@ -163,7 +163,7 @@ This registers:
 
 ---
 
-## **Migration from v2.2.9 → v2.2.12**
+## **Migration from v2.2.9 → v2.2.13**
 
 | Before (Swashbuckle) | After (Native OpenAPI) |
 |---|---|
@@ -204,7 +204,7 @@ MIT License. See the `LICENSE` file for more details.
 
 ## **Changelog**
 
-### v2.2.12 — Native OpenAPI + Scalar Migration
+### v2.2.13 — Native OpenAPI + Scalar Migration
 
 **Breaking changes:**
 
