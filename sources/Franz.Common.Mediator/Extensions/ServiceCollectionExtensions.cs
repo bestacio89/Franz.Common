@@ -141,9 +141,18 @@ namespace Franz.Common.Mediator.Extensions
       return services;
     }
 
-    public static IServiceCollection AddFranzTransactionPipeline(this IServiceCollection services)
+    public static IServiceCollection AddFranzTransactionPipeline(
+        this IServiceCollection services,
+        Action<TransactionOptions>? configure = null)
     {
+      var options = new TransactionOptions();
+      configure?.Invoke(options);
+
+      // Register as singleton — TransactionOptions are configuration,
+      // not per-request state. Safe to share across scopes.
+      services.AddSingleton(options);
       services.AddScoped(typeof(IPipeline<,>), typeof(TransactionPipeline<,>));
+
       return services;
     }
 
