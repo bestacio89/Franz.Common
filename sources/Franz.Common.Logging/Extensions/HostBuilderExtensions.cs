@@ -23,6 +23,9 @@ namespace Franz.Common.Logging.Extensions
     /// Industrial-grade, low-noise, UTF-8-safe logging.
     /// Development → Console + Debug + File
     /// Production  → SRE JSON log + Dev human-readable log + Console
+    ///
+    /// Boot chatter, infrastructure noise, and framework internals are
+    /// suppressed at the Franz level — no appsettings configuration needed.
     /// </summary>
     public static IHostBuilder UseLog(this IHostBuilder hostBuilder)
     {
@@ -40,7 +43,10 @@ namespace Franz.Common.Logging.Extensions
             .Enrich.WithProperty("Application", env.ApplicationName)
             .Enrich.WithMachineName()
             .Enrich.WithEnvironmentName()
-            // ---- Global noise suppression ----
+
+            // =========================================================
+            // FRAMEWORK INTERNALS — never useful in application logs
+            // =========================================================
             .Filter.ByExcluding(Matching.FromSource("Microsoft.EntityFrameworkCore"))
             .Filter.ByExcluding(Matching.FromSource("Microsoft.EntityFrameworkCore.Database.Command"))
             .Filter.ByExcluding(Matching.FromSource("Microsoft.EntityFrameworkCore.Infrastructure"))
@@ -48,7 +54,49 @@ namespace Franz.Common.Logging.Extensions
             .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.DataProtection"))
             .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.StaticFiles"))
             .Filter.ByExcluding(Matching.FromSource("Microsoft.Hosting.Lifetime"))
-            .Filter.ByExcluding(Matching.FromSource("Microsoft.Extensions.Diagnostics.HealthChecks"));
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.Extensions.Diagnostics.HealthChecks"))
+
+            // =========================================================
+            // BOOT CHATTER — VS tooling, browser refresh, hot reload
+            // noise that fires before any user request reaches the app
+            // =========================================================
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Watch"))
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.WebTools"))
+
+            // =========================================================
+            // KESTREL TRANSPORT — EOF probes, FIN signals, TLS handshake
+            // failures on boot are infrastructure noise, not app errors
+            // =========================================================
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets"))
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Server.Kestrel.Connections"))
+            .Filter.ByExcluding(e =>
+                e.Level < LogEventLevel.Error &&
+                Matching.FromSource("Microsoft.AspNetCore.Server.Kestrel.Https")(e))
+
+            // =========================================================
+            // LOCALIZATION — AcceptLanguageHeader noise fires on every
+            // request when the browser sends en-US to a French-locale API
+            // =========================================================
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Localization"))
+
+            // =========================================================
+            // ROUTING & MODEL BINDING — DfaMatcher candidate lists and
+            // model binder provider registration spam on every startup
+            // =========================================================
+            .Filter.ByExcluding(e =>
+                e.Level < LogEventLevel.Warning &&
+                Matching.FromSource("Microsoft.AspNetCore.Routing")(e))
+            .Filter.ByExcluding(e =>
+                e.Level < LogEventLevel.Warning &&
+                Matching.FromSource("Microsoft.AspNetCore.Mvc.ModelBinding")(e))
+
+            // =========================================================
+            // API VERSIONING — description provider execution logs
+            // are registration-time noise, not runtime information
+            // =========================================================
+            .Filter.ByExcluding(e =>
+                e.Level < LogEventLevel.Warning &&
+                Matching.FromSource("Asp.Versioning")(e));
 
         if (env.IsDevelopment())
         {
@@ -56,13 +104,15 @@ namespace Franz.Common.Logging.Extensions
               .MinimumLevel.Debug()
               .WriteTo.Console(
                   outputTemplate:
-                      "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}",
+                      "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} | ReqId:{RequestId} | {Message:lj}{NewLine}{Exception}",
                   restrictedToMinimumLevel: LogEventLevel.Debug)
               .WriteTo.Debug()
               .WriteTo.File(
                   path: "logs/dev-.log",
                   rollingInterval: RollingInterval.Day,
                   encoding: utf8,
+                  outputTemplate:
+                      "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {SourceContext} | ReqId:{RequestId} | Path:{RequestPath} | {Message:lj}{NewLine}{Exception}",
                   retainedFileCountLimit: 10);
         }
         else
@@ -70,7 +120,8 @@ namespace Franz.Common.Logging.Extensions
           logCfg
               .MinimumLevel.Information()
               .WriteTo.Console(
-                  outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
+                  outputTemplate:
+                      "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} | ReqId:{RequestId} | {Message:lj}{NewLine}{Exception}",
                   restrictedToMinimumLevel: LogEventLevel.Information);
 
           // 1️⃣ SRE log (JSON, structured)
@@ -87,18 +138,21 @@ namespace Franz.Common.Logging.Extensions
               rollingInterval: RollingInterval.Day,
               retainedFileCountLimit: 30,
               encoding: utf8,
-              outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}");
+              outputTemplate:
+                  "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {SourceContext} | ReqId:{RequestId} | Path:{RequestPath} | {Message:lj}{NewLine}{Exception}");
         }
       });
 
 #if DEBUG
-            hostBuilder.ConfigureServices((_, __) => Agent.Setup(new AgentComponents()));
+      hostBuilder.ConfigureServices((_, __) => Agent.Setup(new AgentComponents()));
 #endif
       return hostBuilder;
     }
 
     /// <summary>
     /// Hybrid (config-driven) logging with UTF-8 enforcement and noise suppression.
+    /// Applies the same boot chatter and framework internal filters as UseLog
+    /// so config-driven services get the same clean baseline.
     /// </summary>
     public static IHostBuilder UseHybridLog(this IHostBuilder hostBuilder)
     {
@@ -116,13 +170,43 @@ namespace Franz.Common.Logging.Extensions
             .Enrich.WithProperty("Application", env.ApplicationName)
             .Enrich.WithMachineName()
             .Enrich.WithEnvironmentName()
+
+            // Framework internals
             .Filter.ByExcluding(Matching.FromSource("Microsoft.EntityFrameworkCore"))
             .Filter.ByExcluding(Matching.FromSource("Microsoft.EntityFrameworkCore.Database.Command"))
-            .Filter.ByExcluding(Matching.FromSource("System.Net.Http.HttpClient"));
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.EntityFrameworkCore.Infrastructure"))
+            .Filter.ByExcluding(Matching.FromSource("System.Net.Http.HttpClient"))
+
+            // Boot chatter
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Watch"))
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.WebTools"))
+
+            // Kestrel transport
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets"))
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Server.Kestrel.Connections"))
+            .Filter.ByExcluding(e =>
+                e.Level < LogEventLevel.Error &&
+                Matching.FromSource("Microsoft.AspNetCore.Server.Kestrel.Https")(e))
+
+            // Localization noise
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Localization"))
+
+            // Routing and model binding
+            .Filter.ByExcluding(e =>
+                e.Level < LogEventLevel.Warning &&
+                Matching.FromSource("Microsoft.AspNetCore.Routing")(e))
+            .Filter.ByExcluding(e =>
+                e.Level < LogEventLevel.Warning &&
+                Matching.FromSource("Microsoft.AspNetCore.Mvc.ModelBinding")(e))
+
+            // API versioning
+            .Filter.ByExcluding(e =>
+                e.Level < LogEventLevel.Warning &&
+                Matching.FromSource("Asp.Versioning")(e));
       });
 
 #if DEBUG
-            hostBuilder.ConfigureServices((_, __) => Agent.Setup(new AgentComponents()));
+      hostBuilder.ConfigureServices((_, __) => Agent.Setup(new AgentComponents()));
 #endif
       return hostBuilder;
     }
