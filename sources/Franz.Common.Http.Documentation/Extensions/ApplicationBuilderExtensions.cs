@@ -15,7 +15,7 @@ public static class ApplicationBuilderExtensions
 
     app.UseEndpoints(endpoints =>
     {
-      endpoints.MapOpenApi("/openapi/{documentName}/openapi.json");
+      endpoints.MapOpenApi("/openapi/{documentName}.json");
 
       endpoints.MapScalarApiReference(options =>
       {
@@ -23,7 +23,7 @@ public static class ApplicationBuilderExtensions
         options.AddDocument(
             "v1",
             $"{apiName} V1",
-            "/openapi/v1/openapi.json");
+            "/openapi/v1.json");
       });
     });
 
