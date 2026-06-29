@@ -34,7 +34,7 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 
 ## **Version Information**
 
-**Current Version:** v2.2.13
+**Current Version:** v2.2.14
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -47,10 +47,10 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 | `Microsoft.AspNetCore.OpenApi` | 10.0.9 |
 | `Microsoft.Extensions.DependencyInjection.Abstractions` | 10.0.9 |
 | `Scalar.AspNetCore` | 2.16.6 |
-| `Franz.Common.Business` | 2.2.13 |
-| `Franz.Common.Reflection` | 2.2.13 |
+| `Franz.Common.Business` | 2.2.14 |
+| `Franz.Common.Reflection` | 2.2.14 |
 
-> **Removed since v2.2.13:**
+> **Removed since v2.2.14:**
 > `Swashbuckle.AspNetCore.SwaggerGen`, `Swashbuckle.AspNetCore.SwaggerUI`,
 > `Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer`, `Microsoft.OpenApi` (explicit pin no longer needed).
 
@@ -163,7 +163,7 @@ This registers:
 
 ---
 
-## **Migration from v2.2.9 → v2.2.13**
+## **Migration from v2.2.14 → v2.2.14**
 
 | Before (Swashbuckle) | After (Native OpenAPI) |
 |---|---|

@@ -2,7 +2,7 @@
 
 *A deterministic, high-performance object mapping engine for the Franz Framework.*
 
-* **Current Version:** v2.2.13
+* **Current Version:** v2.2.14
 * **Codename:** *Mapping Engine Formalization & Constructor-Aware Evolution*
 * Part of the **Franz Core Infrastructure Suite**
 

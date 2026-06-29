@@ -305,34 +305,17 @@ dotnet test --filter Category=Integration
 
 # 🧠 Core Architectural Expansions
 
-### v2.2.13 — Native OpenAPI + Scalar Migration
+## v2.2.14 — Unit of Work Consolidation
 
-* **`Franz.Common.Http.Documentation` — Swashbuckle removed entirely:**
-  * Replaced `Swashbuckle.AspNetCore` with `Microsoft.AspNetCore.OpenApi` (native .NET 10 pipeline).
-  * Replaced `Swagger UI` with `Scalar.AspNetCore` — cleaner UI, better auth support, version switcher.
-  * Replaced `Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer` (legacy, unmaintained) with
-    `Asp.Versioning.Mvc.ApiExplorer` — the official maintained successor.
-  * `AddVersionedApiExplorer()` replaced by `.AddApiExplorer()` chained on `AddApiVersioning()`.
-  * `ConfigureSwagger()` renamed to `ConfigureOpenApi()` — update call sites in `AddHttpArchitecture`.
-  * `ConfigureSwaggerOptions` class removed — replaced by `ConfigureVersionedOpenApiOptions`
-    using native `OpenApiOptions.AddDocumentTransformer`.
-  * `SwaggerGenOptionsExtensions.ConvertEnumeration` replaced by
-    `OpenApiSchemaExtensions.ConvertEnumeration` using document transformers.
-  * `OpenApiSchema.Type` now uses `JsonSchemaType` enum (not strings) — aligned with `Microsoft.OpenApi 2.x`.
-  * `UseDocumentation()` middleware updated — `UseSwagger()` / `UseSwaggerUI()` replaced by
-    `MapOpenApi()` + `MapScalarApiReference()`.
-  * OpenAPI documents served at `/openapi/{groupName}/openapi.json`.
-  * Scalar UI served at `/scalar/{documentName}`.
+### Fixed
+- `TransactionPipeline` now correctly backed by real EF transactions — 
+  `BeginAsync` and `RollbackAsync` were previously unimplemented.
+- `EfUnitOfWork` consolidated to implement `Franz.Common.Mediator.Pipelines.Core.IUnitOfWork` 
+  exclusively — `Franz.Common.EntityFramework.IUnitOfWork` removed.
 
-* **Root cause:** `Microsoft.OpenApi 3.x` breaks `IOpenApiRequestBody.Content` which
-  Swashbuckle 10.x depends on, causing `MissingMethodException` at `/swagger/v1/swagger.json`.
-  Native OpenAPI eliminates this entire class of version conflict permanently.
-
-* **`Franz.Common.EntityFramework` dependency alignment:**
-  * All EF Core packages updated to `10.0.9`.
-  * `Microsoft.AspNetCore.Mvc` dependency removed — no longer needed at this layer.
-
-
+### Migration
+- Update usings from `Franz.Common.EntityFramework.IUnitOfWork` 
+  to `Franz.Common.Mediator.Pipelines.Core.IUnitOfWork`.
 
 ---
 

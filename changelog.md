@@ -1486,3 +1486,17 @@ public class OrderAggregate : AggregateRoot<OrderEvent>
 `Microsoft.OpenApi 3.x` breaks `IOpenApiRequestBody.Content` which Swashbuckle 10.x
 depends on, causing `MissingMethodException` at `/swagger/v1/swagger.json` generation.
 Native OpenAPI eliminates this entire class of version conflict permanently.
+
+---
+
+## v2.2.14 — Unit of Work Consolidation
+
+### Fixed
+- `TransactionPipeline` now correctly backed by real EF transactions — 
+  `BeginAsync` and `RollbackAsync` were previously unimplemented.
+- `EfUnitOfWork` consolidated to implement `Franz.Common.Mediator.Pipelines.Core.IUnitOfWork` 
+  exclusively — `Franz.Common.EntityFramework.IUnitOfWork` removed.
+
+### Migration
+- Update usings from `Franz.Common.EntityFramework.IUnitOfWork` 
+  to `Franz.Common.Mediator.Pipelines.Core.IUnitOfWork`.
