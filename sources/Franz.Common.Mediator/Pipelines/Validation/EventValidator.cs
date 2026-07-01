@@ -2,17 +2,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Franz.Common.Mediator.Pipelines.Validation;
+
 public sealed class EventValidationException : Exception
 {
-  public IReadOnlyCollection<ValidationError> Errors { get; }
+  public ValidationResult Result { get; }
 
-  public EventValidationException(IEnumerable<ValidationError> errors)
+  public EventValidationException(ValidationResult result)
       : base("Event validation failed")
   {
-    Errors = errors.ToList().AsReadOnly();
+    Result = result ?? throw new ArgumentNullException(nameof(result));
+
+    if (result.Errors.Count == 0)
+      throw new ArgumentException(
+        "EventValidationException requires at least one validation error.",
+        nameof(result));
   }
 }
