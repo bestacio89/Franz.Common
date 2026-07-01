@@ -21,7 +21,9 @@ public static class ApplicationBuilderExtensions
         endpoints.MapControllers().RequireAuthorization();
       })
       .UseDocumentation()
-      .UseHealthChecks("/health");
+      .UseHealthChecks("/health")
+      .UseExceptionHandler();
+        
 
     return applicationBuilder;
   }
