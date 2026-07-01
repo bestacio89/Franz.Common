@@ -1,5 +1,4 @@
-﻿using France.Common.Extensions;
-using Franz.Common.Mediator.Messages;
+﻿using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Validation;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -12,71 +11,71 @@ using System.Threading.Tasks;
 namespace Franz.Common.Mediator.Validation.Events.Validation;
 
 public class EventValidationPipeline<TEvent> : IEventPipeline<TEvent>
-      where TEvent : IEvent
-  {
-    private readonly IEnumerable<IEventValidator<TEvent>> _validators;
-    private readonly ILogger<EventValidationPipeline<TEvent>> _logger;
-    private readonly IHostEnvironment _env;
+    where TEvent : IEvent
+{
+  private readonly IEnumerable<IEventValidator<TEvent>> _validators;
+  private readonly ILogger<EventValidationPipeline<TEvent>> _logger;
+  private readonly IHostEnvironment _env;
 
-    public EventValidationPipeline(
-        IEnumerable<IEventValidator<TEvent>> validators,
-        ILogger<EventValidationPipeline<TEvent>> logger,
-        IHostEnvironment env)
+  public EventValidationPipeline(
+      IEnumerable<IEventValidator<TEvent>> validators,
+      ILogger<EventValidationPipeline<TEvent>> logger,
+      IHostEnvironment env)
+  {
+    _validators = validators;
+    _logger = logger;
+    _env = env;
+  }
+
+  public async Task HandleAsync(
+      TEvent @event,
+      Func<Task> next,
+      CancellationToken cancellationToken = default)
+  {
+    var allErrors = new List<ValidationError>();
+
+    foreach (var validator in _validators)
     {
-      _validators = validators;
-      _logger = logger;
-      _env = env;
+      ValidationResult result = await validator.ValidateAsync(@event, cancellationToken);
+
+      if (result?.IsValid == true)
+        continue;
+
+      if (result?.Errors != null)
+        allErrors.AddRange(result.Errors);
     }
 
-    public async Task HandleAsync(
-        TEvent @event,
-        Func<Task> next,
-        CancellationToken cancellationToken = default)
+    if (allErrors.Any())
     {
-      var failures = new List<string>();
-
-      foreach (var validator in _validators)
-      {
-        var result = await validator.ValidateAsync(@event, cancellationToken);
-        if (result != null)
-          failures.AddRange((IEnumerable<string>)result.Errors);
-      }
-
-      if (failures.Any())
-      {
-        var eventName = @event?.GetType().Name ?? typeof(TEvent).Name;
-
-        if (_env.IsDevelopment())
-        {
-          _logger.LogWarning("[EventValidation] {EventName} failed with errors: {@Errors}",
-              eventName, failures);
-        }
-        else
-        {
-          _logger.LogWarning("[EventValidation] {EventName} failed with {ErrorCount} errors",
-              eventName, failures.Count);
-        }
-
-        throw new EventValidationException(failures);
-      }
+      var eventName = @event?.GetType().Name ?? typeof(TEvent).Name;
 
       if (_env.IsDevelopment())
       {
-        var eventName = @event?.GetType().Name ?? typeof(TEvent).Name;
-        _logger.LogInformation("[EventValidation] {EventName} passed", eventName);
+        _logger.LogWarning(
+          "[EventValidation] {EventName} failed with errors: {@Errors}",
+          eventName,
+          allErrors);
+      }
+      else
+      {
+        _logger.LogWarning(
+          "[EventValidation] {EventName} failed with {ErrorCount} errors",
+          eventName,
+          allErrors.Count);
       }
 
-      await next();
-    }
-  }
+      var validationResult = new ValidationResult(allErrors);
 
-  public class EventValidationException : Exception
-  {
-    public IEnumerable<string> Errors { get; }
-    public EventValidationException(IEnumerable<string> errors)
-        : base("Event validation failed")
+      throw new EventValidationException(validationResult);
+    }
+
+    if (_env.IsDevelopment())
     {
-      Errors = errors;
+      _logger.LogInformation(
+        "[EventValidation] {EventName} passed",
+        @event?.GetType().Name ?? typeof(TEvent).Name);
     }
-  }
 
+    await next();
+  }
+}
