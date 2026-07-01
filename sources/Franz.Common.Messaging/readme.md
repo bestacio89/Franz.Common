@@ -161,7 +161,7 @@ builder.Services.AddOutboxHostedListener();
 
 ## 📝 Version Information
 
-* **Current Version:** v2.2.15
+* **Current Version:** v2.2.16
 * Part of the private **Franz Framework** ecosystem.
 
 ---

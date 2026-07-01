@@ -3,7 +3,7 @@
 A library for handling and standardizing errors and exceptions in .NET applications. This library simplifies error management, making it easier to implement structured and meaningful error responses.
 
 ---
-**Current Version:** v2.2.15
+**Current Version:** v2.2.16
 - Part of the private **Franz Framework** ecosystem.
 ---
 
@@ -145,3 +145,6 @@ This library is licensed under the MIT License. See the LICENSE file for more de
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+### v2.2.16 - Busines Exception Handling
+- addes Business Exception Handling to standardize error responses related to business operations and domain logic.

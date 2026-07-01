@@ -1,7 +1,7 @@
 # Franz.Common.Http.Bootstrap
 
 **Package**: `Franz.Common.Http.Bootstrap`
-**Current Version:** v2.2.15
+**Current Version:** v2.2.16
 
 Opinionated HTTP bootstrapper for the Franz Framework.
 Centralizes common ASP.NET Core HTTP wiring (controllers, auth, headers, docs, serialization, health checks, multi-tenancy) and optionally registers config-driven Refit clients so applications get consistent, production-ready defaults with minimal boilerplate.
@@ -166,6 +166,10 @@ For full changelog/history see the repository `CHANGELOG.md`.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
 
+
+### v2.2.16 - Universal Exception Handling
+- Added global exception handling middleware to standardize error responses and logging across all HTTP endpoints.
+- Exceution context is now enriched with correlation and tenant information for better traceability in logs and monitoring systems.
 ---
 
 ## Contributing & License

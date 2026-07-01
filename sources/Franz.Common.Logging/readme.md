@@ -3,7 +3,7 @@
 A comprehensive logging library within the **Franz Framework**, designed to enhance application monitoring and diagnostics using **Serilog** and **Elastic APM**.
 This package provides tools for centralized logging, tracing, and seamless integration with ASP.NET Core applications.
 
-* **Current Version:** v2.2.15
+* **Current Version:** v2.2.16
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -171,6 +171,9 @@ Agent.Setup(new AgentComponents());
 
 ## **Changelog**
 
+### v2.2.17 - Filter hardening
+- Logging filters hardened to prevent accidental log noise in production environments.
+- Logging Filters Improved to avoid noise in development environments.
 
 ### v2.0.1 – Internal Modernization
 
