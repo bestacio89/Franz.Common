@@ -55,6 +55,9 @@ namespace Franz.Common.Logging.Extensions
             .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.StaticFiles"))
             .Filter.ByExcluding(Matching.FromSource("Microsoft.Hosting.Lifetime"))
             .Filter.ByExcluding(Matching.FromSource("Microsoft.Extensions.Diagnostics.HealthChecks"))
+            .Filter.ByExcluding(e =>
+              e.Level < LogEventLevel.Warning &&
+              Matching.FromSource("Microsoft.AspNetCore.Mvc")(e))
 
             // =========================================================
             // BOOT CHATTER — VS tooling, browser refresh, hot reload
@@ -171,6 +174,13 @@ namespace Franz.Common.Logging.Extensions
             .Enrich.WithMachineName()
             .Enrich.WithEnvironmentName()
 
+            .Filter.ByExcluding(e =>
+              e.Level < LogEventLevel.Warning &&
+              Matching.FromSource("Microsoft.AspNetCore.Mvc")(e))
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Hosting.Diagnostics"))
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Server.Kestrel"))
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Server.Kestrel.Core"))
+            .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets"))
             // Framework internals
             .Filter.ByExcluding(Matching.FromSource("Microsoft.EntityFrameworkCore"))
             .Filter.ByExcluding(Matching.FromSource("Microsoft.EntityFrameworkCore.Database.Command"))
