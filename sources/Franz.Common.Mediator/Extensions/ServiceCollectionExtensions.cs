@@ -59,6 +59,9 @@ namespace Franz.Common.Mediator.Extensions
               .AsImplementedInterfaces().WithScopedLifetime()
           .AddClasses(c => c.AssignableTo(typeof(IEventHandler<>)))
               .AsImplementedInterfaces().WithScopedLifetime()
+          .AddClasses(classes => classes.AssignableTo(typeof(IValidator<>)))
+              .AsImplementedInterfaces()
+              .WithScopedLifetime()
       );
 
       // Observers (optional, but default console observer can be enabled)
