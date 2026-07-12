@@ -36,25 +36,24 @@ namespace Franz.Common.Mediator.Pipelines.Validation
       foreach (var validator in _validators)
       {
         var result = await validator.ValidateAsync(request, cancellationToken);
-        if (!result.IsValid && result.Errors != null)
-        {
-          failures.AddRange(result.Errors);
-        }
+
+        if (result == null || result.IsValid)
+          continue;
+
+        failures.AddRange(result.Errors);
       }
 
-      if (failures.Any())
+      if (failures.Count > 0)
       {
         var requestType = request?.GetType().Name ?? typeof(TRequest).Name;
 
         if (_env.IsDevelopment())
         {
-          // 🔥 Dev: log full list of errors
           _logger.LogWarning("[Validation] {RequestName} failed with errors: {@Errors}",
               requestType, failures);
         }
         else
         {
-          // 🟢 Prod: only count
           _logger.LogWarning("[Validation] {RequestName} failed with {ErrorCount} errors",
               requestType, failures.Count);
         }
@@ -62,11 +61,8 @@ namespace Franz.Common.Mediator.Pipelines.Validation
         throw new ValidationException(failures);
       }
 
-      if (_env.IsDevelopment())
-      {
-        _logger.LogInformation("[Validation] {RequestName} passed",
-            request?.GetType().Name ?? typeof(TRequest).Name);
-      }
+      _logger.LogInformation("[Validation] {RequestName} passed",
+          request?.GetType().Name ?? typeof(TRequest).Name);
 
       return await next();
     }

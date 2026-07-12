@@ -37,70 +37,51 @@ public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : I
   }
 
   public async Task<TResponse> Handle(
-      TRequest request,
-      Func<Task<TResponse>> next,
-      CancellationToken cancellationToken = default)
+     TRequest request,
+     Func<Task<TResponse>> next,
+     CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
-
-    // Ensure native Guid v7 correlation lineage
     var correlationId = CorrelationId.Ensure();
-
     var stopwatch = Stopwatch.StartNew();
-    var context = new ResilienceContext
-    {
-      PolicyName = _policy.PolicyKey
-    };
 
     using (LogContext.PushProperty("FranzRequest", requestName))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))
-    using (LogContext.PushProperty("FranzPipeline", nameof(PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse>)))
     using (LogContext.PushProperty("FranzPolicy", _policy.PolicyKey))
     {
       _logger.LogInformation(
-          "▶️ Executing {Request} [{CorrelationId}] through AdvancedCircuitBreaker {Policy}",
+          "▶️ Executing {Request} [{CorrelationId}] via {Policy}",
           requestName, correlationId, _policy.PolicyKey);
+
+      var context = new ResilienceContext
+      {
+        PolicyName = _policy.PolicyKey
+      };
 
       try
       {
-        TResponse result;
-
-        if (_policy is IAsyncPolicy<TResponse> typedPolicy)
-        {
-          result = await typedPolicy.ExecuteAsync(async _ => await next(), cancellationToken);
-        }
-        else
-        {
-          // FIX: Execute 'next' THROUGH the policy to ensure the Circuit Breaker
-          // tracks the failure/success of this specific call.
-          // Previous version called next() twice or outside the policy's view.
-          result = await _policy.ExecuteAsync(async _ => await next(), cancellationToken);
-        }
+        var result = await _policy.ExecuteAsync(_ => next(), cancellationToken);
 
         stopwatch.Stop();
         context.Duration = stopwatch.Elapsed;
 
-        if (_policy is AsyncCircuitBreakerPolicy breakerPolicy)
-          context.CircuitOpen = breakerPolicy.CircuitState == CircuitState.Open;
-
         _logger.LogInformation(
-            "✅ {Request} [{CorrelationId}] succeeded in {Elapsed}ms via {Policy}",
-            requestName, correlationId, stopwatch.ElapsedMilliseconds, _policy.PolicyKey);
+            "✅ {Request} [{CorrelationId}] completed in {Elapsed}ms",
+            requestName, correlationId, stopwatch.ElapsedMilliseconds);
 
         NotifyObservers(context);
-
         return result;
       }
-      catch (BrokenCircuitException bcex)
+      catch (BrokenCircuitException ex)
       {
         stopwatch.Stop();
         context.Duration = stopwatch.Elapsed;
         context.CircuitOpen = true;
 
         _logger.LogWarning(
-            bcex,
-            "⚠️ {Request} [{CorrelationId}] blocked — circuit OPEN ({Policy}) after {Elapsed}ms",
-            requestName, correlationId, _policy.PolicyKey, stopwatch.ElapsedMilliseconds);
+            ex,
+            "⚠️ {Request} [{CorrelationId}] blocked by circuit breaker",
+            requestName, correlationId);
 
         NotifyObservers(context);
         throw;
@@ -112,8 +93,8 @@ public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : I
 
         _logger.LogError(
             ex,
-            "❌ {Request} [{CorrelationId}] failed in {Elapsed}ms under {Policy}",
-            requestName, correlationId, stopwatch.ElapsedMilliseconds, _policy.PolicyKey);
+            "❌ {Request} [{CorrelationId}] failed",
+            requestName, correlationId);
 
         NotifyObservers(context);
         throw;
