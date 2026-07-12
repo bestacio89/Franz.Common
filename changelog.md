@@ -1534,3 +1534,18 @@ Native OpenAPI eliminates this entire class of version conflict permanently.
 
 * Validation exceptions remain owned by the Mediator pipeline and are intentionally *not duplicated* in HTTP or domain error layers.
 * HTTP bootstrap now acts strictly as a translation boundary for execution results produced by the Mediator engine.
+
+
+## v2.2.17 — When Logging Meets Desktop
+
+**Changed**
+To help potential users understand the scope of `Franz.Common.Logging` at a glance, add this bullet point to the "Features" section of your main project README:
+
+* **Adaptive Environment Logging**
+* `UseLog()` for standard web-based environments.
+
+
+* `UseDesktopLog()` for thread-aware, low-noise diagnostic logging in WPF/Avalonia/MAUI apps.
+
+
+* `UseHybridLog()` for flexible, configuration-driven logging scenarios.

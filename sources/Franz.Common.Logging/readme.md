@@ -1,58 +1,59 @@
 ﻿# **Franz.Common.Logging**
 
 A comprehensive logging library within the **Franz Framework**, designed to enhance application monitoring and diagnostics using **Serilog** and **Elastic APM**.
-This package provides tools for centralized logging, tracing, and seamless integration with ASP.NET Core applications.
+This package provides tools for centralized logging, tracing, and seamless integration with .NET applications.
 
-* **Current Version:** v2.2.16
+* **Current Version:** v2.2.17
 * Part of the private **Franz Framework** ecosystem.
 
 ---
 
-## **What’s New in 1.7.6**
+## **What’s New in 2.2.17**
 
-* **Dual Production Logging**
+* **Desktop Application Support**
+* `UseDesktopLog()` extension providing thread-aware logging for WPF/Avalonia/MAUI.
+* `ThreadIdEnricher` added for high-fidelity concurrency diagnostics.
+* Optimized templates: removed web-specific noise (ReqId/Path) to clean up local output.
 
-  * **SRE logs:** JSON, structured, minimal noise, easy to ship to ELK/Datadog.
-  * **Dev logs:** human-readable, verbose, retains stack traces for troubleshooting.
+
+* **Dual Production Logging (v1.7.6+)**
+* **SRE logs:** JSON, structured, minimal noise, easy to ship to ELK/Datadog.
+* **Dev logs:** human-readable, verbose, retains stack traces for troubleshooting.
+
 
 * **Self-contained, production-ready defaults**
+* Automatic UTF-8-safe encoding, rolling files, environment-aware enrichers.
+* Global noise suppression applied consistently.
 
-  * Automatic UTF-8-safe encoding, rolling files, environment-aware enrichers.
-  * Global noise suppression applied consistently.
 
-* **Integration-ready for Franz.Common.OpenTelemetry**
-
-  * Logs are automatically correlated with tracing for distributed systems.
-
-* **Fail-safe and maintainable**
-
-  * Dev and SRE logs separate, no interference, retention policies enforced.
 
 ---
 
 ## **Features**
 
 * **Centralized Logging**
+* Integration with **Serilog** for structured and enriched logs.
 
-  * Integration with **Serilog** for structured and enriched logs.
 
 * **Tracing Utilities**
+* `TraceHelper` for advanced tracing support in distributed applications.
 
-  * `TraceHelper` for advanced tracing support in distributed applications.
 
 * **Host Extensions**
+* `UseLog()` for strict, environment-aware logging.
+* `UseHybridLog()` for flexible, configuration-driven logging.
+* `UseDesktopLog()` for thread-aware desktop diagnostics.
 
-  * `UseLog()` for strict, environment-aware logging.
-  * `UseHybridLog()` for flexible, configuration-driven logging.
 
 * **Elastic APM Integration**
+* Full support for **Elastic APM** (enabled automatically in DEBUG).
 
-  * Full support for **Elastic APM** (enabled automatically in DEBUG).
 
-* **Dual Production Logging (v1.7.6)**
+* **Dual Production Logging**
+* JSON logs for SRE (prod-sre-.json).
+* Human-readable logs for Dev (prod-dev-.log).
 
-  * JSON logs for SRE (prod-sre-.json)
-  * Human-readable logs for Dev (prod-dev-.log)
+
 
 ---
 
@@ -66,12 +67,14 @@ dotnet nuget add source "https://your-private-feed-url" \
   --username "YourAzureUsername" \
   --password "YourAzurePassword" \
   --store-password-in-clear-text
+
 ```
 
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Logging --version 1.7.6
+dotnet add package Franz.Common.Logging --version 2.2.18
+
 ```
 
 ---
@@ -84,102 +87,61 @@ dotnet add package Franz.Common.Logging --version 1.7.6
 using Franz.Common.Logging.Extensions;
 
 var host = Host.CreateDefaultBuilder(args)
-    .UseLog() // Dev → Console + Debug + File
-              // Prod → Console + Dev log + SRE log
+    .UseLog() 
     .Build();
 
 await host.RunAsync();
+
 ```
 
-**Development:**
-
-* Verbose console logs
-* Debug sink
-* Daily rolling file logs (`logs/dev-.log`)
-
-**Production:**
-
-* **SRE JSON log:** `logs/prod-sre-.json`, structured, minimal noise, 30-day retention
-* **Dev human-readable log:** `logs/prod-dev-.log`, verbose, stack traces, 30-day retention
-* Console logs for live monitoring
-
----
-
-### 2. Hybrid Logging (`UseHybridLog`)
+### 2. Desktop-Optimized Logging (`UseDesktopLog`)
 
 ```csharp
 using Franz.Common.Logging.Extensions;
 
 var host = Host.CreateDefaultBuilder(args)
-    .UseHybridLog() // Configuration-driven logging from appsettings.json
+    .UseDesktopLog() 
     .Build();
 
 await host.RunAsync();
+
 ```
 
-**In `appsettings.json`:**
+* **Thread Enrichment:** Injects `ThreadId` for tracking UI vs. background execution.
+* **Desktop Template:** `[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} | Thread:{ThreadId} | {Message:lj}`.
 
-```json
-{
-  "Serilog": {
-    "Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
-    "MinimumLevel": "Debug",
-    "WriteTo": [
-      { "Name": "Console" },
-      {
-        "Name": "File",
-        "Args": { "path": "logs/app-.log", "rollingInterval": "Day" }
-      }
-    ]
-  }
-}
-```
-
----
-
-### 3. Custom Tracing
+### 3. Hybrid Logging (`UseHybridLog`)
 
 ```csharp
-using Franz.Common.Logging.Tracing;
+using Franz.Common.Logging.Extensions;
 
-TraceHelper.TraceInformation("Starting application initialization...");
-TraceHelper.TraceWarning("Potential configuration issue detected.");
-```
+var host = Host.CreateDefaultBuilder(args)
+    .UseHybridLog() 
+    .Build();
 
----
+await host.RunAsync();
 
-### 4. Elastic APM (Enabled in DEBUG builds)
-
-```csharp
-#if DEBUG
-Agent.Setup(new AgentComponents());
-#endif
-```
-
-**Production:** opt-in via `appsettings.json`:
-
-```json
-{
-  "ElasticApm": {
-    "ServerUrls": "http://localhost:8200",
-    "ServiceName": "MyApplication"
-  }
-}
 ```
 
 ---
 
 ## **Changelog**
 
+### v2.2.18 - Desktop Diagnostics
+
+* Introduced `UseDesktopLog()` for desktop-first applications.
+* Added `ThreadIdEnricher` for high-fidelity concurrency diagnostics.
+* Optimized log templates for desktop output, removing web-specific infrastructure noise.
+
 ### v2.2.17 - Filter hardening
-- Logging filters hardened to prevent accidental log noise in production environments.
-- Logging Filters Improved to avoid noise in development environments.
+
+* Logging filters hardened to prevent accidental log noise in production environments.
+* Logging Filters Improved to avoid noise in development environments.
 
 ### v2.0.1 – Internal Modernization
 
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
+* Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+* All APIs remain fully backward compatible.
 
 ### Version 1.7.6
 
@@ -188,14 +150,3 @@ Agent.Setup(new AgentComponents());
 * Console logging preserved for live monitoring
 * Noise suppression applied consistently across logs
 * Integration-ready for **Franz.Common.OpenTelemetry**
-* Maintains full backward compatibility with `UseLog()` and `UseHybridLog()`
-
-### Version 1.6.20
-
-* Updated to **.NET 10.0**
-* Logging overhaul, platform stability, noise filtering, UTF-8 enforcement, context enrichment
-
-(Older versions omitted for brevity)
-
----
-

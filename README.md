@@ -340,45 +340,19 @@ dotnet test --filter Category=Integration
 
 Full version history lives in [`changelog.md`](changelog.md). Recent highlights:
 
-## v2.2.16 — Execution Boundary Alignment & Logging Noise Reduction
+## v2.2.17 — When Logging Meets Desktop
 
 **Changed**
+To help potential users understand the scope of `Franz.Common.Logging` at a glance, add this bullet point to the "Features" section of your main project README:
 
-* Unified execution ownership: validation remains exclusively within the Mediator pipeline, reinforcing the Mediator as the system execution kernel.
-* `FranzGlobalExceptionHandler` now explicitly relies on Mediator-level exception contracts (`ValidationException`, `BusinessException`) for HTTP translation, removing ambiguity around validation ownership.
-* Logging configuration (`UseLog` / `UseHybridLog`) updated to suppress ASP.NET Core MVC infrastructure noise (`ControllerActionInvoker`, `ObjectResultExecutor`, formatter selection, routing/model binding internals).
-* Request pipeline observability reduced to request lifecycle, application logs, and Franz domain-level events only.
-
-**Improved**
-
-* Stronger separation of concerns between:
-
-  * Mediator (execution + validation + business rule enforcement)
-  * HTTP Bootstrap (transport translation only)
-  * Logging layer (application + domain observability only)
-* More stable log signal-to-noise ratio for production and debugging environments.
-* Consistent exception-to-HTTP mapping aligned with execution semantics.
-
-**Fixed**
-
-* Overly verbose ASP.NET Core MVC logging (formatter negotiation, execution plans, and internal invoker traces) removed from default logging output.
-* Redundant framework-level diagnostic logs no longer pollute application-level observability streams.
-
-**Migration**
-
-* No breaking changes.
-* Optional: review logging filters if custom ASP.NET Core sources were previously depended on (they may now be excluded by default in `UseLog()`).
-
-**Notes**
-
-* Validation exceptions remain owned by the Mediator pipeline and are intentionally *not duplicated* in HTTP or domain error layers.
-* HTTP bootstrap now acts strictly as a translation boundary for execution results produced by the Mediator engine.
+* **Adaptive Environment Logging**
+* `UseLog()` for standard web-based environments.
 
 
-## v2.2.8 — Entity Repository Resolution
+* `UseDesktopLog()` for thread-aware, low-noise diagnostic logging in WPF/Avalonia/MAUI apps.
 
-**Fixed**
-- Bug fixes in the automatic resolution of Entity Repositories.
+
+* `UseHybridLog()` for flexible, configuration-driven logging scenarios.
 
 ---
 
