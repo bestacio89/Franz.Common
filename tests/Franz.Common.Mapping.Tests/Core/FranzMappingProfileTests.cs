@@ -134,7 +134,7 @@ public class FranzMapperTests
 
     act.Should()
        .Throw<TechnicalException>()
-       .WithMessage("[FranzMapper] Circular reference detected while mapping an instance of 'Franz.Common.Mapping.Tests.Core.Node'. Consider breaking the cycle or using ConstructUsing.");
+       .WithMessage("[FranzMapper] Circular reference detected while mapping 'Franz.Common.Mapping.Tests.Core.Node'.");
   }
 
   // -----------------------------------------------------

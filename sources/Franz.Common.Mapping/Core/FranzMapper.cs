@@ -1,98 +1,86 @@
 using Franz.Common.Errors;
 using Franz.Common.Mapping.Abstractions;
-using System;
 using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 
 namespace Franz.Common.Mapping.Core;
 
-// =========================================================
-// ATTRIBUTES
-// =========================================================
-
-/// <summary>
-/// Marks a class or struct as a value object whose inner <c>Value</c> property
-/// should be transparently unwrapped during mapping. Without this attribute,
-/// a property named "Value" is treated as a regular property.
-/// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
-public sealed class ValueObjectAttribute : Attribute { }
+public sealed class ValueObjectAttribute : Attribute
+{
+}
 
-/// <summary>
-/// When a type has multiple constructors, marks the one FranzMapper should
-/// prefer for construction. Without this attribute, the longest constructor wins.
-/// </summary>
 [AttributeUsage(AttributeTargets.Constructor)]
-public sealed class MapConstructorAttribute : Attribute { }
+public sealed class MapConstructorAttribute : Attribute
+{
+}
 
-// =========================================================
-// MAPPER
-// =========================================================
 
-/// <summary>
-/// Production-grade, zero-dependency object mapper for .NET.
-/// </summary>
 public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
 {
   private readonly MappingConfiguration _config = config;
 
-  // =========================================================
-  // STATIC CACHES  (shared across all mapper instances)
-  // =========================================================
+
   private static readonly ConcurrentDictionary<Type, PropertyInfo[]>
       AssignablePropsCache = new();
+
+
+  private static readonly ConcurrentDictionary<Type, Dictionary<string, PropertyInfo>>
+      PropertyLookupCache = new();
+
 
   private static readonly ConcurrentDictionary<Type, ConstructorInfo?>
       ConstructorCache = new();
 
+
   private static readonly ConcurrentDictionary<(Type Src, Type Dest),
       Func<FranzMapper, object, MappingContext, object>>
-      DelegateCache = new();
+      MappingPlanCache = new();
+
 
   private static readonly ConcurrentDictionary<Type, bool>
       IsValueObjectCache = new();
 
+
   private static readonly ConcurrentDictionary<Type, PropertyInfo?>
       ValuePropertyCache = new();
 
-  // =========================================================
-  // MAPPING CONTEXT  (per-call, tracks visited references)
-  // =========================================================
+
   private sealed class MappingContext
   {
     private readonly HashSet<object> _visited =
         new(ReferenceEqualityComparer.Instance);
 
+
     public void Enter(object obj)
     {
-      if (obj.GetType().IsValueType) return;
+      if (obj.GetType().IsValueType)
+        return;
 
       if (!_visited.Add(obj))
+      {
         throw new TechnicalException(
             $"[FranzMapper] Circular reference detected while mapping " +
-            $"an instance of '{obj.GetType().FullName}'. " +
-            $"Consider breaking the cycle or using ConstructUsing.");
+            $"'{obj.GetType().FullName}'.");
+      }
     }
   }
 
-  // =========================================================
-  // PUBLIC API
-  // =========================================================
 
-  public TDestination Map<TSource, TDestination>([DisallowNull] TSource source)
+  public TDestination Map<TSource, TDestination>(
+      [DisallowNull] TSource source)
   {
     ArgumentNullException.ThrowIfNull(source);
-    return MapInternal<TSource, TDestination>(source, new MappingContext());
+
+    return MapInternal<TSource, TDestination>(
+        source,
+        new MappingContext());
   }
 
-  // =========================================================
-  // CORE ENGINE
-  // =========================================================
+
   private TDestination MapInternal<TSource, TDestination>(
       TSource source,
       MappingContext ctx)
@@ -102,195 +90,240 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
     var srcType = typeof(TSource);
     var destType = typeof(TDestination);
 
-    // ---------------------------------------------------------
-    // 1. VALUE OBJECT UNWRAP
-    // ---------------------------------------------------------
+
     if (IsValueObject(source!.GetType()))
     {
-      var inner = GetValueProperty(source.GetType())?.GetValue(source);
+      var inner = GetValueProperty(source.GetType())
+          ?.GetValue(source);
+
       if (inner != null)
-        return (TDestination)ResolveValue(inner.GetType(), destType, inner, ctx)!;
+      {
+        return (TDestination)ResolveValue(
+            inner.GetType(),
+            destType,
+            inner,
+            ctx)!;
+      }
     }
 
-    // ---------------------------------------------------------
-    // 2. COLLECTIONS
-    // ---------------------------------------------------------
-    if (IsCollection(destType))
-      return (TDestination)MapCollection(srcType, destType, source!, ctx);
 
-    // ---------------------------------------------------------
-    // 3. CONFIGURED MAPPING
-    // ---------------------------------------------------------
+    if (IsCollection(destType))
+    {
+      return (TDestination)MapCollection(
+          srcType,
+          destType,
+          source!,
+          ctx);
+    }
+
+
     if (_config.TryGetMapping<TSource, TDestination>(out var expr))
     {
-      // 3A. ConstructUsing Overload Checks (Terminal paths)
-      if (expr!.Constructor != null)
+      if (expr!.Constructor is Func<TSource, TDestination> ctor)
       {
-        if (expr.Constructor is Func<TSource, TDestination> ctor)
-          return ctor(source!);
-
-        if (expr.Constructor is Func<TSource, IFranzMapper, TDestination> ctorWithMapper)
-          return ctorWithMapper(source!, this);
+        return ctor(source!);
       }
 
-      // 3B. Constructor + property binding
-      var destination = CreateInstanceSmart(source!, expr, ctx);
-      ApplyMapping(source!, destination, expr, ctx);
+
+      if (expr.Constructor is Func<TSource, IFranzMapper, TDestination> ctorWithMapper)
+      {
+        return ctorWithMapper(source!, this);
+      }
+
+
+      var destination = CreateInstanceSmart(
+          source!,
+          expr,
+          ctx);
+
+
+      ApplyMapping(
+          source!,
+          destination,
+          expr,
+          ctx);
+
+
       return (TDestination)destination;
     }
 
-    // ---------------------------------------------------------
-    // 4. CONVENTION FALLBACK
-    // ---------------------------------------------------------
-    return DefaultMap<TSource, TDestination>(source!, ctx);
+
+    return DefaultMap<TSource, TDestination>(
+        source!,
+        ctx);
   }
 
-  // =========================================================
-  // CONSTRUCTOR ENGINE
-  // =========================================================
+
   private object CreateInstanceSmart<TSource, TDestination>(
       TSource source,
       MappingExpression<TSource, TDestination> expr,
       MappingContext ctx)
   {
-    var srcType = typeof(TSource);
     var destType = typeof(TDestination);
     var ctor = GetCtor(destType);
+
 
     if (ctor == null || ctor.GetParameters().Length == 0)
     {
       return Activator.CreateInstance(destType)
           ?? throw new TechnicalException(
-              $"[FranzMapper] Cannot create an instance of '{destType.FullName}'. " +
-              $"Ensure it has a public constructor.");
+              $"[FranzMapper] Cannot create '{destType.FullName}'.");
     }
 
-    var ctorArgs = ResolveConstructorArguments(
-        source!, ctor, srcType, destType, expr.MemberBindings, expr.IsStrict, ctx);
 
-    return ctor.Invoke(ctorArgs);
+    var args = ResolveConstructorArguments(
+        source!,
+        ctor,
+        typeof(TSource),
+        destType,
+        expr.MemberBindings,
+        expr.IsStrict,
+        ctx);
+
+
+    return ctor.Invoke(args);
   }
 
+
   private object?[] ResolveConstructorArguments(
-     object source,
-     ConstructorInfo ctor,
-     Type srcType,
-     Type destType,
-     IReadOnlyDictionary<string, string>? memberBindings,
-     bool isStrict,
-     MappingContext ctx)
+      object source,
+      ConstructorInfo ctor,
+      Type srcType,
+      Type destType,
+      IReadOnlyDictionary<string, string>? bindings,
+      bool strict,
+      MappingContext ctx)
   {
     var parameters = ctor.GetParameters();
     var args = new object?[parameters.Length];
 
+    var properties = GetPropertyLookup(srcType);
+
+
     for (var i = 0; i < parameters.Length; i++)
     {
-      var param = parameters[i];
+      var parameter = parameters[i];
+
 
       var sourceName =
-          memberBindings != null &&
-          memberBindings.TryGetValue(param.Name!, out var mapped)
+          bindings != null &&
+          bindings.TryGetValue(parameter.Name!, out var mapped)
               ? mapped
-              : param.Name;
+              : parameter.Name!;
 
-      var srcProp = srcType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-          .FirstOrDefault(p =>
-              string.Equals(p.Name, sourceName, StringComparison.OrdinalIgnoreCase));
 
-      if (srcProp == null)
+      properties.TryGetValue(
+          sourceName,
+          out var sourceProperty);
+
+
+      if (sourceProperty == null)
       {
-        srcProp = srcType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+        sourceProperty = properties.Values
             .FirstOrDefault(p =>
-                p.PropertyType == param.ParameterType);
+                p.PropertyType == parameter.ParameterType);
       }
 
-      if (srcProp == null)
-      {
-        if (isStrict)
-          throw new TechnicalException(
-              $"[FranzMapper] Strict mode: no matching source property for ctor parameter '{param.Name}' " +
-              $"on '{srcType.Name}' → '{destType.Name}'.");
 
-        args[i] = GetDefault(param.ParameterType);
+      if (sourceProperty == null)
+      {
+        if (strict)
+        {
+          throw new TechnicalException(
+              $"[FranzMapper] Strict mode: missing constructor parameter '{parameter.Name}' " +
+              $"for '{srcType.Name}' -> '{destType.Name}'.");
+        }
+
+        args[i] = GetDefault(parameter.ParameterType);
         continue;
       }
 
-      var raw = srcProp.GetValue(source);
 
       args[i] = ResolveValue(
-          srcProp.PropertyType,
-          param.ParameterType,
-          raw,
+          sourceProperty.PropertyType,
+          parameter.ParameterType,
+          sourceProperty.GetValue(source),
           ctx);
     }
+
 
     return args;
   }
 
-  // =========================================================
-  // PROPERTY MAPPING
-  // =========================================================
+
   private void ApplyMapping<TSource, TDestination>(
-    TSource source,
-    object destination,
-    MappingExpression<TSource, TDestination> expr,
-    MappingContext ctx)
+      TSource source,
+      object destination,
+      MappingExpression<TSource, TDestination> expr,
+      MappingContext ctx)
   {
     var srcType = typeof(TSource);
     var destType = destination.GetType();
 
-    var props = GetAssignableProps(destType);
+    var sourceProperties = GetPropertyLookup(srcType);
 
-    foreach (var destProp in props)
+    var ctor = GetCtor(destType);
+
+    var ctorParameters = BuildCtorParamSet(ctor);
+
+
+    foreach (var destProp in GetAssignableProps(destType))
     {
+      if (ctorParameters.Contains(destProp.Name))
+        continue;
+
+
       if (expr.IgnoredMembers.Contains(destProp.Name))
         continue;
 
-      var srcName = expr.MemberBindings != null &&
-                    expr.MemberBindings.TryGetValue(destProp.Name, out var mapped)
-          ? mapped
-          : destProp.Name;
 
-      var srcProp = srcType.GetProperty(
-          srcName,
-          BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+      var sourceName =
+          expr.MemberBindings.TryGetValue(
+              destProp.Name,
+              out var mapped)
+              ? mapped
+              : destProp.Name;
 
-      if (srcProp == null)
+
+      if (!sourceProperties.TryGetValue(
+              sourceName,
+              out var sourceProp))
       {
         if (expr.IsStrict)
+        {
           throw new TechnicalException(
-              $"[FranzMapper] Strict mode: no source property '{srcName}' " +
-              $"found for '{destProp.Name}'.");
+              $"[FranzMapper] Strict mode: missing source property '{sourceName}'.");
+        }
 
         continue;
       }
 
-      var raw = srcProp.GetValue(source);
 
       var value = ResolveValue(
-          srcProp.PropertyType,
+          sourceProp.PropertyType,
           destProp.PropertyType,
-          raw,
+          sourceProp.GetValue(source),
           ctx);
+
 
       destProp.SetValue(destination, value);
     }
   }
-
-  // =========================================================
-  // VALUE RESOLUTION
-  // =========================================================
   private object? ResolveValue(
-      Type srcType,
-      Type destType,
-      object? value,
-      MappingContext ctx)
+    Type srcType,
+    Type destType,
+    object? value,
+    MappingContext ctx)
   {
-    if (value == null) return null;
+    if (value == null)
+      return null;
+
 
     if (IsValueObject(value.GetType()))
     {
-      var inner = GetValueProperty(value.GetType())?.GetValue(value);
+      var inner = GetValueProperty(value.GetType())
+          ?.GetValue(value);
+
       if (inner != null)
       {
         value = inner;
@@ -298,76 +331,137 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
       }
     }
 
+
     if (destType.IsInstanceOfType(value))
       return value;
 
+
     if (IsCollection(destType))
-      return MapCollection(srcType, destType, value, ctx);
+    {
+      return MapCollection(
+          srcType,
+          destType,
+          value,
+          ctx);
+    }
+
 
     if (destType.IsAssignableFrom(srcType))
       return value;
 
-    return InvokeMap(srcType, destType, value, ctx);
+
+    return InvokeMap(
+        srcType,
+        destType,
+        value,
+        ctx);
   }
 
-  // =========================================================
-  // FAST DISPATCH
-  // =========================================================
-  private object InvokeMap(Type srcType, Type destType, object value, MappingContext ctx)
-  {
-    var del = DelegateCache.GetOrAdd(
-        (srcType, destType),
-        _ => CreateDelegate(srcType, destType));
 
-    return del(this, value, ctx);
-  }
 
-  private static Func<FranzMapper, object, MappingContext, object>
-      CreateDelegate(Type src, Type dest)
-  {
-    var mapperParam = Expression.Parameter(typeof(FranzMapper), "m");
-    var sourceParam = Expression.Parameter(typeof(object), "s");
-    var ctxParam = Expression.Parameter(typeof(MappingContext), "c");
-
-    var method = typeof(FranzMapper)
-        .GetMethod(nameof(MapInternal), BindingFlags.NonPublic | BindingFlags.Instance)!
-        .MakeGenericMethod(src, dest);
-
-    var call = Expression.Call(
-        mapperParam,
-        method,
-        Expression.Convert(sourceParam, src),
-        ctxParam);
-
-    return Expression.Lambda<Func<FranzMapper, object, MappingContext, object>>(
-        Expression.Convert(call, typeof(object)),
-        mapperParam, sourceParam, ctxParam
-    ).Compile();
-  }
-
-  // =========================================================
-  // COLLECTION MAPPING
-  // =========================================================
-  private object MapCollection(
+  private object InvokeMap(
       Type srcType,
       Type destType,
+      object value,
+      MappingContext ctx)
+  {
+    var plan = MappingPlanCache.GetOrAdd(
+        (srcType, destType),
+        static pair => CreateMappingPlan(
+            pair.Src,
+            pair.Dest));
+
+
+    return plan(
+        this,
+        value,
+        ctx);
+  }
+
+
+
+  private static Func<FranzMapper, object, MappingContext, object>
+      CreateMappingPlan(
+          Type source,
+          Type destination)
+  {
+    var mapper = Expression.Parameter(
+        typeof(FranzMapper),
+        "mapper");
+
+    var value = Expression.Parameter(
+        typeof(object),
+        "value");
+
+    var context = Expression.Parameter(
+        typeof(MappingContext),
+        "context");
+
+
+    var method =
+        typeof(FranzMapper)
+            .GetMethod(
+                nameof(MapInternal),
+                BindingFlags.Instance |
+                BindingFlags.NonPublic)!
+            .MakeGenericMethod(
+                source,
+                destination);
+
+
+    var call = Expression.Call(
+        mapper,
+        method,
+        Expression.Convert(value, source),
+        context);
+
+
+    return Expression.Lambda<
+        Func<FranzMapper, object, MappingContext, object>>(
+            Expression.Convert(
+                call,
+                typeof(object)),
+            mapper,
+            value,
+            context)
+        .Compile();
+  }
+
+
+
+  private object MapCollection(
+      Type sourceType,
+      Type destinationType,
       object source,
       MappingContext ctx)
   {
     if (source is not IEnumerable enumerable)
+    {
       throw new TechnicalException(
-          $"[FranzMapper] Cannot map '{srcType.FullName}' as a collection: " +
-          $"it does not implement IEnumerable.");
+          $"[FranzMapper] '{sourceType.FullName}' is not enumerable.");
+    }
 
-    var srcElem = GetElementType(srcType);
-    var destElem = GetElementType(destType);
 
-    var listType = typeof(List<>).MakeGenericType(destElem);
-    var list = (IList)Activator.CreateInstance(listType)!;
+    var sourceElement = GetElementType(sourceType);
+    var destinationElement = GetElementType(destinationType);
 
-    var del = DelegateCache.GetOrAdd(
-        (srcElem, destElem),
-        _ => CreateDelegate(srcElem, destElem));
+
+    var listType =
+        typeof(List<>)
+            .MakeGenericType(destinationElement);
+
+
+    var list =
+        (IList)Activator.CreateInstance(listType)!;
+
+
+    var mapper =
+        MappingPlanCache.GetOrAdd(
+            (sourceElement, destinationElement),
+            static pair => CreateMappingPlan(
+                pair.Src,
+                pair.Dest));
+
 
     foreach (var item in enumerable)
     {
@@ -376,165 +470,304 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
         list.Add(null);
         continue;
       }
-      list.Add(del(this, item, ctx));
+
+
+      list.Add(
+          mapper(
+              this,
+              item,
+              ctx));
     }
 
-    return CoerceCollection(list, destType, destElem);
+
+    return CoerceCollection(
+        list,
+        destinationType,
+        destinationElement);
   }
 
-  private static object CoerceCollection(IList list, Type destType, Type elemType)
+
+
+  private static object CoerceCollection(
+      IList list,
+      Type destinationType,
+      Type elementType)
   {
-    if (destType.IsArray)
+    if (destinationType.IsArray)
     {
-      var arr = Array.CreateInstance(elemType, list.Count);
-      list.CopyTo(arr, 0);
-      return arr;
+      var array =
+          Array.CreateInstance(
+              elementType,
+              list.Count);
+
+      list.CopyTo(array, 0);
+
+      return array;
     }
 
-    var def = destType.IsGenericType ? destType.GetGenericTypeDefinition() : null;
 
-    if (def == typeof(HashSet<>))
+    if (destinationType.IsGenericType &&
+        destinationType.GetGenericTypeDefinition() ==
+        typeof(HashSet<>))
     {
-      var setType = typeof(HashSet<>).MakeGenericType(elemType);
-      var set = Activator.CreateInstance(setType)!;
-      var addMeth = setType.GetMethod("Add")!;
-      foreach (var item in list) addMeth.Invoke(set, [item]);
+      var setType =
+          typeof(HashSet<>)
+              .MakeGenericType(elementType);
+
+
+      var set =
+          Activator.CreateInstance(setType)!;
+
+
+      var add =
+          setType.GetMethod("Add")!;
+
+
+      foreach (var item in list)
+      {
+        add.Invoke(set, [item]);
+      }
+
+
       return set;
     }
+
 
     return list;
   }
 
-  // =========================================================
-  // CONVENTION FALLBACK
-  // =========================================================
-  private TDestination DefaultMap<TSource, TDestination>(TSource source, MappingContext ctx)
+
+
+  private TDestination DefaultMap<TSource, TDestination>(
+      TSource source,
+      MappingContext ctx)
   {
-    var srcType = typeof(TSource);
-    var destType = typeof(TDestination);
-    var ctor = GetCtor(destType);
+    var destinationType = typeof(TDestination);
+    var constructor = GetCtor(destinationType);
 
-    object dest;
 
-    if (ctor != null && ctor.GetParameters().Length > 0)
+    object destination;
+
+
+    if (constructor != null &&
+        constructor.GetParameters().Length > 0)
     {
-      var args = ResolveConstructorArguments(
-          source!, ctor, srcType, destType,
-          memberBindings: null,
-          isStrict: false,
-          ctx);
-      dest = ctor.Invoke(args);
+      destination =
+          constructor.Invoke(
+              ResolveConstructorArguments(
+                  source!,
+                  constructor,
+                  typeof(TSource),
+                  destinationType,
+                  null,
+                  false,
+                  ctx));
     }
     else
     {
-      dest = Activator.CreateInstance<TDestination>()
+      destination =
+          Activator.CreateInstance<TDestination>()
           ?? throw new TechnicalException(
-              $"[FranzMapper] Cannot create instance of '{destType.FullName}'.");
+              $"[FranzMapper] Cannot create '{destinationType.FullName}'.");
     }
 
-    var ctorParams = BuildCtorParamSet(ctor);
-    var props = GetAssignableProps(destType);
 
-    foreach (var destProp in props)
+    var ctorParameters =
+        BuildCtorParamSet(constructor);
+
+
+    var sourceProperties =
+        GetPropertyLookup(typeof(TSource));
+
+
+    foreach (var property in GetAssignableProps(destinationType))
     {
-      if (ctorParams.Contains(destProp.Name)) continue;
-      if (IsInitOnly(destProp)) continue;
+      if (ctorParameters.Contains(property.Name))
+        continue;
 
-      var srcProp = srcType.GetProperty(
-          destProp.Name,
-          BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 
-      if (srcProp == null) continue;
+      if (IsInitOnly(property))
+        continue;
 
-      var val = ResolveValue(
-          srcProp.PropertyType,
-          destProp.PropertyType,
-          srcProp.GetValue(source),
-          ctx);
 
-      destProp.SetValue(dest, val);
+      if (!sourceProperties.TryGetValue(
+              property.Name,
+              out var sourceProperty))
+      {
+        continue;
+      }
+
+
+      property.SetValue(
+          destination,
+          ResolveValue(
+              sourceProperty.PropertyType,
+              property.PropertyType,
+              sourceProperty.GetValue(source),
+              ctx));
     }
 
-    return (TDestination)dest;
+
+    return (TDestination)destination;
   }
 
-  // =========================================================
-  // HELPERS
-  // =========================================================
+
+
   private static ConstructorInfo? GetCtor(Type type)
   {
-    return ConstructorCache.GetOrAdd(type, static t =>
-    {
-      var ctors = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
+    return ConstructorCache.GetOrAdd(
+        type,
+        static t =>
+        {
+          var constructors =
+              t.GetConstructors(
+                  BindingFlags.Public |
+                  BindingFlags.Instance);
 
-      if (ctors.Length == 0)
-        return null;
 
-      var attributed = ctors
-          .FirstOrDefault(c => c.IsDefined(typeof(MapConstructorAttribute), false));
+          if (constructors.Length == 0)
+            return null;
 
-      if (attributed != null)
-        return attributed;
 
-      return ctors
-          .OrderByDescending(c => c.GetParameters().Length)
-          .ThenBy(c => c.IsPublic ? 0 : 1)
-          .First();
-    });
+          var attributed =
+              constructors.FirstOrDefault(
+                  c => c.IsDefined(
+                      typeof(MapConstructorAttribute),
+                      false));
+
+
+          if (attributed != null)
+            return attributed;
+
+
+          return constructors
+              .OrderByDescending(
+                  c => c.GetParameters().Length)
+              .First();
+        });
   }
 
-  private static HashSet<string> BuildCtorParamSet(ConstructorInfo? ctor)
-      => ctor?.GetParameters()
-             .Select(p => p.Name!)
-             .ToHashSet(StringComparer.OrdinalIgnoreCase)
-         ?? [];
 
-  private static PropertyInfo[] GetAssignableProps(Type t)
-      => AssignablePropsCache.GetOrAdd(t, static type =>
-          type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-              .Where(p => p.CanWrite || IsInitOnly(p))
-              .ToArray());
 
-  private static bool IsValueObject(Type t)
-      => IsValueObjectCache.GetOrAdd(t,
-          static type => type.IsDefined(typeof(ValueObjectAttribute), inherit: false));
-
-  private static PropertyInfo? GetValueProperty(Type t)
-      => ValuePropertyCache.GetOrAdd(t,
-          static type => type.GetProperty("Value",
-              BindingFlags.Public | BindingFlags.Instance));
-
-  private static bool IsCollection(Type t)
-      => t != typeof(string) && typeof(IEnumerable).IsAssignableFrom(t);
-
-  private static Type GetElementType(Type t)
+  private static PropertyInfo[] GetAssignableProps(Type type)
   {
-    if (t.IsArray)
-      return t.GetElementType()!;
+    return AssignablePropsCache.GetOrAdd(
+        type,
+        static t =>
+            t.GetProperties(
+                    BindingFlags.Public |
+                    BindingFlags.Instance)
+             .Where(p =>
+                 p.CanWrite ||
+                 IsInitOnly(p))
+             .ToArray());
+  }
 
-    if (!t.IsGenericType)
+
+
+  private static Dictionary<string, PropertyInfo>
+      GetPropertyLookup(Type type)
+  {
+    return PropertyLookupCache.GetOrAdd(
+        type,
+        static t =>
+            t.GetProperties(
+                    BindingFlags.Public |
+                    BindingFlags.Instance)
+             .ToDictionary(
+                 p => p.Name,
+                 StringComparer.OrdinalIgnoreCase));
+  }
+
+
+
+  private static HashSet<string> BuildCtorParamSet(
+      ConstructorInfo? ctor)
+  {
+    return ctor?
+        .GetParameters()
+        .Select(p => p.Name!)
+        .ToHashSet(
+            StringComparer.OrdinalIgnoreCase)
+        ?? [];
+  }
+
+
+
+  private static bool IsValueObject(Type type)
+  {
+    return IsValueObjectCache.GetOrAdd(
+        type,
+        static t =>
+            t.IsDefined(
+                typeof(ValueObjectAttribute),
+                false));
+  }
+
+
+
+  private static PropertyInfo? GetValueProperty(Type type)
+  {
+    return ValuePropertyCache.GetOrAdd(
+        type,
+        static t =>
+            t.GetProperty(
+                "Value",
+                BindingFlags.Public |
+                BindingFlags.Instance));
+  }
+
+
+
+  private static bool IsCollection(Type type)
+  {
+    return type != typeof(string) &&
+           typeof(IEnumerable)
+               .IsAssignableFrom(type);
+  }
+
+
+
+  private static Type GetElementType(Type type)
+  {
+    if (type.IsArray)
+      return type.GetElementType()!;
+
+
+    if (!type.IsGenericType)
       return typeof(object);
 
-    var args = t.GetGenericArguments();
 
-    var def = t.GetGenericTypeDefinition();
-    if (def == typeof(IDictionary<,>) || def == typeof(Dictionary<,>))
-      return typeof(KeyValuePair<,>).MakeGenericType(args[0], args[1]);
-
-    return args[0];
+    return type.GetGenericArguments()[0];
   }
 
-  private static object? GetDefault(Type type)
-      => type.IsValueType ? Activator.CreateInstance(type) : null;
 
-  private static bool IsInitOnly(PropertyInfo p)
+
+  private static object? GetDefault(Type type)
   {
-    var setter = p.GetSetMethod(nonPublic: true);
-    if (setter == null) return false;
+    return type.IsValueType
+        ? Activator.CreateInstance(type)
+        : null;
+  }
+
+
+
+  private static bool IsInitOnly(PropertyInfo property)
+  {
+    var setter =
+        property.GetSetMethod(
+            nonPublic: true);
+
+
+    if (setter == null)
+      return false;
+
+
     return setter.ReturnParameter
-                 .GetRequiredCustomModifiers()
-                 .Any(static m =>
-                     m.FullName ==
-                     "System.Runtime.CompilerServices.IsExternalInit");
+        .GetRequiredCustomModifiers()
+        .Any(
+            static modifier =>
+                modifier.FullName ==
+                "System.Runtime.CompilerServices.IsExternalInit");
   }
 }
