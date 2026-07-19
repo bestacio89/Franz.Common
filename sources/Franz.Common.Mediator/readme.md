@@ -219,7 +219,7 @@ This mediator:
 ---
 
 
-**Current Version:** v2.2.18
+**Current Version:** v2.2.19
 
 ## ✨ Added
 

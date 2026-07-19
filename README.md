@@ -340,13 +340,13 @@ dotnet test --filter Category=Integration
 
 Full version history lives in [`changelog.md`](changelog.md). Recent highlights:
 
-## v2.2.18 — Mapping improved
+## v2.2.19 — Resilience improved
 
 **Changed**
-To help potential users understand the scope of `Franz.Common.Logging` at a glance, add this bullet point to the "Features" section of your main project README:
 
-* **Performance mapping done for nested classes**
 
+* **AddFranzResilience simplified**
+eliminated bulk of repeated policies from the resilience pipeline
 
 ---
 
