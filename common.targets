@@ -6,9 +6,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <Version>2.2.17</Version>
-    <AssemblyVersion>2.2.17</AssemblyVersion>
-    <FileVersion>2.2.17</FileVersion>
+    <Version>2.2.18</Version>
+    <AssemblyVersion>2.2.18</AssemblyVersion>
+    <FileVersion>2.2.18</FileVersion>
 
     <Authors>Bernardo Estacio Abreu</Authors>
   </PropertyGroup>

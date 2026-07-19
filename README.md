@@ -289,7 +289,7 @@ SQL Server, Postgres, Oracle, MariaDB, MongoDB, CosmosDB — all behind unified 
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 2.2.15
+dotnet add package Franz.Common --version 2.2.18
 ```
 
 Messaging example:
@@ -340,19 +340,13 @@ dotnet test --filter Category=Integration
 
 Full version history lives in [`changelog.md`](changelog.md). Recent highlights:
 
-## v2.2.17 — When Logging Meets Desktop
+## v2.2.18 — Mapping improved
 
 **Changed**
 To help potential users understand the scope of `Franz.Common.Logging` at a glance, add this bullet point to the "Features" section of your main project README:
 
-* **Adaptive Environment Logging**
-* `UseLog()` for standard web-based environments.
+* **Performance mapping done for nested classes**
 
-
-* `UseDesktopLog()` for thread-aware, low-noise diagnostic logging in WPF/Avalonia/MAUI apps.
-
-
-* `UseHybridLog()` for flexible, configuration-driven logging scenarios.
 
 ---
 
