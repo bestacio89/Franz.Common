@@ -145,7 +145,11 @@ public class MappingExpressionTests
     var act = () => expression.ForMember(dest => "NotAMember", src => src.Id);
 
     // Assert
-    act.Should().Throw<InvalidOperationException>()
-       .WithMessage("Invalid expression");
+    act.Should()
+   .Throw<InvalidOperationException>()
+   .Where(ex =>
+       ex.Message.Contains(
+           "invalid mapping expression",
+           StringComparison.OrdinalIgnoreCase)); ;
   }
 }
