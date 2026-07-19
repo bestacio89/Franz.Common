@@ -8,7 +8,7 @@ public class MappingExpression<TSource, TDestination> : IMappingExpression
   private readonly Dictionary<string, string> _memberBindings = new();
   private readonly HashSet<string> _ignored = new();
 
-  private Func<TSource, TDestination>? _constructor;
+  private Delegate? _constructor;
   private Func<TDestination, TSource>? _reverseConstructor;
   private bool _isStrict;
 
@@ -53,6 +53,12 @@ public class MappingExpression<TSource, TDestination> : IMappingExpression
   }
 
   public MappingExpression<TSource, TDestination> ConstructUsing(Func<TSource, TDestination> ctor)
+  {
+    _constructor = ctor;
+    return this;
+  }
+
+  public MappingExpression<TSource, TDestination> ConstructUsing(Func<TSource, IFranzMapper, TDestination> ctor)
   {
     _constructor = ctor;
     return this;
