@@ -1,12 +1,9 @@
 ﻿using Franz.Common.Mediator.Context;
 using Microsoft.Extensions.Hosting;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
 
 namespace Franz.Common.Mediator.OpenTelemetry.Core;
-
 
 public static class FranzActivityFactory
 {
@@ -14,9 +11,7 @@ public static class FranzActivityFactory
 
   private static readonly ActivitySource Source = new(SourceName);
 
-  public static Activity? StartMediatorActivity<T>(
-      IHostEnvironment env,
-      MediatorContext ctx)
+  public static Activity? StartMediatorActivity<T>(IHostEnvironment env)
   {
     var name = typeof(T).Name;
     var operation = InferOperation(name);
@@ -25,7 +20,7 @@ public static class FranzActivityFactory
         $"{operation}.{name}",
         ActivityKind.Internal);
 
-    Enrich(activity, env, ctx);
+    Enrich(activity, env);
 
     activity?.SetTag(FranzSemanticConventions.MediatorType, operation);
     activity?.SetTag(FranzSemanticConventions.MediatorName, name);
@@ -33,9 +28,7 @@ public static class FranzActivityFactory
     return activity;
   }
 
-  public static Activity? StartEventActivity<T>(
-      IHostEnvironment env,
-      MediatorContext ctx)
+  public static Activity? StartEventActivity<T>(IHostEnvironment env)
   {
     var name = typeof(T).Name;
 
@@ -43,7 +36,7 @@ public static class FranzActivityFactory
         $"event.{name}",
         ActivityKind.Consumer);
 
-    Enrich(activity, env, ctx);
+    Enrich(activity, env);
 
     activity?.SetTag(FranzSemanticConventions.EventName, name);
     activity?.SetTag(FranzSemanticConventions.EventType, typeof(T).FullName ?? name);
@@ -51,28 +44,24 @@ public static class FranzActivityFactory
     return activity;
   }
 
-  private static void Enrich(
-      Activity? activity,
-      IHostEnvironment env,
-      MediatorContext ctx)
+  private static void Enrich(Activity? activity, IHostEnvironment env)
   {
-    if (activity == null || ctx == null) return;
+    if (activity == null) return;
+
+    var ctx = MediatorContext.Current;
 
     activity.SetTag(FranzSemanticConventions.CorrelationId, ctx.CorrelationId);
     activity.SetTag(FranzSemanticConventions.UserId, ctx.UserId);
     activity.SetTag(FranzSemanticConventions.TenantId, ctx.TenantId);
     activity.SetTag(FranzSemanticConventions.Culture, ctx.Culture?.Name);
     activity.SetTag(FranzSemanticConventions.Environment, env.EnvironmentName);
-
-    foreach (var kvp in ctx.Metadata)
-      activity.SetTag($"franz.metadata.{kvp.Key}", kvp.Value);
   }
 
   private static string InferOperation(string name)
   {
-    if (name.EndsWith("Command")) return "command";
-    if (name.EndsWith("Query")) return "query";
-    if (name.EndsWith("Event")) return "event";
+    if (name.EndsWith("Command", StringComparison.Ordinal)) return "command";
+    if (name.EndsWith("Query", StringComparison.Ordinal)) return "query";
+    if (name.EndsWith("Event", StringComparison.Ordinal)) return "event";
     return "request";
   }
 }
