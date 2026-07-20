@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Mediator.Polly.Context;
@@ -42,7 +43,8 @@ public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : I
      CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
-    var correlationId = CorrelationId.Ensure();
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId();
     var stopwatch = Stopwatch.StartNew();
 
     using (LogContext.PushProperty("FranzRequest", requestName))

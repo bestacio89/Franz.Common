@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Mediator.Polly.Observers;
@@ -42,8 +43,8 @@ public sealed class PollyRetryPipeline<TRequest, TResponse> : IPipeline<TRequest
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
 
     // BAZOOKA REFACTOR: Bridge to the native Guid v7 identity.
-    var correlationId = CorrelationId.Ensure();
-    CorrelationId.Current = correlationId;
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
     var resilienceContext = new Context.ResilienceContext
