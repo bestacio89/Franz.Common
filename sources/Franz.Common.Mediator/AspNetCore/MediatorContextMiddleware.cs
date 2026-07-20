@@ -1,62 +1,57 @@
 ﻿using Franz.Common.Mediator.Context;
 using Microsoft.AspNetCore.Http;
-using System;
 using System.Globalization;
-using System.Net.Http;
 using System.Threading.Tasks;
 
-namespace Franz.Common.Mediator.AspNetCore
+namespace Franz.Common.Mediator.AspNetCore;
+
+public sealed class MediatorContextMiddleware
 {
-  public sealed class MediatorContextMiddleware
+  private readonly RequestDelegate _next;
+
+  public MediatorContextMiddleware(RequestDelegate next)
   {
-    private readonly RequestDelegate _next;
+    _next = next;
+  }
 
-    public MediatorContextMiddleware(RequestDelegate next)
+  public async Task InvokeAsync(HttpContext httpContext)
+  {
+    try
     {
-      _next = next;
+      MediatorContext.Reset();
+
+      var context = MediatorExecutionContext.Empty;
+
+      // Correlation ID
+      var rawId = httpContext.TraceIdentifier;
+      var correlationId = Guid.TryParse(rawId, out var parsed)
+          ? parsed
+          : Guid.CreateVersion7();
+
+      context = context.WithCorrelationId(correlationId);
+
+      // User
+      if (httpContext.User?.Identity?.IsAuthenticated == true)
+      {
+        context = context.WithUser(httpContext.User.Identity.Name);
+      }
+
+      // Tenant
+      if (httpContext.Request.Headers.TryGetValue("X-Tenant-Id", out var tenantId))
+      {
+        context = context.WithTenant(tenantId.ToString());
+      }
+
+      // Culture
+      context = context.WithCulture(CultureInfo.CurrentCulture);
+
+      MediatorContext.Set(context);
+
+      await _next(httpContext);
     }
-
-    public async Task InvokeAsync(HttpContext httpContext)
+    finally
     {
-      try
-      {
-        // Reset context for this request
-        MediatorContext.Reset();
-
-        // Always generate a new correlation ID if missing
-
-
-        var rawId = httpContext.TraceIdentifier;
-
-        MediatorContext.Current.CorrelationId = Guid.TryParse(rawId, out var parsedGuid)
-            ? parsedGuid
-            : Guid.CreateVersion7();
-
-        // Capture authenticated user ID (if any)
-        if (httpContext.User?.Identity?.IsAuthenticated == true)
-        {
-          MediatorContext.Current.UserId =
-              httpContext.User.Identity.Name;
-        }
-
-        // Capture tenant ID if passed in headers (customize as needed)
-        if (httpContext.Request.Headers.TryGetValue("X-Tenant-Id", out var tenantId))
-        {
-          MediatorContext.Current.TenantId = tenantId.ToString();
-        }
-
-        // Capture culture (from request localization or headers)
-        MediatorContext.Current.Culture =
-            CultureInfo.CurrentCulture;
-
-        // Continue pipeline
-        await _next(httpContext);
-      }
-      finally
-      {
-        // Ensure context does not leak across requests
-        MediatorContext.Reset();
-      }
+      MediatorContext.Reset();
     }
   }
 }

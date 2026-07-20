@@ -1,7 +1,8 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Core;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
 namespace Franz.Common.Mediator.Pipelines.Logging;
@@ -32,8 +33,8 @@ public sealed class NotificationLoggingPipeline<TNotification> : INotificationPi
     var notificationName = typeof(TNotification).Name;
 
     // Notifications are usually secondary effects; this keeps them linked to the primary intent.
-    var correlationId = CorrelationId.Ensure();
-    CorrelationId.Current = correlationId;
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
 

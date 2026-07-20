@@ -1,6 +1,7 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
-using Franz.Common.Mediator.Pipelines.Logging;
+using Franz.Common.Mediator.Pipelines.Logging; // if you still need it
 using Franz.Common.Mediator.Validation.Events;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -9,7 +10,7 @@ using System.Diagnostics;
 namespace Franz.Common.Mediator.Pipelines.Events.Logging;
 
 /// <summary>
-/// Event logging pipeline — logs lifecycle of event handling with hardened Guid v7 correlation and duration.
+/// Event logging pipeline — logs lifecycle with rich MediatorExecutionContext.
 /// </summary>
 public sealed class SerilogEventLoggingPipeline<TEvent> : IEventPipeline<TEvent>
     where TEvent : IEvent
@@ -32,28 +33,36 @@ public sealed class SerilogEventLoggingPipeline<TEvent> : IEventPipeline<TEvent>
   {
     var eventName = @event?.GetType().Name ?? typeof(TEvent).Name;
 
-    // Ensure we have a Guid v7 correlation ID. 
-    // If one was set by the messaging adapter, it's preserved; otherwise, a new sequential one is created.
-    var correlationId = CorrelationId.Ensure();
+    // === NEW: Use unified context ===
+    var context = MediatorContext.Current;
+    MediatorContext.EnsureCorrelationId(); // Guarantees we have a v7 Guid
 
     var stopwatch = Stopwatch.StartNew();
 
-    // Logging the Guid directly allows Serilog to handle it as a native UUID/Guid type in sinks like Elastic or SQL
-    using (_logger.BeginScope(new { CorrelationId = correlationId }))
+    using (_logger.BeginScope(new
+    {
+      CorrelationId = context.CorrelationId,
+      UserId = context.UserId,
+      TenantId = context.TenantId
+    }))
     {
       try
       {
         if (_env.IsDevelopment())
         {
           _logger.LogInformation(
-              "📢 [Event] {EventName} [{CorrelationId}] started with payload {@Event}",
-              eventName, correlationId, @event);
+              "📢 [Event] {EventName} [{CorrelationId}] started with payload {@Event} | User={UserId} | Tenant={TenantId}",
+              eventName,
+              context.CorrelationId,
+              @event,
+              context.UserId,
+              context.TenantId);
         }
         else
         {
           _logger.LogInformation(
               "📢 [Event] {EventName} [{CorrelationId}] started",
-              eventName, correlationId);
+              eventName, context.CorrelationId);
         }
 
         await next();
@@ -62,7 +71,7 @@ public sealed class SerilogEventLoggingPipeline<TEvent> : IEventPipeline<TEvent>
 
         _logger.LogInformation(
             "✅ [Event] {EventName} [{CorrelationId}] finished in {Elapsed} ms",
-            eventName, correlationId, stopwatch.ElapsedMilliseconds);
+            eventName, context.CorrelationId, stopwatch.ElapsedMilliseconds);
       }
       catch (Exception ex)
       {
@@ -72,13 +81,13 @@ public sealed class SerilogEventLoggingPipeline<TEvent> : IEventPipeline<TEvent>
         {
           _logger.LogError(ex,
               "❌ [Event] {EventName} [{CorrelationId}] failed after {Elapsed} ms",
-              eventName, correlationId, stopwatch.ElapsedMilliseconds);
+              eventName, context.CorrelationId, stopwatch.ElapsedMilliseconds);
         }
         else
         {
           _logger.LogError(
-              "❌ [Event] {EventName} [{CorrelationId}] failed after {Elapsed} ms with {ErrorMessage}",
-              eventName, correlationId, stopwatch.ElapsedMilliseconds, ex.Message);
+              "❌ [Event] {EventName} [{CorrelationId}] failed after {Elapsed} ms",
+              eventName, context.CorrelationId, stopwatch.ElapsedMilliseconds);
         }
 
         throw;

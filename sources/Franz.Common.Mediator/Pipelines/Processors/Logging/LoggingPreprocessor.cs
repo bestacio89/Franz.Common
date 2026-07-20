@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -34,8 +35,8 @@ public sealed class LoggingPreProcessor<TRequest> : IPreProcessor<TRequest>
 
     // Ensure() establishes the 128-bit Guid v7 that will travel through 
     // Pipelines, Sagas, and Domain Events.
-    var correlationId = CorrelationId.Ensure();
-    CorrelationId.Current = correlationId;
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId();
 
     using (_logger.BeginScope(new { CorrelationId = correlationId }))
     {

@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Logging;
@@ -25,7 +26,8 @@ public sealed class SerilogLoggingPostProcessor<TRequest, TResponse> : IPostProc
     var requestType = request?.GetType().Name ?? typeof(TRequest).Name;
 
     // This keeps the "Success" log bitwise-linked to the "Start" log.
-    var correlationId = CorrelationId.Ensure();
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId();
 
     using (LogContext.PushProperty("FranzRequest", requestType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))

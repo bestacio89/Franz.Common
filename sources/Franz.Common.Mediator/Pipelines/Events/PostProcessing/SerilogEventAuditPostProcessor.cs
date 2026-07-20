@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Hosting;
@@ -30,10 +31,10 @@ public sealed class SerilogEventAuditPostProcessor<TEvent> : IEventPostProcessor
     var eventType = @event?.GetType().Name ?? typeof(TEvent).Name;
 
     // instead of creating a random string "N" ID.
-    var correlationId = CorrelationId.Ensure();
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId();
 
-    // Ensure the current context is synced (just in case this is the first entry point)
-    CorrelationId.Current = correlationId;
+    
 
     using (LogContext.PushProperty("FranzEvent", eventType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))

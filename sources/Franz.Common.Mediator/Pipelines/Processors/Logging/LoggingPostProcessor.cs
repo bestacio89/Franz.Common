@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -34,7 +35,8 @@ public sealed class LoggingPostProcessor<TRequest, TResponse> : IPostProcessor<T
 
     // BAZOOKA REFACTOR: Fetch the existing Guid v7.
     // In a Post-Processor, we expect the ID to already exist from the Pre-Processor or Pipeline.
-    var correlationId = CorrelationId.Ensure();
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId();
 
     using (_logger.BeginScope(new { CorrelationId = correlationId }))
     {

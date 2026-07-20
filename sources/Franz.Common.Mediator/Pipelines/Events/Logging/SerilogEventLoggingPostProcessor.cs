@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Events.PostProcessing;
 using Franz.Common.Mediator.Pipelines.Logging;
@@ -28,7 +29,8 @@ public sealed class SerilogEventLoggingPostProcessor<TEvent> : IEventPostProcess
 
     
     // This ensures the "Success" log is bitwise-linked to the "Start" log.
-    var correlationId = CorrelationId.Ensure();
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId(); // Guarantees we have a v7 Guid
 
     using (LogContext.PushProperty("FranzEvent", eventType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))

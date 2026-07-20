@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Logging;
@@ -27,11 +28,10 @@ public sealed class SerilogEventAuditPreProcessor<TEvent> : IEventPreProcessor<T
 
     // BAZOOKA REFACTOR: Fetch or establish the native Guid v7 context.
     // This ensures the audit trail is physically ordered in your log storage.
-    var correlationId = CorrelationId.Ensure();
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId(); 
 
-    // Sync the ambient context so all downstream logic sees this ID.
-    CorrelationId.Current = correlationId;
-
+   
     using (LogContext.PushProperty("FranzEvent", eventType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))
     using (LogContext.PushProperty("FranzProcessor", nameof(SerilogEventAuditPreProcessor<TEvent>)))

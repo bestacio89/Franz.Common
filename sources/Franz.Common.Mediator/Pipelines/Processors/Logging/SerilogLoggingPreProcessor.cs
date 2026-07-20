@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Logging;
@@ -25,8 +26,8 @@ public sealed class SerilogLoggingPreProcessor<TRequest> : IPreProcessor<TReques
     var requestType = request?.GetType().Name ?? typeof(TRequest).Name;
 
     // Ensure() creates the Guid v7 that links all downstream Serilog properties.
-    var correlationId = CorrelationId.Ensure();
-    CorrelationId.Current = correlationId;
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId();
 
     using (LogContext.PushProperty("FranzRequest", requestType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))

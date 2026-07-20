@@ -1,7 +1,8 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Core;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
 namespace Franz.Common.Mediator.Pipelines.Logging;
@@ -37,9 +38,8 @@ public sealed class LoggingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
             : "Request";
 
     // If an ID exists (from an upstream HTTP header or Message), it is preserved.
-    var correlationId = CorrelationId.Ensure();
-    CorrelationId.Current = correlationId;
-
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId();
     var stopwatch = Stopwatch.StartNew();
 
     // Scope the native Guid—Serilog will index this as a UUID, not a string.

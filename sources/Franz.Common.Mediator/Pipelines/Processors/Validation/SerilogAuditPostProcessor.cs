@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Hosting;
@@ -27,9 +28,10 @@ public sealed class SerilogAuditPostProcessor<TRequest, TResponse> : IPostProces
   public Task ProcessAsync(TRequest request, TResponse response, CancellationToken cancellationToken = default)
   {
     var requestType = request?.GetType().Name ?? typeof(TRequest).Name;
-    // BAZOOKA REFACTOR: Retrieve the existing Guid v7 from the context.
+    
     // We use Ensure() to guarantee we have a valid lineage for the final audit entry.
-    var correlationId = CorrelationId.Ensure();
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId();
 
     using (LogContext.PushProperty("FranzRequest", requestType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))

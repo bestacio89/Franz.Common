@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Microsoft.Extensions.Logging;
@@ -27,10 +28,10 @@ public sealed class SerilogLoggingPipeline<TRequest, TResponse> : IPipeline<TReq
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
 
- 
+
     // This ensures the correlation ID is a sortable, timestamped binary.
-    var correlationId = CorrelationId.Ensure();
-    CorrelationId.Current = correlationId;
+    var correlationId = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
 
