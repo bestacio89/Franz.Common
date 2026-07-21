@@ -28,6 +28,9 @@ public class FranzDispatcher : IDispatcher
   private static readonly ConcurrentDictionary<Type, Func<IServiceProvider, object, CancellationToken, Task>> VoidHandlerCache = new();
   private static readonly ConcurrentDictionary<Type, Func<FranzDispatcher, IEvent, CancellationToken, Task>> EventPublisherCache = new();
 
+  private static readonly ConcurrentDictionary<Type, Func<IServiceProvider, object, CancellationToken, Task>> PreProcessorInvokerCache = new();
+  private static readonly ConcurrentDictionary<(Type RequestType, Type ResponseType), Func<IServiceProvider, object, object?, CancellationToken, Task>> PostProcessorInvokerCache = new();
+
   public FranzDispatcher(IServiceProvider serviceProvider)
   {
     _serviceProvider = serviceProvider;
@@ -48,7 +51,7 @@ public class FranzDispatcher : IDispatcher
 
     try
     {
-      await RunPreProcessors(command, ct).ConfigureAwait(false);
+      await RunPreProcessorsDynamic(command, ct).ConfigureAwait(false);
 
       var commandType = command.GetType();
       var invoker = ResponseHandlerCache.GetOrAdd(commandType, static t => CompileResponseInvoker(t, typeof(TResponse)));
@@ -65,7 +68,7 @@ public class FranzDispatcher : IDispatcher
           },
           ct).ConfigureAwait(false);
 
-      await RunPostProcessors(command, response, ct).ConfigureAwait(false);
+      await RunPostProcessorsDynamic(command, response, ct).ConfigureAwait(false);
 
       var duration = DateTime.UtcNow - start;
       await NotifyRequestCompleted(command, response, context.CorrelationId, duration, ct).ConfigureAwait(false);
@@ -93,14 +96,13 @@ public class FranzDispatcher : IDispatcher
 
     try
     {
-      await RunPreProcessors(command, ct).ConfigureAwait(false);
+      await RunPreProcessorsDynamic(command, ct).ConfigureAwait(false);
 
       var commandType = command.GetType();
       var invoker = VoidHandlerCache.GetOrAdd(commandType, static t => CompileVoidInvoker(t));
 
       var pipelines = ResolveServices<IPipeline<ICommand, Unit>>();
 
-      // FIX for CS1662 & CS0266: Adapt Task -> Task<Unit>
       await PipelineExecutor.ExecuteAsync(
           command,
           pipelines,
@@ -111,7 +113,7 @@ public class FranzDispatcher : IDispatcher
           },
           ct).ConfigureAwait(false);
 
-      await RunPostProcessors(command, Unit.Value, ct).ConfigureAwait(false);
+      await RunPostProcessorsDynamic(command, Unit.Value, ct).ConfigureAwait(false);
 
       var duration = DateTime.UtcNow - start;
       await NotifyRequestCompleted(command, Unit.Value, context.CorrelationId, duration, ct).ConfigureAwait(false);
@@ -139,7 +141,7 @@ public class FranzDispatcher : IDispatcher
 
     try
     {
-      await RunPreProcessors(query, ct).ConfigureAwait(false);
+      await RunPreProcessorsDynamic(query, ct).ConfigureAwait(false);
 
       var queryType = query.GetType();
       var invoker = ResponseHandlerCache.GetOrAdd(queryType, static t => CompileQueryInvoker(t, typeof(TResponse)));
@@ -156,7 +158,7 @@ public class FranzDispatcher : IDispatcher
           },
           ct).ConfigureAwait(false);
 
-      await RunPostProcessors(query, response, ct).ConfigureAwait(false);
+      await RunPostProcessorsDynamic(query, response, ct).ConfigureAwait(false);
 
       var duration = DateTime.UtcNow - start;
       await NotifyRequestCompleted(query, response, context.CorrelationId, duration, ct).ConfigureAwait(false);
@@ -330,7 +332,6 @@ public class FranzDispatcher : IDispatcher
 
   // ==================== STREAMING ====================
 
-  // FIX for CS1626: Split execution to allow try/finally without forbidden try/catch yield
   public async IAsyncEnumerable<TResponse> Stream<TQuery, TResponse>(
       TQuery query,
       [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -391,7 +392,7 @@ public class FranzDispatcher : IDispatcher
 
       if (capturedException is null)
         await NotifyRequestCompleted(query, null, correlationId, duration, cancellationToken).ConfigureAwait(false);
-      else if (enumerator is not null) // Only log failure in finally if it wasn't caught during creation
+      else if (enumerator is not null)
         await NotifyRequestFailed(query, capturedException, correlationId, duration, cancellationToken).ConfigureAwait(false);
     }
   }
@@ -405,22 +406,69 @@ public class FranzDispatcher : IDispatcher
            ?? _serviceProvider.GetServices<TService>().ToArray();
   }
 
-  private async Task RunPreProcessors<TRequest>(TRequest request, CancellationToken ct)
+  private Task RunPreProcessorsDynamic(object request, CancellationToken ct)
   {
-    var processors = ResolveServices<IPreProcessor<TRequest>>();
-    for (int i = 0; i < processors.Count; i++)
-    {
-      await processors[i].ProcessAsync(request, ct).ConfigureAwait(false);
-    }
+    var requestType = request.GetType();
+    var invoker = PreProcessorInvokerCache.GetOrAdd(requestType, CompilePreProcessorInvoker);
+    return invoker(_serviceProvider, request, ct);
   }
 
-  private async Task RunPostProcessors<TRequest, TResponse>(TRequest request, TResponse response, CancellationToken ct)
+  private Task RunPostProcessorsDynamic<TResponse>(object request, TResponse response, CancellationToken ct)
   {
-    var processors = ResolveServices<IPostProcessor<TRequest, TResponse>>();
-    for (int i = 0; i < processors.Count; i++)
+    var requestType = request.GetType();
+    var key = (RequestType: requestType, ResponseType: typeof(TResponse));
+    var invoker = PostProcessorInvokerCache.GetOrAdd(key, k => CompilePostProcessorInvoker(k.RequestType, k.ResponseType));
+    return invoker(_serviceProvider, request, response, ct);
+  }
+
+  private static Func<IServiceProvider, object, CancellationToken, Task> CompilePreProcessorInvoker(Type requestType)
+  {
+    return (sp, req, ct) =>
     {
-      await processors[i].ProcessAsync(request, response, ct).ConfigureAwait(false);
-    }
+      var processorType = typeof(IPreProcessor<>).MakeGenericType(requestType);
+      var processors = sp.GetServices(processorType);
+
+      var method = processorType.GetMethod(nameof(IPreProcessor<object>.ProcessAsync))!;
+
+      async Task ExecuteAll()
+      {
+        foreach (var p in processors)
+        {
+          if (p is not null)
+          {
+            var task = (Task)method.Invoke(p, new[] { req, ct })!;
+            await task.ConfigureAwait(false);
+          }
+        }
+      }
+
+      return ExecuteAll();
+    };
+  }
+
+  private static Func<IServiceProvider, object, object?, CancellationToken, Task> CompilePostProcessorInvoker(Type requestType, Type responseType)
+  {
+    return (sp, req, res, ct) =>
+    {
+      var processorType = typeof(IPostProcessor<,>).MakeGenericType(requestType, responseType);
+      var processors = sp.GetServices(processorType);
+
+      var method = processorType.GetMethod(nameof(IPostProcessor<object, object>.ProcessAsync))!;
+
+      async Task ExecuteAll()
+      {
+        foreach (var p in processors)
+        {
+          if (p is not null)
+          {
+            var task = (Task)method.Invoke(p, new[] { req, res, ct })!;
+            await task.ConfigureAwait(false);
+          }
+        }
+      }
+
+      return ExecuteAll();
+    };
   }
 
   private async Task NotifyRequestStarted(object request, Guid correlationId, CancellationToken ct)

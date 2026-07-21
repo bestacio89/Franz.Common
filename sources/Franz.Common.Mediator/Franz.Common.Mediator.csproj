@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common\Franz.Common.csproj" />
+    <ProjectReference Include="..\Microsoft.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj" />
   </ItemGroup>
 
   
