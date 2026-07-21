@@ -35,7 +35,8 @@ public static class MediatorServiceCollectionExtensionsV2
   /// </summary>
   public static IServiceCollection AddFranzMediatorV2(
       this IServiceCollection services,
-      Action<FranzMediatorOptions>? configure = null)
+      Action<FranzMediatorOptions>? configure = null,
+      Assembly? handlerAssembly = null)
   {
     ArgumentNullException.ThrowIfNull(services);
 
@@ -55,7 +56,10 @@ public static class MediatorServiceCollectionExtensionsV2
     }
 
     // Direct invocation of source-generated handler provider (Zero Reflection / Native AOT)
-    services.AddFranzGeneratedHandlerRegistration();
+    // Allow callers to explicitly provide the assembly that contains handlers so
+    // AddFranzMediatorV2 can be safely called from the mediator library without
+    // accidentally targeting the mediator assembly itself.
+    services.AddFranzGeneratedHandlerRegistration(handlerAssembly);
 
     return services;
   }
@@ -87,9 +91,10 @@ public static class MediatorServiceCollectionExtensionsV2
   /// </summary>
   public static IServiceCollection AddFranzMediatorV2Default(
       this IServiceCollection services,
-      Action<FranzMediatorOptions>? configure = null)
+      Action<FranzMediatorOptions>? configure = null,
+      Assembly? handlerAssembly = null)
   {
-    services.AddFranzMediatorV2(configure);
+    services.AddFranzMediatorV2(configure, handlerAssembly);
 
     services.AddFranzLoggingPipelineV2();
     services.AddFranzValidationPipelineV2();
