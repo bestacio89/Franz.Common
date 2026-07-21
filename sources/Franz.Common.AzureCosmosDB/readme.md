@@ -163,7 +163,7 @@ await messageStore.SaveAsync(msg);
 
 ---
 
-**Current Version:** v2.2.19
+**Current Version:** v2.3.0
 
 ## **Changelog**
 

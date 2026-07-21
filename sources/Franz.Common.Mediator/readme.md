@@ -1,15 +1,16 @@
-﻿# 📦 Franz.Common.Mediator (v2.2.18)
+﻿# 📦 Franz.Common.Mediator (v2.3.0)
 
 A deterministic execution engine for application commands, queries, notifications, and events within the **Franz Framework**.
 
-This mediator is designed as a **structured execution pipeline runtime**, not a simple in-process dispatcher.
+Franz Mediator is not a simple in-process dispatcher.
 
-It provides:
+It is a structured execution runtime providing:
 
 * explicit handler execution
-* composable pipeline stages
-* deterministic cross-cutting behavior
-* clear separation between command/query/event execution flows
+* deterministic pipeline composition
+* configurable cross-cutting behavior
+* compile-time or runtime composition models
+* clear separation between commands, queries, notifications, and events
 
 ---
 
@@ -17,97 +18,229 @@ It provides:
 
 ## Core Dispatcher
 
-* `IDispatcher` as the single entry point for execution
-* Scoped execution model per request
-* Explicit handler resolution via DI
+* `IDispatcher` as the single execution entry point
+* Scoped request execution model
+* Explicit handler resolution through dependency injection
+* Optimized execution paths with generated registrations support
 
-## Handler Model
+---
+
+# Handler Registration Models
+
+Franz Mediator supports two registration models.
+
+## V1 — Reflection Registration
+
+Designed for simplicity and traditional application development.
+
+Features:
+
+* assembly scanning
+* runtime handler discovery
+* zero generator dependency
+* minimal setup
+
+Example:
+
+```csharp
+services.AddFranzMediator(
+    typeof(CreateHeroHandler).Assembly);
+```
+
+Suitable for:
+
+* standard web applications
+* internal applications
+* rapid development scenarios
+
+---
+
+## V2 — Source Generated Registration
+
+Designed for modern applications requiring deterministic startup and compile-time composition.
+
+Features:
+
+* Roslyn source generation
+* zero runtime handler discovery
+* Native AOT compatible
+* trimming friendly
+* compile-time registration validation
+
+Example:
+
+```csharp
+services.AddFranzMediatorGenerated();
+```
+
+The generator produces:
+
+```csharp
+services.AddScoped<
+    ICommandHandler<CreateHeroCommand, HeroDto>,
+    CreateHeroCommandHandler>();
+```
+
+without runtime scanning.
+
+---
+
+# Handler Model
 
 Supports:
 
 * `ICommandHandler<TCommand, TResult>`
 * `IQueryHandler<TQuery, TResult>`
-* `INotificationHandler<TEvent>`
+* `INotificationHandler<TNotification>`
 * `IEventHandler<TEvent>`
-* `IStreamQueryHandler<TQuery, TStream>`
+* `IStreamQueryHandler<TQuery, TResult>`
 
-Handlers are discovered via assembly scanning and registered automatically.
+Handler rules remain explicit:
+
+* one handler owns one contract
+* contracts define execution boundaries
+* handlers remain independent units
 
 ---
 
-## Pipeline Execution Engine
+# ⚡ Performance Improvements
 
-The mediator supports **composable execution pipelines**:
+## Compile-Time Registration
 
-### Command / Query Pipelines
+Previous model:
 
-* `IPipeline<TRequest, TResult>`
-* Pre-processing + post-processing stages
-* Ordered execution chain
+```
+Application startup
+        |
+        v
+Assembly scanning
+        |
+        v
+Reflection inspection
+        |
+        v
+DI registration
+```
 
-### Event Pipelines
+New generated model:
+
+```
+Build time
+        |
+        v
+Roslyn generator
+        |
+        v
+Generated registration code
+
+Application startup
+        |
+        v
+Direct DI registration
+```
+
+Benefits:
+
+* reduced startup overhead
+* deterministic application composition
+* no runtime discovery cost
+
+---
+
+# Pipeline Execution Engine
+
+Franz Mediator continues using composable execution pipelines.
+
+## Command / Query Pipelines
+
+Supports:
+
+* `IPipeline<TRequest,TResponse>`
+* pre-processors
+* handler execution
+* post-processors
+
+---
+
+## Event Pipelines
+
+Dedicated event execution model:
 
 * `IEventPipeline<TEvent>`
-* Dedicated event execution flow
-* Independent from command/query pipelines
+* event preprocessing
+* event handlers
+* event postprocessing
+
+Events remain isolated from request/response execution.
 
 ---
 
-## Cross-Cutting Pipelines (Composable Modules)
+# Cross-Cutting Pipeline Modules
 
-Franz Mediator provides optional pipeline modules:
+## Observability
 
-### Observability
+* logging pipelines
+* Serilog enrichment
+* observers
 
-* Logging pipelines
-* Serilog enrichment pipelines
-* Console observer (optional)
+## Validation
 
-### Validation
+* command/query validation
+* event validation
+* audit processors
 
-* Request validation pipeline
-* Event validation pipeline
-* Pre-execution validation hooks
+## Resilience
 
-### Resilience
+* retry
+* circuit breaker
+* bulkhead isolation
+* timeout policies
 
-* Retry pipeline
-* Circuit breaker pipeline
-* Bulkhead isolation pipeline
-* Timeout pipeline
+## Transactions
 
-### Transactional Control
-
-* Transaction pipeline for execution boundaries
+* execution boundary management
+* transactional pipeline support
 
 ---
 
 # 🧭 Execution Model
 
-The Franz Mediator follows a strict execution flow:
+## Commands and Queries
 
-```text id="exec_model"
+```
 Dispatcher
-  ↓
-Pre-Pipeline Stages
-  ↓
-Handler Execution
-  ↓
-Post-Pipeline Stages
-  ↓
-Observers (optional)
+    |
+    v
+Pre Processors
+    |
+    v
+Pipeline Chain
+    |
+    v
+Handler
+    |
+    v
+Post Processors
+    |
+    v
+Observers
 ```
 
-For events:
+---
 
-```text id="event_model"
+## Events
+
+```
 Dispatcher
-  ↓
-Event Pre-Pipeline
-  ↓
+    |
+    v
+Event Pre Pipeline
+    |
+    v
 Event Handlers
-  ↓
-Event Post-Pipeline
+    |
+    v
+Event Post Pipeline
 ```
 
 ---
@@ -116,144 +249,106 @@ Event Post-Pipeline
 
 ## 1. Deterministic Execution
 
-Pipeline execution order is explicit and predictable.
+The execution chain is explicit.
 
-## 2. Composable Behavior
-
-Cross-cutting concerns are modular pipeline components.
-
-## 3. No Hidden Magic
-
-No implicit behavior chains outside registered pipelines.
-
-## 4. Clear Execution Boundaries
-
-Commands, queries, and events are distinct execution models.
-
-## 5. DI-Native Design
-
-All behavior is composed through `IServiceCollection`.
+No hidden behavior is injected outside registered pipelines.
 
 ---
 
-# ⚙️ Basic Usage
+## 2. Dual Composition Strategy
 
-## 1️⃣ Register Mediator
+Developers choose the appropriate model:
 
-```csharp id="med1"
-services.AddFranzMediator(
-    new[] { typeof(SomeHandler).Assembly });
-```
+Reflection when simplicity matters.
+
+Generation when deterministic composition matters.
 
 ---
 
-## 2️⃣ Optional Default Setup (Recommended)
+## 3. DI Native
 
-```csharp id="med2"
+All runtime behavior remains composed through `IServiceCollection`.
+
+---
+
+## 4. Contract Isolation
+
+Commands, queries, notifications, and events remain separate execution models.
+
+---
+
+## 5. Performance Without Complexity Leakage
+
+The framework absorbs optimization complexity.
+
+Application developers do not manually register infrastructure.
+
+---
+
+# ⚙️ Recommended Setup
+
+## Standard Applications
+
+```csharp
 services.AddFranzMediatorDefault();
 ```
 
-This includes:
+Uses:
 
-* dispatcher
-* handler scanning
-* logging pipeline
-* validation pipeline
-* audit pipeline
-* transaction pipeline (optional module set)
+* reflection registration
+* default pipelines
+* conventional setup
 
 ---
 
-## 3️⃣ Sending Commands / Queries
+## Modern Applications
 
-```csharp id="med3"
-var result = await dispatcher.Send(new CreateHeroCommand());
+```csharp
+services.AddFranzMediatorGeneratedDefault();
 ```
 
----
+Uses:
 
-## 4️⃣ Publishing Notifications / Events
-
-```csharp id="med4"
-await dispatcher.Publish(new HeroCreatedEvent());
-```
+* generated handler registration
+* deterministic startup
+* same pipeline model
 
 ---
 
-# 🧩 Pipeline Composition Model
+# Architectural Boundaries
 
-Pipelines are **additive and ordered via registration**:
-
-```csharp id="med5"
-builder.Services.AddFranzSerilogAuditPipeline()
-                .AddFranzEventValidationPipeline()
-                .AddFranzSerilogLoggingPipeline()
-                .AddFranzTelemetry(env, config);
-```
-
-Each pipeline is:
-
-* independently composable
-* scoped
-* executed in registration order
-
----
-
-# ⚠️ Architectural Boundaries
-
-This mediator:
+Franz Mediator:
 
 ## DOES
 
-* execute in-process application logic
-* orchestrate pipelines
+* execute application logic
+* compose execution pipelines
 * manage handler lifetimes
-* enforce execution policies
+* apply execution policies
 
 ## DOES NOT
 
-* handle transport (Kafka, RabbitMQ, HTTP)
-* manage background workers
-* perform hosting or runtime orchestration outside DI
+* replace transport systems
+* process messages from brokers
+* manage hosted services
+* own distributed communication
 
 ---
 
+# 🧠 Architectural Evolution
 
-**Current Version:** v2.2.19
+## v2.2
 
-## ✨ Added
+> Mediator as a structured execution runtime.
 
-* `AddFranzMediatorDefault()` as canonical setup method
-* clearer separation between command/query/event pipelines
-* improved event pipeline isolation model
+## v2.3
 
-## 🔧 Changed
+> Mediator as a structured execution runtime with compile-time composition.
 
-* pipeline system explicitly separated into command/query/event flows
-* improved DI scanning consistency for handlers
-* clarified execution model semantics
+The runtime philosophy remains unchanged:
 
-## 🧠 Architectural Clarification
+> **Execution must be explicit, composable, and deterministic.**
 
-* Mediator = execution engine
-* Pipelines = behavior composition layer
-* Transport systems (Kafka, etc.) are external to this model
+The difference is that v2.3 removes unnecessary runtime discovery where modern applications demand maximum determinism.
 
 ---
-
-# 📄 License
-
-MIT License
-
----
-
-# 🧠 Final Note
-
-Franz Mediator is designed around one principle:
-
-> **Execution must be explicit, composable, and deterministic**
-
-It is not a request dispatcher with optional behaviors —
-it is a structured execution runtime for application logic.
-
-

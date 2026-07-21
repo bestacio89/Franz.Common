@@ -1549,3 +1549,54 @@ To help potential users understand the scope of `Franz.Common.Logging` at a glan
 
 
 * `UseHybridLog()` for flexible, configuration-driven logging scenarios.
+## v2.3.0 — Source Generated Runtime & Execution Model Modernization
+
+**Added**
+
+* **Source Generated Dependency Registration**
+  - Added compile-time handler registration through Roslyn source generators.
+  - Eliminates runtime assembly scanning for modern applications.
+  - Provides deterministic registrations compatible with Native AOT scenarios.
+  - Keeps registration failures visible at build time instead of runtime.
+
+* **Dual Registration Strategy**
+  - Introduced two registration modes:
+    - **V1**: reflection-based registration for compatibility and migration scenarios.
+    - **V2**: source-generated registration for modern high-performance applications.
+  - Allows existing applications to migrate without breaking changes.
+
+* **Improved Mediator Runtime Architecture**
+  - Optimized handler resolution through generated registrations.
+  - Reduced runtime discovery overhead.
+  - Improved startup performance by removing unnecessary reflection paths.
+
+**Changed**
+
+* **Mediator execution model modernization**
+  - Handler registration is now deterministic when using the generated model.
+  - Dependency injection composition is generated instead of discovered at runtime.
+  - Runtime behavior remains fully DI-native.
+
+* **Improved dispatcher resilience**
+  - Enhanced internal execution caching.
+  - Improved dynamic handler invocation paths.
+  - Reduced repeated runtime resolution overhead.
+
+* **Pipeline architecture refinement**
+  - Further separated command/query/event execution flows.
+  - Improved consistency between pipeline composition and handler execution.
+
+**Architectural Clarification**
+
+* Franz Mediator now supports two execution philosophies:
+  - **Compatibility first**: runtime discovery through reflection.
+  - **Performance first**: compile-time generated registrations.
+
+* The generated model becomes the recommended approach for new applications.
+
+**Performance Improvements**
+
+* Reduced application startup work.
+* Reduced runtime reflection dependency.
+* Improved Native AOT readiness.
+* More predictable dependency graph generation.

@@ -1,20 +1,27 @@
 ﻿#nullable enable
-
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
-using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Messaging.Messages;
+using System;
+using System.Collections.Concurrent;
+using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Franz.Common.Messaging.Adapters;
 
 public static class MessageDeserializerExtensions
 {
-  private static readonly JsonSerializerOptions _jsonOptions = new()
+  private static readonly JsonSerializerOptions JsonOptions = new()
   {
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
   };
+
+  // Cache reflected property setters to avoid runtime reflection overhead per message deserialization
+  private static readonly ConcurrentDictionary<Type, Action<object, Guid>?> PropertySetterCache = new();
+  private static readonly ConcurrentDictionary<string, Type?> TypeResolutionCache = new();
 
   public static ICommand? ToCommand(this Message message)
   {
@@ -22,13 +29,11 @@ public static class MessageDeserializerExtensions
     if (type is null || string.IsNullOrWhiteSpace(message.Body))
       return null;
 
-    var command = (ICommand?)JsonSerializer.Deserialize(message.Body, type, _jsonOptions);
-
+    var command = (ICommand?)JsonSerializer.Deserialize(message.Body, type, JsonOptions);
     if (command is null)
       return null;
 
     ApplyCorrelation(command, message.CorrelationId);
-
     return command;
   }
 
@@ -38,18 +43,16 @@ public static class MessageDeserializerExtensions
     if (type is null || string.IsNullOrWhiteSpace(message.Body))
       return null;
 
-    var @event = (IEvent?)JsonSerializer.Deserialize(message.Body, type, _jsonOptions);
-
+    var @event = (IEvent?)JsonSerializer.Deserialize(message.Body, type, JsonOptions);
     if (@event is null)
       return null;
 
     ApplyCorrelation(@event, message.CorrelationId);
-
     return @event;
   }
 
   // =====================================================
-  // TYPE RESOLUTION (transport-safe)
+  // TYPE RESOLUTION (Cached & Transport-Safe)
   // =====================================================
 
   private static Type? ResolveType(string? typeName, Type expectedBase)
@@ -57,59 +60,69 @@ public static class MessageDeserializerExtensions
     if (string.IsNullOrWhiteSpace(typeName))
       return null;
 
-    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+    var cacheKey = $"{typeName}:{expectedBase.FullName}";
+    return TypeResolutionCache.GetOrAdd(cacheKey, _ =>
     {
-      var type = asm.GetType(typeName, throwOnError: false);
+      var assemblies = AppDomain.CurrentDomain.GetAssemblies();
 
-      if (type != null && expectedBase.IsAssignableFrom(type))
-        return type;
-    }
+      for (int i = 0; i < assemblies.Length; i++)
+      {
+        var type = assemblies[i].GetType(typeName, throwOnError: false);
+        if (type != null && expectedBase.IsAssignableFrom(type))
+          return type;
+      }
 
-    // fallback: search by FullName (more test-friendly)
-    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-    {
-      var type = asm.GetTypes()
-        .FirstOrDefault(t =>
-          t.FullName == typeName &&
-          expectedBase.IsAssignableFrom(t));
+      // Fallback: search by FullName
+      for (int i = 0; i < assemblies.Length; i++)
+      {
+        var types = assemblies[i].GetTypes();
+        for (int j = 0; j < types.Length; j++)
+        {
+          var t = types[j];
+          if (t.FullName == typeName && expectedBase.IsAssignableFrom(t))
+            return t;
+        }
+      }
 
-      if (type != null)
-        return type;
-    }
-
-    return null;
+      return null;
+    });
   }
 
   // =====================================================
-  // CORRELATION (transport-agnostic injection)
+  // CORRELATION (MediatorContext Ambient Hydration)
   // =====================================================
 
   private static void ApplyCorrelation(object target, Guid? correlationId)
   {
-    // -----------------------------
-    // 1. Ambient context (ONLY if present)
-    // -----------------------------
-    if (correlationId is Guid correlation)
-    {
-      CorrelationId.Current = correlation;
-    }
+    var targetCorrelation = correlationId ?? Guid.CreateVersion7();
 
-    var prop = target.GetType()
-      .GetProperty("CorrelationId", BindingFlags.Public | BindingFlags.Instance);
+    // 1. Hydrate Ambient MediatorContext for downstream pipelines / telemetry
+    var currentContext = MediatorContext.Current;
+    MediatorContext.Set(currentContext.WithCorrelationId(targetCorrelation));
 
+    // 2. Hydrate Domain Property on the Message Payload (Cached Setter)
+    var targetType = target.GetType();
+    var setter = PropertySetterCache.GetOrAdd(targetType, static type => CompileCorrelationSetter(type));
+
+    setter?.Invoke(target, targetCorrelation);
+  }
+
+  private static Action<object, Guid>? CompileCorrelationSetter(Type type)
+  {
+    var prop = type.GetProperty("CorrelationId", BindingFlags.Public | BindingFlags.Instance);
     if (prop is null || !prop.CanWrite)
-      return;
+      return null;
 
-    // -----------------------------
-    // 2. Domain hydration
-    // -----------------------------
     if (prop.PropertyType == typeof(Guid))
     {
-      prop.SetValue(target, correlationId ?? Guid.Empty);
+      return (obj, val) => prop.SetValue(obj, val);
     }
-    else if (prop.PropertyType == typeof(Guid?))
+
+    if (prop.PropertyType == typeof(Guid?))
     {
-      prop.SetValue(target, correlationId);
+      return (obj, val) => prop.SetValue(obj, (Guid?)val);
     }
+
+    return null;
   }
 }

@@ -71,6 +71,7 @@
     <Project Path="sources/Franz.Common.SSO/Franz.Common.SSO.csproj" />
     <Project Path="sources/Franz.Common.Testing/Franz.Common.Testing.csproj" />
     <Project Path="sources/Franz.Common/Franz.Common.csproj" />
+    <Project Path="sources/Microsoft.Common.Mediator.SourceGenerator/Franz.Common.Mediator.SourceGenerator.csproj" Id="af59ed84-f6a3-44cb-9347-b32b22ed27b8" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Franz.Common.Business.Test/Franz.Common.Business.Tests.csproj" />
@@ -82,6 +83,7 @@
     <Project Path="tests/Franz.Common.EntityFramework.SQLServer.Tests/Franz.Common.EntityFramework.SQLServer.Tests.csproj" />
     <Project Path="tests/Franz.Common.Integration.Test/Franz.Common.Integration.Tests.csproj" />
     <Project Path="tests/Franz.Common.Mapping.Tests/Franz.Common.Mapping.Tests.csproj" />
+    <Project Path="tests/Franz.Common.Mediator.Tests/Franz.Common.Mediator.Tests.csproj" Id="72f4d006-188b-4a8b-b0c9-31f1aef11c3d" />
     <Project Path="tests/Franz.Common.Messaging.Hosting.Kafka.Tests/Franz.Common.Messaging.Hosting.Kafka.Tests.csproj" />
     <Project Path="tests/Franz.Common.Messaging.Hosting.RabbitMQ.Tests/Franz.Common.Messaging.Hosting.RabbitMQ.Tests.csproj" />
     <Project Path="tests/Franz.Common.Messaging.Kafka.Tests/Franz.Common.Messaging.Kafka.Tests.csproj" />

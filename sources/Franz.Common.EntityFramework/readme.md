@@ -2,7 +2,7 @@
 
 ## 🚀 Version
 
-**Current Version:** v2.2.19
+**Current Version:** v2.3.0
 
 ---
 
