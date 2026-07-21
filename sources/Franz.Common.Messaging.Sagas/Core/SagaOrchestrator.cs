@@ -2,6 +2,7 @@
 
 using Franz.Common.Business.Domain;
 using Franz.Common.Mediator;
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Abstractions;
@@ -179,7 +180,8 @@ public sealed class SagaOrchestrator
 
     if (transition?.OutgoingMessage is IIntegrationEvent integrationEvent)
     {
-      CorrelationId.Current = context.CorrelationId;
+      var correlationGuid = MediatorContext.CorrelationId;
+      MediatorContext.EnsureCorrelationId(); // Ensure a correlation ID is present in the MediatorContext
       await _publisher.Publish(integrationEvent);
     }
   }

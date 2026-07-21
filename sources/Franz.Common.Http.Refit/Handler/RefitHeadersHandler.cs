@@ -26,7 +26,8 @@ public sealed class FranzRefitHeadersHandler : DelegatingHandler
   {
     // BAZOOKA REFACTOR: Bridge the MediatorContext and the HTTP Headers.
     // We use the raw Guid to avoid unnecessary string allocations until the very last moment.
-    var correlationGuid = CorrelationId.Ensure();
+    var correlationGuid = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId(); // Ensure a correlation ID is present in the MediatorContext
     var correlationId = correlationGuid.ToString(); // Use standard UUID format for HTTP headers
 
     // Ensure X-Correlation-ID is set (Propagating the Turbo ID)

@@ -1,5 +1,6 @@
 ﻿#nullable enable
 using Franz.Common.Mediator;
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Messages;
@@ -50,7 +51,8 @@ public sealed class SagaDispatchingMessageHandler(
     var correlationId = message.CorrelationId ?? Guid.Empty;
     var causationId = message.Id;
 
-    CorrelationId.Current = correlationId;
+    var correlationGuid = MediatorContext.CorrelationId;
+    MediatorContext.EnsureCorrelationId(); // Ensure a correlation ID is present in the MediatorContext
 
     try
     {
@@ -62,7 +64,7 @@ public sealed class SagaDispatchingMessageHandler(
     }
     finally
     {
-      CorrelationId.Current = Guid.Empty;
+      MediatorContext.Reset(); // Reset the MediatorContext to its previous state after handling the event
     }
   }
 
