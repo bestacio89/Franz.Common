@@ -1,4 +1,5 @@
 ﻿using FluentAssertions;
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Messaging.Adapters;
@@ -43,7 +44,7 @@ public class MessageDeserializerExtensionsTests
     result.Should().NotBeNull();
     result!.Data.Should().Be("Hello World");
     result.CorrelationId.Should().Be(expectedId);
-    CorrelationId.Current.Should().Be(expectedId); // Verify ambient context
+    MediatorContext.Current.CorrelationId.Should().Be(expectedId); // Verify ambient context
   }
 
   [Fact]
@@ -67,7 +68,7 @@ public class MessageDeserializerExtensionsTests
     result.Should().NotBeNull();
     result!.Info.Should().Be("EventData");
     result.CorrelationId.Should().Be(expectedId);
-    CorrelationId.Current.Should().Be(expectedId);
+    MediatorContext.Current.CorrelationId.Should().Be(expectedId);
   }
 
   [Theory]
