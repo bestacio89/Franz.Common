@@ -183,3 +183,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 
 ---
 
+---
+
+## Dependency maintenance — October 2026
+
+The MongoDB driver was upgraded as part of the .NET 10 dependency baseline. Validate serialization, compression, and persistence integration tests against the resolved driver/transitive package graph before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
