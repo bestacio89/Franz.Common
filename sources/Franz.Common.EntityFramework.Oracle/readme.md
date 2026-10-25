@@ -27,7 +27,7 @@ A specialized library within the **Franz Framework** that extends **Entity Frame
 ## **Dependencies**
 
 This package relies on:
-- **Oracle.EntityFrameworkCore** (8.21.121): Official EF Core provider for Oracle databases.
+- **Oracle.EntityFrameworkCore** (10.23.26200): Official EF Core provider for Oracle databases.
 - **Franz.Common.EntityFramework**: Core EF utilities and patterns.
 - **Franz.Common.MultiTenancy**: Multi-tenancy support for database operations.
 
