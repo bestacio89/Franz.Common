@@ -40,6 +40,13 @@ The GitHub Actions workflow `.github/workflows/dependency-validation.yml` runs r
 
 ## Validation status
 
+The latest completed CI run on commit `f359f93195076de588fd8ddd8742d4003e227cfa` passed restore, Release build, and all solution tests. The run reported no NU1901–NU1904 advisories, so the conditional vulnerability-gate step was skipped as designed. The Mediator source-generator integration test now passes after correcting the generator's `ICommandHandler` generic metadata. The subsequent cleanup of duplicate `Snappier` references and redundant Mediator framework package references is newer than that successful run and must be revalidated by CI.
+
+The completed run still reported these warnings:
+- `NU1504`: duplicate `Snappier` references in the Bootstrap and HTTP Bootstrap projects. The duplicate entries have since been removed; confirm in the next run.
+- `NU1510`: explicit Hosting/Logging abstractions references in Mediator are supplied by the shared framework. Those redundant package references have since been removed; confirm in the next run.
+- `NU1608`: `Pomelo.EntityFrameworkCore.MySql` 9.0.0 declares EF Core 9.x support while EF Core Relational 10.0.14 is resolved. This provider compatibility issue remains unresolved and must not be suppressed.
+
 The first CI attempt failed during restore, before build or tests:
 1. `Grpc >= 2.83.0` could not be resolved because that version is not published for the legacy `Grpc` package.
 2. NuGet auditing reported vulnerable transitive dependencies.
