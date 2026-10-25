@@ -1,4 +1,29 @@
-# **Franz.Common.Messaging.MultiTenancy**
+# Franz.Common.Messaging.MultiTenancy
+
+> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Messaging.MultiTenancy` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Messaging.MultiTenancy
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A library within the **Franz Framework** that adds multi-tenancy support to messaging workflows. This package provides tools for managing tenant and domain-specific messaging contexts, enabling seamless integration of multi-tenancy in distributed systems.
 
@@ -221,7 +246,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ---
 
 
-### v2.0.1 – Internal Modernization
+### v2.0.1 â€“ Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
