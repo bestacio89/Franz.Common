@@ -2,17 +2,8 @@ name: Dependency and .NET 10 validation
 
 on:
   pull_request:
-    branches: [develop]
-    paths:
-      - '**/*.csproj'
-      - '**/*.props'
-      - '**/*.targets'
-      - 'global.json'
-      - 'Franz.Common.slnx'
-      - '.github/workflows/dependency-validation.yml'
-  push:
     branches:
-      - chore/platform-quality-and-mediator-roadmap
+      - develop
 
 permissions:
   contents: read
