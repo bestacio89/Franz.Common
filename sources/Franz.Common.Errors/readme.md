@@ -1,4 +1,29 @@
-# **Franz.Common.Errors**
+# Franz.Common.Errors
+
+> Shared framework capability for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Errors` package provides shared framework capability within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Errors
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A library for handling and standardizing errors and exceptions in .NET applications. This library simplifies error management, making it easier to implement structured and meaningful error responses.
 
@@ -135,12 +160,12 @@ This library is licensed under the MIT License. See the LICENSE file for more de
 - ?? **Bilingual Support**: every test exception available in **English & French**  
 - ?? **Consistent API**: wrapped under `TestExceptions` static class  
 - ?? Purpose: make resilience demos, test failures, and dev workshops **fun & obvious**  
-- ?? No impact on production code — these are **opt-in chaos exceptions**  
+- ?? No impact on production code â€” these are **opt-in chaos exceptions**  
 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
 
-### v2.0.1 – Internal Modernization
+### v2.0.1 â€“ Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
