@@ -10,6 +10,7 @@ namespace Franz.Common.EntityFramework.Oracle.Tests;
 
 public class TestEntity : Entity<Guid>
 {
+  protected TestEntity(Guid id) : base(id) { }
   public string Name { get; set; } = string.Empty;
 }
 
