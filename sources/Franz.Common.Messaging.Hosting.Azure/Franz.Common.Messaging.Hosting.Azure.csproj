@@ -4,7 +4,7 @@
   </PropertyGroup>
   <Import Project="..\..\common.targets" />
   <ItemGroup>
-    <PackageReference Include="SharpCompress" Version="1.0.0" />
+    <PackageReference Include="SharpCompress" Version="0.50.7" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common.Errors\Franz.Common.Errors.csproj" />
