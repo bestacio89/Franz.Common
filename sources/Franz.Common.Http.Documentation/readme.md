@@ -44,8 +44,8 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 | Package | Version |
 |---|---|
 | `Asp.Versioning.Mvc.ApiExplorer` | 10.0.0 |
-| `Microsoft.AspNetCore.OpenApi` | 10.0.9 |
-| `Microsoft.Extensions.DependencyInjection.Abstractions` | 10.0.9 |
+| `Microsoft.AspNetCore.OpenApi` | 10.0.14 |
+| `Microsoft.Extensions.DependencyInjection.Abstractions` | 10.0.14 |
 | `Scalar.AspNetCore` | 2.16.6 |
 | `Franz.Common.Business` | 2.2.14 |
 | `Franz.Common.Reflection` | 2.2.14 |
