@@ -153,4 +153,4 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## Dependency maintenance — October 2026
 
-Oracle EF Core integration and its test dependency graph are part of the .NET 10 dependency validation pass. The tests now explicitly resolve patched SSH.NET and cryptography packages where those dependencies were vulnerable transitively. Run Oracle Testcontainers integration tests before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+Oracle EF Core integration and its test dependency graph are part of the .NET 10 dependency validation pass. The project pins System.Security.Cryptography.Pkcs 10.0.13, and tests explicitly resolve patched SSH.NET 2026.0.0. Run Oracle Testcontainers integration tests before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
