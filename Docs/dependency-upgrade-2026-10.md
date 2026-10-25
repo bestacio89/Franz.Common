@@ -28,7 +28,7 @@ NuGet auditing previously identified:
 - A restore blocker from the nonexistent `Grpc` 2.83.0 version.
 - A provider compatibility warning: `Pomelo.EntityFrameworkCore.MySql` 9.0.0 declares EF Core 9.x compatibility, but this repository resolves EF Core 10. This remains a compatibility decision and must not be hidden with warning suppression.
 
-The GitHub Actions workflow `.github/workflows/dependency-validation.yml` runs restore with NuGet auditing, records outdated and vulnerable direct/transitive package reports, builds Release, and runs the solution tests. A successful merge gate requires all stages to pass and all remaining advisories/compatibility warnings to be reviewed. Merely adding a direct package pin is not proof that every transitive dependency is safe.
+The GitHub Actions workflow `.github/workflows/dependency-validation.yml` runs restore with NuGet auditing, builds Release, runs the solution tests with hang diagnostics, and uploads restore-audit/test reports. An optional `dotnet list package` inventory step was removed from the blocking job because it hung after canceled runs; direct/transitive package inventory must be run separately if needed. A successful merge gate requires all stages to pass and all remaining advisories/compatibility warnings to be reviewed. Merely adding a direct package pin is not proof that every transitive dependency is safe.
 
 ## Consumer guidance
 
