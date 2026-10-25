@@ -1,4 +1,4 @@
-Here’s the README file tailored for the **Franz.Common.Headers** package based on its structure and dependencies:
+Hereâ€™s the README file tailored for the **Franz.Common.Headers** package based on its structure and dependencies:
 
 ---
 
@@ -145,8 +145,14 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
 
-### v2.0.1 – Internal Modernization
+### v2.0.1 â€“ Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance â€” October 2026
+
+This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
