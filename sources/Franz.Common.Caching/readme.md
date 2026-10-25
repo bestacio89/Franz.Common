@@ -241,4 +241,4 @@ If you want, I can **also make a slightly fancier Markdown/mermaid diagram** tha
 
 ## Dependency maintenance — October 2026
 
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+EPPlus is upgraded to 8.7.2, which includes fixes for the current System.Security.Cryptography.Xml advisories. Snappier is pinned to patched 1.3.1 and Pkcs to 10.0.13. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
