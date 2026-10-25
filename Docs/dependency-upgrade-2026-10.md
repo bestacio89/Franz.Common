@@ -2,13 +2,19 @@
 
 **Branch:** `chore/platform-quality-and-mediator-roadmap`  
 **Pull request:** [#134](https://github.com/bestacio89/Franz.Common/pull/134)  
-**Target framework:** `.NET 10`
+**Target framework:** `.NET 10`  
+**Next package version:** `2.3.1`  
+**SDK baseline:** `10.0.400`
 
 ## Purpose
 
 This maintenance change establishes a supported dependency baseline before the planned Mediator runtime/performance work. It does not change Mediator dispatch behavior or intentionally change public Franz APIs.
 
 ## Changes
+
+- Bump the shared Franz.Common package version from 2.3.0 to 2.3.1 for this compatible maintenance release; retain assembly identity 2.3.0.0 and advance file version to 2.3.1.0.
+- Align both Azure DevOps pipeline definitions with the repository-pinned .NET SDK 10.0.400. The publishing pipeline now validates produced NuGet package metadata against the intended 2.3.1 release before invoking publisher scripts.
+- Upgrade the legacy `Franz.Common.CosmosDB` project from `net7.0` to `net10.0`, update its Microsoft.Extensions dependency, and correct its project-reference path.
 
 - Align direct Microsoft.Extensions, ASP.NET Core, and Entity Framework Core 10 package references to version 10.0.14 where that package version is published. The CI audit is authoritative for the exact resolved graph.
 - Replace legacy ASP.NET Core 2.3.11 package references in affected projects with `FrameworkReference Include="Microsoft.AspNetCore.App"`.
@@ -40,7 +46,7 @@ The GitHub Actions workflow `.github/workflows/dependency-validation.yml` runs r
 
 ## Validation status
 
-The latest completed CI run on commit `f359f93195076de588fd8ddd8742d4003e227cfa` passed restore, Release build, and all solution tests. The run reported no NU1901–NU1904 advisories, so the conditional vulnerability-gate step was skipped as designed. The Mediator source-generator integration test now passes after correcting the generator's `ICommandHandler` generic metadata. The subsequent cleanup of duplicate `Snappier` references and redundant Mediator framework package references is newer than that successful run and must be revalidated by CI.
+The latest completed CI run on commit `f359f93195076de588fd8ddd8742d4003e227cfa` passed restore, Release build, and all solution tests. The run reported no NU1901–NU1904 advisories, so the conditional vulnerability-gate step was skipped as designed. The Mediator source-generator integration test now passes after correcting the generator's `ICommandHandler` generic metadata. The subsequent cleanup of duplicate `Snappier` references, redundant Mediator framework package references, release-version changes, SDK alignment, and legacy CosmosDB target changes is newer than that successful run and must be revalidated by CI.
 
 The completed run still reported these warnings:
 - `NU1504`: duplicate `Snappier` references in the Bootstrap and HTTP Bootstrap projects. The duplicate entries have since been removed; confirm in the next run.
