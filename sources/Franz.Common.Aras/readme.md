@@ -1,12 +1,12 @@
 ````markdown
-# Franz.Common.Aras – v1.5.0 ??
+# Franz.Common.Aras â€“ v1.5.0 ??
 
 **Franz.Common.Aras** integrates **ARAS Innovator** into the **Franz Framework** with clean, DDD-driven abstractions.  
-It lets you treat ARAS as just another persistence provider — with **Entities**, **Aggregates**, **Unit of Work**, **Snapshots**, **Diagnostics**, and an **InMemory provider for testing**.
+It lets you treat ARAS as just another persistence provider â€” with **Entities**, **Aggregates**, **Unit of Work**, **Snapshots**, **Diagnostics**, and an **InMemory provider for testing**.
 
 ---
 
-## ?? What’s New in v1.5.0
+## ?? Whatâ€™s New in v1.5.0
 
 - ? **Concrete ARAS Innovator provider** (REST API)  
 - ? **Fluent mapping layer** (field ? property, ignores, conversions)  
@@ -26,7 +26,7 @@ It lets you treat ARAS as just another persistence provider — with **Entities**,
 dotnet add package Franz.Common.Aras
 ````
 
-If you’re in a class library (not ASP.NET Core), also add:
+If youâ€™re in a class library (not ASP.NET Core), also add:
 
 ```bash
 dotnet add package Microsoft.Extensions.Http
@@ -235,7 +235,7 @@ services.Decorate<IArasEntityContext, DiagnosticEntityContextDecorator>();
 services.Decorate<IArasAggregateContext, DiagnosticAggregateContextDecorator>();
 ```
 
-You’ll get logs for:
+Youâ€™ll get logs for:
 
 * Entity queries, saves, deletes
 * Aggregate tracking, saving, committing
@@ -276,15 +276,21 @@ This repo includes a `samples/` folder with ready-to-run console apps:
 
 ---
 
-Franz.Common.Aras v1.5.0 — **bringing ARAS into the DDD world.**
+Franz.Common.Aras v1.5.0 â€” **bringing ARAS into the DDD world.**
 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
 
 ---
 
-### v2.0.1 – Internal Modernization
+### v2.0.1 â€“ Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance â€” October 2026
+
+This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
