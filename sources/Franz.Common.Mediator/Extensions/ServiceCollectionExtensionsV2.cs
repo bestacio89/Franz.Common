@@ -21,6 +21,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace Franz.Common.Mediator.Extensions;
 
@@ -33,6 +34,7 @@ public static class MediatorServiceCollectionExtensionsV2
   /// <summary>
   /// Registers core Franz Mediator infrastructure and wires handlers using compile-time source generation.
   /// </summary>
+  [MethodImpl(MethodImplOptions.NoInlining)]
   public static IServiceCollection AddFranzMediatorV2(
       this IServiceCollection services,
       Action<FranzMediatorOptions>? configure = null,
@@ -59,7 +61,7 @@ public static class MediatorServiceCollectionExtensionsV2
     // Allow callers to explicitly provide the assembly that contains handlers so
     // AddFranzMediatorV2 can be safely called from the mediator library without
     // accidentally targeting the mediator assembly itself.
-    services.AddFranzGeneratedHandlerRegistration(handlerAssembly);
+    services.AddFranzGeneratedHandlerRegistration(handlerAssembly ?? Assembly.GetCallingAssembly());
 
     return services;
   }
@@ -68,19 +70,17 @@ public static class MediatorServiceCollectionExtensionsV2
   /// Standalone extension to register source-generated handlers via provider.
   /// </summary>
 
+  [MethodImpl(MethodImplOptions.NoInlining)]
   public static IServiceCollection AddFranzGeneratedHandlerRegistration(
          this IServiceCollection services,
          Assembly? targetAssembly = null)
   {
     ArgumentNullException.ThrowIfNull(services);
 
-        // Explicitly fallback to Assembly.GetCallingAssembly() or Assembly.GetEntryAssembly()
-        // when called directly from the consumer/test target assembly
-        var assembly = targetAssembly
-            ?? Assembly.GetCallingAssembly()
-            ?? Assembly.GetEntryAssembly();
+    // Preserve caller assembly semantics under Release/JIT optimization.
+    var assembly = targetAssembly ?? Assembly.GetCallingAssembly();
 
-        var provider = new GeneratedHandlerRegistrationProvider(assembly);
+    var provider = new GeneratedHandlerRegistrationProvider(assembly);
     provider.Register(services);
 
     return services;
