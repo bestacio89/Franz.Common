@@ -123,8 +123,14 @@ This library is part of a private framework and subject to internal licensing te
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
-### v2.0.1 � Internal Modernization
+### v2.0.1 – Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance — October 2026
+
+The SQL Server provider is aligned with the .NET 10 EF Core servicing baseline. The dependency audit also checks transitive cryptography packages; vulnerable older versions must not remain in the resolved graph. Run SQL Server integration tests before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
