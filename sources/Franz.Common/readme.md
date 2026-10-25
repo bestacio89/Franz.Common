@@ -217,3 +217,9 @@ This library is private and governed by the Franz Framework's internal licensing
 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
+
+---
+
+## Dependency maintenance — October 2026
+
+This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
