@@ -14,7 +14,7 @@ public sealed class GeneratedHandlerRegistrationProvider : IHandlerRegistrationP
 
   public GeneratedHandlerRegistrationProvider(Assembly? targetAssembly = null)
       {
-        _targetAssembly = targetAssembly ?? Assembly.GetCallingAssembly() ?? Assembly.GetEntryAssembly();
+        _targetAssembly = targetAssembly ?? Assembly.GetCallingAssembly();
       }
 
   public void Register(IServiceCollection services)
