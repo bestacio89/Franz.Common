@@ -73,9 +73,9 @@ public sealed class BusinessBootstrapExtensionsTests
   }
 
   // Minimal dummy entity for DI resolution tests
-  private sealed class DummyEntity : Entity<Guid>
+  private class DummyEntity : Entity<Guid>
   {
     public DummyEntity() : base(Guid.NewGuid()) { }
-    private DummyEntity(Guid id) : base(id) { }
+    protected DummyEntity(Guid id) : base(id) { }
   }
 }
