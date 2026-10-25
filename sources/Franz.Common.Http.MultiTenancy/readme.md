@@ -1,4 +1,29 @@
-# **Franz.Common.Http.MultiTenancy**
+# Franz.Common.Http.MultiTenancy
+
+> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Http.MultiTenancy` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Http.MultiTenancy
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A library within the **Franz Framework** that extends multi-tenancy support for HTTP-based **ASP.NET Core** applications. This package provides tools for tenant-specific context management, dependency injection, and Swagger documentation enhancements, enabling seamless multi-tenant application development.
 
