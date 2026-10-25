@@ -352,3 +352,9 @@ The runtime philosophy remains unchanged:
 The difference is that v2.3 removes unnecessary runtime discovery where modern applications demand maximum determinism.
 
 ---
+
+---
+
+## Dependency maintenance — October 2026
+
+This package now uses the .NET 10 ASP.NET Core shared framework for ASP.NET Core APIs instead of the obsolete ASP.NET Core 2.3.11 package. Microsoft.Extensions dependencies are aligned to the .NET 10 servicing baseline. No Mediator dispatch semantics or public API changes are intended by this dependency-only maintenance. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
