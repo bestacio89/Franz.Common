@@ -292,3 +292,9 @@ This makes Franz one of the **strictest, most consistent, and most architectural
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance — October 2026
+
+The gRPC client dependency is updated to the current compatible `Grpc.Net.Client` release. The legacy `Grpc` package remains at 2.46.6 because NuGet does not publish version 2.83.0 for that package ID; do not copy the client version onto the legacy package. Restore and integration tests must pass before publishing this maintenance update. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
