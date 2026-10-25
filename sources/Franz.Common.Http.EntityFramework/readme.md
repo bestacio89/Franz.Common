@@ -211,3 +211,9 @@ The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
 - Tests, listeners, and pipeline components modernized.
 
 ---
+
+---
+
+## Dependency maintenance — October 2026
+
+This package now uses `Microsoft.AspNetCore.App` for ASP.NET Core APIs and patched cryptography dependencies. EF Core package versions are aligned with the .NET 10 servicing baseline. The MariaDB provider still has a known compatibility warning because Pomelo 9.x declares EF Core 9 support; review the [dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md) before relying on MariaDB with EF Core 10.
