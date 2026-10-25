@@ -1,7 +1,6 @@
 ﻿using Franz.Common.Mediator.OpenTelemetry.Core;
 using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.Hosting;
-using OpenTelemetry.Trace;
 using System;
 using System.Diagnostics;
 using System.Threading;
@@ -34,7 +33,7 @@ public class OpenTelemetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TR
     }
     catch (Exception ex)
     {
-      activity?.RecordException(ex);
+      activity?.AddException(ex);
       activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
       throw;
     }
