@@ -25,8 +25,8 @@ A library within the **Franz Framework** designed to extend **Entity Framework C
 ## **Dependencies**
 
 This package relies on:
-- **Microsoft.EntityFrameworkCore.Relational** (8.0.0): Provides relational database functionality for EF Core.
-- **Pomelo.EntityFrameworkCore.MySql** (7.0.0): MariaDB provider for EF Core.
+- **Microsoft.EntityFrameworkCore.Relational** (10.0.14): Provides relational database functionality for EF Core 10.
+- **Pomelo.EntityFrameworkCore.MySql** (9.0.0): MariaDB provider. This release declares EF Core 9.x compatibility, so its use with EF Core 10 is currently a known compatibility warning and must be validated before release.
 - **Franz.Common.EntityFramework**: Shared utilities and patterns for database integration.
 
 ---
