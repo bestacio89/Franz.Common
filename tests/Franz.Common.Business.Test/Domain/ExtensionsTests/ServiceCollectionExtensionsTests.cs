@@ -76,5 +76,6 @@ public sealed class BusinessBootstrapExtensionsTests
   private sealed class DummyEntity : Entity<Guid>
   {
     public DummyEntity() : base(Guid.NewGuid()) { }
+    private DummyEntity(Guid id) : base(id) { }
   }
 }
