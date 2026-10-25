@@ -52,12 +52,12 @@ app.Run();
 
 ---
 
-## Refit (optional) — what the bootstrapper does
+## Refit (optional) â€” what the bootstrapper does
 
 When `Franz:HttpClients:EnableRefit` is `true`, the bootstrapper will:
 
 * Read `Franz:HttpClients:Apis` from configuration.
-* Resolve each typed Refit interface (prefer `InterfaceType` — assembly-qualified; falls back to assembly scan).
+* Resolve each typed Refit interface (prefer `InterfaceType` â€” assembly-qualified; falls back to assembly scan).
 * Invoke `AddFranzRefit<TClient>(...)` reflectively to register the typed client.
 * For each client it wires:
 
@@ -88,7 +88,7 @@ When `Franz:HttpClients:EnableRefit` is `true`, the bootstrapper will:
 **Notes**
 
 * `InterfaceType` (assembly-qualified) is recommended for deterministic resolution.
-* `Policy` is optional — if present the bootstrapper will attach the named policy from the host's `IPolicyRegistry<string>`.
+* `Policy` is optional â€” if present the bootstrapper will attach the named policy from the host's `IPolicyRegistry<string>`.
 
 ---
 
@@ -160,7 +160,7 @@ builder.Services.AddFranzRefit<MyApp.ApiClients.IWeatherApi>(
 
 For full changelog/history see the repository `CHANGELOG.md`.
 
-### v2.0.1 – Internal Modernization
+### v2.0.1 â€“ Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
@@ -174,5 +174,10 @@ For full changelog/history see the repository `CHANGELOG.md`.
 
 ## Contributing & License
 
-This package is part of the private Franz Framework. Contributions are internal; follow your team’s contribution guidelines. Licensed under MIT.
+This package is part of the private Franz Framework. Contributions are internal; follow your teamâ€™s contribution guidelines. Licensed under MIT.
 
+---
+
+## Dependency maintenance â€” October 2026
+
+The dependency graph pins Snappier to a patched version to avoid the known high-severity issue in 1.0.0. The package continues to target .NET 10. Verify HTTP bootstrap, serialization, health-check, and compression-related paths with the full test suite before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
