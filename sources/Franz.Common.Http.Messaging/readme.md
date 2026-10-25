@@ -184,3 +184,9 @@ See the `LICENSE` file for more details.
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance — October 2026
+
+The package now uses the .NET 10 ASP.NET Core shared framework instead of legacy ASP.NET Core 2.3.11 packages, and cryptography dependencies are pinned to patched releases. Kafka, RabbitMQ, and health-check integration behavior must be validated by the solution test suite before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
