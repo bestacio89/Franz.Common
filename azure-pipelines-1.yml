@@ -37,7 +37,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
 
     - task: NuGetAuthenticate@1
 
@@ -76,7 +76,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
 
     - script: |
         set -euo pipefail
@@ -96,7 +96,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packagetype: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Mediator.Tests.csproj \
@@ -113,7 +113,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Caching.Tests.csproj \
@@ -129,7 +129,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Mapping.Tests.csproj \
@@ -145,7 +145,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Tests.csproj \
@@ -161,7 +161,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Kafka.Tests.csproj \
@@ -177,7 +177,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.RabbitMQ.Tests.csproj \
@@ -193,7 +193,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Hosting.Kafka.Tests.csproj \
@@ -209,7 +209,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Hosting.RabbitMQ.Tests.csproj \
@@ -225,7 +225,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.EntityFramework.SQLServer.Tests.csproj \
@@ -241,7 +241,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.EntityFramework.Postgres.Tests.csproj \
@@ -257,7 +257,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.EntityFramework.Oracle.Tests.csproj \
@@ -274,7 +274,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.AzureCosmosDB.Tests.csproj \
@@ -304,7 +304,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.200'
+        version: '10.0.400'
 
     - task: NuGetAuthenticate@1
 
@@ -322,6 +322,83 @@ stages:
         set -euo pipefail
         dotnet pack           --configuration $(buildConfiguration)           --no-restore           --no-build           --output $(outputDir)
       displayName: Pack NuGet
+
+    - task: PowerShell@2
+      displayName: Validate package release metadata
+      inputs:
+        targetType: inline
+        pwsh: true
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $expectedVersion = '2.3.1'
+          $packages = @(Get-ChildItem -Path '$(outputDir)' -Filter '*.nupkg' -File)
+          if ($packages.Count -eq 0) {
+            throw "No NuGet packages were produced in $(outputDir)."
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          foreach ($package in $packages) {
+            $archive = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
+            try {
+              $nuspec = $archive.Entries | Where-Object { $_.FullName -match '\\.nuspec
+    # Scripts are at repo root, resolved from the checkout workspace.
+
+    - task: PowerShell@2
+      displayName: Publish to Franz Artifact
+      inputs:
+          filePath: '$(System.DefaultWorkingDirectory)/FranzArtifactPublisher.ps1'
+          arguments: '-PackagesDirectory "$(outputDir)"'
+          pwsh: true
+    
+    - task: PowerShell@2
+      displayName: Publish to NuGet.org
+      inputs:
+        filePath: '$(System.DefaultWorkingDirectory)/nugetpublish.ps1'
+        arguments: '-PackagesDirectory "$(outputDir)"'
+        pwsh: true
+      env:
+        NUGET_API_KEY: $(API_Key)
+
+
+# ============================================================
+# SYNC
+# ============================================================
+- stage: Sync
+  displayName: Sync Repos
+  dependsOn: Package
+  condition: succeeded()
+
+  jobs:
+  - job: github_sync
+    displayName: Sync to GitHub
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      persistCredentials: true
+
+    - script: |
+        set -euo pipefail
+        git remote add github "https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/bestacio89/Franz.Common.git" || true
+        git push --force github origin/main:refs/heads/main
+        git push --force github origin/Develop:refs/heads/develop
+      displayName: Sync main and develop } | Select-Object -First 1
+              if ($null -eq $nuspec) {
+                throw "Package '$($package.Name)' has no nuspec metadata."
+              }
+
+              $reader = [System.IO.StreamReader]::new($nuspec.Open())
+              try { [xml]$metadata = $reader.ReadToEnd() } finally { $reader.Dispose() }
+              $actualVersion = [string]$metadata.package.metadata.version
+              if ($actualVersion -ne $expectedVersion) {
+                throw "Package '$($package.Name)' has version '$actualVersion'; expected '$expectedVersion'."
+              }
+            } finally {
+              $archive.Dispose()
+            }
+          }
+
+          Write-Host "Validated $($packages.Count) package(s) at version $expectedVersion."
 
     # PowerShell@2 uses pwsh on Linux — correct runtime for .ps1 files.
     # Scripts are at repo root, resolved from the checkout workspace.
