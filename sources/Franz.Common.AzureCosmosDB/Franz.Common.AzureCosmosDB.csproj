@@ -3,6 +3,7 @@
   <Import Project="..\..\common.targets" />
 
   <ItemGroup>
+    <!-- Keep aligned with Microsoft.EntityFrameworkCore.Cosmos 10.0.14 (minimum 3.63.1). -->
     <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.63.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Cosmos" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.14" />
