@@ -1,4 +1,29 @@
-# **Franz.Common.IO**
+# Franz.Common.IO
+
+> Shared framework capability for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.IO` package provides shared framework capability within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.IO
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A utility library within the **Franz Framework** designed to simplify input/output operations in **.NET** applications. This package provides streamlined solutions for managing temporary files and file streams, ensuring efficient and clean file handling.
 
@@ -106,7 +131,7 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
 
-### v2.0.1 – Internal Modernization
+### v2.0.1 â€“ Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
