@@ -416,3 +416,7 @@ All PRs must include **tests**, **documentation**, and comply with **Franz Tribu
 # 📜 License
 
 MIT License.
+
+## .NET 10 dependency maintenance
+
+The dependency baseline and compatibility notes are tracked in [the October 2026 .NET 10 dependency upgrade record](Docs/dependency-upgrade-2026-10.md). This maintenance work keeps the repository on .NET 10, updates vulnerable/outdated package references, and validates the full resolved dependency graph through the [dependency validation workflow](.github/workflows/dependency-validation.yml). Package updates are not considered complete until NuGet audit, Release build, and solution tests pass. Provider-specific compatibility notes (including EF Core/MariaDB) are recorded in the upgrade document.
