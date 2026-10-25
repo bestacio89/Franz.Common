@@ -318,6 +318,19 @@ stages:
         dotnet build --configuration $(buildConfiguration) --no-restore
       displayName: Build
 
+    - task: PowerShell@2
+      displayName: Clean package staging directory
+      inputs:
+        targetType: inline
+        pwsh: true
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $packageDirectory = '$(outputDir)'
+          if (Test-Path $packageDirectory) {
+            Remove-Item -Path $packageDirectory -Recurse -Force
+          }
+          New-Item -Path $packageDirectory -ItemType Directory -Force | Out-Null
+
     - script: |
         set -euo pipefail
         dotnet pack           --configuration $(buildConfiguration)           --no-restore           --no-build           --output $(outputDir)
