@@ -24,8 +24,6 @@
 	  <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
 	</ItemGroup>
   
-  <ItemGroup>
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.14" />
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
+  <ItemGroup>    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 </Project>
