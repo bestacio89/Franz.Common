@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: dependency-validation-v4-${{ github.ref }}
+  group: dependency-validation-v5-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -52,7 +52,7 @@ jobs:
         run: dotnet build Franz.Common.slnx --configuration Release --no-restore
 
       - name: Test solution
-        run: dotnet test Franz.Common.slnx --configuration Release --no-build --logger "trx;LogFileName=dependency-validation.trx"
+        run: dotnet test Franz.Common.slnx --configuration Release --no-build --blame-hang-timeout 10m --logger "trx;LogFileName=dependency-validation.trx"
 
       - name: Capture outdated direct and transitive packages
         if: always() && steps.restore.outcome == 'success'
