@@ -32,7 +32,7 @@ NuGet auditing previously identified:
 - `SSH.NET` 2025.1.0 (high severity; patched version 2026.0.0).
 - Vulnerable older `System.Security.Cryptography.Pkcs` and `System.Security.Cryptography.Xml` versions. Pkcs is pinned to the published 10.0.13 servicing version; XML package references are removed where the API is provided by the ASP.NET Core shared framework. The final audit must confirm no vulnerable transitive XML package remains.
 - A restore blocker from the nonexistent `Grpc` 2.83.0 version.
-- A provider compatibility warning: `Pomelo.EntityFrameworkCore.MySql` 9.0.0 declares EF Core 9.x compatibility, but this repository resolves EF Core 10. This remains a compatibility decision and must not be hidden with warning suppression.
+- The MariaDB provider was moved from `Pomelo.EntityFrameworkCore.MySql` 9.0.0 to `Microting.EntityFrameworkCore.MySql` 10.0.13, whose declared dependency range supports EF Core 10. This is a community-maintained fork with renamed package and namespaces; package compatibility is corrected, but behavioral compatibility remains subject to MariaDB integration testing.
 
 The GitHub Actions workflow `.github/workflows/dependency-validation.yml` runs restore with NuGet auditing, builds Release, runs the solution tests with hang diagnostics, and uploads restore-audit/test reports. An optional `dotnet list package` inventory step was removed from the blocking job because it hung after canceled runs; direct/transitive package inventory must be run separately if needed. A successful merge gate requires all stages to pass and all remaining advisories/compatibility warnings to be reviewed. Merely adding a direct package pin is not proof that every transitive dependency is safe.
 
@@ -51,7 +51,7 @@ The latest completed CI run on commit `f359f93195076de588fd8ddd8742d4003e227cfa`
 The completed run still reported these warnings:
 - `NU1504`: duplicate `Snappier` references in the Bootstrap and HTTP Bootstrap projects. The duplicate entries have since been removed; confirm in the next run.
 - `NU1510`: explicit Hosting/Logging abstractions references in Mediator are supplied by the shared framework. Those redundant package references have since been removed; confirm in the next run.
-- `NU1608`: `Pomelo.EntityFrameworkCore.MySql` 9.0.0 declares EF Core 9.x support while EF Core Relational 10.0.14 is resolved. This provider compatibility issue remains unresolved and must not be suppressed.
+- The prior `NU1608` provider mismatch was addressed by replacing Pomelo 9.0.0 with `Microting.EntityFrameworkCore.MySql` 10.0.13. Confirm the next CI restore has no provider-version warning, and run MariaDB 11.4 LTS integration tests before treating the provider switch as behaviorally validated.
 
 The first CI attempt failed during restore, before build or tests:
 1. `Grpc >= 2.83.0` could not be resolved because that version is not published for the legacy `Grpc` package.
