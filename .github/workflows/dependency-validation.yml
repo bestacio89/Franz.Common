@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: dependency-validation-v5-${{ github.ref }}
+  group: dependency-validation-v6-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -54,15 +54,6 @@ jobs:
       - name: Test solution
         run: dotnet test Franz.Common.slnx --configuration Release --no-build --blame-hang-timeout 10m --logger "trx;LogFileName=dependency-validation.trx"
 
-      - name: Capture outdated direct and transitive packages
-        if: always() && steps.restore.outcome == 'success'
-        continue-on-error: true
-        timeout-minutes: 2
-        shell: bash
-        run: |
-          timeout 30s dotnet list Franz.Common.slnx package --outdated --include-transitive --no-restore > outdated-packages.txt 2>&1 || true
-          timeout 30s dotnet list Franz.Common.slnx package --vulnerable --include-transitive --no-restore > vulnerable-packages.txt 2>&1 || true
-
       - name: Enforce vulnerability gate
         if: always() && steps.restore.outputs.vulnerabilities_found == 'true'
         shell: bash
@@ -77,7 +68,5 @@ jobs:
           name: dependency-validation-reports
           path: |
             restore-audit.log
-            outdated-packages.txt
-            vulnerable-packages.txt
             **/TestResults/*.trx
           if-no-files-found: warn
