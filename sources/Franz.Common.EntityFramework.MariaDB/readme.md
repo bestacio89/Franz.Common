@@ -25,14 +25,14 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 
 ## Package-specific guide
 
-A library within the **Franz Framework** designed to extend **Entity Framework Core** support for **MariaDB** using the **Pomelo.EntityFrameworkCore.MySql** provider. This package simplifies the configuration and integration of MariaDB with EF Core in .NET applications.
+A library within the **Franz Framework** designed to extend **Entity Framework Core** support for **MariaDB** using the **Microting.EntityFrameworkCore.MySql** provider. This package simplifies the configuration and integration of MariaDB with EF Core in .NET applications.
 
 ---
 
 ## **Features**
 
 - **MariaDB Integration**:
-  - Leverages `Pomelo.EntityFrameworkCore.MySql` for robust MariaDB support.
+  - Leverages `Microting.EntityFrameworkCore.MySql` for robust MariaDB support.
 - **Service Registration**:
   - `ServiceCollectionExtensions` to streamline dependency injection for MariaDB contexts.
 - **Compatibility**:
@@ -51,7 +51,7 @@ A library within the **Franz Framework** designed to extend **Entity Framework C
 
 This package relies on:
 - **Microsoft.EntityFrameworkCore.Relational** (10.0.14): Provides relational database functionality for EF Core 10.
-- **Pomelo.EntityFrameworkCore.MySql** (9.0.0): MariaDB provider. This release declares EF Core 9.x compatibility, so its use with EF Core 10 is currently a known compatibility warning and must be validated before release.
+- **Microting.EntityFrameworkCore.MySql** (10.0.13): MariaDB/MySQL provider aligned with EF Core 10. This is a community-maintained fork with renamed package/namespace identity, not the original Pomelo package; validate query translation, migrations, and runtime behavior against supported MariaDB versions before release.
 - **Franz.Common.EntityFramework**: Shared utilities and patterns for database integration.
 
 ---
@@ -169,4 +169,4 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## Dependency maintenance — October 2026
 
-**Compatibility warning:** this repository currently resolves EF Core 10 while `Pomelo.EntityFrameworkCore.MySql` 9.0.0 declares a dependency range for EF Core 9.x. This mismatch is not treated as validated compatibility. Confirm a provider release that supports EF Core 10 and run MariaDB integration tests before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+**Compatibility status:** `Microting.EntityFrameworkCore.MySql` 10.0.13 declares compatibility with EF Core 10 and MariaDB 11.4 LTS. This resolves the package-version mismatch, but does not prove behavioral equivalence with the former Pomelo provider. Run MariaDB integration tests for model creation, CRUD, relationships, LINQ translation, transactions, and migrations before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
