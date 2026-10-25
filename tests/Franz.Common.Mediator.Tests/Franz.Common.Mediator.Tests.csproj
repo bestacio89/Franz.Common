@@ -30,7 +30,7 @@
   <ItemGroup>
     <!-- Enables compile-time code generation for test handlers -->
     <ProjectReference
-      Include="..\..\sources\Franz.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj"
+      Include="..\..\sources\Microsoft.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj"
       OutputItemType="Analyzer"
       ReferenceOutputAssembly="false" />
   </ItemGroup>
