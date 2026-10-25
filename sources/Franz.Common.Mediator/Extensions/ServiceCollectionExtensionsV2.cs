@@ -89,12 +89,13 @@ public static class MediatorServiceCollectionExtensionsV2
   /// <summary>
   /// Registers Franz Mediator V2 with the default recommended enterprise pipeline setup.
   /// </summary>
+  [MethodImpl(MethodImplOptions.NoInlining)]
   public static IServiceCollection AddFranzMediatorV2Default(
       this IServiceCollection services,
       Action<FranzMediatorOptions>? configure = null,
       Assembly? handlerAssembly = null)
   {
-    services.AddFranzMediatorV2(configure, handlerAssembly);
+    services.AddFranzMediatorV2(configure, handlerAssembly ?? Assembly.GetCallingAssembly());
 
     services.AddFranzLoggingPipelineV2();
     services.AddFranzValidationPipelineV2();
