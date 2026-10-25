@@ -4,6 +4,7 @@ namespace Franz.Common.EntityFramework.Tests.Repositories.Fakes;
 
 public class DummyEntity : Entity<Guid>
 {
+  protected DummyEntity(Guid id) : base(id) { }
   public string Name { get; private set; } = string.Empty;
 
   public TestEnum EnumProp { get; set; } = TestEnum.One;
