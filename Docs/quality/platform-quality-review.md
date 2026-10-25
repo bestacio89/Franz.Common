@@ -28,9 +28,10 @@ The repository contains multiple Azure pipeline definitions and a custom solutio
 
 ## Dependency baseline changes made on the maintenance branch
 
-- Updated direct .NET 10 / ASP.NET Core / EF Core package references from 10.0.10 to 10.0.13 where present; `Microsoft.Extensions.Logging.Abstractions` is 10.0.14.
-- Updated `FluentValidation` to 12.2.0, `SharpCompress` to 0.50.7, gRPC packages to 2.83.0, and `MongoDB.Driver` to 3.12.0.
-- Updated `System.Security.Cryptography.Xml` to 10.0.12 and explicitly pinned `System.Security.Cryptography.Pkcs` to 10.0.13 in projects using XML crypto.
+- Updated direct Microsoft.Extensions, ASP.NET Core, and EF Core 10 package references to 10.0.14 where that version is published; `System.Security.Cryptography.Pkcs` is pinned to published 10.0.13 where required.
+- Updated `FluentValidation` to 12.2.0, `SharpCompress` to 0.50.7, `Grpc.Net.Client` to 2.84.0 (legacy `Grpc` remains at 2.46.6 because 2.83.0 is not published), `MongoDB.Driver` to 3.12.0, `EPPlus` to 8.7.2, and affected `SSH.NET` references to 2026.0.0.
+- Pinned `Snappier` to patched 1.3.1 in affected dependency graphs and upgraded `Microsoft.Azure.Cosmos` to 3.63.1 to satisfy EF Core Cosmos 10.0.14.
+- Removed explicit `System.Security.Cryptography.Xml` package references where the API is supplied by the ASP.NET Core shared framework; EPPlus 8.7.2 updates the XML cryptography dependency for affected package graphs.
 - Added a GitHub Actions validation workflow for NuGet audit, outdated/vulnerable package reports, Release build, and solution tests.
 - Remaining known compatibility blocker: `Pomelo.EntityFrameworkCore.MySql` 9.0.0 declares EF Core 9.x support while the repository targets EF Core 10. Resolve the provider decision explicitly rather than forcing an incompatible package version.
 - This is a reviewed direct-dependency baseline, not proof that all transitive vulnerabilities or outdated packages have been eliminated. The workflow results and any remaining findings must be reviewed before merge.
