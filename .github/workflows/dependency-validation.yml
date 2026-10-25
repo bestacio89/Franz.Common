@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: dependency-validation-v2-${{ github.ref }}
+  group: dependency-validation-v3-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -52,8 +52,8 @@ jobs:
         if: always() && steps.restore.outcome != 'skipped'
         shell: bash
         run: |
-          timeout 180s dotnet list Franz.Common.slnx package --outdated --include-transitive > outdated-packages.txt 2>&1 || true
-          timeout 180s dotnet list Franz.Common.slnx package --vulnerable --include-transitive > vulnerable-packages.txt 2>&1 || true
+          timeout 60s dotnet list Franz.Common.slnx package --outdated --include-transitive --no-restore > outdated-packages.txt 2>&1 || true
+          timeout 60s dotnet list Franz.Common.slnx package --vulnerable --include-transitive --no-restore > vulnerable-packages.txt 2>&1 || true
 
       - name: Build solution
         run: dotnet build Franz.Common.slnx --configuration Release --no-restore
