@@ -179,3 +179,9 @@ Console.WriteLine($"User: {identity.FullName}, Tenant: {identity.TenantId}, Role
 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
+
+---
+
+## Dependency maintenance — October 2026
+
+The SSO package uses patched cryptography dependencies and a patched Snappier version where required by the resolved dependency graph. ASP.NET Core integration remains on the .NET 10 shared framework. Confirm SAML/OIDC and cryptographic flows with integration tests before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
