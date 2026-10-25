@@ -134,8 +134,14 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
 
-### v2.0.1 � Internal Modernization
+### v2.0.1 – Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance — October 2026
+
+**Compatibility warning:** this repository currently resolves EF Core 10 while `Pomelo.EntityFrameworkCore.MySql` 9.0.0 declares a dependency range for EF Core 9.x. This mismatch is not treated as validated compatibility. Confirm a provider release that supports EF Core 10 and run MariaDB integration tests before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
