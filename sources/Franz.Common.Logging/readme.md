@@ -150,3 +150,9 @@ await host.RunAsync();
 * Console logging preserved for live monitoring
 * Noise suppression applied consistently across logs
 * Integration-ready for **Franz.Common.OpenTelemetry**
+
+---
+
+## Dependency maintenance — October 2026
+
+The logging package is aligned with the .NET 10 servicing baseline. Snappier is pinned to patched version 1.3.1 because the dependency graph previously resolved vulnerable 1.0.0. The public logging contracts are not intentionally changed. Validate restore, Release build, and the full solution tests before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
