@@ -65,7 +65,7 @@ Franz.Common.Messaging.Hosting.Kafka/
 
 ## ⚙️ Dependencies
 
-* **Microsoft.Extensions.Hosting** (10.0.0)
+* **Microsoft.Extensions.Hosting** (10.0.14)
 * **Microsoft.Extensions.DependencyInjection.Abstractions** (10.0.0)
 * **Franz.Common.Messaging**
 * **Franz.Common.Messaging.Kafka**
