@@ -1,4 +1,29 @@
-# **Franz.Common.Hosting**
+# Franz.Common.Hosting
+
+> Shared framework capability for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Hosting` package provides shared framework capability within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Hosting
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A utility library within the **Franz Framework** designed to simplify and enhance hosting configurations for .NET applications. This package provides powerful extensions for working with hosts and service providers, offering flexibility and consistency in application startup and lifecycle management.
 
