@@ -68,7 +68,7 @@ Franz.Common.Messaging.Hosting/
 ## ⚙️ Dependencies
 
 - **Microsoft.Extensions.DependencyInjection.Abstractions** (10.0.14)  
-- **Microsoft.Extensions.Hosting** (8.0.0)  
+- **Microsoft.Extensions.Hosting** (10.0.14)  
 - **Franz.Common.Hosting** – general hosting utilities  
 - **Franz.Common.Logging** – centralized structured logging  
 - **Franz.Common.Messaging** – core messaging abstractions  
