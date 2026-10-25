@@ -153,8 +153,14 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
 
-### v2.0.1 � Internal Modernization
+### v2.0.1 – Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance — October 2026
+
+PostgreSQL EF Core dependencies are aligned with the .NET 10 servicing baseline. Validate migrations, transactions, and repository behavior with the PostgreSQL Testcontainers suite before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
