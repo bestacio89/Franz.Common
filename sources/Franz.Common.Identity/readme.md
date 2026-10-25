@@ -1,4 +1,29 @@
-# **Franz.Common.Identity**
+# Franz.Common.Identity
+
+> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Identity` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Identity
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A foundational library within the **Franz Framework** that provides contracts and utilities for managing **identity context** across applications.
 This package defines the **core abstractions** for accessing user identity information in a consistent, provider-agnostic way.
