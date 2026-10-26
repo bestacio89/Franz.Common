@@ -13,9 +13,7 @@ public abstract class MariaDbTestBase(MariaDbFixture database)
     var options = new DbContextOptionsBuilder<TestDbContext>()
         .UseMySql(
             Database.ConnectionString,
-            Microting.EntityFrameworkCore.MySql.Infrastructure.ServerVersion.Create(
-                new Version(11, 4, 0),
-                Microting.EntityFrameworkCore.MySql.Infrastructure.ServerType.MariaDb))
+            ServerVersion.Create(new Version(11, 4, 0), ServerType.MariaDb))
         .Options;
 
     return options;
