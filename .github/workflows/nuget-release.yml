@@ -20,13 +20,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Validate and release NuGet packages
+  validate:
+    name: Validate and pack NuGet packages
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
-      contents: write
-      id-token: write
+      contents: read
+    outputs:
+      version: ${{ steps.release-version.outputs.version }}
+      tag: ${{ steps.release-version.outputs.tag }}
+      release_needed: ${{ steps.release-version.outputs.release_needed }}
+      dry_run: ${{ steps.release-version.outputs.dry_run }}
     env:
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || (github.event_name != 'workflow_dispatch' && vars.RELEASE_DRY_RUN != 'false') }}
     steps:
@@ -41,7 +45,7 @@ jobs:
           dotnet-version: 10.0.400
 
       - name: Validate release version and determine release eligibility
-        id: release
+        id: release-version
         shell: bash
         run: |
           set -euo pipefail
@@ -55,7 +59,7 @@ jobs:
           if node is None or not node.text:
               raise SystemExit("common.targets must define a package Version.")
           version = node.text.strip()
-          if not re.fullmatch(r"0|[1-9][0-9]*", version.split(".")[0]) or not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", version):
+          if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", version):
               raise SystemExit(f"Expected a stable MAJOR.MINOR.PATCH version, got '{version}'.")
           print(version)
           PY
@@ -157,7 +161,7 @@ jobs:
 
       - name: Validate package versions and metadata
         env:
-          EXPECTED_VERSION: ${{ steps.release.outputs.version }}
+          EXPECTED_VERSION: ${{ steps.release-version.outputs.version }}
           PACKAGES_DIR: ${{ runner.temp }}/franz-nuget-packages
         shell: bash
         run: |
@@ -198,32 +202,80 @@ jobs:
               print(f" - {package.name}")
           PY
 
-      - name: Upload release packages and validation reports
+      - name: Upload NuGet package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: franz-nuget-${{ steps.release.outputs.version }}
+          name: franz-nuget-${{ steps.release-version.outputs.version }}
           path: |
             ${{ runner.temp }}/franz-nuget-packages/*.nupkg
             ${{ runner.temp }}/franz-nuget-packages/*.snupkg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload audit and test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: franz-release-reports-${{ steps.release-version.outputs.version }}
+          path: |
             restore-audit.log
             **/TestResults/*.trx
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Report dry-run result
+        if: steps.release-version.outputs.dry_run == 'true'
+        shell: bash
+        run: |
+          echo "::notice::Dry run complete. Build, tests, dependency audit, package creation, and package metadata validation succeeded."
+          echo "::notice::No version tag, GitHub Release, or NuGet package was published."
+
+  publish:
+    name: Tag, release, and publish
+    needs: validate
+    if: needs.validate.outputs.release_needed == 'true' && needs.validate.outputs.dry_run != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout validated source and tags
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.400
+
+      - name: Download validated NuGet packages
+        uses: actions/download-artifact@v4
+        with:
+          name: franz-nuget-${{ needs.validate.outputs.version }}
+          path: ${{ runner.temp }}/franz-nuget-packages
+
       - name: Authenticate with NuGet Trusted Publishing
-        if: steps.release.outputs.release_needed == 'true' && steps.release.outputs.dry_run != 'true'
         id: nuget-login
         uses: NuGet/login@v1
         with:
           user: ${{ vars.NUGET_USER }}
 
       - name: Create version tag
-        if: steps.release.outputs.release_needed == 'true' && steps.release.outputs.dry_run != 'true'
         env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
+          git fetch --force --tags origin
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::The release commit is no longer reachable from origin/main."
+            exit 1
+          fi
+
           if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
             tagged_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
             if [[ "$tagged_sha" != "$GITHUB_SHA" ]]; then
@@ -239,10 +291,9 @@ jobs:
           fi
 
       - name: Create GitHub Release with generated notes
-        if: steps.release.outputs.release_needed == 'true' && steps.release.outputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
@@ -253,7 +304,6 @@ jobs:
           fi
 
       - name: Publish packages to NuGet.org
-        if: steps.release.outputs.release_needed == 'true' && steps.release.outputs.dry_run != 'true'
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
           PACKAGES_DIR: ${{ runner.temp }}/franz-nuget-packages
@@ -276,10 +326,3 @@ jobs:
             echo "Publishing $(basename "$package")"
             dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
           done
-
-      - name: Report dry-run result
-        if: steps.release.outputs.dry_run == 'true'
-        shell: bash
-        run: |
-          echo "::notice::Dry run complete. Build, tests, dependency audit, package creation, and package metadata validation succeeded."
-          echo "::notice::No version tag, GitHub Release, or NuGet package was published."
