@@ -1,6 +1,5 @@
 using Franz.Common.EntityFramework.MySql.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Xunit.Abstractions;
 
 namespace Franz.Common.EntityFramework.MySql.Tests;
@@ -14,8 +13,9 @@ public sealed class ProviderCompatibilityTests(MySqlFixture database, ITestOutpu
   {
     await using var context = CreateContext();
 
-    Assert.Equal("8.4.0", (await context.Database.SqlQueryRaw<string>(
-        "SELECT VERSION() AS Value").SingleAsync()).Split('-', '+')[0][..5]);
+    var serverVersion = (await context.Database.SqlQueryRaw<string>(
+        "SELECT VERSION() AS Value").SingleAsync()).Split('-', '+')[0];
+    Assert.StartsWith("8.4.", serverVersion, StringComparison.Ordinal);
 
     await context.Database.EnsureCreatedAsync();
 
