@@ -1,5 +1,6 @@
 using Franz.Common.Mediator.Dispatchers;
 using Microsoft.EntityFrameworkCore;
+using Microting.EntityFrameworkCore.MySql.Infrastructure;
 using NSubstitute;
 
 namespace Franz.Common.EntityFramework.MariaDB.Tests.Fixtures;
