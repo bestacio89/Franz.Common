@@ -76,19 +76,19 @@ jobs:
           exit 1
 
       - name: Pack release packages
+        env:
+          PACKAGES_DIR: ${{ runner.temp }}/franz-nuget-packages
         shell: bash
         run: |
           set -euo pipefail
-          packages_dir="$RUNNER_TEMP/franz-nuget-packages"
-          rm -rf "$packages_dir"
-          mkdir -p "$packages_dir"
-          dotnet pack Franz.Common.slnx --configuration Release --no-build --no-restore --output "$packages_dir" -p:GeneratePackageOnBuild=false
-          echo "PACKAGES_DIR=$packages_dir" >> "$GITHUB_ENV"
+          rm -rf "$PACKAGES_DIR"
+          mkdir -p "$PACKAGES_DIR"
+          dotnet pack Franz.Common.slnx --configuration Release --no-build --no-restore --output "$PACKAGES_DIR" -p:GeneratePackageOnBuild=false
 
       - name: Validate package versions and metadata
         env:
           EXPECTED_VERSION: ${{ steps.release.outputs.version }}
-          PACKAGES_DIR: ${{ env.PACKAGES_DIR }}
+          PACKAGES_DIR: ${{ runner.temp }}/franz-nuget-packages
         shell: bash
         run: |
           set -euo pipefail
@@ -133,8 +133,8 @@ jobs:
         with:
           name: franz-nuget-${{ steps.release.outputs.version }}
           path: |
-            ${{ env.PACKAGES_DIR }}/*.nupkg
-            ${{ env.PACKAGES_DIR }}/*.snupkg
+            ${{ runner.temp }}/franz-nuget-packages/*.nupkg
+            ${{ runner.temp }}/franz-nuget-packages/*.snupkg
             restore-audit.log
             **/TestResults/*.trx
           if-no-files-found: warn
@@ -143,7 +143,7 @@ jobs:
       - name: Publish packages to NuGet.org
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-          PACKAGES_DIR: ${{ env.PACKAGES_DIR }}
+          PACKAGES_DIR: ${{ runner.temp }}/franz-nuget-packages
         shell: bash
         run: |
           set -euo pipefail
