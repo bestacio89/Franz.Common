@@ -7,8 +7,7 @@ namespace Franz.Common.Integration.Test;
 
 public sealed class MariaDbProviderIntegrationTests : IAsyncLifetime
 {
-  private readonly MariaDbContainer _database = new MariaDbBuilder()
-      .WithImage("mariadb:11.4")
+  private readonly MariaDbContainer _database = new MariaDbBuilder("mariadb:11.4")
       .WithDatabase("franz_provider_tests")
       .WithUsername("franz_test")
       .WithPassword("franz_test_password")
