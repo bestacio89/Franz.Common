@@ -190,10 +190,21 @@ jobs:
                   nuspecs = [name for name in archive.namelist() if name.lower().endswith(".nuspec")]
                   if len(nuspecs) != 1:
                       sys.exit(f"{package.name}: expected exactly one .nuspec, found {len(nuspecs)}.")
-                  metadata = ET.fromstring(archive.read(nuspecs[0])).find("./metadata")
+                  nuspec_root = ET.fromstring(archive.read(nuspecs[0]))
+                  metadata = next(
+                      (element for element in nuspec_root
+                       if element.tag.split("}")[-1] == "metadata"),
+                      None,
+                  )
                   if metadata is None:
                       sys.exit(f"{package.name}: .nuspec has no metadata element.")
-                  actual = metadata.findtext("version")
+
+                  version_node = next(
+                      (element for element in metadata
+                       if element.tag.split("}")[-1] == "version"),
+                      None,
+                  )
+                  actual = None if version_node is None else version_node.text
                   if actual != expected:
                       sys.exit(f"{package.name}: package version '{actual}' does not match release version '{expected}'.")
 
