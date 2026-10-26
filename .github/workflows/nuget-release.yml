@@ -140,15 +140,21 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: NuGet login (trusted publishing)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Publish packages to NuGet.org
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
           PACKAGES_DIR: ${{ runner.temp }}/franz-nuget-packages
         shell: bash
         run: |
           set -euo pipefail
           if [[ -z "${NUGET_API_KEY:-}" ]]; then
-            echo "::error::Repository secret NUGET_API_KEY is not configured."
+            echo "::error::NuGet trusted publishing did not return a temporary API key."
             exit 1
           fi
 
