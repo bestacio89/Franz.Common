@@ -15,6 +15,9 @@ concurrency:
 jobs:
   validate-and-publish:
     name: Validate and publish NuGet packages
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
