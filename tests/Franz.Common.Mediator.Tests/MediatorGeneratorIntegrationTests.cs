@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using Franz.Common.Mediator.Extensions;
 using Franz.Common.Mediator.Handlers;
+using Franz.Common.Mediator.Registration;
 using Franz.Common.Mediator.Tests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
@@ -33,5 +34,24 @@ public class MediatorGeneratorIntegrationTests
 
     handler.Should().NotBeNull();
     handler.Should().BeOfType<PingCommandHandler>();
+  }
+
+  [Fact]
+  public void GeneratedRegistration_DoesNotDiscoverHandlersFromUnrelatedLoadedAssemblies()
+  {
+    // Arrange: explicitly target the Mediator assembly, not this test assembly.
+    var services = new ServiceCollection();
+    var provider = new GeneratedHandlerRegistrationProvider(
+        typeof(GeneratedHandlerRegistrationProvider).Assembly);
+
+    // Act
+    provider.Register(services);
+
+    // Assert: the generated Ping handler belongs to this test assembly and must not leak
+    // into registrations for a different target assembly merely because it is already loaded.
+    services.Any(descriptor =>
+        descriptor.ServiceType == typeof(ICommandHandler<PingCommand, string>))
+        .Should()
+        .BeFalse();
   }
 }
