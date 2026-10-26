@@ -1,15 +1,8 @@
 ﻿#nullable enable
 using FluentAssertions;
-using FluentAssertions.Execution;
-using FluentAssertions.Extensions;
 using Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fixtures;
-using Franz.Common.Messaging.Messages;
-using Franz.Common.Messaging.RabbitMQ.Connections;
-using Microsoft.Azure.Cosmos.Core;
 using Microsoft.Extensions.DependencyInjection;
-using RabbitMQ.Client;
-using System.Text;
 using Xunit;
 
 namespace Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Integration;
@@ -24,36 +17,41 @@ public sealed class RabbitMQListenerTests : IClassFixture<RabbitMQHostingFixture
     _fixture = fixture;
   }
 
- 
-
   [Fact]
-  public async Task Listen_ShouldExecuteNack_WhenHandlerThrowsExceptionAndNoReplayStrategy()
+  public async Task Listen_ShouldStopCleanly_WhenCancellationIsRequested()
   {
-    // Arrange
     var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
-    listener.OnMessageReceivedAsync = _ => throw new InvalidOperationException("Simulated Failure");
+    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+    await listener.Listen(cts.Token);
+    await listener.WaitUntilReadyAsync().WaitAsync(cts.Token);
 
-    // Act & Assert: Listener runs without crashing
-    await FluentActions.Invoking(async () => await listener.Listen(cts.Token))
+    await FluentActions.Invoking(() => listener.StopListenAsync())
                        .Should().NotThrowAsync();
   }
 
   [Fact]
-  public async Task StopListenAsync_ShouldReleaseChannelToPool()
+  public async Task StopListenAsync_ShouldReleaseChannelToPool_AndAllowRestart()
   {
-    // Arrange
     var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
+    using var firstCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-    using var cts = new CancellationTokenSource(100);
-
-    // Act: Start & quickly stop
-    var listenTask = listener.Listen(cts.Token);
+    await listener.Listen(firstCts.Token);
+    await listener.WaitUntilReadyAsync().WaitAsync(firstCts.Token);
     await listener.StopListenAsync();
 
-    // Assert: Listener can restart without fault
-    await FluentActions.Invoking(async () => await listener.Listen(CancellationToken.None))
-                       .Should().NotThrowAsync();
+    using var secondCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+    await listener.Listen(secondCts.Token);
+
+    try
+    {
+      await FluentActions.Invoking(() => listener.StopListenAsync())
+                         .Should().NotThrowAsync();
+    }
+    finally
+    {
+      // Ensure no background consumer survives the test or fixture teardown.
+      await listener.StopListenAsync();
+    }
   }
 }

@@ -16,6 +16,10 @@ This document outlines planned and potential future enhancements.
   - enhanced outbox/inbox support,
   - first-class saga/long-running process helper APIs.
 
+## Mediator runtime modernization
+
+Mediator improvements follow a correctness-first, measurement-driven sequence while preserving the current .NET 10 and Franz.Common 2.3.1 baseline. The detailed phases, compatibility constraints, and exit criteria are maintained in [the Mediator upgrade roadmap](mediator-upgrade-roadmap.md).
+
 ---
 
 ## Mid-term (6–18 months)

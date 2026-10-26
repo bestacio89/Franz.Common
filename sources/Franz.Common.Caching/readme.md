@@ -1,4 +1,31 @@
-﻿Here’s an updated **README** for version **1.7.8**, including all the **observability improvements, metrics observer, logging + metrics observer, and Excel/export-ready observer** you’ve just implemented:
+# Franz.Common.Caching
+
+> Caching and performance for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Caching` package provides the caching and performance capability within Franz.Common. It is designed to be composed with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Caching
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
+
+Here’s an updated **README** for version **1.7.8**, including all the **observability improvements, metrics observer, logging + metrics observer, and Excel/export-ready observer** you’ve just implemented:
 
 ---
 
@@ -237,3 +264,8 @@ This makes it **instantly clear** how any cache action flows through the system 
 
 If you want, I can **also make a slightly fancier Markdown/mermaid diagram** that will render nicely on GitHub and looks professional in the README. Do you want me to do that too?
 
+---
+
+## Dependency maintenance — October 2026
+
+EPPlus is upgraded to 8.7.2, which includes fixes for the current System.Security.Cryptography.Xml advisories. Snappier is pinned to patched 1.3.1 and Pkcs to 10.0.13. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

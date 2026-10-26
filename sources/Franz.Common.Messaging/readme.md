@@ -1,5 +1,29 @@
-﻿
 # Franz.Common.Messaging
+
+> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Messaging` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Messaging
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A messaging abstraction library within the **Franz Framework** that provides a unified foundation for building reliable, resilient, and extensible distributed messaging systems.  
 
@@ -200,3 +224,9 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance — October 2026
+
+The messaging core dependency references were reviewed as part of the repository-wide .NET 10 servicing update. The intended public messaging contracts remain unchanged. Verify all transport, serialization, and persistence integration tests against the resolved dependency graph before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

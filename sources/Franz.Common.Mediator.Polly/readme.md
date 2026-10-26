@@ -1,4 +1,29 @@
-﻿# **Franz.Common.Mediator.Polly**
+# Franz.Common.Mediator.Polly
+
+> Application dispatch and request pipelines for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Mediator.Polly` package provides application dispatch and request pipelines within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Mediator.Polly
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 **Franz.Common.Mediator.Polly** extends [Franz.Common.Mediator](https://www.nuget.org/packages/Franz.Common.Mediator/) with **Polly-based resilience pipelines**.
 It gives you **retry, circuit breaker, advanced circuit breaker, timeout, and bulkhead isolation** for Mediator requests — all with **enriched Serilog logging, context-awareness, and resilience telemetry** built-in.
@@ -262,3 +287,9 @@ All pipelines automatically participate in **Franz’s logging & correlation sys
 Configure it once — and your Mediator pipelines automatically enforce retries, timeouts, bulkheads, and breakers **with total visibility**.
 
 ---
+
+---
+
+## Dependency maintenance — October 2026
+
+This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

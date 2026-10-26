@@ -1,4 +1,29 @@
-# **Franz.Common.EntityFramework.Oracle**
+# Franz.Common.EntityFramework.Oracle
+
+> Persistence and infrastructure integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.EntityFramework.Oracle` package provides persistence and infrastructure integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.EntityFramework.Oracle
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A specialized library within the **Franz Framework** that extends **Entity Framework Core** support for **Oracle Database** using the **Oracle.EntityFrameworkCore** provider. This package simplifies the configuration and integration of Oracle databases in .NET applications, supporting both single-tenant and multi-tenant environments.
 
@@ -27,7 +52,7 @@ A specialized library within the **Franz Framework** that extends **Entity Frame
 ## **Dependencies**
 
 This package relies on:
-- **Oracle.EntityFrameworkCore** (8.21.121): Official EF Core provider for Oracle databases.
+- **Oracle.EntityFrameworkCore** (10.23.26200): Official EF Core provider for Oracle databases.
 - **Franz.Common.EntityFramework**: Core EF utilities and patterns.
 - **Franz.Common.MultiTenancy**: Multi-tenancy support for database operations.
 
@@ -148,3 +173,9 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
+---
+
+## Dependency maintenance — October 2026
+
+Oracle EF Core integration and its test dependency graph are part of the .NET 10 dependency validation pass. The project pins System.Security.Cryptography.Pkcs 10.0.13, and tests explicitly resolve patched SSH.NET 2026.0.0. Run Oracle Testcontainers integration tests before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

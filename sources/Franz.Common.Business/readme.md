@@ -1,4 +1,29 @@
-# 📦 Franz.Common.Business
+# Franz.Common.Business
+
+> Domain and application building blocks for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Business` package provides the domain and application building blocks capability within Franz.Common. It is designed to be composed with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Business
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A core infrastructure library of the **Franz Framework**, designed to support **Domain-Driven Design (DDD)**, **CQRS**, and **Event-Sourcing-ready architectures** in modern .NET applications.
 
@@ -413,3 +438,9 @@ It ensures that:
 * domain logic remains pure
 * persistence remains isolated
 * system composition is deterministic
+
+---
+
+## Dependency maintenance — October 2026
+
+This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

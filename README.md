@@ -15,7 +15,7 @@
 [![Observability-OpenTelemetry](https://img.shields.io/badge/Observability-OpenTelemetry-yellow)](https://opentelemetry.io)
 [![Multi--Tenancy-Built--In](https://img.shields.io/badge/Multi--Tenancy-Built--In-9cf)](https://github.com/bestacio89/Franz.Common)
 [![License-MIT](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE.MD)
-[![NuGet](https://img.shields.io/badge/NuGet-640k%2B%20downloads-success)](https://www.nuget.org/packages?q=Franz.Common)
+[![NuGet](https://img.shields.io/badge/NuGet-700k%2B%20downloads-success)](https://www.nuget.org/packages?q=Franz.Common)
 
 ---
 
@@ -416,3 +416,17 @@ All PRs must include **tests**, **documentation**, and comply with **Franz Tribu
 # 📜 License
 
 MIT License.
+
+## .NET 10 dependency maintenance
+
+The dependency baseline and compatibility notes are tracked in [the October 2026 .NET 10 dependency upgrade record](Docs/dependency-upgrade-2026-10.md). This maintenance work keeps the repository on .NET 10 and updates vulnerable/outdated package references. The [dependency validation workflow](.github/workflows/dependency-validation.yml) runs NuGet audit, Release build, and solution tests. The latest completed CI run passed restore, Release build, and all solution tests with no NU1901–NU1904 advisories. Follow-up cleanup of duplicate/redundant references still requires a fresh run, and the Pomelo EF Core 9 / EF Core 10 compatibility warning remains open. Provider-specific compatibility notes (including EF Core/MariaDB) are recorded in the upgrade document.
+
+
+## Versioning and compatibility
+
+- **Framework packages:** versioned together through `common.targets`; the dependency-maintenance release targets **2.3.1**.
+- **Target framework:** supported library projects target .NET 10 (`net10.0`). The repository pins SDK `10.0.400` in `global.json`; CI should use that same SDK.
+- **Third-party dependencies:** package versions are selected independently according to compatibility and security requirements. A package's version number is not the Franz.Common release version.
+- **Publishing:** the Azure DevOps publishing pipeline validates package metadata before publishing. Publish only after restore/audit, Release build, and full tests pass.
+
+See [the versioning policy](Docs/governance/versioning-policy.md) and [the dependency upgrade record](Docs/dependency-upgrade-2026-10.md) for the release rules and current compatibility caveats.

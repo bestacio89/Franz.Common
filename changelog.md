@@ -1600,3 +1600,21 @@ To help potential users understand the scope of `Franz.Common.Logging` at a glan
 * Reduced runtime reflection dependency.
 * Improved Native AOT readiness.
 * More predictable dependency graph generation.
+
+## v2.3.1 — EF Core MySQL Provider Qualification
+
+**Changed**
+
+- Qualified `Microting.EntityFrameworkCore.MySql` 10.0.13 against MariaDB 11.4 and Oracle MySQL 8.4 through isolated real-database integration suites.
+- Added incremental migration coverage on both engines to verify migration SQL generation, schema expansion, migration history, and preservation of pre-existing rows.
+- Retained MariaDB-specific registration semantics in `AddMariaDatabase<TDbContext>`; the qualification does not imply that this extension configures Oracle MySQL.
+
+**Quality and Security**
+
+- Expanded persistence regression coverage for auditing, soft deletion, relationships, LINQ translation, and transaction behavior.
+- Pinned SSH.NET 2026.0.0 in provider qualification test projects to address the previously reported transitive NuGet advisories.
+- Release remains contingent on successful full Release build, test suite, and executed NuGet vulnerability gate.
+
+**Migration Notes**
+
+- Provider-level migration tests do not replace testing consumer-owned migration chains against representative existing schemas. Applications with existing databases should validate their own upgrade path before deployment.

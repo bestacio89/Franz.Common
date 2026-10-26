@@ -1,0 +1,64 @@
+name: Dependency and .NET 10 validation
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-validation-v6-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Restore, audit, build, and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.400
+
+      - name: Restore with NuGet security auditing
+        id: restore
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet restore Franz.Common.slnx --force-evaluate -p:NuGetAudit=true -p:NuGetAuditLevel=low 2>&1 | tee restore-audit.log
+          if grep -E 'NU190[1-4]' restore-audit.log; then
+            echo "vulnerabilities_found=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::NuGet restore reported vulnerable packages; build and tests will still run for diagnosis."
+          else
+            echo "vulnerabilities_found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build solution
+        run: dotnet build Franz.Common.slnx --configuration Release --no-restore
+
+      - name: Test solution
+        run: dotnet test Franz.Common.slnx --configuration Release --no-build --blame-hang-timeout 10m --logger "trx;LogFileName=dependency-validation.trx"
+
+      - name: Enforce vulnerability gate
+        if: always() && steps.restore.outputs.vulnerabilities_found == 'true'
+        shell: bash
+        run: |
+          echo "::error::Resolve all NU1901-NU1904 advisories before merging."
+          exit 1
+
+      - name: Upload dependency and test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-validation-reports
+          path: |
+            restore-audit.log
+            **/TestResults/*.trx
+          if-no-files-found: warn

@@ -1,4 +1,29 @@
-# **Franz.Common.Http.Authentication**
+# Franz.Common.Http.Authentication
+
+> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Http.Authentication` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Http.Authentication
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A specialized library within the **Franz Framework** that provides streamlined configurations for **JWT Bearer Authentication** and Swagger integration in **ASP.NET Core** applications. This package simplifies secure API development by integrating authentication mechanisms and enhancing API documentation with authentication workflows.
 
@@ -162,8 +187,14 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Now compatible with both the **in-house mediator** and **MediatR**
 
 
-### v2.0.1 � Internal Modernization
+### v2.0.1 – Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance — October 2026
+
+This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

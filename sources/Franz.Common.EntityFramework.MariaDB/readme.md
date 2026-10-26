@@ -1,13 +1,38 @@
-# **Franz.Common.EntityFramework.MariaDB**
+# Franz.Common.EntityFramework.MariaDB
 
-A library within the **Franz Framework** designed to extend **Entity Framework Core** support for **MariaDB** using the **Pomelo.EntityFrameworkCore.MySql** provider. This package simplifies the configuration and integration of MariaDB with EF Core in .NET applications.
+> Persistence and infrastructure integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.EntityFramework.MariaDB` package provides persistence and infrastructure integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.EntityFramework.MariaDB
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
+
+A library within the **Franz Framework** designed to extend **Entity Framework Core** support for **MariaDB** using the **Microting.EntityFrameworkCore.MySql** provider. This package simplifies the configuration and integration of MariaDB with EF Core in .NET applications.
 
 ---
 
 ## **Features**
 
 - **MariaDB Integration**:
-  - Leverages `Pomelo.EntityFrameworkCore.MySql` for robust MariaDB support.
+  - Leverages `Microting.EntityFrameworkCore.MySql` for robust MariaDB support.
 - **Service Registration**:
   - `ServiceCollectionExtensions` to streamline dependency injection for MariaDB contexts.
 - **Compatibility**:
@@ -25,8 +50,8 @@ A library within the **Franz Framework** designed to extend **Entity Framework C
 ## **Dependencies**
 
 This package relies on:
-- **Microsoft.EntityFrameworkCore.Relational** (8.0.0): Provides relational database functionality for EF Core.
-- **Pomelo.EntityFrameworkCore.MySql** (7.0.0): MariaDB provider for EF Core.
+- **Microsoft.EntityFrameworkCore.Relational** (10.0.14): Provides relational database functionality for EF Core 10.
+- **Microting.EntityFrameworkCore.MySql** (10.0.13): MariaDB/MySQL provider aligned with EF Core 10. This is a community-maintained fork with renamed package/namespace identity, not the original Pomelo package; validate query translation, migrations, and runtime behavior against supported MariaDB versions before release.
 - **Franz.Common.EntityFramework**: Shared utilities and patterns for database integration.
 
 ---
@@ -134,8 +159,14 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
 
-### v2.0.1 � Internal Modernization
+### v2.0.1 – Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance — October 2026
+
+**Compatibility status:** `Microting.EntityFrameworkCore.MySql` 10.0.13 declares compatibility with EF Core 10 and MariaDB 11.4 LTS. This resolves the package-version mismatch, but does not prove behavioral equivalence with the former Pomelo provider. Run MariaDB integration tests for model creation, CRUD, relationships, LINQ translation, transactions, and migrations before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

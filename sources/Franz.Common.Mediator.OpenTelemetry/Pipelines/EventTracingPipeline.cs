@@ -5,7 +5,6 @@ using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Validation.Events;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenTelemetry.Trace;
 using System;
 using System.Diagnostics;
 using System.Threading;
@@ -42,7 +41,7 @@ public sealed class EventTracingPipeline<TEvent> : IEventPipeline<TEvent>
     }
     catch (Exception ex)
     {
-      activity?.RecordException(ex);
+      activity?.AddException(ex);
       activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
 
       var correlationId = MediatorContext.CorrelationId;

@@ -1,4 +1,31 @@
-﻿Absolutely ✅ — here’s your **fully updated `Franz.Common.Http.Messaging` README** rewritten to match the structure you provided, with the **new v1.6.17** changelog compacted but still complete and consistent with your ecosystem documentation style.
+# Franz.Common.Http.Messaging
+
+> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Http.Messaging` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Http.Messaging
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
+
+Absolutely ✅ — here’s your **fully updated `Franz.Common.Http.Messaging` README** rewritten to match the structure you provided, with the **new v1.6.17** changelog compacted but still complete and consistent with your ecosystem documentation style.
 
 ---
 
@@ -184,3 +211,9 @@ See the `LICENSE` file for more details.
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance — October 2026
+
+The package now uses the .NET 10 ASP.NET Core shared framework instead of legacy ASP.NET Core 2.3.11 packages, and cryptography dependencies are pinned to patched releases. Kafka, RabbitMQ, and health-check integration behavior must be validated by the solution test suite before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

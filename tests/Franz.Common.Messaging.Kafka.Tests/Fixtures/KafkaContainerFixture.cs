@@ -1,8 +1,10 @@
 ﻿#nullable enable
 using Confluent.Kafka;
 using Confluent.Kafka.Admin;
+using System.Reflection;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Mediator.Extensions;
+using Franz.Common.Messaging.Kafka;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Extensions;
 using Franz.Common.Messaging.Serialization;
@@ -44,7 +46,13 @@ public sealed class KafkaContainerFixture : IAsyncLifetime
     var topicName = "integration-test";
     var configuration = BuildConfiguration(topicName);
 
+    // KafkaSender derives the production topic from the entry assembly; create
+    // that topic as well as the explicitly configured initializer topic.
     CreateTopicAsync(topicName).GetAwaiter().GetResult();
+    var entryAssembly = Assembly.GetEntryAssembly() ?? typeof(KafkaContainerFixture).Assembly;
+    var senderTopicName = TopicNamer.GetTopicName(new AssemblyWrapper(entryAssembly));
+    if (!StringComparer.Ordinal.Equals(topicName, senderTopicName))
+      CreateTopicAsync(senderTopicName).GetAwaiter().GetResult();
 
     RegisterCoreServices(services, configuration);
 

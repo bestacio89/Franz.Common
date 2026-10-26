@@ -1,0 +1,328 @@
+name: Main release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate build, tests, package metadata, and release eligibility without tagging or publishing.
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: franz-main-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate and pack NuGet packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.release-version.outputs.version }}
+      tag: ${{ steps.release-version.outputs.tag }}
+      release_needed: ${{ steps.release-version.outputs.release_needed }}
+      dry_run: ${{ steps.release-version.outputs.dry_run }}
+    env:
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || (github.event_name != 'workflow_dispatch' && vars.RELEASE_DRY_RUN != 'false') }}
+    steps:
+      - name: Checkout source and tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.400
+
+      - name: Validate release version and determine release eligibility
+        id: release-version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="$(python3 - <<'PY'
+          import re
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("common.targets").getroot()
+          node = root.find(".//Version")
+          if node is None or not node.text:
+              raise SystemExit("common.targets must define a package Version.")
+          version = node.text.strip()
+          if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", version):
+              raise SystemExit(f"Expected a stable MAJOR.MINOR.PATCH version, got '{version}'.")
+          print(version)
+          PY
+          )"
+          tag="v$version"
+
+          git fetch --force --tags origin
+          git fetch --no-tags origin main
+
+          if [[ "$DRY_RUN" != "true" ]] && ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::A real release must use a commit reachable from origin/main."
+            exit 1
+          fi
+
+          latest_tag="$(git tag --list 'v*' | python3 -c '
+          import re, sys
+          tags = []
+          for line in sys.stdin:
+              tag = line.strip()
+              match = re.fullmatch(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", tag)
+              if match:
+                  tags.append((tuple(map(int, match.groups())), tag))
+          print(max(tags)[1] if tags else "")
+          ')"
+
+          release_needed=true
+          if [[ -n "$latest_tag" ]]; then
+            latest_version="${latest_tag#v}"
+            comparison="$(python3 - "$version" "$latest_version" <<'PY'
+          import sys
+          current = tuple(map(int, sys.argv[1].split(".")))
+          latest = tuple(map(int, sys.argv[2].split(".")))
+          print((current > latest) - (current < latest))
+          PY
+          )"
+            if [[ "$comparison" -lt 0 ]]; then
+              echo "::error::Package version $version is lower than the latest release $latest_tag."
+              exit 1
+            elif [[ "$comparison" -eq 0 ]]; then
+              if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+                tagged_sha="$(git rev-list -n 1 "$tag")"
+                if [[ "$tagged_sha" == "$GITHUB_SHA" ]]; then
+                  echo "Version $version is already tagged on this commit; allowing an idempotent retry."
+                else
+                  echo "Package version $version is already released. No new release is needed for this main commit."
+                  release_needed=false
+                fi
+              else
+                echo "::error::Version $version matches the latest release number but its tag is missing. Investigate the release tags before continuing."
+                exit 1
+              fi
+            fi
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release_needed=$release_needed" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
+          echo "Package version: $version"
+          echo "Latest release tag: ${latest_tag:-none}"
+          echo "Release required: $release_needed"
+          echo "Dry run: $DRY_RUN"
+
+      - name: Restore and audit dependencies
+        id: restore
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet restore Franz.Common.slnx --force-evaluate -p:NuGetAudit=true -p:NuGetAuditLevel=low 2>&1 | tee restore-audit.log
+          if grep -E 'NU190[1-4]' restore-audit.log; then
+            echo "vulnerabilities_found=true" >> "$GITHUB_OUTPUT"
+            echo "::error::NuGet restore reported package vulnerability advisories."
+          else
+            echo "vulnerabilities_found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build Release solution
+        run: dotnet build Franz.Common.slnx --configuration Release --no-restore
+
+      - name: Run complete test suite
+        run: dotnet test Franz.Common.slnx --configuration Release --no-build --blame-hang-timeout 10m --logger "trx;LogFileName=main-release.trx"
+
+      - name: Enforce NuGet vulnerability gate
+        if: always() && steps.restore.outputs.vulnerabilities_found == 'true'
+        shell: bash
+        run: |
+          echo "::error::Resolve all NU1901-NU1904 advisories before releasing."
+          exit 1
+
+      - name: Pack release packages
+        env:
+          PACKAGES_DIR: ${{ runner.temp }}/franz-nuget-packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$PACKAGES_DIR"
+          mkdir -p "$PACKAGES_DIR"
+          dotnet pack Franz.Common.slnx --configuration Release --no-build --no-restore --output "$PACKAGES_DIR" -p:GeneratePackageOnBuild=false
+
+      - name: Validate package versions and metadata
+        env:
+          EXPECTED_VERSION: ${{ steps.release-version.outputs.version }}
+          PACKAGES_DIR: ${{ runner.temp }}/franz-nuget-packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import sys
+          import zipfile
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          expected = os.environ["EXPECTED_VERSION"]
+          packages_dir = Path(os.environ["PACKAGES_DIR"])
+          common_targets = ET.parse("common.targets").getroot()
+          version_node = common_targets.find(".//Version")
+          if version_node is None or (version_node.text or "").strip() != expected:
+              actual = "(missing)" if version_node is None else (version_node.text or "").strip()
+              sys.exit(f"common.targets package version '{actual}' does not match release version '{expected}'.")
+
+          packages = sorted(packages_dir.glob("*.nupkg"))
+          if not packages:
+              sys.exit(f"No .nupkg files were produced in {packages_dir}.")
+
+          for package in packages:
+              with zipfile.ZipFile(package) as archive:
+                  nuspecs = [name for name in archive.namelist() if name.lower().endswith(".nuspec")]
+                  if len(nuspecs) != 1:
+                      sys.exit(f"{package.name}: expected exactly one .nuspec, found {len(nuspecs)}.")
+                  metadata = ET.fromstring(archive.read(nuspecs[0])).find("./metadata")
+                  if metadata is None:
+                      sys.exit(f"{package.name}: .nuspec has no metadata element.")
+                  actual = metadata.findtext("version")
+                  if actual != expected:
+                      sys.exit(f"{package.name}: package version '{actual}' does not match release version '{expected}'.")
+
+          print(f"Validated {len(packages)} NuGet package(s) at version {expected}:")
+          for package in packages:
+              print(f" - {package.name}")
+          PY
+
+      - name: Upload NuGet package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: franz-nuget-${{ steps.release-version.outputs.version }}
+          path: |
+            ${{ runner.temp }}/franz-nuget-packages/*.nupkg
+            ${{ runner.temp }}/franz-nuget-packages/*.snupkg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload audit and test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: franz-release-reports-${{ steps.release-version.outputs.version }}
+          path: |
+            restore-audit.log
+            **/TestResults/*.trx
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Report dry-run result
+        if: steps.release-version.outputs.dry_run == 'true'
+        shell: bash
+        run: |
+          echo "::notice::Dry run complete. Build, tests, dependency audit, package creation, and package metadata validation succeeded."
+          echo "::notice::No version tag, GitHub Release, or NuGet package was published."
+
+  publish:
+    name: Tag, release, and publish
+    needs: validate
+    if: needs.validate.outputs.release_needed == 'true' && needs.validate.outputs.dry_run != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout validated source and tags
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.400
+
+      - name: Download validated NuGet packages
+        uses: actions/download-artifact@v4
+        with:
+          name: franz-nuget-${{ needs.validate.outputs.version }}
+          path: ${{ runner.temp }}/franz-nuget-packages
+
+      - name: Authenticate with NuGet Trusted Publishing
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Create version tag
+        env:
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::The release commit is no longer reachable from origin/main."
+            exit 1
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tagged_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+            if [[ "$tagged_sha" != "$GITHUB_SHA" ]]; then
+              echo "::error::Tag $RELEASE_TAG already points to a different commit."
+              exit 1
+            fi
+            echo "Tag $RELEASE_TAG already points to this commit; keeping it."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$RELEASE_TAG" "$GITHUB_SHA" -m "Release $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+
+      - name: Create GitHub Release with generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "GitHub Release $RELEASE_TAG already exists; keeping its release notes."
+          else
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "Franz.Common $RELEASE_TAG" --generate-notes
+          fi
+
+      - name: Publish packages to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          PACKAGES_DIR: ${{ runner.temp }}/franz-nuget-packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${NUGET_API_KEY:-}" ]]; then
+            echo "::error::NuGet Trusted Publishing did not return a temporary API key."
+            exit 1
+          fi
+
+          shopt -s nullglob
+          packages=("$PACKAGES_DIR"/*.nupkg)
+          if (( ${#packages[@]} == 0 )); then
+            echo "::error::No NuGet packages are available to publish."
+            exit 1
+          fi
+
+          for package in "${packages[@]}"; do
+            echo "Publishing $(basename "$package")"
+            dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+          done
