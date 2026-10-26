@@ -43,7 +43,7 @@ public sealed class MariaDbProviderIntegrationTests : IAsyncLifetime
       };
 
       context.Orders.Add(order);
-      Assert.Equal(1, await context.SaveChangesAsync());
+      Assert.Equal(3, await context.SaveChangesAsync());
       Assert.True(order.Id > 0);
       Assert.All(order.Lines, line => Assert.True(line.Id > 0));
     }
