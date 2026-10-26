@@ -73,7 +73,7 @@ The follow-up qualification branch adds a real-database integration test using T
 - Relationship loading.
 - Transaction rollback and verification that rolled-back data is absent.
 
-**Current status:** test coverage has been added, but execution results are pending CI. No claim is made yet that the candidate has passed these checks.
+**Current status:** on commit `c8c25f9e500c965d610759d3eff30c7c15c511b5`, the Release build succeeded and the integration-test project reported 14 passed and 0 failed, including the new MariaDB qualification test. The overall solution test step still failed because three Azure Cosmos DB emulator tests could not start their container; the emulator process crashed during startup with a Service Fabric `0x800700B7` exception. That failure is outside the MariaDB test path. A follow-up commit replaces the obsolete parameterless `MariaDbBuilder` constructor with the explicit image constructor; the full CI run for the latest PR head remains to be confirmed.
 
 This first slice does not establish migration compatibility, MySQL 8.4 compatibility, parity with the previous Pomelo provider, or correct behavior of Franz.Common's `AddMariaDatabase<TDbContext>` composition path. Those remain explicit follow-up gates. Next, run the new test on the exact PR head; then add migration and service-registration coverage based on the results, and evaluate MySQL 8.4 separately if MySQL is a supported target.
 
