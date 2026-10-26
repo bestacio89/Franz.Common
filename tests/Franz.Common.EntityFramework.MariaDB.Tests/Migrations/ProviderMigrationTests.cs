@@ -9,9 +9,10 @@ namespace Franz.Common.EntityFramework.MariaDB.Tests.Migrations;
 [Collection(MariaDbCollection.Name)]
 public sealed class ProviderMigrationTests(MariaDbFixture database)
 {
-  private const string InitialMigration = "202610260001_InitialProviderQualification";
-  private const string ExpandMigration = "202610260002_AddDescriptionToProviderQualification";
+  private const string InitialMigration = "20261026000100_InitialProviderQualification";
+  private const string ExpandMigration = "20261026000200_AddDescriptionToProviderQualification";
   private const string TableName = "provider_migration_qualification";
+  private const string HistoryTable = "__EFMigrationsHistory_MicrotingQualification";
 
   private DbContextOptions<Franz.Common.EntityFramework.MariaDB.Tests.TestDbContext> CreateOptions()
   {
@@ -21,7 +22,7 @@ public sealed class ProviderMigrationTests(MariaDbFixture database)
             ServerVersion.Create(new Version(11, 4, 0), ServerType.MariaDb),
             providerOptions => providerOptions
                 .MigrationsAssembly(typeof(ProviderMigrationTests).Assembly.GetName().Name)
-                .MigrationsHistoryTable("__EFMigrationsHistory_MicrotingQualification"))
+                .MigrationsHistoryTable(HistoryTable))
         .Options;
 
     return options;
@@ -34,40 +35,50 @@ public sealed class ProviderMigrationTests(MariaDbFixture database)
         CreateOptions(),
         NSubstitute.Substitute.For<Franz.Common.Mediator.Dispatchers.IDispatcher>());
 
-    var migrator = context.GetService<IMigrator>();
-    var generatedScript = migrator.GenerateScript();
+    try
+    {
+      var migrator = context.GetService<IMigrator>();
+      var generatedScript = migrator.GenerateScript();
 
-    Assert.Contains("CREATE TABLE", generatedScript, StringComparison.OrdinalIgnoreCase);
-    Assert.Contains("ALTER TABLE", generatedScript, StringComparison.OrdinalIgnoreCase);
-    Assert.Contains(TableName, generatedScript, StringComparison.OrdinalIgnoreCase);
+      Assert.Contains("CREATE TABLE", generatedScript, StringComparison.OrdinalIgnoreCase);
+      Assert.Contains("ALTER TABLE", generatedScript, StringComparison.OrdinalIgnoreCase);
+      Assert.Contains(TableName, generatedScript, StringComparison.OrdinalIgnoreCase);
 
-    await migrator.MigrateAsync(InitialMigration);
+      await migrator.MigrateAsync(InitialMigration);
 
-    var id = Guid.NewGuid().ToString("D");
-    const string originalName = "existing-row-before-upgrade";
-    await context.Database.ExecuteSqlInterpolatedAsync(
-        $"INSERT INTO provider_migration_qualification (Id, Name) VALUES ({id}, {originalName})");
+      var id = Guid.NewGuid().ToString("D");
+      const string originalName = "existing-row-before-upgrade";
+      await context.Database.ExecuteSqlInterpolatedAsync(
+          $"INSERT INTO provider_migration_qualification (Id, Name) VALUES ({id}, {originalName})");
 
-    await migrator.MigrateAsync(ExpandMigration);
+      await migrator.MigrateAsync(ExpandMigration);
 
-    var preservedName = await context.Database.SqlQueryRaw<string>(
-        $"SELECT Name AS Value FROM {TableName} WHERE Id = '{id}'").SingleAsync();
-    Assert.Equal(originalName, preservedName);
+      var preservedName = await context.Database.SqlQueryRaw<string>(
+          $"SELECT Name AS Value FROM {TableName} WHERE Id = '{id}'").SingleAsync();
+      Assert.Equal(originalName, preservedName);
 
-    var descriptionColumnCount = await context.Database.SqlQueryRaw<int>(
-        $"SELECT COUNT(*) AS Value FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '{TableName}' AND column_name = 'Description'")
-        .SingleAsync();
-    Assert.Equal(1, descriptionColumnCount);
+      var descriptionColumnCount = await context.Database.SqlQueryRaw<int>(
+          $"SELECT COUNT(*) AS Value FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '{TableName}' AND column_name = 'Description'")
+          .SingleAsync();
+      Assert.Equal(1, descriptionColumnCount);
 
-    var appliedMigrations = await context.Database.SqlQueryRaw<string>(
-        "SELECT MigrationId AS Value FROM __EFMigrationsHistory_MicrotingQualification ORDER BY MigrationId")
-        .ToListAsync();
-    Assert.Equal([InitialMigration, ExpandMigration], appliedMigrations);
+      var appliedMigrations = await context.Database.SqlQueryRaw<string>(
+          $"SELECT MigrationId AS Value FROM {HistoryTable} ORDER BY MigrationId")
+          .ToListAsync();
+      Assert.Equal([InitialMigration, ExpandMigration], appliedMigrations);
+    }
+    finally
+    {
+      // EnsureCreated in the provider lifecycle tests expects an empty schema.
+      // Keep this migration-only schema isolated by removing every object this test owns.
+      await context.Database.ExecuteSqlRawAsync($"DROP TABLE IF EXISTS {TableName}");
+      await context.Database.ExecuteSqlRawAsync($"DROP TABLE IF EXISTS {HistoryTable}");
+    }
   }
 }
 
 [DbContext(typeof(Franz.Common.EntityFramework.MariaDB.Tests.TestDbContext))]
-[Migration("202610260001_InitialProviderQualification")]
+[Migration("20261026000100_InitialProviderQualification")]
 public sealed class InitialProviderQualification : Migration
 {
   protected override void Up(MigrationBuilder migrationBuilder)
@@ -87,7 +98,7 @@ public sealed class InitialProviderQualification : Migration
 }
 
 [DbContext(typeof(Franz.Common.EntityFramework.MariaDB.Tests.TestDbContext))]
-[Migration("202610260002_AddDescriptionToProviderQualification")]
+[Migration("20261026000200_AddDescriptionToProviderQualification")]
 public sealed class AddDescriptionToProviderQualification : Migration
 {
   protected override void Up(MigrationBuilder migrationBuilder) =>
