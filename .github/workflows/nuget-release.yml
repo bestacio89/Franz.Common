@@ -1,0 +1,165 @@
+name: NuGet release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nuget-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-and-publish:
+    name: Validate and publish NuGet packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify release tag and main-branch ancestry
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" != "tag" || ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tags must use the vMAJOR.MINOR.PATCH format (for example, v2.3.1)."
+            exit 1
+          fi
+
+          version="${GITHUB_REF_NAME#v}"
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "::error::The tagged commit must already be reachable from origin/main."
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Release version: $version"
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.400
+
+      - name: Restore and audit dependencies
+        id: restore
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet restore Franz.Common.slnx --force-evaluate -p:NuGetAudit=true -p:NuGetAuditLevel=low 2>&1 | tee restore-audit.log
+          if grep -E 'NU190[1-4]' restore-audit.log; then
+            echo "vulnerabilities_found=true" >> "$GITHUB_OUTPUT"
+            echo "::error::NuGet restore reported package vulnerability advisories."
+          else
+            echo "vulnerabilities_found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build Release solution
+        run: dotnet build Franz.Common.slnx --configuration Release --no-restore
+
+      - name: Run complete test suite
+        run: dotnet test Franz.Common.slnx --configuration Release --no-build --blame-hang-timeout 10m --logger "trx;LogFileName=nuget-release.trx"
+
+      - name: Enforce NuGet vulnerability gate
+        if: always() && steps.restore.outputs.vulnerabilities_found == 'true'
+        shell: bash
+        run: |
+          echo "::error::Resolve all NU1901-NU1904 advisories before publishing."
+          exit 1
+
+      - name: Pack release packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages_dir="$RUNNER_TEMP/franz-nuget-packages"
+          rm -rf "$packages_dir"
+          mkdir -p "$packages_dir"
+          dotnet pack Franz.Common.slnx --configuration Release --no-build --no-restore --output "$packages_dir" -p:GeneratePackageOnBuild=false
+          echo "PACKAGES_DIR=$packages_dir" >> "$GITHUB_ENV"
+
+      - name: Validate package versions and metadata
+        env:
+          EXPECTED_VERSION: ${{ steps.release.outputs.version }}
+          PACKAGES_DIR: ${{ env.PACKAGES_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import sys
+          import zipfile
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          expected = os.environ["EXPECTED_VERSION"]
+          packages_dir = Path(os.environ["PACKAGES_DIR"])
+          common_targets = ET.parse("common.targets").getroot()
+          version_node = common_targets.find(".//Version")
+          if version_node is None or (version_node.text or "").strip() != expected:
+              actual = "(missing)" if version_node is None else (version_node.text or "").strip()
+              sys.exit(f"common.targets package version '{actual}' does not match release tag '{expected}'.")
+
+          packages = sorted(packages_dir.glob("*.nupkg"))
+          if not packages:
+              sys.exit(f"No .nupkg files were produced in {packages_dir}.")
+
+          for package in packages:
+              with zipfile.ZipFile(package) as archive:
+                  nuspecs = [name for name in archive.namelist() if name.lower().endswith(".nuspec")]
+                  if len(nuspecs) != 1:
+                      sys.exit(f"{package.name}: expected exactly one .nuspec, found {len(nuspecs)}.")
+                  metadata = ET.fromstring(archive.read(nuspecs[0])).find("./metadata")
+                  if metadata is None:
+                      sys.exit(f"{package.name}: .nuspec has no metadata element.")
+                  actual = metadata.findtext("version")
+                  if actual != expected:
+                      sys.exit(f"{package.name}: package version '{actual}' does not match tag '{expected}'.")
+
+          print(f"Validated {len(packages)} NuGet package(s) at version {expected}:")
+          for package in packages:
+              print(f" - {package.name}")
+          PY
+
+      - name: Upload release packages and audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: franz-nuget-${{ steps.release.outputs.version }}
+          path: |
+            ${{ env.PACKAGES_DIR }}/*.nupkg
+            ${{ env.PACKAGES_DIR }}/*.snupkg
+            restore-audit.log
+            **/TestResults/*.trx
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Publish packages to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          PACKAGES_DIR: ${{ env.PACKAGES_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${NUGET_API_KEY:-}" ]]; then
+            echo "::error::Repository secret NUGET_API_KEY is not configured."
+            exit 1
+          fi
+
+          shopt -s nullglob
+          packages=("$PACKAGES_DIR"/*.nupkg)
+          if (( ${#packages[@]} == 0 )); then
+            echo "::error::No NuGet packages are available to publish."
+            exit 1
+          fi
+
+          for package in "${packages[@]}"; do
+            echo "Publishing $(basename "$package")"
+            dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+          done
