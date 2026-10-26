@@ -58,6 +58,37 @@ public sealed class PersistenceLifecycleTests(MariaDbFixture database) : MariaDb
     Assert.True(retained.IsDeleted);
   }
 
+
+  [Fact]
+  public async Task RemoveParent_SoftDeletesTrackedChildrenWithoutPhysicalCascade()
+  {
+    var marker = $"cascade-{Guid.NewGuid():N}";
+    Guid parentId;
+    Guid childId;
+    await using (var context = CreateContext())
+    {
+      await context.Database.EnsureCreatedAsync();
+      var parent = new TestEntity
+      {
+        Name = marker,
+        Children = [new TestChild { Name = "cascade-child" }]
+      };
+      context.Entities.Add(parent);
+      await context.SaveChangesAsync();
+      parentId = parent.Id;
+      childId = parent.Children.Single().Id;
+
+      context.Entities.Remove(parent);
+      await context.SaveChangesAsync();
+    }
+
+    await using var verify = CreateContext();
+    Assert.False(await verify.Entities.AnyAsync(x => x.Id == parentId));
+    Assert.False(await verify.Children.AnyAsync(x => x.Id == childId));
+    Assert.True(await verify.Entities.IgnoreQueryFilters().AnyAsync(x => x.Id == parentId && x.IsDeleted));
+    Assert.True(await verify.Children.IgnoreQueryFilters().AnyAsync(x => x.Id == childId && x.IsDeleted));
+  }
+
   [Fact]
   public async Task SaveChanges_PersistsParentAndChildrenAndTranslatesQueries()
   {
