@@ -5,12 +5,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: Validate build, tests, package metadata, and release eligibility without tagging or publishing.
-        required: true
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -23,6 +17,7 @@ jobs:
   validate:
     name: Validate and pack NuGet packages
     runs-on: ubuntu-24.04
+    environment: production
     timeout-minutes: 90
     permissions:
       contents: read
@@ -32,7 +27,7 @@ jobs:
       release_needed: ${{ steps.release-version.outputs.release_needed }}
       dry_run: ${{ steps.release-version.outputs.dry_run }}
     env:
-      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || (github.event_name != 'workflow_dispatch' && vars.RELEASE_DRY_RUN != 'false') }}
+      DRY_RUN: ${{ vars.RELEASE_DRY_RUN != 'false' }}
     steps:
       - name: Checkout source and tags
         uses: actions/checkout@v4
@@ -246,6 +241,7 @@ jobs:
     needs: validate
     if: needs.validate.outputs.release_needed == 'true' && needs.validate.outputs.dry_run != 'true'
     runs-on: ubuntu-24.04
+    environment: production
     timeout-minutes: 30
     permissions:
       contents: write
