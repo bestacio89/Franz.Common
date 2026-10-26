@@ -59,3 +59,21 @@ The first CI attempt failed during restore, before build or tests:
 3. The Mediator test project referenced a nonexistent source-generator project path.
 
 Corrections now on the branch include the valid gRPC package versions, the corrected source-generator project reference, patched SSH.NET/Snappier dependencies, and removal of invalid cryptography package version references. Do not describe the upgrade as complete until the latest CI run proves restore, audit, Release build, and tests pass.
+
+## MariaDB provider qualification — follow-up work
+
+PR #134 is merged with `Microting.EntityFrameworkCore.MySql` 10.0.13 selected as the EF Core 10 candidate. The provider switch is not considered behaviorally qualified by package compatibility or a successful solution build alone.
+
+The follow-up qualification branch adds a real-database integration test using Testcontainers and MariaDB 11.4. The initial test exercises:
+
+- Container startup and provider connectivity.
+- Schema creation through EF Core.
+- Generated primary keys and persistence of a parent/child relationship.
+- SQL translation for string filtering, related-entity predicates, aggregate counts, and decimal comparisons.
+- Relationship loading.
+- Transaction rollback and verification that rolled-back data is absent.
+
+**Current status:** test coverage has been added, but execution results are pending CI. No claim is made yet that the candidate has passed these checks.
+
+This first slice does not establish migration compatibility, MySQL 8.4 compatibility, parity with the previous Pomelo provider, or correct behavior of Franz.Common's `AddMariaDatabase<TDbContext>` composition path. Those remain explicit follow-up gates. Next, run the new test on the exact PR head; then add migration and service-registration coverage based on the results, and evaluate MySQL 8.4 separately if MySQL is a supported target.
+
