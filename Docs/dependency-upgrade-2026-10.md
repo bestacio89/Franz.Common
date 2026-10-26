@@ -75,5 +75,14 @@ The follow-up qualification branch adds a real-database integration test using T
 
 **Current status:** on commit `c8c25f9e500c965d610759d3eff30c7c15c511b5`, the Release build succeeded and the integration-test project reported 14 passed and 0 failed, including the new MariaDB qualification test. The overall solution test step still failed because three Azure Cosmos DB emulator tests could not start their container; the emulator process crashed during startup with a Service Fabric `0x800700B7` exception. That failure is outside the MariaDB test path. A follow-up commit replaces the obsolete parameterless `MariaDbBuilder` constructor with the explicit image constructor; the full CI run for the latest PR head remains to be confirmed.
 
-This first slice does not establish migration compatibility, MySQL 8.4 compatibility, parity with the previous Pomelo provider, or correct behavior of Franz.Common's `AddMariaDatabase<TDbContext>` composition path. Those remain explicit follow-up gates. Next, run the new test on the exact PR head; then add migration and service-registration coverage based on the results, and evaluate MySQL 8.4 separately if MySQL is a supported target.
+The qualification suite is being moved out of `Franz.Common.Integration.Test` into the dedicated `tests/Franz.Common.EntityFramework.MariaDB.Tests` project so provider-specific fixtures, dependencies, and behavior checks remain isolated from unrelated integration tests.
+
+The dedicated project currently covers:
+- Real MariaDB 11.4 container lifecycle and a shared fixture.
+- Franz.Common `DbContextBase` auditing on create/update and soft-delete behavior on removal, including normal query filters versus `IgnoreQueryFilters()`.
+- Parent/child persistence, relationship loading, and representative LINQ translation.
+- Transaction commit and rollback, verified from a separate context.
+- The public `AddMariaDatabase<TDbContext>` registration path, including resolving `DbContextBase` and connecting through the configured provider.
+
+**Qualification status:** these test files have been authored but have not yet been executed in CI as a dedicated project. Do not treat the suite as green until the exact PR head completes restore, build, and test execution. Migration compatibility, MySQL 8.4 compatibility, and parity with the former Pomelo provider remain separate gates. Migration testing should use real migrations against a fresh database and an upgrade path; `EnsureCreated()` is not a substitute.
 
