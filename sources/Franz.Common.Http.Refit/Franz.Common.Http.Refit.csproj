@@ -8,11 +8,11 @@
      <PackageReference Include="Refit" Version="13.1.0" />
 
      <!-- HttpClientFactory primitives (AddHttpClient etc) -->
-     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.10" />
+     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.14" />
 
      <!-- Polly & integration for HttpClient (policy registry + AddPolicyHandlerFromRegistry) -->
      <PackageReference Include="Polly" Version="8.7.0" />
-     <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.10" />
+     <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.14" />
 
      <!-- Serilog for logging (library + aspnetcore integration if needed in host) -->
      <PackageReference Include="Serilog" Version="4.4.0" />
@@ -20,7 +20,7 @@
 
      <!-- OpenTelemetry API (your module annotates Activity.Current; host configures exporters) -->
      <PackageReference Include="OpenTelemetry.Api" Version="1.17.0" />
-     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
     </ItemGroup>
   <Import Project="..\..\common.targets" />  
 

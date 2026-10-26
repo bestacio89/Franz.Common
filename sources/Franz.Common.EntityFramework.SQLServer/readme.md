@@ -1,4 +1,29 @@
-# **Franz.Common.EntityFramework.SQLServer**
+# Franz.Common.EntityFramework.SQLServer
+
+> Persistence and infrastructure integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.EntityFramework.SQLServer` package provides persistence and infrastructure integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.EntityFramework.SQLServer
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A private utility library for seamless integration of **Entity Framework Core** with **SQL Server**, designed as part of the **Franz Framework** ecosystem. This package is versioned as `1.2.65` and is hosted exclusively on a private Azure NuGet feed.
 
@@ -123,8 +148,14 @@ This library is part of a private framework and subject to internal licensing te
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
-### v2.0.1 � Internal Modernization
+### v2.0.1 – Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
 - Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance — October 2026
+
+The SQL Server provider is aligned with the .NET 10 EF Core servicing baseline. The dependency audit also checks transitive cryptography packages; vulnerable older versions must not remain in the resolved graph. Run SQL Server integration tests before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

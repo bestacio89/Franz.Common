@@ -10,6 +10,8 @@ namespace Franz.Common.AzureCosmosDB.Tests;
 
 public class CosmosEntity : Entity<Guid>
 {
+  public CosmosEntity() { }
+  protected CosmosEntity(Guid id) : base(id) { }
   public string Label { get; set; } = string.Empty;
 }
 

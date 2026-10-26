@@ -1,4 +1,29 @@
-﻿# **Franz.Common.Http.Documentation**
+# Franz.Common.Http.Documentation
+
+> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Http.Documentation` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Http.Documentation
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A robust library within the **Franz Framework** designed to simplify and enhance API documentation for **ASP.NET Core** applications. This package provides seamless integration with native .NET OpenAPI, API versioning, Scalar UI, and route conventions — enabling clear, versioned, and comprehensive API documentation with zero third-party documentation dependencies.
 
@@ -44,8 +69,8 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 | Package | Version |
 |---|---|
 | `Asp.Versioning.Mvc.ApiExplorer` | 10.0.0 |
-| `Microsoft.AspNetCore.OpenApi` | 10.0.9 |
-| `Microsoft.Extensions.DependencyInjection.Abstractions` | 10.0.9 |
+| `Microsoft.AspNetCore.OpenApi` | 10.0.14 |
+| `Microsoft.Extensions.DependencyInjection.Abstractions` | 10.0.14 |
 | `Scalar.AspNetCore` | 2.16.6 |
 | `Franz.Common.Business` | 2.2.14 |
 | `Franz.Common.Reflection` | 2.2.14 |
@@ -258,3 +283,9 @@ Native OpenAPI eliminates this entire class of version conflict permanently.
 ### v1.2.65 — Initial .NET 9 Migration
 
 - Upgraded to **.NET 9**.
+
+---
+
+## Dependency maintenance — October 2026
+
+This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

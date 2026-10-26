@@ -1,4 +1,31 @@
-﻿---
+# Franz.Common.SSO
+
+> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.SSO` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.SSO
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
+
+---
 
 # **Franz.Common.SSO**
 
@@ -179,3 +206,9 @@ Console.WriteLine($"User: {identity.FullName}, Tenant: {identity.TenantId}, Role
 
 ### Version 1.6.20
 - Updated to **.NET 10.0**
+
+---
+
+## Dependency maintenance — October 2026
+
+The SSO package uses patched cryptography dependencies and a patched Snappier version where required by the resolved dependency graph. ASP.NET Core integration remains on the .NET 10 shared framework. Confirm SAML/OIDC and cryptographic flows with integration tests before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

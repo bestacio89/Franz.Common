@@ -1,5 +1,30 @@
 # Franz.Common.Http.Bootstrap
 
+> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Http.Bootstrap` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Http.Bootstrap
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
+
 **Package**: `Franz.Common.Http.Bootstrap`
 **Current Version:** v2.3.0
 
@@ -52,12 +77,12 @@ app.Run();
 
 ---
 
-## Refit (optional) — what the bootstrapper does
+## Refit (optional) â€” what the bootstrapper does
 
 When `Franz:HttpClients:EnableRefit` is `true`, the bootstrapper will:
 
 * Read `Franz:HttpClients:Apis` from configuration.
-* Resolve each typed Refit interface (prefer `InterfaceType` — assembly-qualified; falls back to assembly scan).
+* Resolve each typed Refit interface (prefer `InterfaceType` â€” assembly-qualified; falls back to assembly scan).
 * Invoke `AddFranzRefit<TClient>(...)` reflectively to register the typed client.
 * For each client it wires:
 
@@ -88,7 +113,7 @@ When `Franz:HttpClients:EnableRefit` is `true`, the bootstrapper will:
 **Notes**
 
 * `InterfaceType` (assembly-qualified) is recommended for deterministic resolution.
-* `Policy` is optional — if present the bootstrapper will attach the named policy from the host's `IPolicyRegistry<string>`.
+* `Policy` is optional â€” if present the bootstrapper will attach the named policy from the host's `IPolicyRegistry<string>`.
 
 ---
 
@@ -160,7 +185,7 @@ builder.Services.AddFranzRefit<MyApp.ApiClients.IWeatherApi>(
 
 For full changelog/history see the repository `CHANGELOG.md`.
 
-### v2.0.1 – Internal Modernization
+### v2.0.1 â€“ Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - All APIs remain fully backward compatible.
@@ -174,5 +199,10 @@ For full changelog/history see the repository `CHANGELOG.md`.
 
 ## Contributing & License
 
-This package is part of the private Franz Framework. Contributions are internal; follow your team’s contribution guidelines. Licensed under MIT.
+This package is part of the private Franz Framework. Contributions are internal; follow your teamâ€™s contribution guidelines. Licensed under MIT.
 
+---
+
+## Dependency maintenance â€” October 2026
+
+The dependency graph pins Snappier to a patched version to avoid the known high-severity issue in 1.0.0. The package continues to target .NET 10. Verify HTTP bootstrap, serialization, health-check, and compression-related paths with the full test suite before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

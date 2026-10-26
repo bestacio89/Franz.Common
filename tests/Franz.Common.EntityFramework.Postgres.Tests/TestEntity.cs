@@ -10,6 +10,8 @@ namespace Franz.Common.EntityFramework.Postgres.Tests;
 
 public class TestEntity : Entity<Guid>
 {
+  public TestEntity() { }
+  protected TestEntity(Guid id) : base(id) { }
   public string Name { get; set; } = string.Empty;
 }
 

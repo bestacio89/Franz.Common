@@ -1,4 +1,29 @@
-﻿# 📦 Franz.Common.Mediator (v2.3.0)
+# Franz.Common.Mediator
+
+> Application dispatch and request pipelines for the Franz.Common framework on .NET 10.
+
+## Overview
+
+The `Franz.Common.Mediator` package provides application dispatch and request pipelines within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Mediator
+```
+
+## Design principles
+
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
 
 A deterministic execution engine for application commands, queries, notifications, and events within the **Franz Framework**.
 
@@ -352,3 +377,9 @@ The runtime philosophy remains unchanged:
 The difference is that v2.3 removes unnecessary runtime discovery where modern applications demand maximum determinism.
 
 ---
+
+---
+
+## Dependency maintenance — October 2026
+
+This package now uses the .NET 10 ASP.NET Core shared framework for ASP.NET Core APIs instead of the obsolete ASP.NET Core 2.3.11 package. Microsoft.Extensions dependencies are aligned to the .NET 10 servicing baseline. No Mediator dispatch semantics or public API changes are intended by this dependency-only maintenance. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).

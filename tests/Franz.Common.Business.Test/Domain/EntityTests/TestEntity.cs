@@ -5,8 +5,9 @@ using System.Text;
 
 namespace Franz.Common.Business.Tests.Domain.EntityTests;
 
-internal sealed class TestEntity : Entity<Guid>
+internal class TestEntity : Entity<Guid>
 {
+  protected TestEntity(Guid id) : base(id) { }
 
 
   public TestEntity() { }

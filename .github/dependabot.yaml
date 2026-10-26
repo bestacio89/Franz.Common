@@ -1,8 +1,31 @@
-# version: 2
-# updates:
-#  - package-ecosystem: "nuget" # For .NET projects
-#    directory: "/"            # Root directory of the project
-#    schedule:
-#      interval: "weekly"      # Weekly interval
-#      day: "monday"           # Check every Monday
-#      time: "01:00"           # UTC time
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 10
+    groups:
+      microsoft-extensions-patch:
+        patterns:
+          - Microsoft.Extensions.*
+        update-types:
+          - patch
+      nuget-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
