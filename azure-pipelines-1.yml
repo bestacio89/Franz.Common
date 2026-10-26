@@ -292,85 +292,89 @@ stages:
   condition: succeeded()
 
   jobs:
-  - job: pack
+  - deployment: pack
     displayName: Pack and Publish
-    steps:
-    # Fresh checkout — reliable source of truth for publishing.
-    # Artifacts don't guarantee complete capture; repo checkout does.
-    - checkout: self
-      fetchDepth: 0
-      persistCredentials: true
+    environment: production
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          # Fresh checkout — reliable source of truth for publishing.
+          # Artifacts don't guarantee complete capture; repo checkout does.
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
 
-    - task: UseDotNet@2
-      inputs:
-        packageType: sdk
-        version: '10.0.400'
+          - task: UseDotNet@2
+            inputs:
+              packageType: sdk
+              version: '10.0.400'
 
-    - task: NuGetAuthenticate@1
+          - task: NuGetAuthenticate@1
 
-    - script: |
-        set -euo pipefail
-        dotnet restore
-      displayName: Restore
+          - script: |
+              set -euo pipefail
+              dotnet restore
+            displayName: Restore
 
-    - script: |
-        set -euo pipefail
-        dotnet build --configuration $(buildConfiguration) --no-restore
-      displayName: Build
+          - script: |
+              set -euo pipefail
+              dotnet build --configuration $(buildConfiguration) --no-restore
+            displayName: Build
 
-    - task: PowerShell@2
-      displayName: Clean package staging directory
-      inputs:
-        targetType: inline
-        pwsh: true
-        script: |
-          $ErrorActionPreference = 'Stop'
-          $packageDirectory = '$(outputDir)'
-          if (Test-Path $packageDirectory) {
-            Remove-Item -Path $packageDirectory -Recurse -Force
-          }
-          New-Item -Path $packageDirectory -ItemType Directory -Force | Out-Null
+          - task: PowerShell@2
+            displayName: Clean package staging directory
+            inputs:
+              targetType: inline
+              pwsh: true
+              script: |
+                $ErrorActionPreference = 'Stop'
+                $packageDirectory = '$(outputDir)'
+                if (Test-Path $packageDirectory) {
+                  Remove-Item -Path $packageDirectory -Recurse -Force
+                }
+                New-Item -Path $packageDirectory -ItemType Directory -Force | Out-Null
 
-    - script: |
-        set -euo pipefail
-        dotnet pack           --configuration $(buildConfiguration)           --no-restore           --no-build           --output $(outputDir)
-      displayName: Pack NuGet
+          - script: |
+              set -euo pipefail
+              dotnet pack           --configuration $(buildConfiguration)           --no-restore           --no-build           --output $(outputDir)
+            displayName: Pack NuGet
 
-    - task: PowerShell@2
-      displayName: Validate package release metadata
-      inputs:
-        targetType: inline
-        pwsh: true
-        script: |
-          $ErrorActionPreference = 'Stop'
-          $expectedVersion = '2.3.1'
-          $packages = @(Get-ChildItem -Path '$(outputDir)' -Filter '*.nupkg' -File)
-          if ($packages.Count -eq 0) {
-            throw "No NuGet packages were produced in $(outputDir)."
-          }
+          - task: PowerShell@2
+            displayName: Validate package release metadata
+            inputs:
+              targetType: inline
+              pwsh: true
+              script: |
+                $ErrorActionPreference = 'Stop'
+                $expectedVersion = '2.3.1'
+                $packages = @(Get-ChildItem -Path '$(outputDir)' -Filter '*.nupkg' -File)
+                if ($packages.Count -eq 0) {
+                  throw "No NuGet packages were produced in $(outputDir)."
+                }
 
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          foreach ($package in $packages) {
-            $archive = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
-            try {
-              $nuspec = $archive.Entries | Where-Object { $_.FullName -match '\\.nuspec
-    # Scripts are at repo root, resolved from the checkout workspace.
+                Add-Type -AssemblyName System.IO.Compression.FileSystem
+                foreach ($package in $packages) {
+                  $archive = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
+                  try {
+                    $nuspec = $archive.Entries | Where-Object { $_.FullName -match '\\.nuspec
+          # Scripts are at repo root, resolved from the checkout workspace.
 
-    - task: PowerShell@2
-      displayName: Publish to Franz Artifact
-      inputs:
-          filePath: '$(System.DefaultWorkingDirectory)/FranzArtifactPublisher.ps1'
-          arguments: '-PackagesDirectory "$(outputDir)"'
-          pwsh: true
-    
-    - task: PowerShell@2
-      displayName: Publish to NuGet.org
-      inputs:
-        filePath: '$(System.DefaultWorkingDirectory)/nugetpublish.ps1'
-        arguments: '-PackagesDirectory "$(outputDir)"'
-        pwsh: true
-      env:
-        NUGET_API_KEY: $(API_Key)
+          - task: PowerShell@2
+            displayName: Publish to Franz Artifact
+            inputs:
+                filePath: '$(System.DefaultWorkingDirectory)/FranzArtifactPublisher.ps1'
+                arguments: '-PackagesDirectory "$(outputDir)"'
+                pwsh: true
+          
+          - task: PowerShell@2
+            displayName: Publish to NuGet.org
+            inputs:
+              filePath: '$(System.DefaultWorkingDirectory)/nugetpublish.ps1'
+              arguments: '-PackagesDirectory "$(outputDir)"'
+              pwsh: true
+            env:
+              NUGET_API_KEY: $(API_Key)
 
 
 # ============================================================
