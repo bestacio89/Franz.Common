@@ -81,6 +81,7 @@
     <Project Path="tests/Franz.Common.EntityFramework.Oracle.Tests/Franz.Common.EntityFramework.Oracle.Tests.csproj" />
     <Project Path="tests/Franz.Common.EntityFramework.Postgres.Tests/Franz.Common.EntityFramework.Postgres.Tests.csproj" />
     <Project Path="tests/Franz.Common.EntityFramework.MariaDB.Tests/Franz.Common.EntityFramework.MariaDB.Tests.csproj" />
+    <Project Path="tests/Franz.Common.EntityFramework.MySql.Tests/Franz.Common.EntityFramework.MySql.Tests.csproj" />
     <Project Path="tests/Franz.Common.EntityFramework.SQLServer.Tests/Franz.Common.EntityFramework.SQLServer.Tests.csproj" />
     <Project Path="tests/Franz.Common.Integration.Test/Franz.Common.Integration.Tests.csproj" />
     <Project Path="tests/Franz.Common.Mapping.Tests/Franz.Common.Mapping.Tests.csproj" />
