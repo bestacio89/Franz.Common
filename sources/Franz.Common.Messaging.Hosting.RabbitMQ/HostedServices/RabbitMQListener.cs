@@ -69,7 +69,7 @@ public sealed class RabbitMQListener(
     {
       logger.LogInformation("🛑 RabbitMQ Listener cancellation requested for {Queue}", _queueName);
     }
-    catch (RabbitMQ.Client.Exceptions.OperationInterruptedException ex) when (ct.IsCancellationRequested)
+    catch (global::RabbitMQ.Client.Exceptions.OperationInterruptedException ex) when (ct.IsCancellationRequested)
     {
       // RabbitMQ may report consumer/channel shutdown as an interrupted operation
       // while cancellation is closing the consumer. Treat only this cancellation
