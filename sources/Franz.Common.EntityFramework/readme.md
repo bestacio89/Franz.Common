@@ -27,7 +27,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 
 ## 🚀 Version
 
-**Current Version:** v2.3.0
+**Current Version:** v2.3.2
 
 ---
 
