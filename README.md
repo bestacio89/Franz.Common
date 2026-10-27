@@ -289,7 +289,7 @@ SQL Server, Postgres, Oracle, MariaDB, MongoDB, CosmosDB — all behind unified 
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 2.2.18
+dotnet add package Franz.Common --version 2.3.2
 ```
 
 Messaging example:
@@ -424,7 +424,7 @@ The dependency baseline and compatibility notes are tracked in [the October 2026
 
 ## Versioning and compatibility
 
-- **Framework packages:** versioned together through `common.targets`; the dependency-maintenance release targets **2.3.1**.
+- **Framework packages:** versioned together through `common.targets`; the current release targets **2.3.2**.
 - **Target framework:** supported library projects target .NET 10 (`net10.0`). The repository pins SDK `10.0.400` in `global.json`; CI should use that same SDK.
 - **Third-party dependencies:** package versions are selected independently according to compatibility and security requirements. A package's version number is not the Franz.Common release version.
 - **Publishing:** the Azure DevOps publishing pipeline validates package metadata before publishing. Publish only after restore/audit, Release build, and full tests pass.
