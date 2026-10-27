@@ -18,7 +18,7 @@ This document outlines planned and potential future enhancements.
 
 ## Mediator runtime modernization
 
-Mediator improvements follow a correctness-first, measurement-driven sequence while preserving the current .NET 10 and Franz.Common 2.3.2 baseline. The detailed phases, compatibility constraints, and exit criteria are maintained in [the Mediator upgrade roadmap](mediator-upgrade-roadmap.md).
+Mediator improvements follow a correctness-first, measurement-driven sequence while preserving the current .NET 10 and Franz.Common 2.3.3 baseline. The detailed phases, compatibility constraints, and exit criteria are maintained in [the Mediator upgrade roadmap](mediator-upgrade-roadmap.md).
 
 ---
 
