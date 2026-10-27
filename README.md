@@ -340,6 +340,19 @@ dotnet test --filter Category=Integration
 
 Full version history lives in [`changelog.md`](changelog.md). Recent highlights:
 
+## v2.3.3 — RabbitMQ Operational Hardening
+
+- Supervised consumer startup and runtime failure through the generic host.
+- Defined single-owner acknowledgement and replay behavior, bounded delivery buffering, and safer channel/connection lifecycle management.
+- Enforced strict TLS validation by default and clarified transaction-channel ownership.
+- Documented operational contracts and added real-broker dead-letter routing coverage.
+
+This is the documentation baseline for the planned patch release; package publication remains a separate release step.
+
+## v2.3.2 — Release Baseline
+
+- Previous coordinated package baseline following .NET 10 dependency maintenance and provider qualification.
+
 ## v2.3.0 — Source Generated Runtime & Execution Model Modernization
 
 **Added**
