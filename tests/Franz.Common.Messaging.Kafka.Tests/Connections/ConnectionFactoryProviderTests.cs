@@ -66,7 +66,7 @@ public sealed class ConnectionFactoryProviderTests
     config.LingerMs.Should().Be(10);
     config.MessageSendMaxRetries.Should().Be(5);
     config.RetryBackoffMs.Should().Be(250);
-    config.DeliveryTimeoutMs.Should().Be(45000);
+    config.MessageTimeoutMs.Should().Be(45000);
     config.SecurityProtocol.Should().Be(SecurityProtocol.SaslSsl);
     config.SaslMechanism.Should().Be(SaslMechanism.ScramSha256);
     config.SaslUsername.Should().Be("user");
