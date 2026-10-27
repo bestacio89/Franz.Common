@@ -26,14 +26,7 @@ public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
   private IConnectionFactory CreateFactory()
   {
     var options = _options.Value;
-    var factory = new ConnectionFactory
-    {
-      ClientProvidedName = GetClientProvidedName(),
-      AutomaticRecoveryEnabled = options.AutomaticRecoveryEnabled ?? true,
-      TopologyRecoveryEnabled = options.TopologyRecoveryEnabled ?? true,
-      RequestedHeartbeat = TimeSpan.FromSeconds(
-          options.RequestedHeartbeatSeconds ?? 30)
-    };
+    var factory = new ConnectionFactory();
 
     if (!string.IsNullOrWhiteSpace(options.BootStrapServers))
     {
@@ -51,27 +44,34 @@ public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
       }
 
       factory.Uri = uri;
-      return factory;
     }
-
-    var sslEnabled = options.SslEnabled == true;
-    factory.HostName = Require(options.HostName, "localhost");
-    factory.UserName = Require(options.UserName, "guest");
-    factory.Password = Require(options.Password, "guest");
-    factory.VirtualHost = Require(options.VirtualHost, "/");
-    factory.Port = options.Port ?? (sslEnabled ? 5671 : AmqpTcpEndpoint.UseDefaultPort);
-
-    if (sslEnabled)
+    else
     {
-      factory.Ssl = new SslOption
+      var sslEnabled = options.SslEnabled == true;
+      factory.HostName = Require(options.HostName, "localhost");
+      factory.UserName = Require(options.UserName, "guest");
+      factory.Password = Require(options.Password, "guest");
+      factory.VirtualHost = Require(options.VirtualHost, "/");
+      factory.Port = options.Port ?? (sslEnabled ? 5671 : AmqpTcpEndpoint.UseDefaultPort);
+
+      if (sslEnabled)
       {
-        Enabled = true,
-        ServerName = factory.HostName,
-        // Never silently accept missing, mismatched, or untrusted server certificates.
-        AcceptablePolicyErrors = SslPolicyErrors.None,
-        Version = SslProtocols.Tls12 | SslProtocols.Tls13
-      };
+        factory.Ssl = new SslOption
+        {
+          Enabled = true,
+          ServerName = factory.HostName,
+          // Never silently accept missing, mismatched, or untrusted server certificates.
+          AcceptablePolicyErrors = SslPolicyErrors.None,
+          Version = SslProtocols.Tls12 | SslProtocols.Tls13
+        };
+      }
     }
+
+    // Apply framework options after URI parsing so explicit options are authoritative.
+    factory.ClientProvidedName = GetClientProvidedName();
+    factory.AutomaticRecoveryEnabled = options.AutomaticRecoveryEnabled ?? true;
+    factory.TopologyRecoveryEnabled = options.TopologyRecoveryEnabled ?? true;
+    factory.RequestedHeartbeat = TimeSpan.FromSeconds(options.RequestedHeartbeatSeconds ?? 30);
 
     return factory;
   }
