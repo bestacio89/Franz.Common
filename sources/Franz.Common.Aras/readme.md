@@ -45,7 +45,7 @@ It lets you treat ARAS as just another persistence provider — with **Entities*
 - ? **Full samples** for Entities, Aggregates, UoW, Testing, and Snapshots  
 ````
 ---
-**Current Version:** v2.3.0
+**Current Version:** v2.3.2
 --- 
 ## ?? Installation
 
