@@ -65,7 +65,7 @@ This package simplifies transactional handling, dependency injection, and middle
 
 ## **Version Information**
 
-* **Current Version:** v2.3.0
+* **Current Version:** v2.3.2
   → Adds **environment-aware validation**, stronger governance for multi-database setups, and provider-context alignment.
 * Part of the private **Franz Framework** ecosystem.
 
