@@ -1646,4 +1646,4 @@ To help potential users understand the scope of `Franz.Common.Logging` at a glan
 
 **Compatibility and release scope**
 - These notes describe the planned 2.3.3 documentation baseline for the RabbitMQ hardening work.
-- Package metadata, assembly/file versions, and NuGet publication remain separate release steps; this documentation change does not publish packages.
+- The shared `common.targets` package version is set to 2.3.3 and file version to 2.3.3.0; the assembly version remains 2.3.0.0. NuGet publication remains a separate release step.
