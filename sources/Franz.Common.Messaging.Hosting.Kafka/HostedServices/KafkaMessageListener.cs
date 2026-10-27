@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Confluent.Kafka;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
@@ -30,15 +30,13 @@ public sealed class KafkaMessageListener : IListener
   public async Task Listen(CancellationToken stoppingToken = default)
   {
     _consumer.Subscribe(_topics);
-    _logger.LogInformation(
-        "🎧 Kafka listener subscribed to {Topics}",
-        string.Join(", ", _topics));
+    _logger.LogInformation("Kafka listener subscribed to {Topics}", string.Join(", ", _topics));
 
     try
     {
       while (!stoppingToken.IsCancellationRequested)
       {
-        ConsumeResult<string, string>? result = null;
+        ConsumeResult<string, string> result;
         try
         {
           result = _consumer.Consume(stoppingToken);
@@ -49,67 +47,67 @@ public sealed class KafkaMessageListener : IListener
         }
         catch (ConsumeException ex)
         {
-          _logger.LogError(ex, "❌ Kafka consume error");
-          continue;
+          _logger.LogError(ex, "Kafka consume error");
+          throw;
         }
 
-        if (result?.Message?.Value is null)
+        // A Kafka tombstone (null value) is a valid record. There is no payload
+        // to dispatch, so it can be acknowledged after recording the skip.
+        if (result.Message?.Value is null)
         {
-          if (result is not null)
-            _consumer.Commit(result);
+          _logger.LogDebug("Skipping Kafka tombstone on {Topic} partition {Partition} offset {Offset}",
+            result.Topic, result.Partition, result.Offset);
+          _consumer.Commit(result);
           continue;
         }
 
         Message? transport;
         try
         {
-          // ✅ Delegate to IMessageSerializer abstraction — JsonSerializer
-          // is no longer a direct dependency of this class. The concrete
-          // implementation is resolved from DI via AddDefaultMessageSerializer().
           transport = _serializer.Deserialize<Message>(result.Message.Value);
         }
         catch (Exception ex)
         {
-          _logger.LogWarning(
-              ex,
-              "⚠️ Failed to deserialize Kafka message on topic {Topic}",
-              result.Topic);
-          _consumer.Commit(result);
-          continue;
+          _logger.LogError(ex, "Kafka envelope deserialization failed on {Topic} partition {Partition} offset {Offset}",
+            result.Topic, result.Partition, result.Offset);
+          // Do not advance the offset: the invalid record remains observable and
+          // must be handled through the configured operational/DLT policy.
+          throw;
         }
 
         if (transport is null)
         {
-          _consumer.Commit(result);
-          continue;
+          var error = new InvalidOperationException(
+            $"Kafka envelope deserialized to null at {result.Topic}/{result.Partition}/{result.Offset}.");
+          _logger.LogError(error, "Kafka envelope was null");
+          throw error;
         }
 
-        if (OnMessageReceivedAsync is not null)
+        var handler = OnMessageReceivedAsync
+          ?? throw new InvalidOperationException("Kafka message handler has not been configured.");
+
+        try
         {
-          try
-          {
-            // Awaiting ensures the handler (including scope disposal) completes
-            // before moving to the next message — at-least-once guarantee.
-            await OnMessageReceivedAsync(new MessageEventArgs(transport));
-          }
-          catch (Exception ex)
-          {
-            _logger.LogError(
-                ex,
-                "🔥 Kafka handler failed for message {MessageId} on topic {Topic}",
-                transport.Id,
-                result.Topic);
-          }
+          // Sequential processing keeps commit order aligned with processing order.
+          await handler(new MessageEventArgs(transport)).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+          _logger.LogError(ex,
+            "Kafka handler failed for message {MessageId} on {Topic} partition {Partition} offset {Offset}; offset will not be committed",
+            transport.Id, result.Topic, result.Partition, result.Offset);
+          throw;
         }
 
-        // ✅ Commit ONLY after the handler has finished — never before.
+        // Commit only after successful handler completion. With auto commit/store
+        // disabled, this provides at-least-once delivery (duplicates are possible).
         _consumer.Commit(result);
       }
     }
     finally
     {
       _consumer.Close();
-      _logger.LogInformation("🛑 Kafka listener stopped");
+      _logger.LogInformation("Kafka listener stopped");
     }
   }
 
@@ -117,13 +115,12 @@ public sealed class KafkaMessageListener : IListener
   {
     try
     {
-      _logger.LogInformation("📤 Kafka consumer unsubscribing...");
+      _logger.LogInformation("Kafka consumer unsubscribing");
       _consumer.Unsubscribe();
-      _logger.LogInformation("✅ Kafka consumer unsubscribed.");
     }
     catch (Exception ex)
     {
-      _logger.LogError(ex, "❌ Error during Kafka unsubscribe.");
+      _logger.LogError(ex, "Error during Kafka unsubscribe");
       return Task.FromException(ex);
     }
 
