@@ -27,7 +27,7 @@ public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
       BatchSize = _options.Producer.BatchSize,
       MessageSendMaxRetries = _options.Producer.MessageSendMaxRetries,
       RetryBackoffMs = _options.Producer.RetryBackoffMs,
-      DeliveryTimeoutMs = _options.Producer.DeliveryTimeoutMs,
+      MessageTimeoutMs = _options.Producer.DeliveryTimeoutMs,
       CompressionType = MapCompression(_options.Producer.CompressionType),
 
       // Security
