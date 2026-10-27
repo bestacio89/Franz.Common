@@ -44,8 +44,13 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
     // the background service before the test has a chance to publish anything.
     using (var scope = Host.Services.CreateScope())
     {
-      var initializer = scope.ServiceProvider.GetRequiredService<IMessagingInitializer>();
-      await initializer.InitializeAsync();
+      // Multiple messaging transports and stores can register initializers.
+      // Initialize every registered component rather than only the last registration.
+      var initializers = scope.ServiceProvider.GetServices<IMessagingInitializer>();
+      foreach (var initializer in initializers)
+      {
+        await initializer.InitializeAsync();
+      }
     }
 
     await Host.StartAsync();
