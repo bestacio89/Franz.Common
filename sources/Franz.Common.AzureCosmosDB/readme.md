@@ -188,7 +188,7 @@ await messageStore.SaveAsync(msg);
 
 ---
 
-**Current Version:** v2.3.0
+**Current Version:** v2.3.2
 
 ## **Changelog**
 
