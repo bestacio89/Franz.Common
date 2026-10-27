@@ -145,7 +145,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
 
     var companyName = entryAssembly.Name?.Split('.').FirstOrDefault() ?? string.Empty;
 
-    var integrationEvents = CachedIntegrationEvents.GetOrAdd(entryAssembly, _ =>
+    var integrationEvents = CachedIntegrationEvents.GetOrAdd(entryAssembly.Assembly, _ =>
         AppDomain.CurrentDomain
             .GetAssemblies()
             .Where(a => !a.IsDynamic &&
