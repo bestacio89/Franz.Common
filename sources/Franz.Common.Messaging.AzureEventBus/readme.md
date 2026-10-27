@@ -234,7 +234,7 @@ Other Azure transports are implemented separately:
 * Event Hubs streaming adapter (Kafka-style)
 
 
-* **Current Version:** v2.3.0
+* **Current Version:** v2.3.2
 * Target Framework: **.NET 10**
 * Part of the **Franz Framework**
 
