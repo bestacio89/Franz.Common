@@ -83,22 +83,41 @@ public sealed class RabbitMQListener(
 
       await using var consumer = new RabbitMqConsumer(channel, _queueName);
       var enumerator = consumer.ConsumeAsync(ct).GetAsyncEnumerator(ct);
+      Task<bool>? pendingMoveNext = null;
       try
       {
         // The first MoveNextAsync starts the iterator. The consumer's explicit
         // readiness signal only completes after BasicConsumeAsync succeeds.
-        var moveNextTask = enumerator.MoveNextAsync().AsTask();
+        pendingMoveNext = enumerator.MoveNextAsync().AsTask();
         await consumer.WaitUntilReadyAsync().WaitAsync(ct).ConfigureAwait(false);
         readyTcs.TrySetResult();
 
-        while (await moveNextTask.ConfigureAwait(false))
+        while (await pendingMoveNext.ConfigureAwait(false))
         {
           await ReceiveMessageAsync(channel, enumerator.Current, ct).ConfigureAwait(false);
-          moveNextTask = enumerator.MoveNextAsync().AsTask();
+          pendingMoveNext = enumerator.MoveNextAsync().AsTask();
         }
+
+        pendingMoveNext = null;
       }
       finally
       {
+        // Async iterators reject concurrent MoveNextAsync/DisposeAsync calls.
+        // Drain the outstanding move before disposing the enumerator.
+        if (pendingMoveNext is not null)
+        {
+          try
+          {
+            await pendingMoveNext.ConfigureAwait(false);
+          }
+          catch (OperationCanceledException) when (ct.IsCancellationRequested)
+          {
+          }
+          catch (global::RabbitMQ.Client.Exceptions.OperationInterruptedException) when (ct.IsCancellationRequested)
+          {
+          }
+        }
+
         await enumerator.DisposeAsync().ConfigureAwait(false);
       }
     }
