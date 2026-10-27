@@ -39,7 +39,10 @@ public sealed class ConnectionFactoryProviderTests
       {
         Acks = KafkaAcks.Leader,
         EnableIdempotence = false,
-        LingerMs = 10
+        LingerMs = 10,
+        MessageSendMaxRetries = 5,
+        RetryBackoffMs = 250,
+        DeliveryTimeoutMs = 45000
       },
       Security = new KafkaSecurityOptions
       {
@@ -61,6 +64,9 @@ public sealed class ConnectionFactoryProviderTests
     config.Acks.Should().Be(Acks.Leader);
     config.EnableIdempotence.Should().BeFalse();
     config.LingerMs.Should().Be(10);
+    config.MessageSendMaxRetries.Should().Be(5);
+    config.RetryBackoffMs.Should().Be(250);
+    config.DeliveryTimeoutMs.Should().Be(45000);
     config.SecurityProtocol.Should().Be(SecurityProtocol.SaslSsl);
     config.SaslMechanism.Should().Be(SaslMechanism.ScramSha256);
     config.SaslUsername.Should().Be("user");
