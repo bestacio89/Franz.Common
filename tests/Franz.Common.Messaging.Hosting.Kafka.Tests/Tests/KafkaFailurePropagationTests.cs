@@ -29,6 +29,7 @@ public sealed class KafkaFailurePropagationTests
         provider.GetRequiredService<ILogger<KafkaMessagingHostedService>>());
 
     await hostedService.StartAsync(CancellationToken.None);
+    await listener.HandlerReady.WaitAsync(TimeSpan.FromSeconds(5));
 
     var message = new Message("{}");
     var act = () => listener.OnMessageReceivedAsync!(
@@ -44,11 +45,17 @@ public sealed class KafkaFailurePropagationTests
   {
     private readonly TaskCompletionSource _stopped =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _handlerReady =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
+    public Task HandlerReady => _handlerReady.Task;
 
     public Task Listen(CancellationToken stoppingToken = default)
-        => _stopped.Task.WaitAsync(stoppingToken);
+    {
+      _handlerReady.TrySetResult();
+      return _stopped.Task.WaitAsync(stoppingToken);
+    }
 
     public Task StopListenAsync(CancellationToken cancellationToken = default)
     {
