@@ -1,4 +1,4 @@
-﻿using Franz.Common.Errors;
+using Franz.Common.Errors;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Hosting.Executing;
 using Franz.Common.Messaging.Hosting.Properties;
@@ -26,32 +26,29 @@ public sealed class KafkaMessagingHostedService : BackgroundService
 
   protected override async Task ExecuteAsync(CancellationToken stoppingToken)
   {
-    // ✅ Register the Task-based delegate
     _listener.OnMessageReceivedAsync = HandleMessageInternalAsync;
 
     try
     {
-      _logger.LogInformation("🚀 MessagingHostedService started");
+      _logger.LogInformation("Messaging hosted service started.");
       await _listener.Listen(stoppingToken);
     }
-    catch (OperationCanceledException)
+    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
     {
-      // Expected on shutdown
+      // Expected during graceful shutdown.
     }
     catch (Exception ex)
     {
-      _logger.LogCritical(ex, "❌ MessagingHostedService crashed");
+      _logger.LogCritical(ex, "Messaging hosted service stopped after an unrecoverable listener failure.");
       throw;
     }
     finally
     {
-      // ✅ Clean up delegate reference
       _listener.OnMessageReceivedAsync = null;
-      _logger.LogInformation("🛑 MessagingHostedService stopped");
+      _logger.LogInformation("Messaging hosted service stopped.");
     }
   }
 
-  // ✅ Changed from 'async void' to 'async Task' to allow the listener to await completion
   private async Task HandleMessageInternalAsync(MessageEventArgs args)
   {
     try
@@ -66,14 +63,12 @@ public sealed class KafkaMessagingHostedService : BackgroundService
       var executers =
           scope.ServiceProvider.GetServices<IMessagingStrategyExecuter>();
 
-      // ✅ Senior Architect Rule: Avoid .GetAwaiter().GetResult() in async paths.
-      // Use an asynchronous search for the strategy executer.
       IMessagingStrategyExecuter? executer = null;
-      foreach (var e in executers)
+      foreach (var candidate in executers)
       {
-        if (await e.CanExecuteAsync(args.Message))
+        if (await candidate.CanExecuteAsync(args.Message))
         {
-          executer = e;
+          executer = candidate;
           break;
         }
       }
@@ -85,11 +80,8 @@ public sealed class KafkaMessagingHostedService : BackgroundService
     }
     catch (Exception ex)
     {
-      // Do NOT crash the host because of a bad message, but log it properly.
-      _logger.LogError(ex, "❌ Error handling incoming message {MessageId}", args.Message.Id);
-
-      // Note: If you want Kafka to retry, you might re-throw here so the Listener 
-      // doesn't commit the offset.
+      _logger.LogError(ex, "Message handler failed for message {MessageId}. The failure is propagated so the transport cannot acknowledge it as successful.", args.Message.Id);
+      throw;
     }
   }
 

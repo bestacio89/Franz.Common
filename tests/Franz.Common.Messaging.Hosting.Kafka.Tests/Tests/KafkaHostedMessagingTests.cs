@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using System.Text;
 using FluentAssertions;
 using Franz.Common.Messaging.Hosting.Kafka.HostedServices;
 using Franz.Common.Messaging.Hosting.Kafka.Tests.Fixtures;
@@ -23,10 +24,8 @@ public sealed class KafkaMessagingEngineTests
   [Fact]
   public async Task HandleMessage_ShouldInjectCorrectCorrelationId_IntoScopedContext()
   {
-    // 1. Arrange
     var probe = _fixture.Host!.Services.GetRequiredService<ITestProbe>();
     var serializer = _fixture.Host.Services.GetRequiredService<IMessageSerializer>();
-
     var correlationId = Guid.CreateVersion7();
     var messageId = Guid.CreateVersion7();
 
@@ -36,25 +35,40 @@ public sealed class KafkaMessagingEngineTests
       CorrelationId = correlationId
     };
 
-    var rawContent = serializer.Serialize(message);
+    await _fixture.ProduceRawMessageAsync("TestEvent", serializer.Serialize(message));
 
-    // 2. Act
-    await _fixture.ProduceRawMessageAsync("TestEvent", rawContent);
-
-    // 3. Assert
     var arrived = await probe.WaitForArrivalAsync(messageId);
-    arrived.Should().BeTrue("The strategy executer must be found and executed.");
+    arrived.Should().BeTrue("the strategy executer must be found and executed.");
+  }
+
+  [Fact]
+  public async Task HandlerFailure_ShouldPublishOriginalPayloadToDeadLetterTopic()
+  {
+    var serializer = _fixture.Host!.Services.GetRequiredService<IMessageSerializer>();
+    var message = new Message("__fail__") { Id = Guid.CreateVersion7() };
+    var payload = serializer.Serialize(message);
+
+    await _fixture.ProduceRawMessageAsync("TestEvent", payload);
+
+    var deadLetter = await _fixture.ConsumeDeadLetterAsync(
+        "hero-test-dlt", payload, TimeSpan.FromSeconds(10));
+
+    deadLetter.Should().NotBeNull("the original record must be preserved after retries are exhausted");
+    Encoding.UTF8.GetString(deadLetter!.Message.Value).Should().Be(payload);
+    deadLetter.Message.Headers.Any(h => h.Key == "x-franz-original-topic").Should().BeTrue();
+    deadLetter.Message.Headers.Any(h => h.Key == "x-franz-failure-type").Should().BeTrue();
+    deadLetter.Message.Headers
+        .First(h => h.Key == "x-franz-original-topic")
+        .GetValueBytes()
+        .Should()
+        .Equal(Encoding.UTF8.GetBytes("TestEvent"));
   }
 
   [Fact]
   public void Listener_ShouldHaveDelegate_WiredByHostedService()
   {
-    // Verifies that KafkaMessagingHostedService correctly wired
-    // OnMessageReceivedAsync on startup — without stopping the shared host
-    // which would break all subsequent tests in the collection.
     var listener = _fixture.Host!.Services.GetRequiredService<KafkaMessageListener>();
-
     listener.OnMessageReceivedAsync.Should().NotBeNull(
-        "KafkaMessagingHostedService should have wired OnMessageReceivedAsync on startup.");
+        "KafkaMessagingHostedService should wire the callback before listening.");
   }
 }
