@@ -44,6 +44,16 @@ public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
       }
 
       factory.Uri = uri;
+      if (uri.Scheme == "amqps")
+      {
+        factory.Ssl = new SslOption
+        {
+          Enabled = true,
+          ServerName = uri.Host,
+          AcceptablePolicyErrors = SslPolicyErrors.None,
+          Version = SslProtocols.Tls12 | SslProtocols.Tls13
+        };
+      }
     }
     else
     {

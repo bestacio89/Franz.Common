@@ -84,7 +84,7 @@ public sealed class ConnectionTests
     });
     var provider = new ConnectionFactoryProvider(options, new AssemblyAccessorWrapper());
 
-    var act = () => provider.Current;
+    Action act = () => _ = provider.Current;
 
     act.Should().Throw<InvalidOperationException>()
         .WithMessage("*BootStrapServers*");
