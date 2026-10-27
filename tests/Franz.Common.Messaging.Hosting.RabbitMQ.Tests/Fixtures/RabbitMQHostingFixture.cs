@@ -1,5 +1,9 @@
 ﻿#nullable enable
 using Franz.Common.Mediator.Extensions;
+using Franz.Common.Messaging;
+using Franz.Common.Messaging.RabbitMQ;
+using Franz.Common.Messaging.RabbitMQ.Connections;
+using Franz.Common.Reflection;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.MongoDB.Extensions;
@@ -37,6 +41,26 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
 
     // 2️⃣ Build host with merged configuration
     Host = BuildHost();
+
+    // Declare exchanges and queues before the hosted listener attempts to consume.
+    // Starting a consumer against a missing queue closes its channel and can fault
+    // the background service before the test has a chance to publish anything.
+    using (var scope = Host.Services.CreateScope())
+    {
+      // Multiple messaging transports and stores can register initializers.
+      // Initialize every registered component rather than only the last registration.
+      var initializers = scope.ServiceProvider.GetServices<IMessagingInitializer>();
+      foreach (var initializer in initializers)
+      {
+        await initializer.InitializeAsync();
+      }
+
+      // TestHost is the process entry assembly under xUnit. Provision the exact
+      // queue derived by RabbitMQListener explicitly, so the test exercises the
+      // listener lifecycle rather than depending on entry-assembly discovery.
+      await DeclareListenerTopologyAsync(scope.ServiceProvider);
+    }
+
     await Host.StartAsync();
   }
 
@@ -52,6 +76,37 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
     await Task.WhenAll(
         _rabbit.DisposeAsync(),
         _mongo.DisposeAsync());
+  }
+
+  private static async Task DeclareListenerTopologyAsync(IServiceProvider services)
+  {
+    var assembly = services.GetRequiredService<IAssemblyAccessor>().GetEntryAssembly()
+        ?? throw new InvalidOperationException("Entry assembly cannot be null.");
+    var queue = QueueNamer.GetQueueName(assembly);
+    var exchange = ExchangeNamer.GetEventExchangeName(assembly);
+    var deadLetterQueue = QueueNamer.GetDeadLetterQueueName(assembly);
+    var deadLetterExchange = ExchangeNamer.GetDeadLetterExchangeName(assembly);
+    var channel = await services.GetRequiredService<IChannelPool>().GetAsync();
+
+    try
+    {
+      await channel.ExchangeDeclareAsync(exchange, ExchangeType.Headers, durable: true, autoDelete: false);
+      await channel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Direct, durable: true, autoDelete: false);
+      await channel.QueueDeclareAsync(queue, durable: true, exclusive: false, autoDelete: false,
+          arguments: new Dictionary<string, object?>
+          {
+            ["x-queue-type"] = "quorum",
+            ["x-dead-letter-exchange"] = deadLetterExchange,
+            ["x-dead-letter-routing-key"] = deadLetterQueue
+          });
+      await channel.QueueDeclareAsync(deadLetterQueue, durable: true, exclusive: false, autoDelete: false,
+          arguments: new Dictionary<string, object?> { ["x-queue-type"] = "quorum" });
+      await channel.QueueBindAsync(deadLetterQueue, deadLetterExchange, deadLetterQueue);
+    }
+    finally
+    {
+      services.GetRequiredService<IChannelPool>().Return(channel);
+    }
   }
 
   private IHost BuildHost()

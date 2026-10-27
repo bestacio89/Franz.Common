@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
@@ -9,7 +9,7 @@ using System.Text;
 namespace Franz.Common.Messaging.RabbitMQ;
 
 public sealed class RabbitMQMessagingSender(
-    Connections.ChannelPool channelPool,
+    Connections.IChannelPool channelPool,
     IMessageHandler handler,
     IMessagingTransaction? transaction = null)
     : IMessagingSender, IAsyncDisposable, IDisposable
@@ -31,29 +31,19 @@ public sealed class RabbitMQMessagingSender(
     ArgumentNullException.ThrowIfNull(message.Body);
 
     await handler.ProcessAsync(message, cancellationToken).ConfigureAwait(false);
-
     var queue = QueueNamer.GetQueueName(message.Kind);
-
     var channel = await channelPool.GetAsync(cancellationToken).ConfigureAwait(false);
 
     try
     {
-      if (transaction is RabbitMQMessagingTransaction rmt)
-      {
-        rmt.Attach(channel);
-      }
+      if (transaction is RabbitMQMessagingTransaction rabbitTransaction)
+        rabbitTransaction.Attach(channel);
 
       if (transaction is not null)
-      {
-        await transaction.BeginAsync().ConfigureAwait(false);
-      }
+        await transaction.BeginAsync(cancellationToken).ConfigureAwait(false);
 
       var body = Encoding.UTF8.GetBytes(message.Body);
-
-      // ✅ FIX 1: remove unsafe cast + force null safety explicitly
       var properties = message.Headers.ToBasicProperties();
-
-      // Ensure non-null BasicProperties
       var basicProperties = properties ?? new BasicProperties
       {
         Headers = new Dictionary<string, object?>()
@@ -65,25 +55,58 @@ public sealed class RabbitMQMessagingSender(
           mandatory: true,
           basicProperties: basicProperties,
           body: body,
-          cancellationToken: cancellationToken
-      ).ConfigureAwait(false);
+          cancellationToken: cancellationToken).ConfigureAwait(false);
 
       if (transaction is not null)
-      {
-        await transaction.CompleteAsync().ConfigureAwait(false);
-      }
+        await transaction.CompleteAsync(cancellationToken).ConfigureAwait(false);
     }
-    catch
+    catch (Exception sendException)
     {
       if (transaction is not null)
       {
-        await transaction.RollbackAsync().ConfigureAwait(false);
+        try
+        {
+          await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception rollbackException)
+        {
+          throw new AggregateException(
+              "RabbitMQ send failed and the transaction rollback also failed.",
+              sendException,
+              rollbackException);
+        }
       }
+
       throw;
     }
     finally
     {
-      channelPool.Return(channel);
+      if (transaction is RabbitMQMessagingTransaction)
+        await DisposeTransactionalChannelAsync(channel).ConfigureAwait(false);
+      else
+        channelPool.Return(channel);
+    }
+  }
+
+  private static async ValueTask DisposeTransactionalChannelAsync(IChannel channel)
+  {
+    try
+    {
+      if (channel.IsOpen)
+        await channel.CloseAsync().ConfigureAwait(false);
+    }
+    catch
+    {
+      // A channel in transaction mode must never return to the shared pool.
+    }
+
+    try
+    {
+      await channel.DisposeAsync().ConfigureAwait(false);
+    }
+    catch
+    {
+      // Preserve the send/transaction outcome if cleanup also fails.
     }
   }
 }
