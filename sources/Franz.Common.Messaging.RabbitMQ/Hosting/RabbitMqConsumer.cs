@@ -6,71 +6,80 @@ using System.Threading.Channels;
 namespace Franz.Common.Messaging.RabbitMQ.Hosting;
 
 /// <summary>
-/// High-performance bridge between RabbitMQ push events and IAsyncEnumerable.
-/// Senior Note: Utilizes System.Threading.Channels for thread-safe handoffs and zero-allocation streaming.
+/// Bridges RabbitMQ push deliveries to a bounded, sequential async stream.
 /// </summary>
 public sealed class RabbitMqConsumer(
-    IChannel channel, 
-    string queueName, 
+    IChannel channel,
+    string queueName,
     ushort prefetchCount = 10) : IAsyncDisposable
 {
-    private readonly Channel<BasicDeliverEventArgs> _messageChannel = Channel.CreateUnbounded<BasicDeliverEventArgs>(new UnboundedChannelOptions
-    {
-        SingleReader = true,
-        SingleWriter = true
-    });
+    private readonly Channel<BasicDeliverEventArgs> _messageChannel =
+        Channel.CreateBounded<BasicDeliverEventArgs>(new BoundedChannelOptions(prefetchCount)
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.Wait
+        });
 
+    private readonly TaskCompletionSource _readyTcs =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
     private string? _consumerTag;
 
-    public async IAsyncEnumerable<BasicDeliverEventArgs> ConsumeAsync([EnumeratorCancellation] CancellationToken ct = default)
+    /// <summary>Completes after RabbitMQ has accepted the consumer registration.</summary>
+    public Task WaitUntilReadyAsync() => _readyTcs.Task;
+
+    public async IAsyncEnumerable<BasicDeliverEventArgs> ConsumeAsync(
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
-        // 1. Configure Quality of Service (Back-pressure)
-        // Senior Note: prefetchCount determines how many un-acked messages RabbitMQ sends.
-        await channel.BasicQosAsync(0, prefetchCount, false, ct).ConfigureAwait(false);
-
-        var consumer = new AsyncEventingBasicConsumer(channel);
-        
-        // 2. Event Handler -> Channel Writer Bridge
-        consumer.ReceivedAsync += (sender, args) =>
+        try
         {
-            // Non-blocking write to the internal buffer
-            _messageChannel.Writer.TryWrite(args);
-            return Task.CompletedTask;
-        };
+            await channel.BasicQosAsync(0, prefetchCount, global: false, cancellationToken: ct)
+                .ConfigureAwait(false);
 
-        // 3. Start the actual RabbitMQ Consumption
-        _consumerTag = await channel.BasicConsumeAsync(
-            queue: queueName,
-            autoAck: false,
-            consumer: consumer,
-            cancellationToken: ct).ConfigureAwait(false);
+            var consumer = new AsyncEventingBasicConsumer(channel);
+            consumer.ReceivedAsync += async (_, args) =>
+            {
+                await _messageChannel.Writer.WriteAsync(args, ct).ConfigureAwait(false);
+            };
 
-        // 4. Yield messages as they arrive in the channel
+            _consumerTag = await channel.BasicConsumeAsync(
+                queue: queueName,
+                autoAck: false,
+                consumer: consumer,
+                cancellationToken: ct).ConfigureAwait(false);
+
+            _readyTcs.TrySetResult();
+        }
+        catch (Exception ex)
+        {
+            _readyTcs.TrySetException(ex);
+            _messageChannel.Writer.TryComplete(ex);
+            throw;
+        }
+
         var reader = _messageChannel.Reader;
-        
         while (await reader.WaitToReadAsync(ct).ConfigureAwait(false))
         {
-            while (reader.TryRead(out var args))
-            {
-                yield return args;
-            }
+            while (reader.TryRead(out var delivery))
+                yield return delivery;
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        _messageChannel.Writer.TryComplete();
-
-        if (_consumerTag != null && channel.IsOpen)
+        if (_consumerTag is not null && channel.IsOpen)
         {
-            try 
-            { 
-                // Stop RabbitMQ from sending more messages
-                await channel.BasicCancelAsync(_consumerTag).ConfigureAwait(false); 
-            } 
-            catch { /* Consumer may already be closed */ }
+            try
+            {
+                await channel.BasicCancelAsync(_consumerTag).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // Shutdown can race broker-side consumer cancellation.
+            }
         }
-        
+
+        _messageChannel.Writer.TryComplete();
         GC.SuppressFinalize(this);
     }
 }

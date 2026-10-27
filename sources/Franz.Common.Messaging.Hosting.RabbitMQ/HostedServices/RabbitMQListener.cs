@@ -98,51 +98,62 @@ public sealed class RabbitMQListener(
     }
   }
 
-  private async Task ReceiveMessageAsync(IChannel channel, BasicDeliverEventArgs e, CancellationToken ct)
+  private async Task ReceiveMessageAsync(IChannel channel, BasicDeliverEventArgs delivery, CancellationToken ct)
   {
     try
     {
       var message = new Message
       {
-        Headers = RabbitHeaderMapper.ExtractHeaders(e),
-        Body = Encoding.UTF8.GetString(e.Body.Span)
+        Headers = RabbitHeaderMapper.ExtractHeaders(delivery),
+        Body = Encoding.UTF8.GetString(delivery.Body.Span)
       };
 
-      if (OnMessageReceivedAsync != null)
+      var handler = OnMessageReceivedAsync
+          ?? throw new InvalidOperationException(
+              $"No message handler is configured for RabbitMQ queue '{_queueName}'.");
+
+      await handler(new MessageEventArgs(message)).ConfigureAwait(false);
+    }
+    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+    {
+      // Leave the delivery unacknowledged. Closing the channel lets RabbitMQ redeliver it.
+      throw;
+    }
+    catch (Exception processingException)
+    {
+      logger.LogError(processingException,
+          "Message processing failed for delivery {DeliveryTag} on queue {Queue}",
+          delivery.DeliveryTag, _queueName);
+
+      if (replayStrategy is null)
       {
-        await OnMessageReceivedAsync(new MessageEventArgs(message)).ConfigureAwait(false);
+        await channel.BasicNackAsync(delivery.DeliveryTag, multiple: false, requeue: false,
+            cancellationToken: ct).ConfigureAwait(false);
+        return;
       }
 
-      await channel.BasicAckAsync(e.DeliveryTag, multiple: false, cancellationToken: ct).ConfigureAwait(false);
-    }
-    catch (Exception ex)
-    {
-      logger.LogError(ex, "🔥 Error while processing RabbitMQ message {DeliveryTag} on {Queue}", e.DeliveryTag, _queueName);
-
-      if (replayStrategy != null)
+      try
       {
-        await ExecuteReplayLogicAsync(channel, e, ex, ct).ConfigureAwait(false);
+        // Replay strategies publish the failed delivery elsewhere; acknowledgement
+        // remains the listener's responsibility so there is exactly one owner.
+        await replayStrategy.ReplayAsync(delivery, processingException).ConfigureAwait(false);
       }
-      else
+      catch (Exception replayException)
       {
-        await channel.BasicNackAsync(e.DeliveryTag, multiple: false, requeue: false, cancellationToken: ct).ConfigureAwait(false);
+        logger.LogError(replayException,
+            "Replay strategy failed for delivery {DeliveryTag} on queue {Queue}",
+            delivery.DeliveryTag, _queueName);
+
+        await channel.BasicNackAsync(delivery.DeliveryTag, multiple: false, requeue: false,
+            cancellationToken: ct).ConfigureAwait(false);
+        return;
       }
     }
-  }
 
-  private async Task ExecuteReplayLogicAsync(IChannel channel, BasicDeliverEventArgs e, Exception originalEx, CancellationToken ct)
-  {
-    try
-    {
-      await replayStrategy!.ReplayAsync(e, originalEx).ConfigureAwait(false);
-      await channel.BasicAckAsync(e.DeliveryTag, multiple: false, cancellationToken: ct).ConfigureAwait(false);
-    }
-    catch (Exception replayEx)
-    {
-      logger.LogError(replayEx, "❌ Replay/DLT strategy failed for message {DeliveryTag}", e.DeliveryTag);
-      await channel.BasicNackAsync(e.DeliveryTag, multiple: false, requeue: false, cancellationToken: ct).ConfigureAwait(false);
-      throw new AggregateException("Message processing and Replay strategy both failed.", originalEx, replayEx);
-    }
+    // Keep acknowledgement outside the handler/replay catch. A broker/channel
+    // acknowledgement failure must not be misclassified as a business failure.
+    await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken: ct)
+        .ConfigureAwait(false);
   }
 
   public async Task StopListenAsync(CancellationToken cancellationToken = default)

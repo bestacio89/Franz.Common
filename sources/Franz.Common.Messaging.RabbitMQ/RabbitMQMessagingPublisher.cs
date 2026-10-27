@@ -7,6 +7,7 @@ using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
+using Franz.Common.Messaging.RabbitMQ.Transactions;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using System.Text;
@@ -47,7 +48,7 @@ public sealed class RabbitMQMessagingPublisher(
     var message = _messageFactory.Build(evt);
 
     // Execute pipeline (Middleware/Validation)
-    await _handler.ProcessAsync(message);
+    await _handler.ProcessAsync(message, ct).ConfigureAwait(false);
 
     var exchange = _options.ExchangeName ?? ExchangeNamer.GetEventExchangeName(evt.GetType().Assembly);
 
@@ -61,10 +62,11 @@ public sealed class RabbitMQMessagingPublisher(
 
     try
     {
+      if (_transaction is RabbitMQMessagingTransaction rabbitTransaction)
+        rabbitTransaction.Attach(channel);
+
       if (_transaction is not null)
-      {
-        await _transaction.BeginAsync(ct);
-      }
+        await _transaction.BeginAsync(ct).ConfigureAwait(false);
 
       var body = Encoding.UTF8.GetBytes(message.Body ?? string.Empty);
 
@@ -81,16 +83,25 @@ public sealed class RabbitMQMessagingPublisher(
       );
 
       if (_transaction is not null)
-      {
-        await _transaction.CompleteAsync(ct);
-      }
+        await _transaction.CompleteAsync(ct).ConfigureAwait(false);
     }
-    catch
+    catch (Exception publishException)
     {
       if (_transaction is not null)
       {
-        await _transaction.RollbackAsync(ct);
+        try
+        {
+          await _transaction.RollbackAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception rollbackException)
+        {
+          throw new AggregateException(
+              "RabbitMQ publishing failed and the transaction rollback also failed.",
+              publishException,
+              rollbackException);
+        }
       }
+
       throw;
     }
     finally

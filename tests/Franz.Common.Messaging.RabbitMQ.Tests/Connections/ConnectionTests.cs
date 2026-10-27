@@ -7,6 +7,7 @@ using Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Net.Security;
 using RabbitMQ.Client;
 using Xunit;
 
@@ -36,6 +37,57 @@ public sealed class ConnectionTests
     services.AddSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>();
     services.AddSingleton<IConnectionProvider, ConnectionProvider>();
     return services;
+  }
+
+  [Fact]
+  public void ConnectionFactoryProvider_ShouldRespectRecoveryAndHeartbeatOptions()
+  {
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      BootStrapServers = _fixture.ConnectionString,
+      AutomaticRecoveryEnabled = false,
+      TopologyRecoveryEnabled = false,
+      RequestedHeartbeatSeconds = 17
+    });
+    var provider = new ConnectionFactoryProvider(options, new AssemblyAccessorWrapper());
+
+    var factory = (ConnectionFactory)provider.Current;
+
+    factory.AutomaticRecoveryEnabled.Should().BeFalse();
+    factory.TopologyRecoveryEnabled.Should().BeFalse();
+    factory.RequestedHeartbeat.Should().Be(TimeSpan.FromSeconds(17));
+  }
+
+  [Fact]
+  public void ConnectionFactoryProvider_ShouldUseStrictTlsValidation()
+  {
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      HostName = "rabbit.example.test",
+      SslEnabled = true
+    });
+    var provider = new ConnectionFactoryProvider(options, new AssemblyAccessorWrapper());
+
+    var factory = (ConnectionFactory)provider.Current;
+
+    factory.Ssl.Enabled.Should().BeTrue();
+    factory.Ssl.AcceptablePolicyErrors.Should().Be(SslPolicyErrors.None);
+    factory.Port.Should().Be(5671);
+  }
+
+  [Fact]
+  public void ConnectionFactoryProvider_ShouldRejectMalformedBootstrapUri()
+  {
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      BootStrapServers = "not-a-valid-rabbitmq-uri"
+    });
+    var provider = new ConnectionFactoryProvider(options, new AssemblyAccessorWrapper());
+
+    var act = () => provider.Current;
+
+    act.Should().Throw<InvalidOperationException>()
+        .WithMessage("*BootStrapServers*");
   }
 
   [Fact]

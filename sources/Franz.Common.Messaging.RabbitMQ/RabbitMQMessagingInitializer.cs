@@ -30,7 +30,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
   private readonly string _deadLetterQueueName;
   private readonly string _deadLetterExchangeName;
 
-  private static Type[]? _cachedIntegrationEvents;
+  private Type[]? _cachedIntegrationEvents;
 
   public RabbitMQMessagingInitializer(
       IModelProvider modelProvider,
@@ -98,11 +98,6 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       ["x-dead-letter-exchange"] = deadLetterExchange,
       ["x-dead-letter-routing-key"] = deadLetterQueue
     };
-
-    if (_options.RequestedHeartbeatSeconds.HasValue)
-    {
-      args["x-heartbeat"] = _options.RequestedHeartbeatSeconds.Value;
-    }
 
     await channel.QueueDeclareAsync(
         queueName,

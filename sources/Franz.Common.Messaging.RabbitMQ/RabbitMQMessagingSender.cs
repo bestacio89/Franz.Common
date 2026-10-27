@@ -45,7 +45,7 @@ public sealed class RabbitMQMessagingSender(
 
       if (transaction is not null)
       {
-        await transaction.BeginAsync().ConfigureAwait(false);
+        await transaction.BeginAsync(cancellationToken).ConfigureAwait(false);
       }
 
       var body = Encoding.UTF8.GetBytes(message.Body);
@@ -70,15 +70,26 @@ public sealed class RabbitMQMessagingSender(
 
       if (transaction is not null)
       {
-        await transaction.CompleteAsync().ConfigureAwait(false);
+        await transaction.CompleteAsync(cancellationToken).ConfigureAwait(false);
       }
     }
-    catch
+    catch (Exception sendException)
     {
       if (transaction is not null)
       {
-        await transaction.RollbackAsync().ConfigureAwait(false);
+        try
+        {
+          await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception rollbackException)
+        {
+          throw new AggregateException(
+              "RabbitMQ send failed and the transaction rollback also failed.",
+              sendException,
+              rollbackException);
+        }
       }
+
       throw;
     }
     finally

@@ -1,5 +1,6 @@
 ﻿#nullable enable
 using Franz.Common.Mediator.Extensions;
+using Franz.Common.Messaging;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.MongoDB.Extensions;
@@ -37,6 +38,16 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
 
     // 2️⃣ Build host with merged configuration
     Host = BuildHost();
+
+    // Declare exchanges and queues before the hosted listener attempts to consume.
+    // Starting a consumer against a missing queue closes its channel and can fault
+    // the background service before the test has a chance to publish anything.
+    using (var scope = Host.Services.CreateScope())
+    {
+      var initializer = scope.ServiceProvider.GetRequiredService<IMessagingInitializer>();
+      await initializer.InitializeAsync();
+    }
+
     await Host.StartAsync();
   }
 
