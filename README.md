@@ -347,7 +347,7 @@ Full version history lives in [`changelog.md`](changelog.md). Recent highlights:
 - Enforced strict TLS validation by default and clarified transaction-channel ownership.
 - Documented operational contracts and added real-broker dead-letter routing coverage.
 
-This is the documentation baseline for the planned patch release; package publication remains a separate release step.
+The shared build target sets package version 2.3.3 and file version 2.3.3.0 while retaining assembly version 2.3.0.0. NuGet publication remains a separate release step.
 
 ## v2.3.2 — Release Baseline
 
