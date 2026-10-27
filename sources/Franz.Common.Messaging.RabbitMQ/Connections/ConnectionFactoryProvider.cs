@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
@@ -26,49 +26,62 @@ public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
   private IConnectionFactory CreateFactory()
   {
     var options = _options.Value;
+    var factory = new ConnectionFactory();
 
     if (!string.IsNullOrWhiteSpace(options.BootStrapServers))
     {
-      return new ConnectionFactory
+      if (!Uri.TryCreate(options.BootStrapServers, UriKind.Absolute, out var uri) ||
+          (uri.Scheme != "amqp" && uri.Scheme != "amqps"))
       {
-        Uri = new Uri(options.BootStrapServers),
-        ClientProvidedName = GetClientProvidedName(),
-        AutomaticRecoveryEnabled = true,
-        TopologyRecoveryEnabled = true,
-        RequestedHeartbeat = TimeSpan.FromSeconds(30)
-      };
+        throw new InvalidOperationException(
+            "Messaging:RabbitMQ:BootStrapServers must be an absolute amqp:// or amqps:// URI.");
+      }
+
+      if (options.SslEnabled == true && uri.Scheme != "amqps")
+      {
+        throw new InvalidOperationException(
+            "RabbitMQ TLS is enabled but BootStrapServers does not use the amqps:// scheme.");
+      }
+
+      factory.Uri = uri;
+      if (uri.Scheme == "amqps")
+      {
+        factory.Ssl = new SslOption
+        {
+          Enabled = true,
+          ServerName = uri.Host,
+          AcceptablePolicyErrors = SslPolicyErrors.None,
+          Version = SslProtocols.Tls12 | SslProtocols.Tls13
+        };
+      }
+    }
+    else
+    {
+      var sslEnabled = options.SslEnabled == true;
+      factory.HostName = Require(options.HostName, "localhost");
+      factory.UserName = Require(options.UserName, "guest");
+      factory.Password = Require(options.Password, "guest");
+      factory.VirtualHost = Require(options.VirtualHost, "/");
+      factory.Port = options.Port ?? (sslEnabled ? 5671 : AmqpTcpEndpoint.UseDefaultPort);
+
+      if (sslEnabled)
+      {
+        factory.Ssl = new SslOption
+        {
+          Enabled = true,
+          ServerName = factory.HostName,
+          // Never silently accept missing, mismatched, or untrusted server certificates.
+          AcceptablePolicyErrors = SslPolicyErrors.None,
+          Version = SslProtocols.Tls12 | SslProtocols.Tls13
+        };
+      }
     }
 
-    var factory = new ConnectionFactory
-    {
-      HostName = Require(options.HostName, "localhost"),
-      UserName = Require(options.UserName, "guest"),
-      Password = Require(options.Password, "guest"),
-      Port = options.Port ?? AmqpTcpEndpoint.UseDefaultPort,
-      VirtualHost = Require(options.VirtualHost, "/"),
-
-      ClientProvidedName = GetClientProvidedName(),
-      AutomaticRecoveryEnabled = true,
-      TopologyRecoveryEnabled = true,
-      RequestedHeartbeat = TimeSpan.FromSeconds(30)
-    };
-
-    if (options.SslEnabled == true)
-    {
-      factory.Ssl = new SslOption
-      {
-        Enabled = true,
-        ServerName = factory.HostName, // safer than options.HostName
-        AcceptablePolicyErrors =
-            SslPolicyErrors.RemoteCertificateNotAvailable |
-            SslPolicyErrors.RemoteCertificateNameMismatch |
-            SslPolicyErrors.RemoteCertificateChainErrors,
-        Version = SslProtocols.Tls12 | SslProtocols.Tls13
-      };
-
-      if (options.Port is null)
-        factory.Port = 5671;
-    }
+    // Apply framework options after URI parsing so explicit options are authoritative.
+    factory.ClientProvidedName = GetClientProvidedName();
+    factory.AutomaticRecoveryEnabled = options.AutomaticRecoveryEnabled ?? true;
+    factory.TopologyRecoveryEnabled = options.TopologyRecoveryEnabled ?? true;
+    factory.RequestedHeartbeat = TimeSpan.FromSeconds(options.RequestedHeartbeatSeconds ?? 30);
 
     return factory;
   }

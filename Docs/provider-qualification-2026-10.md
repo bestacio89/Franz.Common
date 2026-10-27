@@ -19,7 +19,7 @@ Qualify `Microting.EntityFrameworkCore.MySql` 10.0.13 against MariaDB 11.4 and O
 3. Run the complete solution test suite, including provider-neutral Entity Framework tests and both real-engine suites.
 4. Review behavioral differences between MySQL 8.4 and MariaDB 11.4 instead of treating one engine's green result as proof for the other.
 5. Treat the incremental migration test as provider-level evidence only. Before claiming application-specific migration compatibility, run the application's actual migration chain against a representative pre-change database/schema and verify schema plus data preservation. The current Franz.Common provider tests do not substitute for an application-owned migration history or snapshot.
-6. Validate package metadata/versioning and produce the release artifacts for Franz.Common 2.3.2 only after all gates pass.
+6. Validate package metadata/versioning and produce the release artifacts for Franz.Common 2.3.3 only after all gates pass.
 
 ## Known production-registration limitation
 

@@ -3,6 +3,7 @@ using System.Text;
 using Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fixtures;
 using Franz.Common.Messaging.RabbitMQ.Connections;
+using Franz.Common.Messaging;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using RabbitMQ.Client;
@@ -52,9 +53,11 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
       var pubChannel = await channelPool.GetAsync(cts.Token);
       try
       {
+        var queueName = QueueNamer.GetQueueName(
+            _fixture.Services.GetRequiredService<Franz.Common.Reflection.IAssemblyAccessor>().GetEntryAssembly());
         await pubChannel.BasicPublishAsync(
-            exchange: "franz-test-exchange",
-            routingKey: "test-key",
+            exchange: string.Empty,
+            routingKey: queueName,
             body: Encoding.UTF8.GetBytes("fail-me"),
             cancellationToken: cts.Token);
       }

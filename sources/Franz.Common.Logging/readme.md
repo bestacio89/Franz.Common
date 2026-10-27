@@ -28,7 +28,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 A comprehensive logging library within the **Franz Framework**, designed to enhance application monitoring and diagnostics using **Serilog** and **Elastic APM**.
 This package provides tools for centralized logging, tracing, and seamless integration with .NET applications.
 
-* **Current Version:** v2.3.2
+* **Current Version:** v2.3.3
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -98,7 +98,7 @@ dotnet nuget add source "https://your-private-feed-url" \
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Logging --version 2.3.2
+dotnet add package Franz.Common.Logging --version 2.3.3
 
 ```
 

@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using RabbitMQ.Client;
 using System.Collections.Concurrent;
 using System.Threading;
@@ -6,29 +6,49 @@ using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.RabbitMQ.Connections;
 
-public sealed class ChannelPool
-  (
-    IConnectionProvider connectionProvider,
-    int maxRetained = 16) : IAsyncDisposable, IChannelPool
+/// <summary>
+/// Reuses idle RabbitMQ channels while preserving explicit pool shutdown semantics.
+/// </summary>
+public sealed class ChannelPool : IAsyncDisposable, IChannelPool
 {
+  private readonly IConnectionProvider _connectionProvider;
+  private readonly int _maxRetained;
   private readonly ConcurrentStack<IChannel> _channels = new();
   private readonly SemaphoreSlim _createLock = new(1, 1);
-
+  private readonly object _gate = new();
   private int _count;
+  private bool _disposed;
+
+  public ChannelPool(IConnectionProvider connectionProvider, int maxRetained = 16)
+  {
+    _connectionProvider = connectionProvider
+        ?? throw new ArgumentNullException(nameof(connectionProvider));
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRetained);
+    _maxRetained = maxRetained;
+  }
 
   public async ValueTask<IChannel> GetAsync(CancellationToken ct = default)
   {
-    while (_channels.TryPop(out var channel))
+    while (true)
     {
-      Interlocked.Decrement(ref _count);
+      IChannel? channel;
+      lock (_gate)
+      {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!_channels.TryPop(out channel))
+          channel = null;
+        else
+          _count--;
+      }
+
+      if (channel is null)
+        return await CreateChannelAsync(ct).ConfigureAwait(false);
 
       if (channel.IsOpen)
         return channel;
 
       await SafeDisposeAsync(channel).ConfigureAwait(false);
     }
-
-    return await CreateChannelAsync(ct).ConfigureAwait(false);
   }
 
   private async ValueTask<IChannel> CreateChannelAsync(CancellationToken ct)
@@ -36,8 +56,20 @@ public sealed class ChannelPool
     await _createLock.WaitAsync(ct).ConfigureAwait(false);
     try
     {
-      var connection = await connectionProvider.GetConnectionAsync(ct).ConfigureAwait(false);
-      return await connection.CreateChannelAsync(cancellationToken: ct).ConfigureAwait(false);
+      lock (_gate)
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+      var connection = await _connectionProvider.GetConnectionAsync(ct).ConfigureAwait(false);
+      var channel = await connection.CreateChannelAsync(cancellationToken: ct).ConfigureAwait(false);
+
+      lock (_gate)
+      {
+        if (!_disposed)
+          return channel;
+      }
+
+      await SafeDisposeAsync(channel).ConfigureAwait(false);
+      throw new ObjectDisposedException(nameof(ChannelPool));
     }
     finally
     {
@@ -50,28 +82,25 @@ public sealed class ChannelPool
     if (channel is null)
       return;
 
-    if (!channel.IsOpen)
+    var dispose = !channel.IsOpen;
+    if (!dispose)
     {
+      lock (_gate)
+      {
+        if (_disposed || _count >= _maxRetained)
+        {
+          dispose = true;
+        }
+        else
+        {
+          _channels.Push(channel);
+          _count++;
+        }
+      }
+    }
+
+    if (dispose)
       _ = SafeDisposeAsync(channel);
-      return;
-    }
-
-    while (true)
-    {
-      var current = Volatile.Read(ref _count);
-
-      if (current >= maxRetained)
-      {
-        _ = SafeDisposeAsync(channel);
-        return;
-      }
-
-      if (Interlocked.CompareExchange(ref _count, current + 1, current) == current)
-      {
-        _channels.Push(channel);
-        return;
-      }
-    }
   }
 
   private static async ValueTask SafeDisposeAsync(IChannel channel)
@@ -86,16 +115,32 @@ public sealed class ChannelPool
 
       await channel.DisposeAsync().ConfigureAwait(false);
     }
-    catch { }
+    catch
+    {
+      // Pool cleanup must not mask the transport failure that triggered disposal.
+    }
   }
 
   public async ValueTask DisposeAsync()
   {
-    while (_channels.TryPop(out var channel))
+    List<IChannel> channelsToDispose = new();
+
+    lock (_gate)
     {
-      await SafeDisposeAsync(channel).ConfigureAwait(false);
+      if (_disposed)
+        return;
+
+      _disposed = true;
+      while (_channels.TryPop(out var channel))
+        channelsToDispose.Add(channel);
+      _count = 0;
     }
 
-    Interlocked.Exchange(ref _count, 0);
+    // Wait for any in-flight channel creation to observe the disposed state.
+    await _createLock.WaitAsync().ConfigureAwait(false);
+    _createLock.Release();
+
+    foreach (var channel in channelsToDispose)
+      await SafeDisposeAsync(channel).ConfigureAwait(false);
   }
 }

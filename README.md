@@ -289,7 +289,7 @@ SQL Server, Postgres, Oracle, MariaDB, MongoDB, CosmosDB — all behind unified 
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 2.3.2
+dotnet add package Franz.Common --version 2.3.3
 ```
 
 Messaging example:
@@ -339,6 +339,19 @@ dotnet test --filter Category=Integration
 # 📋 Changelog
 
 Full version history lives in [`changelog.md`](changelog.md). Recent highlights:
+
+## v2.3.3 — RabbitMQ Operational Hardening
+
+- Supervised consumer startup and runtime failure through the generic host.
+- Defined single-owner acknowledgement and replay behavior, bounded delivery buffering, and safer channel/connection lifecycle management.
+- Enforced strict TLS validation by default and clarified transaction-channel ownership.
+- Documented operational contracts and added real-broker dead-letter routing coverage.
+
+The shared build target sets package version 2.3.3 and file version 2.3.3.0 while retaining assembly version 2.3.0.0. NuGet publication remains a separate release step.
+
+## v2.3.2 — Release Baseline
+
+- Previous coordinated package baseline following .NET 10 dependency maintenance and provider qualification.
 
 ## v2.3.0 — Source Generated Runtime & Execution Model Modernization
 
@@ -424,7 +437,7 @@ The dependency baseline and compatibility notes are tracked in [the October 2026
 
 ## Versioning and compatibility
 
-- **Framework packages:** versioned together through `common.targets`; the current release targets **2.3.2**.
+- **Framework packages:** versioned together through `common.targets`; the current documentation baseline targets **2.3.3**.
 - **Target framework:** supported library projects target .NET 10 (`net10.0`). The repository pins SDK `10.0.400` in `global.json`; CI should use that same SDK.
 - **Third-party dependencies:** package versions are selected independently according to compatibility and security requirements. A package's version number is not the Franz.Common release version.
 - **Publishing:** the Azure DevOps publishing pipeline validates package metadata before publishing. Publish only after restore/audit, Release build, and full tests pass.
