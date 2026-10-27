@@ -26,7 +26,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 ## Package-specific guide
 
 **Package**: `Franz.Common.Http.Bootstrap`
-**Current Version:** v2.3.0
+**Current Version:** v2.3.2
 
 Opinionated HTTP bootstrapper for the Franz Framework.
 Centralizes common ASP.NET Core HTTP wiring (controllers, auth, headers, docs, serialization, health checks, multi-tenancy) and optionally registers config-driven Refit clients so applications get consistent, production-ready defaults with minimal boilerplate.
