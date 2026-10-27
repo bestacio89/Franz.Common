@@ -44,7 +44,7 @@ A dedicated library within the **Franz Framework** that extends **Entity Framewo
 
 ## **Version Information**
 
-**Current Version:** v2.3.0
+**Current Version:** v2.3.2
 - Part of the private **Franz Framework** ecosystem.
 
 ---

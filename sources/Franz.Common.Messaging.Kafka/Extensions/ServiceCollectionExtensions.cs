@@ -148,6 +148,7 @@ public static class ServiceCollectionExtensions
         CompressionType = MapCompression(o.Producer.CompressionType),
         MessageSendMaxRetries = o.Producer.MessageSendMaxRetries,
         RetryBackoffMs = o.Producer.RetryBackoffMs,
+        MessageTimeoutMs = o.Producer.DeliveryTimeoutMs,
       };
     };
 

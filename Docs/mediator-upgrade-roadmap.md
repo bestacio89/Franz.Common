@@ -1,6 +1,6 @@
 # Franz.Common.Mediator upgrade roadmap
 
-**Baseline:** .NET 10, Franz.Common 2.3.1  
+**Baseline:** .NET 10, Franz.Common 2.3.2  
 **Compatibility rule:** preserve existing public APIs and V1 reflection-registration behavior. Keep the current package version while these changes are validated; do not bump versions or change downstream applications as part of this work.
 
 ## Delivery principles
