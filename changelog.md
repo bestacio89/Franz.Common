@@ -1618,3 +1618,32 @@ To help potential users understand the scope of `Franz.Common.Logging` at a glan
 **Migration Notes**
 
 - Provider-level migration tests do not replace testing consumer-owned migration chains against representative existing schemas. Applications with existing databases should validate their own upgrade path before deployment.
+
+
+## v2.3.2 — Release Alignment & Messaging Maintenance
+
+**Changed**
+- Aligned the coordinated Franz.Common package release baseline and consumer documentation to 2.3.2.
+- Continued .NET 10 dependency maintenance and provider qualification documentation.
+
+**Release note**
+- This entry records the previous package baseline; it does not alter the package artifacts.
+
+## v2.3.3 — RabbitMQ Operational Hardening
+
+**Fixed and hardened**
+- Supervised RabbitMQ listener startup and runtime completion through the generic host, so unexpected consumer termination is observable.
+- Bound delivery handoff buffering to configured prefetch capacity and preserved sequential dispatch per listener.
+- Centralized source-delivery acknowledgement ownership in the listener to avoid double acknowledgements during replay.
+- Treated missing handlers as processing failures instead of silently acknowledging messages.
+- Hardened connection creation, channel-pool shutdown, and resource ownership under concurrent operations.
+- Applied strict TLS certificate validation by default and honored configured connection recovery and heartbeat settings.
+- Ensured transaction-mode channels are not returned to the shared channel pool and preserved rollback failures.
+- Corrected RabbitMQ topology setup and added integration coverage for dead-letter routing.
+
+**Documentation**
+- Added the RabbitMQ operational contracts covering lifecycle supervision, delivery and failure semantics, publishing and transactions, TLS configuration, topology compatibility, and integration-test expectations.
+
+**Compatibility and release scope**
+- These notes describe the planned 2.3.3 documentation baseline for the RabbitMQ hardening work.
+- Package metadata, assembly/file versions, and NuGet publication remain separate release steps; this documentation change does not publish packages.
