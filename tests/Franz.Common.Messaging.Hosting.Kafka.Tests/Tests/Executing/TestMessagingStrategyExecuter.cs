@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Hosting.Executing;
 using Franz.Common.Messaging.Hosting.Kafka.Tests.Probes;
@@ -17,13 +17,13 @@ public sealed class TestMessagingStrategyExecuter : IMessagingStrategyExecuter
     _contextAccessor = contextAccessor;
   }
 
-
-  public Task<bool> CanExecuteAsync(Message message)
-      => Task.FromResult(message is not null);
+  public Task<bool> CanExecuteAsync(Message message) => Task.FromResult(message is not null);
 
   public Task ExecuteAsync(Message message)
   {
-   
+    if (message.Body.Contains("__fail__", StringComparison.Ordinal))
+      throw new InvalidOperationException("Simulated transient processing failure.");
+
     _probe.SignalArrival(message.Id);
     return Task.CompletedTask;
   }
