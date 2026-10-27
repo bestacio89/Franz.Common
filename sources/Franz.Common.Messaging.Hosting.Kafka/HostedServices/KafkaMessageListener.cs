@@ -173,7 +173,7 @@ public sealed class KafkaMessageListener : IListener
         ? $"{result.Topic}-dlt"
         : _failureOptions.DeadLetterTopic;
 
-    var headers = new Headers();
+    var headers = new Confluent.Kafka.Headers();
     if (result.Message.Headers is not null)
     {
       foreach (var header in result.Message.Headers)
