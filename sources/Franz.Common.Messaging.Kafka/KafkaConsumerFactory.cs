@@ -1,16 +1,11 @@
-﻿#nullable enable
+#nullable enable
 using Confluent.Kafka;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System;
 
 namespace Franz.Common.Messaging.Kafka;
 
-/// <summary>
-/// Factory for generating pre-configured Kafka consumers.
-/// Driven by strongly-typed, host-validated KafkaMessagingOptions.
-/// </summary>
 public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
 {
   private readonly KafkaMessagingOptions _options;
@@ -26,20 +21,31 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
 
   public IConsumer<string, string> Build()
   {
+    var options = _options.Consumer;
     var config = new ConsumerConfig
     {
       BootstrapServers = _options.BootstrapServers,
       GroupId = _options.GroupId,
-      AutoOffsetReset = Enum.TryParse<AutoOffsetReset>(_options.Consumer.AutoOffsetReset.ToString(), true, out var reset) ? reset : AutoOffsetReset.Earliest,
-      EnableAutoCommit = _options.Consumer.EnableAutoCommit,
-      EnableAutoOffsetStore = _options.Consumer.EnableAutoOffsetStore,
-      SessionTimeoutMs = _options.Consumer.SessionTimeoutMs,
-      MaxPollIntervalMs = _options.Consumer.MaxPollIntervalMs,
-      FetchMaxBytes = _options.Consumer.FetchMaxBytes,
-
-      // Security Mapping
-      SecurityProtocol = Enum.TryParse<SecurityProtocol>(_options.Security.SecurityProtocol.ToString(), true, out var sec) ? sec : SecurityProtocol.Plaintext,
-      SaslMechanism = Enum.TryParse<SaslMechanism>(_options.Security.SaslMechanism.ToString(), true, out var sasl) ? sasl : null,
+      AutoOffsetReset = Enum.TryParse<AutoOffsetReset>(
+          options.AutoOffsetReset.ToString(), true, out var reset)
+          ? reset
+          : AutoOffsetReset.Earliest,
+      EnableAutoCommit = options.EnableAutoCommit,
+      EnableAutoOffsetStore = options.EnableAutoOffsetStore,
+      SessionTimeoutMs = options.SessionTimeoutMs,
+      MaxPollIntervalMs = options.MaxPollIntervalMs,
+      MaxPollRecords = options.MaxPollRecords,
+      FetchMinBytes = options.FetchMinBytes,
+      FetchMaxBytes = options.FetchMaxBytes,
+      FetchWaitMaxMs = options.FetchWaitMaxMs,
+      SecurityProtocol = Enum.TryParse<SecurityProtocol>(
+          _options.Security.SecurityProtocol.ToString(), true, out var securityProtocol)
+          ? securityProtocol
+          : SecurityProtocol.Plaintext,
+      SaslMechanism = Enum.TryParse<SaslMechanism>(
+          _options.Security.SaslMechanism?.ToString(), true, out var saslMechanism)
+          ? saslMechanism
+          : null,
       SaslUsername = _options.Security.SaslUsername,
       SaslPassword = _options.Security.SaslPassword,
       SslCaLocation = _options.Security.SslCaLocation,
@@ -48,21 +54,17 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
     };
 
     return new ConsumerBuilder<string, string>(config)
-        .SetErrorHandler((_, e) =>
+        .SetErrorHandler((_, error) =>
         {
-          if (e.IsFatal)
-            _logger.LogCritical("🚨 FATAL Kafka Error: {Reason} | Local: {IsLocal}", e.Reason, e.IsLocalError);
+          if (error.IsFatal)
+            _logger.LogCritical("Fatal Kafka error: {Reason} | Local: {IsLocal}",
+                error.Reason, error.IsLocalError);
           else
-            _logger.LogWarning("⚠️ Kafka Warning: {Reason}", e.Reason);
+            _logger.LogWarning("Kafka warning: {Reason}", error.Reason);
         })
-        .SetStatisticsHandler((_, json) =>
-        {
-          _logger.LogTrace("📊 Kafka Stats: {Stats}", json);
-        })
-        .SetLogHandler((_, msg) =>
-        {
-          _logger.LogDebug("📝 Kafka Internal: [{Level}] {Message}", msg.Level, msg.Message);
-        })
+        .SetStatisticsHandler((_, json) => _logger.LogTrace("Kafka statistics: {Stats}", json))
+        .SetLogHandler((_, message) =>
+            _logger.LogDebug("Kafka internal log: [{Level}] {Message}", message.Level, message.Message))
         .Build();
   }
 }
