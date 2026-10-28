@@ -38,7 +38,7 @@ A utility library within the **Franz Framework** designed to simplify input/outp
 
 ## **Version Information**
 
-**Current Version:** v2.3.2
+**Current Version:** v2.3.3
 - Part of the private **Franz Framework** ecosystem.
 
 ---

@@ -6,41 +6,53 @@ using RabbitMQ.Client;
 
 namespace Franz.Common.Messaging.RabbitMQ.Connections;
 
+/// <summary>
+/// Owns one recoverable RabbitMQ connection for the application service provider.
+/// </summary>
 public sealed class ConnectionProvider : IConnectionProvider, IAsyncDisposable
 {
   private readonly IConnectionFactoryProvider _factoryProvider;
   private readonly SemaphoreSlim _lock = new(1, 1);
-
   private IConnection? _connection;
-  private bool _disposed;
+  private volatile bool _disposed;
 
   public ConnectionProvider(IConnectionFactoryProvider factoryProvider)
   {
-    _factoryProvider = factoryProvider;
+    _factoryProvider = factoryProvider
+        ?? throw new ArgumentNullException(nameof(factoryProvider));
   }
 
   public async ValueTask<IConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
   {
     ObjectDisposedException.ThrowIf(_disposed, this);
 
-    // Fast path (no lock)
-    if (_connection is { IsOpen: true })
-      return _connection;
-
     await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
     try
     {
-      // Double-check after acquiring lock
+      ObjectDisposedException.ThrowIf(_disposed, this);
+
       if (_connection is { IsOpen: true })
         return _connection;
 
       var factory = _factoryProvider.Current;
+      var newConnection = await factory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
 
-      _connection = await factory
-          .CreateConnectionAsync(cancellationToken)
-          .ConfigureAwait(false);
+      if (_disposed)
+      {
+        newConnection.Dispose();
+        throw new ObjectDisposedException(nameof(ConnectionProvider));
+      }
 
-      return _connection;
+      var previousConnection = _connection;
+      _connection = newConnection;
+
+      if (previousConnection is not null)
+      {
+        try { previousConnection.Dispose(); }
+        catch { /* A stale connection must not prevent replacement. */ }
+      }
+
+      return newConnection;
     }
     finally
     {
@@ -54,7 +66,6 @@ public sealed class ConnectionProvider : IConnectionProvider, IAsyncDisposable
       return;
 
     _disposed = true;
-
     await _lock.WaitAsync().ConfigureAwait(false);
     try
     {
@@ -67,7 +78,7 @@ public sealed class ConnectionProvider : IConnectionProvider, IAsyncDisposable
         }
         catch
         {
-          // swallow — shutdown path
+          // Preserve deterministic disposal even when the broker is already unavailable.
         }
 
         _connection.Dispose();
@@ -77,7 +88,6 @@ public sealed class ConnectionProvider : IConnectionProvider, IAsyncDisposable
     finally
     {
       _lock.Release();
-      _lock.Dispose();
     }
   }
 }

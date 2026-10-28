@@ -13,7 +13,7 @@ Franz.Common uses semantic versioning (SemVer) for its published NuGet packages.
 
 ## Release version
 
-The current release baseline is **2.3.2**, a patch release under SemVer. The assembly version remains **2.3.0.0** to avoid unnecessary assembly-binding identity changes; the file version advances to **2.3.2.0**. The preceding dependency-maintenance release, 2.3.1, is documented in the historical dependency-upgrade record.
+The current documentation baseline is **2.3.3**, a patch release under SemVer. The assembly version remains **2.3.0.0** to avoid unnecessary assembly-binding identity changes; the file version for the planned package release is **2.3.3.0**. The preceding 2.3.2 release is part of the historical release record. The shared `common.targets` file now sets package version **2.3.3** and file version **2.3.3.0**. This change prepares package metadata but does not publish packages.
 
 ## Semantic versioning
 

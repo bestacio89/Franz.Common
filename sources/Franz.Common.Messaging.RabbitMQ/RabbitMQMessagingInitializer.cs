@@ -9,8 +9,10 @@ using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -30,7 +32,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
   private readonly string _deadLetterQueueName;
   private readonly string _deadLetterExchangeName;
 
-  private static Type[]? _cachedIntegrationEvents;
+  private static readonly ConcurrentDictionary<Assembly, Type[]> CachedIntegrationEvents = new();
 
   public RabbitMQMessagingInitializer(
       IModelProvider modelProvider,
@@ -99,11 +101,6 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       ["x-dead-letter-routing-key"] = deadLetterQueue
     };
 
-    if (_options.RequestedHeartbeatSeconds.HasValue)
-    {
-      args["x-heartbeat"] = _options.RequestedHeartbeatSeconds.Value;
-    }
-
     await channel.QueueDeclareAsync(
         queueName,
         durable,
@@ -148,26 +145,24 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
 
     var companyName = entryAssembly.Name?.Split('.').FirstOrDefault() ?? string.Empty;
 
-    if (_cachedIntegrationEvents is null)
-    {
-      _cachedIntegrationEvents = AppDomain.CurrentDomain
-          .GetAssemblies()
-          .Where(a => !a.IsDynamic &&
-                      a.FullName?.StartsWith(companyName, StringComparison.OrdinalIgnoreCase) == true)
-          .SelectMany(a => a.ExportedTypes)
-          .Where(t => t.GetInterfaces().Any(ifc =>
-              ifc.IsGenericType &&
-              ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>)))
-          .SelectMany(t => t.GetInterfaces())
-          .Where(ifc => ifc.IsGenericType &&
-                        ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
-          .Select(ifc => ifc.GetGenericArguments()[0])
-          .Where(t => typeof(IIntegrationEvent).IsAssignableFrom(t))
-          .Distinct()
-          .ToArray();
-    }
+    var integrationEvents = CachedIntegrationEvents.GetOrAdd(entryAssembly.Assembly, _ =>
+        AppDomain.CurrentDomain
+            .GetAssemblies()
+            .Where(a => !a.IsDynamic &&
+                        a.FullName?.StartsWith(companyName, StringComparison.OrdinalIgnoreCase) == true)
+            .SelectMany(a => a.ExportedTypes)
+            .Where(t => t.GetInterfaces().Any(ifc =>
+                ifc.IsGenericType &&
+                ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>)))
+            .SelectMany(t => t.GetInterfaces())
+            .Where(ifc => ifc.IsGenericType &&
+                          ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
+            .Select(ifc => ifc.GetGenericArguments()[0])
+            .Where(t => typeof(IIntegrationEvent).IsAssignableFrom(t))
+            .Distinct()
+            .ToArray());
 
-    foreach (var eventType in _cachedIntegrationEvents)
+    foreach (var eventType in integrationEvents)
     {
       await InitializeExchangeForSubscriptionAsync(channel, eventType)
           .ConfigureAwait(false);

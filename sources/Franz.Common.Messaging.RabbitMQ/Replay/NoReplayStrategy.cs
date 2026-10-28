@@ -45,8 +45,7 @@ public class NoReplayStrategy : IReplayStrategy
         mandatory: true,
         basicProperties: props,
         body: e.Body);
-
-    // Just ACK the failed message
-    await channel.BasicAckAsync(e.DeliveryTag, false);
+ 
+    // The listener owns acknowledgement of the original delivery after replay succeeds.
   }
 }

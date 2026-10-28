@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Franz.Common.Business.Events;
 using Franz.Common.Mediator;
 using Franz.Common.Messaging.Delegating;
@@ -7,6 +7,7 @@ using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
+using Franz.Common.Messaging.RabbitMQ.Transactions;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using System.Text;
@@ -32,43 +33,34 @@ public sealed class RabbitMQMessagingPublisher(
   public async ValueTask DisposeAsync()
   {
     if (_transaction is IAsyncDisposable asyncDisposable)
-    {
-      await asyncDisposable.DisposeAsync();
-    }
+      await asyncDisposable.DisposeAsync().ConfigureAwait(false);
   }
 
   public async ValueTask Publish<TIntegrationEvent>(TIntegrationEvent evt, CancellationToken ct = default)
       where TIntegrationEvent : IIntegrationEvent
   {
-    // Ensure transport is initialized
-    await _initializer.InitializeAsync(ct);
+    await _initializer.InitializeAsync(ct).ConfigureAwait(false);
 
-    // Build message and process through handler pipeline
     var message = _messageFactory.Build(evt);
-
-    // Execute pipeline (Middleware/Validation)
-    await _handler.ProcessAsync(message);
+    await _handler.ProcessAsync(message, ct).ConfigureAwait(false);
 
     var exchange = _options.ExchangeName ?? ExchangeNamer.GetEventExchangeName(evt.GetType().Assembly);
-
-    await PublishInternalAsync(message, exchange, ct);
+    await PublishInternalAsync(message, exchange, ct).ConfigureAwait(false);
   }
 
   private async ValueTask PublishInternalAsync(Message message, string exchange, CancellationToken ct)
   {
-    // Use SemaphoreSlim double-check is handled inside the Pool
-    var channel = await _channelPool.GetAsync(ct);
+    var channel = await _channelPool.GetAsync(ct).ConfigureAwait(false);
 
     try
     {
+      if (_transaction is RabbitMQMessagingTransaction rabbitTransaction)
+        rabbitTransaction.Attach(channel);
+
       if (_transaction is not null)
-      {
-        await _transaction.BeginAsync(ct);
-      }
+        await _transaction.BeginAsync(ct).ConfigureAwait(false);
 
       var body = Encoding.UTF8.GetBytes(message.Body ?? string.Empty);
-
-      // ToBasicProperties should return the interface IBasicProperties to avoid Moq generic issues
       var properties = message.Headers.ToBasicProperties();
 
       await channel.BasicPublishAsync(
@@ -77,25 +69,58 @@ public sealed class RabbitMQMessagingPublisher(
           mandatory: true,
           basicProperties: properties,
           body: body,
-          cancellationToken: ct
-      );
+          cancellationToken: ct).ConfigureAwait(false);
 
       if (_transaction is not null)
-      {
-        await _transaction.CompleteAsync(ct);
-      }
+        await _transaction.CompleteAsync(ct).ConfigureAwait(false);
     }
-    catch
+    catch (Exception publishException)
     {
       if (_transaction is not null)
       {
-        await _transaction.RollbackAsync(ct);
+        try
+        {
+          await _transaction.RollbackAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception rollbackException)
+        {
+          throw new AggregateException(
+              "RabbitMQ publishing failed and the transaction rollback also failed.",
+              publishException,
+              rollbackException);
+        }
       }
+
       throw;
     }
     finally
     {
-      _channelPool.Return(channel);
+      if (_transaction is RabbitMQMessagingTransaction)
+        await DisposeTransactionalChannelAsync(channel).ConfigureAwait(false);
+      else
+        _channelPool.Return(channel);
+    }
+  }
+
+  private static async ValueTask DisposeTransactionalChannelAsync(IChannel channel)
+  {
+    try
+    {
+      if (channel.IsOpen)
+        await channel.CloseAsync().ConfigureAwait(false);
+    }
+    catch
+    {
+      // A channel in transaction mode must never return to the shared pool.
+    }
+
+    try
+    {
+      await channel.DisposeAsync().ConfigureAwait(false);
+    }
+    catch
+    {
+      // Preserve the publish/transaction outcome if cleanup also fails.
     }
   }
 }
