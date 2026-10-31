@@ -31,14 +31,14 @@ public sealed class TenantDatabaseRoutingTests : IClassFixture<PostgresFixture>
     }
 
     [Fact]
-    public void AddPostgresDatabase_RejectsTenantDatabaseRoutingWithoutValidatedTenantContext()
+    public void AddPostgresDatabase_PreservesLegacyDomainRoutingWithoutTenantExecutionContext()
     {
-        var provider = _fixture.BuildServiceProvider(Guid.NewGuid().ToString());
+        var domainId = Guid.NewGuid();
+        var provider = _fixture.BuildServiceProvider(domainId.ToString());
 
-        var act = () => provider.GetRequiredService<TestDbContext>();
+        var connectionString = provider.GetRequiredService<TestDbContext>().Database.GetConnectionString();
 
-        act.Should().Throw<TenantIsolationException>()
-            .WithMessage("*validated tenant execution context*");
+        connectionString.Should().Contain($"Database=test_{domainId}");
     }
 
     [Fact]

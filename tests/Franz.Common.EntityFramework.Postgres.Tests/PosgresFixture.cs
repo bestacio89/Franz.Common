@@ -1,4 +1,4 @@
-﻿using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Builders;
 using Franz.Common.Business.Domain.Factories;
 using Franz.Common.Business.Domain.IdGenerators;
 using Franz.Common.Business.Extensions;
@@ -26,7 +26,7 @@ public class PostgresFixture : IAsyncLifetime
   public IServiceProvider BuildServiceProvider(
       string? domainId = null,
       Action<IServiceCollection>? extraRegistrations = null,
-      string databaseName = "franz_test")
+      string databaseName = "test_{dbName}")
   {
     var services = new ServiceCollection();
 
@@ -35,7 +35,7 @@ public class PostgresFixture : IAsyncLifetime
     {
       ["Database:ServerName"] = Container.Hostname,
       ["Database:Port"] = Container.GetMappedPublicPort(5432).ToString(),
-      ["Database:DatabaseName"] = databaseName, // Supports tenant database and shared database test configurations
+      ["Database:DatabaseName"] = databaseName,
       ["Database:UserName"] = "postgres",
       ["Database:Password"] = "password"
     };
