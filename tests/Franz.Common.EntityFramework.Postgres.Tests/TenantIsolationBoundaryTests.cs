@@ -21,6 +21,7 @@ public sealed class TenantIsolationBoundaryTests : IClassFixture<PostgresFixture
         await using (var scope = provider.CreateAsyncScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+            await context.Database.EnsureCreatedAsync();
             context.TenantOwnedEntities.Add(new TenantOwnedTestEntity { Name = $"visible-only-to-{tenantId:N}" });
             await context.SaveChangesAsync();
         }
@@ -43,6 +44,7 @@ public sealed class TenantIsolationBoundaryTests : IClassFixture<PostgresFixture
         await using var provider = (ServiceProvider)_fixture.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+        await context.Database.EnsureCreatedAsync();
         context.TenantOwnedEntities.Add(new TenantOwnedTestEntity { Name = $"must-not-persist-{Guid.NewGuid():N}" });
 
         var act = () => context.SaveChangesAsync();
@@ -59,6 +61,7 @@ public sealed class TenantIsolationBoundaryTests : IClassFixture<PostgresFixture
         await using var provider = BuildTenantProvider(tenantId);
         await using var scope = provider.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+        await context.Database.EnsureCreatedAsync();
         var foreignEntity = new TenantOwnedTestEntity
         {
             TenantId = foreignTenantId,
