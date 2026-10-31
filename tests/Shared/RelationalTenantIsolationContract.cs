@@ -255,12 +255,10 @@ public abstract class RelationalTenantIsolationContract
             var repository = new EntityRepository<DbContextBase, TenantOwnedTestEntity, Guid>(
                 (DbContextBase)db);
 
-            Assert.Throws<TenantIsolationException>(() =>
-            {
+            await Assert.ThrowsAsync<TenantIsolationException>(() =>
                 repository.ExecuteBulkUpdateAsync(
                     _ => true,
-                    update => update.SetProperty(entity => entity.TenantId, foreignTenantId));
-            });
+                    update => update.SetProperty(entity => entity.TenantId, foreignTenantId)));
         });
     }
 
