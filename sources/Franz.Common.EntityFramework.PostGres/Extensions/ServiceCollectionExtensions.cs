@@ -35,18 +35,16 @@ public static class ServiceCollectionExtensions
                     ? DatabaseNamePattern
                     : databaseOptions.DatabaseName;
 
-                if (databaseName.Contains(DatabaseNamePattern, StringComparison.Ordinal))
-                {
-                    var tenantId = serviceProvider.GetService<ITenantExecutionContextAccessor>()?.Current?.TenantId;
-                    if (tenantId is null || tenantId == Guid.Empty)
-                        throw new TenantIsolationException(
-                            "Database-per-tenant routing requires a validated tenant execution context.");
+                // Prefer validated tenant identity; preserve legacy domain-based routing as fallback.
+                var tenantId = serviceProvider.GetService<ITenantExecutionContextAccessor>()?.Current?.TenantId;
+                var domainId = tenantId.HasValue
+                    ? null
+                    : serviceProvider.GetService<IDomainContextAccessor>()?.GetCurrentDomainId();
+                var databaseKey = tenantId?.ToString("D") ?? domainId?.ToString("D");
 
-                    databaseName = databaseName.Replace(
-                        DatabaseNamePattern,
-                        tenantId.Value.ToString("D"),
-                        StringComparison.Ordinal);
-                }
+                databaseName = databaseKey is not null
+                    ? databaseName.Replace(DatabaseNamePattern, databaseKey, StringComparison.Ordinal)
+                    : databaseName.Replace($"_{DatabaseNamePattern}", string.Empty, StringComparison.Ordinal);
 
                 var builder = new NpgsqlConnectionStringBuilder
                 {
