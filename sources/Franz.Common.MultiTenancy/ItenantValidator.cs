@@ -1,15 +1,7 @@
-﻿// File: ITenantValidator.cs
-using System;
-using System.Threading.Tasks;
+namespace Franz.Common.MultiTenancy;
 
-namespace Franz.Common.MultiTenancy
+/// <summary>Validates tenant eligibility before application execution.</summary>
+public interface ITenantValidator
 {
-  /// <summary>
-  /// Optional validation before considering a tenant valid for request processing.
-  /// Implementations can enforce tenant state (active/paused/disabled), expiry, billing, etc.
-  /// </summary>
-  public interface ITenantValidator
-  {
-    Task<bool> IsValidAsync(Guid tenantId);
-  }
+    Task<bool> IsValidAsync(Guid tenantId, CancellationToken cancellationToken = default);
 }

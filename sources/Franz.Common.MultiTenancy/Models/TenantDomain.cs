@@ -1,24 +1,24 @@
-﻿// File: Models/TenantDomain.cs
-using System;
+using System.Globalization;
 
-namespace Franz.Common.MultiTenancy.Models
+namespace Franz.Common.MultiTenancy.Models;
+
+/// <summary>A hostname mapping with an independent identity and explicit tenant ownership.</summary>
+public sealed record TenantDomain
 {
-  /// <summary>
-  /// Represents a domain (hostname) that belongs to a tenant.
-  /// Example: tenant1.myapp.com or www.example-tenant.com
-  /// </summary>
-  public sealed record TenantDomain
-  {
     public TenantDomain(string host, bool isPrimary = false)
     {
-      Host = host?.Trim()?.ToLowerInvariant() ?? throw new ArgumentNullException(nameof(host));
-      IsPrimary = isPrimary;
+        if (string.IsNullOrWhiteSpace(host)) throw new ArgumentException("A hostname is required.", nameof(host));
+        var value = host.Trim().TrimEnd('.');
+        if (value.Contains("://", StringComparison.Ordinal) || value.Contains('/', StringComparison.Ordinal) || value.Contains('\\\\', StringComparison.Ordinal))
+            throw new ArgumentException("A hostname must not contain a scheme or path.", nameof(host));
+        try { Host = new IdnMapping().GetAscii(value).ToLowerInvariant(); }
+        catch (ArgumentException exception) { throw new ArgumentException("The hostname is not a valid IDN hostname.", nameof(host), exception); }
+        IsPrimary = isPrimary;
     }
 
-    /// <summary>Canonical host (lowercase, no scheme, no path)</summary>
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid TenantId { get; init; }
     public string Host { get; init; }
-
-    /// <summary>True when this domain is the canonical / primary domain for the tenant.</summary>
     public bool IsPrimary { get; init; }
-  }
+    public bool IsVerified { get; init; } = true;
 }
