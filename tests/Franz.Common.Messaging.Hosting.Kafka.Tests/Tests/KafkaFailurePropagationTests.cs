@@ -5,6 +5,7 @@ using Franz.Common.Messaging.Hosting;
 using Franz.Common.Messaging.Hosting.Executing;
 using Franz.Common.Messaging.Hosting.Kafka.HostedServices;
 using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.MultiTenancy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -20,6 +21,8 @@ public sealed class KafkaFailurePropagationTests
     var services = new ServiceCollection();
     services.AddLogging();
     services.AddSingleton<MessageContextAccessor>();
+    var tenantInitializer = new TrackingTenantMessageContextInitializer();
+    services.AddSingleton<ITenantMessageContextInitializer>(tenantInitializer);
     services.AddSingleton<IMessagingStrategyExecuter, FailingStrategyExecuter>();
 
     using var provider = services.BuildServiceProvider();
@@ -37,6 +40,11 @@ public sealed class KafkaFailurePropagationTests
 
     await act.Should().ThrowAsync<InvalidOperationException>()
         .WithMessage("Simulated downstream processing failure.");
+
+    tenantInitializer.BeginCount.Should().Be(1);
+    tenantInitializer.LastMessage.Should().BeSameAs(message);
+    tenantInitializer.DisposeCount.Should().Be(1,
+        "tenant execution context must be cleared even when message handling fails");
 
     await hostedService.StopAsync(CancellationToken.None);
   }
@@ -61,6 +69,33 @@ public sealed class KafkaFailurePropagationTests
     {
       _stopped.TrySetResult();
       return Task.CompletedTask;
+    }
+  }
+
+ 
+  private sealed class TrackingTenantMessageContextInitializer : ITenantMessageContextInitializer
+  {
+    public int BeginCount { get; private set; }
+    public int DisposeCount { get; private set; }
+    public Message? LastMessage { get; private set; }
+
+    public Task<IAsyncDisposable> BeginAsync(CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("The hosted consumer must pass the delivered message explicitly.");
+
+    public Task<IAsyncDisposable> BeginAsync(Message message, CancellationToken cancellationToken = default)
+    {
+      LastMessage = message;
+      BeginCount++;
+      return Task.FromResult<IAsyncDisposable>(new ExecutionScope(this));
+    }
+
+    private sealed class ExecutionScope(TrackingTenantMessageContextInitializer owner) : IAsyncDisposable
+    {
+      public ValueTask DisposeAsync()
+      {
+        owner.DisposeCount++;
+        return ValueTask.CompletedTask;
+      }
     }
   }
 
