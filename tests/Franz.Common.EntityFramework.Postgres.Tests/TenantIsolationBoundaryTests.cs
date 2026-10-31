@@ -61,7 +61,6 @@ public sealed class TenantIsolationBoundaryTests : IClassFixture<PostgresFixture
         var context = scope.ServiceProvider.GetRequiredService<TestDbContext>();
         var foreignEntity = new TenantOwnedTestEntity
         {
-            Id = Guid.NewGuid(),
             TenantId = foreignTenantId,
             Name = "foreign-tenant"
         };
