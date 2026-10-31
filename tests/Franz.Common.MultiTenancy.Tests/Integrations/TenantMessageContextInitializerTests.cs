@@ -29,6 +29,26 @@ public sealed class TenantMessageContextInitializerTests
     }
 
     [Fact]
+    public async Task BeginAsync_WithExplicitMessage_DoesNotRequireAmbientMessageAccessor()
+    {
+        var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
+        var message = CreateMessage(tenant.Id);
+        var executionAccessor = new MessagingTenantExecutionContextAccessor();
+        var initializer = new TenantMessageContextInitializer(
+            new InMemoryTenantStore([tenant]),
+            executionAccessor,
+            new StubAuthorizer(authorized: true),
+            new ServiceCollection().BuildServiceProvider());
+
+        await using (await initializer.BeginAsync(message))
+        {
+            Assert.Equal(tenant.Id, executionAccessor.Current?.TenantId);
+        }
+
+        Assert.Null(executionAccessor.Current);
+    }
+
+    [Fact]
     public async Task BeginAsync_RejectsUnauthorizedProducer()
     {
         var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
