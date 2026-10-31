@@ -23,7 +23,7 @@ public sealed class TenantRequestAuthorizationTests
         var called = false;
         var middleware = CreateMiddleware(tenant, accessor, new ServiceCollection().BuildServiceProvider(), () => called = true);
 
-        await middleware.InvokeAsync(context);
+        await middleware.InvokeAsync(context, _ => { called = true; return Task.CompletedTask; });
 
         Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
         Assert.False(called);
@@ -46,7 +46,7 @@ public sealed class TenantRequestAuthorizationTests
             Assert.Equal(tenant.Id, accessor.Current?.TenantId);
         });
 
-        await middleware.InvokeAsync(context);
+        await middleware.InvokeAsync(context, _ => { called = true; Assert.Equal(tenant.Id, accessor.Current?.TenantId); return Task.CompletedTask; });
 
         Assert.True(called);
         Assert.Null(accessor.Current);
@@ -66,12 +66,7 @@ public sealed class TenantRequestAuthorizationTests
         Action next)
     {
         var pipeline = new StubTenantResolutionPipeline(tenant);
-        return new TenantResolutionMiddleware(
-            _ => { next(); return Task.CompletedTask; },
-            pipeline,
-            accessor,
-            Options.Create(new TenantResolutionOptions()),
-            services);
+        return new TenantResolutionMiddleware(pipeline, accessor, Options.Create(new TenantResolutionOptions()), services);
     }
 
     private sealed class StubTenantResolutionPipeline(TenantInfo tenant) : ITenantResolutionPipeline
