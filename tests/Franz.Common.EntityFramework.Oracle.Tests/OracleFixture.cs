@@ -13,6 +13,29 @@ namespace Franz.Common.EntityFramework.Oracle.Tests;
 
 public class OracleFixture : IAsyncLifetime
 {
+  private readonly SemaphoreSlim _databaseInitializationLock = new(1, 1);
+  private bool _databaseInitialized;
+
+  public async Task EnsureDatabaseCreatedAsync(Microsoft.EntityFrameworkCore.DbContext context)
+  {
+    if (_databaseInitialized)
+      return;
+
+    await _databaseInitializationLock.WaitAsync();
+    try
+    {
+      if (_databaseInitialized)
+        return;
+
+      await context.Database.EnsureCreatedAsync();
+      _databaseInitialized = true;
+    }
+    finally
+    {
+      _databaseInitializationLock.Release();
+    }
+  }
+
   public readonly OracleContainer Container = new OracleBuilder("gvenzl/oracle-free:23-slim-faststart")
       .WithWaitStrategy(Wait.ForUnixContainer()
           .UntilMessageIsLogged(".*DATABASE IS READY TO USE.*")

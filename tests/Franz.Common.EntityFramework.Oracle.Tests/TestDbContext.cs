@@ -1,28 +1,25 @@
-﻿using Franz.Common.EntityFramework;
+using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.Auditing;
+using Franz.Common.EntityFramework.ProviderContract.Tests;
 using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace Franz.Common.EntityFramework.Oracle.Tests;
 
-public class TestDbContext : DbContextBase
+public class TestDbContext(
+    DbContextOptions<TestDbContext> options,
+    IDispatcher dispatcher,
+    ICurrentUserService? currentUser = null,
+    ITenantExecutionContextAccessor? tenantContextAccessor = null)
+    : DbContextBase(options, dispatcher, currentUser, tenantContextAccessor)
 {
-  public TestDbContext(
-      DbContextOptions<TestDbContext> options,
-      IDispatcher dispatcher,
-      ICurrentUserService? currentUser = null)
-      : base(options, dispatcher, currentUser)
-  {
-  }
-
-  // Only domain sets
   public DbSet<TestEntity> TestEntities => Set<TestEntity>();
+  public DbSet<TenantOwnedTestEntity> TenantOwnedEntities => Set<TenantOwnedTestEntity>();
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
-
-    // Only test-specific configuration (if any)
-    // ❌ DO NOT reapply soft delete logic here anymore
+    modelBuilder.Entity<TenantOwnedTestEntity>().ToTable("provider_contract_tenant_owned_entities");
   }
 }
