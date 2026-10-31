@@ -408,3 +408,20 @@ Entities that belong to a tenant implement `Franz.Common.MultiTenancy.ITenantEnt
 - Tenant identity is immutable after insertion.
 
 Global query filters are defense in depth, not a substitute for database permissions. Raw SQL, bulk APIs, and deliberate `IgnoreQueryFilters` usage must be separately controlled. For high-assurance shared-database deployments, enable database row-level security with a transaction-scoped tenant setting and a restricted application database role. Define tenant-scoped unique constraints and composite tenant-aware foreign keys in the application model; the framework does not silently rewrite business uniqueness semantics.
+
+
+### Register the context accessor in derived DbContexts
+
+A concrete DbContext must accept and forward the scoped accessor to `DbContextBase`; constructor injection does not automatically pass optional base parameters:
+
+```csharp
+public sealed class ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    IDispatcher dispatcher,
+    ITenantExecutionContextAccessor tenantContext)
+    : DbContextBase(options, dispatcher, tenantContextAccessor: tenantContext)
+{
+}
+```
+
+If the accessor is not forwarded, tenant-owned queries intentionally match no rows and tenant-owned writes fail closed.

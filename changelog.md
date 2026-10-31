@@ -3,6 +3,20 @@
 
 ## Unreleased — Multi-Tenancy Security Hardening
 
+### HTTP membership authorization
+- Host-based resolution now requires a verified canonical domain mapping owned by the resolved tenant.
+
+### Persistence integrations
+- PostgreSQL database-per-tenant routing prefers the validated tenant ID and preserves domain-based routing only as a compatibility fallback.
+- EF sensitive-data logging is opt-in and disabled by default.
+- Authenticated HTTP principals now require an application-provided tenant membership authorizer; missing or denied authorization fails with HTTP 403.
+
+### Distributed execution and integrations
+- Added scoped inbound message tenant initialization with lifecycle validation, optional tenant validation, verified domain ownership, and mandatory producer authorization.
+- Outbound message builders now propagate only validated tenant/domain execution context.
+- Added tenant-prefixed cache key strategy and opt-in DI registration.
+- Corrected gRPC client behavior to use the client pipeline contract; server behavior discards untrusted inbound tenant metadata before resolution.
+
 ### Persistence
 - Added tenant-owned entity contract, tenant-aware global query filters, automatic tenant stamping, and cross-tenant write rejection in `DbContextBase`.
 - Applied tenant checks to synchronous and asynchronous save paths; added persistence isolation regression tests.
