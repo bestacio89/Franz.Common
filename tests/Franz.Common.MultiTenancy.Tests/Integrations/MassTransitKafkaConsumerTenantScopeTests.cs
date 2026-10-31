@@ -67,7 +67,7 @@ public sealed class MassTransitKafkaConsumerTenantScopeTests
 
     private static ConsumeResult<string, string> CreateDelivery(Guid tenantId)
     {
-        var headers = new Headers
+        var headers = new Confluent.Kafka.Headers
         {
             new Header(HeaderConstants.TenantId, Encoding.UTF8.GetBytes(tenantId.ToString()))
         };
