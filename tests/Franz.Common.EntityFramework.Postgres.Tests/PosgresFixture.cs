@@ -26,7 +26,8 @@ public class PostgresFixture : IAsyncLifetime
   public IServiceProvider BuildServiceProvider(
       string? domainId = null,
       Action<IServiceCollection>? extraRegistrations = null,
-      string databaseName = "test_{dbName}")
+      string databaseName = "test_{dbName}",
+      string? isolationMode = null)
   {
     var services = new ServiceCollection();
 
@@ -36,6 +37,7 @@ public class PostgresFixture : IAsyncLifetime
       ["Database:ServerName"] = Container.Hostname,
       ["Database:Port"] = Container.GetMappedPublicPort(5432).ToString(),
       ["Database:DatabaseName"] = databaseName,
+      ["Database:IsolationMode"] = isolationMode ?? (databaseName.Contains("{dbName}", StringComparison.Ordinal) ? "TenantDatabase" : "SharedDatabase"),
       ["Database:UserName"] = "postgres",
       ["Database:Password"] = "password"
     };

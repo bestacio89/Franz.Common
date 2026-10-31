@@ -34,7 +34,7 @@ public sealed class TenantDatabaseRoutingTests : IClassFixture<PostgresFixture>
     public void AddPostgresDatabase_PreservesLegacyDomainRoutingWithoutTenantExecutionContext()
     {
         var domainId = Guid.NewGuid();
-        var provider = _fixture.BuildServiceProvider(domainId.ToString());
+        var provider = _fixture.BuildServiceProvider(domainId.ToString(), isolationMode: "DomainDatabase");
 
         var connectionString = provider.GetRequiredService<TestDbContext>().Database.GetConnectionString();
 

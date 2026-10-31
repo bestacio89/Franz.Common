@@ -425,3 +425,28 @@ public sealed class ApplicationDbContext(
 ```
 
 If the accessor is not forwarded, tenant-owned queries intentionally match no rows and tenant-owned writes fail closed.
+
+
+## Provider-neutral database isolation policy
+
+Database routing is configured through `Database:IsolationMode` and `Database:DatabaseName`:
+
+- `SharedDatabase` (default) uses a concrete database name unchanged. A `{dbName}` token is rejected rather than silently removed.
+- `TenantDatabase` requires `DatabaseName` to contain `{dbName}` and requires a validated tenant execution context. Missing tenant identity fails closed; domain identity is never a fallback.
+- `DomainDatabase` explicitly opts in to domain-based database routing. The configured name must contain `{dbName}` and a domain context must be present.
+
+Example:
+
+```json
+{
+  "Database": {
+    "ServerName": "localhost",
+    "DatabaseName": "app_{dbName}",
+    "IsolationMode": "TenantDatabase",
+    "UserName": "app",
+    "EnableSensitiveDataLogging": false
+  }
+}
+```
+
+All EF provider adapters use the shared `DatabaseTargetResolver`; adapters construct provider-specific connection strings only. Domain-based routing is an explicit deployment decision, not a compatibility fallback.
