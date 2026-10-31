@@ -36,7 +36,7 @@ public sealed class DatabaseTargetResolverTests
     public void TenantDatabase_FailsClosedWhenTenantContextIsMissingEvenIfDomainExists()
     {
         var options = new DatabaseOptions { DatabaseName = "app_{dbName}", IsolationMode = DatabaseIsolationMode.TenantDatabase };
-        Assert.Throws<TenantIsolationException>(() => DatabaseTargetResolver.ResolveDatabaseName(options, null, null));
+        Assert.Throws<TenantIsolationException>(() => DatabaseTargetResolver.ResolveDatabaseName(options, null, new StubDomainAccessor(Guid.NewGuid())));
     }
 
     [Fact]

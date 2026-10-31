@@ -50,8 +50,6 @@ public static class ServiceCollectionExtensions
 
           var connectionString = sqlConnectionStringBuilder.ConnectionString;
 
-          connectionString = sqlConnectionStringBuilder.ConnectionString;
-
           dbContextBuilder.UseSqlServer(connectionString);
           if (databaseOptions.Value.EnableSensitiveDataLogging) dbContextBuilder.EnableSensitiveDataLogging();
         })

@@ -14,7 +14,6 @@ namespace Franz.Common.EntityFramework.Postgres.Extensions;
 public static class ServiceCollectionExtensions
 {
     private const string DefaultServerName = "localhost";
-    private const string DatabaseNamePattern = "{dbName}";
     private const string DefaultUserName = "postgres";
     private const string DefaultPassword = "password";
     private const int DefaultPort = 5432;
