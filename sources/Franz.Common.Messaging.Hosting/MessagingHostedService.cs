@@ -1,4 +1,5 @@
 ﻿using Franz.Common.Errors;
+using Franz.Common.Messaging.MultiTenancy;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Hosting.Executing;
 using Franz.Common.Messaging.Hosting.Properties;
@@ -43,6 +44,11 @@ public sealed class MessagingHostedService : IHostedService
 
     var messageContextAccessor = scope.ServiceProvider.GetRequiredService<MessageContextAccessor>();
     messageContextAccessor.Set(new MessageContext(message));
+
+    var tenantInitializer = scope.ServiceProvider.GetService<ITenantMessageContextInitializer>();
+    await using var tenantExecutionScope = tenantInitializer is null
+        ? null
+        : await tenantInitializer.BeginAsync();
 
     var strategyExecuters = scope.ServiceProvider.GetServices<IMessagingStrategyExecuter>();
 
