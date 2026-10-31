@@ -64,7 +64,7 @@ public sealed class KafkaMessagingHostedService : BackgroundService
     var tenantInitializer = scope.ServiceProvider.GetService<ITenantMessageContextInitializer>();
     await using var tenantExecutionScope = tenantInitializer is null
         ? null
-        : await tenantInitializer.BeginAsync();
+        : await tenantInitializer.BeginAsync(args.Message);
 
       var executers =
           scope.ServiceProvider.GetServices<IMessagingStrategyExecuter>();
