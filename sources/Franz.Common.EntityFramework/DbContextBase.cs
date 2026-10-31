@@ -112,6 +112,9 @@ public abstract class DbContextBase : DbContext
             if (!isDomainEntity && !isTenantEntity)
                 continue;
 
+            if (isTenantEntity)
+                modelBuilder.Entity(clrType).Property<Guid>(nameof(ITenantEntity.TenantId)).IsConcurrencyToken();
+
             var parameter = Expression.Parameter(clrType, "entity");
             Expression? filterBody = null;
 
