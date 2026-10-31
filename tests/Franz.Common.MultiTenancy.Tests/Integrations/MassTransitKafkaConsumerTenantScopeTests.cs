@@ -90,7 +90,7 @@ public sealed class MassTransitKafkaConsumerTenantScopeTests
         public string Value { get; set; } = string.Empty;
     }
 
-    private sealed class ScopedProbe;
+    private sealed class ScopedProbe { }
 
     private sealed class TrackingTenantMessageContextInitializer : ITenantMessageContextInitializer
     {
