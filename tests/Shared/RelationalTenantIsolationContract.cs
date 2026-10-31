@@ -22,6 +22,9 @@ public abstract class RelationalTenantIsolationContract
 {
     protected abstract Task WithContextAsync(Guid? tenantId, Func<DbContext, Task> action);
 
+    protected virtual Task EnsureDatabaseCreatedAsync(DbContext db)
+        => db.Database.EnsureCreatedAsync();
+
     [Fact]
     public async Task TenantOwnedQueries_AreRestrictedToTheExecutionTenant()
     {
@@ -32,7 +35,7 @@ public abstract class RelationalTenantIsolationContract
 
         await WithContextAsync(tenantA, async db =>
         {
-            await db.Database.EnsureCreatedAsync();
+            await EnsureDatabaseCreatedAsync(db);
             db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = nameA });
             await db.SaveChangesAsync();
         });
@@ -65,7 +68,7 @@ public abstract class RelationalTenantIsolationContract
     {
         await WithContextAsync(null, async db =>
         {
-            await db.Database.EnsureCreatedAsync();
+            await EnsureDatabaseCreatedAsync(db);
             db.Set<TenantOwnedTestEntity>().Add(
                 new TenantOwnedTestEntity { Name = $"unscoped-{Guid.NewGuid():N}" });
 
@@ -81,7 +84,7 @@ public abstract class RelationalTenantIsolationContract
 
         await WithContextAsync(tenantId, async db =>
         {
-            await db.Database.EnsureCreatedAsync();
+            await EnsureDatabaseCreatedAsync(db);
             db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity
             {
                 TenantId = foreignTenantId,
@@ -102,7 +105,7 @@ public abstract class RelationalTenantIsolationContract
 
         await WithContextAsync(ownerTenantId, async db =>
         {
-            await db.Database.EnsureCreatedAsync();
+            await EnsureDatabaseCreatedAsync(db);
             var entity = new TenantOwnedTestEntity { Name = marker };
             db.Set<TenantOwnedTestEntity>().Add(entity);
             await db.SaveChangesAsync();
@@ -126,7 +129,7 @@ public abstract class RelationalTenantIsolationContract
 
         await WithContextAsync(tenantId, async db =>
         {
-            await db.Database.EnsureCreatedAsync();
+            await EnsureDatabaseCreatedAsync(db);
             var entity = new TenantOwnedTestEntity { Name = $"ownership-{Guid.NewGuid():N}" };
             db.Set<TenantOwnedTestEntity>().Add(entity);
             await db.SaveChangesAsync();
@@ -147,7 +150,7 @@ public abstract class RelationalTenantIsolationContract
 
         await WithContextAsync(ownerTenantId, async db =>
         {
-            await db.Database.EnsureCreatedAsync();
+            await EnsureDatabaseCreatedAsync(db);
             var entity = new TenantOwnedTestEntity { Name = marker };
             db.Set<TenantOwnedTestEntity>().Add(entity);
             await db.SaveChangesAsync();
@@ -172,7 +175,7 @@ public abstract class RelationalTenantIsolationContract
 
         await WithContextAsync(tenantA, async db =>
         {
-            await db.Database.EnsureCreatedAsync();
+            await EnsureDatabaseCreatedAsync(db);
             db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
             await db.SaveChangesAsync();
         });
@@ -211,7 +214,7 @@ public abstract class RelationalTenantIsolationContract
 
         await WithContextAsync(tenantA, async db =>
         {
-            await db.Database.EnsureCreatedAsync();
+            await EnsureDatabaseCreatedAsync(db);
             db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
             await db.SaveChangesAsync();
         });
@@ -251,7 +254,7 @@ public abstract class RelationalTenantIsolationContract
 
         await WithContextAsync(tenantId, async db =>
         {
-            await db.Database.EnsureCreatedAsync();
+            await EnsureDatabaseCreatedAsync(db);
             var repository = new EntityRepository<DbContextBase, TenantOwnedTestEntity, Guid>(
                 (DbContextBase)db);
 
@@ -271,7 +274,7 @@ public abstract class RelationalTenantIsolationContract
 
         await WithContextAsync(tenantA, async db =>
         {
-            await db.Database.EnsureCreatedAsync();
+            await EnsureDatabaseCreatedAsync(db);
             db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
             await db.SaveChangesAsync();
         });
