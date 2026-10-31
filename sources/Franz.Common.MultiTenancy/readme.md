@@ -201,3 +201,6 @@ Tenant resolution identifies a candidate; it does not by itself authorize execut
 - `ITenantExecutionContextAccessor` is the execution-boundary contract. Implementations must isolate concurrent requests and messages.
 
 Tenant stores must guarantee globally unique verified hostname mappings. The in-memory implementation is intended only for tests and local demonstrations.
+
+
+`ITenantValidator` retains its original `IsValidAsync(Guid)` contract. The cancellation-aware overload has a default implementation that delegates to the original method, so existing validators remain source-compatible while new implementations can observe request cancellation.
