@@ -2,148 +2,174 @@
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Messages;
+using Franz.Common.Messaging;
+using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Hosting;
 using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.MultiTenancy;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Messaging.Storage;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Franz.Common.Messaging.Hosting.Listeners;
 
 public sealed class OutboxMessageListener : IListener
 {
-  private readonly IMessageStore _messageStore;
-  private readonly IInboxStore _inbox;
-  private readonly IDispatcher _dispatcher;
-  private readonly IMessageSerializer _serializer;
+  private readonly IServiceScopeFactory _scopeFactory;
   private readonly ILogger<OutboxMessageListener> _logger;
 
   public OutboxMessageListener(
-      IMessageStore messageStore,
-      IInboxStore inbox,
-      IDispatcher dispatcher,
-      IMessageSerializer serializer,
+      IServiceScopeFactory scopeFactory,
       ILogger<OutboxMessageListener> logger)
   {
-    _messageStore = messageStore;
-    _inbox = inbox;
-    _dispatcher = dispatcher;
-    _serializer = serializer;
+    _scopeFactory = scopeFactory;
     _logger = logger;
   }
 
-  // ✅ FIX: Replaced synchronous event with awaitable Func delegate
   public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
 
   public async Task Listen(CancellationToken stoppingToken = default)
   {
-    _logger.LogInformation("🚀 OutboxMessageListener started polling...");
+    _logger.LogInformation("Outbox message listener started.");
 
     while (!stoppingToken.IsCancellationRequested)
     {
       try
       {
-        // Fetching stored records
-        var pending = await _messageStore.GetPendingAsync(stoppingToken);
+        IReadOnlyList<StoredMessage> pending;
+
+        await using (var pollingScope = _scopeFactory.CreateAsyncScope())
+        {
+          var messageStore = pollingScope.ServiceProvider.GetRequiredService<IMessageStore>();
+          pending = await messageStore.GetPendingAsync(stoppingToken).ConfigureAwait(false);
+        }
 
         foreach (var stored in pending)
         {
-          // Bridge stored data to our native Message
-          var message = stored.ToMessage();
-
-          // 👉 Inbox check (Idempotency)
-          if (await _inbox.HasProcessedAsync(message.Id, stoppingToken))
-          {
-            _logger.LogInformation("⏩ Skipping already processed message {MessageId}", message.Id);
-            await _messageStore.MarkAsSentAsync(stored.Id, stoppingToken);
-            continue;
-          }
-
-          // 🚀 THE FIX: Await external processing before committing state changes
-          if (OnMessageReceivedAsync != null)
-          {
-            await OnMessageReceivedAsync(new MessageEventArgs(message));
-          }
-
-          // Deserialize domain object for internal dispatch
-          object? domainObject = TryDeserializeDomainObject(message);
-
-          using var scope = _logger.BeginScope(new Dictionary<string, object?>
-          {
-            ["FranzCorrelationId"] = message.CorrelationId ?? Guid.Empty,
-            ["FranzMessageId"] = message.Id
-          });
-
-          if (domainObject is IEvent evt)
-          {
-            _logger.LogInformation("📢 Dispatching event {EventType} from Outbox", evt.GetType().Name);
-            await _dispatcher.PublishEventAsync(evt, stoppingToken);
-          }
-          else if (domainObject is ICommand cmd)
-          {
-            _logger.LogInformation("📨 Dispatching command {CommandType} from Outbox", cmd.GetType().Name);
-            await _dispatcher.SendAsync(cmd, stoppingToken);
-          }
-          else
-          {
-            _logger.LogWarning("⚠️ Outbox message {Id} is neither ICommand nor IEvent", message.Id);
-          }
-
-          // 👉 Atomic logical completion: mark both stores
-          await _inbox.MarkProcessedAsync(message.Id, stoppingToken);
-          await _messageStore.MarkAsSentAsync(stored.Id, stoppingToken);
-
-          _logger.LogInformation("✅ Marked Outbox message {MessageId} as sent + processed", message.Id);
+          stoppingToken.ThrowIfCancellationRequested();
+          await ProcessMessageAsync(stored, stoppingToken).ConfigureAwait(false);
         }
+      }
+      catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+      {
+        throw;
       }
       catch (Exception ex)
       {
-        _logger.LogError(ex, "💥 Unexpected error in OutboxMessageListener loop");
+        _logger.LogError(ex, "Outbox polling or message processing failed.");
       }
 
-      // Polling interval - in a production scenario, consider a backoff strategy or SignalR/DbNotification trigger
-      await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+      await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken).ConfigureAwait(false);
+    }
+  }
+
+  private async Task ProcessMessageAsync(StoredMessage stored, CancellationToken cancellationToken)
+  {
+    await using var scope = _scopeFactory.CreateAsyncScope();
+    var services = scope.ServiceProvider;
+    var messageStore = services.GetRequiredService<IMessageStore>();
+    var inbox = services.GetRequiredService<IInboxStore>();
+    var dispatcher = services.GetRequiredService<IDispatcher>();
+    var serializer = services.GetRequiredService<IMessageSerializer>();
+    var message = stored.ToMessage();
+    var messageContextAccessor = services.GetService<MessageContextAccessor>();
+
+    messageContextAccessor?.Set(new MessageContext(message));
+
+    try
+    {
+      if (await inbox.HasProcessedAsync(message.Id, cancellationToken).ConfigureAwait(false))
+      {
+        _logger.LogInformation("Skipping already processed message {MessageId}.", message.Id);
+        await messageStore.MarkAsSentAsync(stored.Id, cancellationToken).ConfigureAwait(false);
+        return;
+      }
+
+      var tenantInitializer = services.GetService<ITenantMessageContextInitializer>();
+      await using var tenantExecutionScope = tenantInitializer is null
+          ? null
+          : await tenantInitializer.BeginAsync(message, cancellationToken).ConfigureAwait(false);
+
+      if (OnMessageReceivedAsync is not null)
+        await OnMessageReceivedAsync(new MessageEventArgs(message)).ConfigureAwait(false);
+
+      var domainObject = TryDeserializeDomainObject(message, serializer);
+
+      using var logScope = _logger.BeginScope(new Dictionary<string, object?>
+      {
+        ["FranzCorrelationId"] = message.CorrelationId ?? Guid.Empty,
+        ["FranzMessageId"] = message.Id
+      });
+
+      if (domainObject is IEvent evt)
+      {
+        _logger.LogInformation("Dispatching outbox event {EventType}.", evt.GetType().Name);
+        await dispatcher.PublishEventAsync(evt, cancellationToken).ConfigureAwait(false);
+      }
+      else if (domainObject is ICommand cmd)
+      {
+        _logger.LogInformation("Dispatching outbox command {CommandType}.", cmd.GetType().Name);
+        await dispatcher.SendAsync(cmd, cancellationToken).ConfigureAwait(false);
+      }
+      else
+      {
+        _logger.LogWarning("Outbox message {MessageId} is neither an ICommand nor an IEvent.", message.Id);
+      }
+
+      await inbox.MarkProcessedAsync(message.Id, cancellationToken).ConfigureAwait(false);
+      await messageStore.MarkAsSentAsync(stored.Id, cancellationToken).ConfigureAwait(false);
+
+      _logger.LogInformation("Marked outbox message {MessageId} as sent and processed.", message.Id);
+    }
+    finally
+    {
+      messageContextAccessor?.Clear();
     }
   }
 
   public Task StopListenAsync(CancellationToken cancellationToken = default)
   {
-    _logger.LogInformation("🛑 OutboxMessageListener stopping...");
+    _logger.LogInformation("Outbox message listener stopping.");
     return Task.CompletedTask;
   }
 
-  private object? TryDeserializeDomainObject(Message message)
+  private object? TryDeserializeDomainObject(Message message, IMessageSerializer serializer)
   {
     var typeName = message.MessageType;
 
-    if (!string.IsNullOrWhiteSpace(typeName) && message.Body is string bodyJson)
+    if (string.IsNullOrWhiteSpace(typeName) || message.Body is not string bodyJson)
+      return null;
+
+    var type = ResolveType(typeName);
+    if (type is null)
+      return null;
+
+    try
     {
-      var type = ResolveType(typeName);
-      if (type != null)
-      {
-        try
-        {
-          return _serializer.Deserialize(bodyJson, type);
-        }
-        catch (Exception ex)
-        {
-          _logger.LogError(ex, "❌ Failed to deserialize message {Id} as {TypeName}", message.Id, typeName);
-        }
-      }
+      return serializer.Deserialize(bodyJson, type);
     }
-    return null;
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Failed to deserialize outbox message {MessageId} as {TypeName}.",
+          message.Id, typeName);
+      return null;
+    }
   }
 
   private static Type? ResolveType(string typeName)
   {
     var type = Type.GetType(typeName);
-    if (type != null) return type;
+    if (type is not null)
+      return type;
 
-    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+    foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
     {
-      type = asm.GetType(typeName);
-      if (type != null) return type;
+      type = assembly.GetType(typeName);
+      if (type is not null)
+        return type;
     }
+
     return null;
   }
 }
