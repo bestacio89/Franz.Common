@@ -21,6 +21,7 @@ A `TenantExecutionContext` is immutable validated identity. Tenant resolution is
 - The ambient message context is cleared in a `finally` block after tenant-scope disposal, including when tenant validation or handler execution fails. The Outbox listener also creates a fresh DI scope per stored message and resolves its stores, serializer and dispatcher from that scope.
 - The initializer also accepts an explicit `Message`, allowing transport processors that do not use the ambient message accessor to establish the same validated tenant context.
 - A message scope rejects a second initialization. A consumer must not reuse an initialized accessor for another message; create a new DI scope per message.
+- The generic MassTransit Kafka adapter exposes a scoped-handler overload that receives the per-delivery `IServiceProvider`; it maps Kafka headers into the tenant message envelope and invokes the same initializer. Its legacy `Func<T, Task>` overload fails closed when messaging multitenancy is registered, because a captured handler cannot be guaranteed to resolve dependencies from the delivery scope.
 - Background jobs must carry explicit tenant identity in authenticated job/message metadata and re-enter through the same validation and authorization boundary. Do not capture an HTTP accessor, copy a mutable accessor between jobs, or trust a tenant identifier supplied only in an arbitrary job payload.
 
 ## Persistence guarantees and limitations
