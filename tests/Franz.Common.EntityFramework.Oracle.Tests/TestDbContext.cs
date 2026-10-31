@@ -20,5 +20,6 @@ public class TestDbContext(
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
+    modelBuilder.Entity<TenantOwnedTestEntity>().ToTable("provider_contract_tenant_owned_entities");
   }
 }
