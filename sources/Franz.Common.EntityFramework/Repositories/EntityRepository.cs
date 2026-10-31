@@ -2,7 +2,6 @@ using Franz.Common.Business.Domain;
 using Franz.Common.Business.Repositories;
 using Franz.Common.Errors;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query;
 using System.Linq.Expressions;
 
 namespace Franz.Common.EntityFramework.Repositories;
@@ -66,17 +65,18 @@ public class EntityRepository<TDbContext, TEntity, TId>
   /// <inheritdoc />
   public Task<int> ExecuteBulkUpdateAsync(
       Expression<Func<TEntity, bool>> predicate,
-      Expression<Func<UpdateSettersBuilder<TEntity>, UpdateSettersBuilder<TEntity>>> setPropertyCalls,
+      Action<BulkUpdateBuilder<TEntity>> configure,
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(predicate);
-    ArgumentNullException.ThrowIfNull(setPropertyCalls);
+    ArgumentNullException.ThrowIfNull(configure);
 
-    BulkUpdateExpressionValidator.Validate<TEntity>(setPropertyCalls);
+    var update = new BulkUpdateBuilder<TEntity>();
+    configure(update);
 
     return DbContext.Set<TEntity>()
         .Where(predicate)
-        .ExecuteUpdateAsync(setPropertyCalls, cancellationToken);
+        .ExecuteUpdateAsync(update.ApplyTo, cancellationToken);
   }
 
   public async Task DeleteAsync(TEntity entity, bool hardDelete = false, CancellationToken cancellationToken = default)
