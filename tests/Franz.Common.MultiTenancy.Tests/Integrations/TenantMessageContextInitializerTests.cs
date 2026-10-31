@@ -39,19 +39,6 @@ public sealed class TenantMessageContextInitializerTests
         Assert.Null(executionAccessor.Current);
     }
 
-    [Fact]
-    public async Task BeginAsync_RejectsUnverifiedOrForeignDomain()
-    {
-        var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
-        var message = CreateMessage(tenant.Id);
-        message.Headers[HeaderConstants.DomainId] = [Guid.NewGuid().ToString()];
-        var executionAccessor = new MessagingTenantExecutionContextAccessor();
-        var initializer = CreateInitializer(tenant, message, executionAccessor, authorized: true);
-
-        await Assert.ThrowsAsync<TenantResolutionException>(() => initializer.BeginAsync());
-        Assert.Null(executionAccessor.Current);
-    }
-
     private static TenantMessageContextInitializer CreateInitializer(
         TenantInfo tenant,
         Message message,

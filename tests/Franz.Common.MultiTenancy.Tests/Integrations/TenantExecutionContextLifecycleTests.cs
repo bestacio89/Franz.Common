@@ -27,9 +27,7 @@ public sealed class TenantExecutionContextLifecycleTests
         accessor.Clear();
 
         Assert.Null(accessor.Current);
-        Assert.False(httpContext.Items.ContainsKey(HttpTenantContextKeys.ExecutionContext));
-        Assert.False(httpContext.Items.ContainsKey(HttpTenantContextKeys.TenantId));
-        Assert.False(httpContext.Items.ContainsKey(HttpTenantContextKeys.DomainId));
+        Assert.Empty(httpContext.Items);
     }
 
     [Fact]
