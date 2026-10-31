@@ -3,6 +3,7 @@ using Franz.Common.Http.MultiTenancy.Configuration;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Http.MultiTenancy.Middleware;
