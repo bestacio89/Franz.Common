@@ -8,6 +8,9 @@ namespace Franz.Common.EntityFramework.Oracle.Tests;
 public sealed class RelationalTenantIsolationTests(OracleFixture fixture)
     : RelationalTenantIsolationContract, IClassFixture<OracleFixture>
 {
+    protected override Task EnsureDatabaseCreatedAsync(DbContext db)
+        => fixture.EnsureDatabaseCreatedAsync(db);
+
     protected override async Task WithContextAsync(Guid? tenantId, Func<DbContext, Task> action)
     {
         using var provider = (ServiceProvider)fixture.BuildServiceProvider(
