@@ -188,3 +188,16 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
   ### Version 1.6.20
 - Updated to **.NET 10.0**
+
+
+## Validated tenant execution
+
+Tenant resolution identifies a candidate; it does not by itself authorize execution. Adapters should validate tenant lifecycle and establish a scoped `TenantExecutionContext` only after successful resolution.
+
+- `TenantExecutionContext` is immutable and rejects inactive tenants.
+- `TenantStatus` distinguishes provisioning, active, suspended, disabled, and deprovisioned tenants.
+- `TenantDomain` has its own identifier and normalizes internationalized hostnames to IDNA ASCII.
+- `DefaultTenantResolutionPipeline` evaluates all successful strategies and rejects contradictory tenant identities.
+- `ITenantExecutionContextAccessor` is the execution-boundary contract. Implementations must isolate concurrent requests and messages.
+
+Tenant stores must guarantee globally unique verified hostname mappings. The in-memory implementation is intended only for tests and local demonstrations.

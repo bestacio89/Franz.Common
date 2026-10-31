@@ -206,3 +206,25 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## Secure request context
+
+Register the HTTP integration and place its middleware after authentication and before authorization/endpoints:
+
+```csharp
+services.AddFranzMultiTenancy(options =>
+{
+    options.RequireTenant = true; // fail closed when no active tenant resolves
+});
+
+app.UseAuthentication();
+app.UseFranzMultiTenancy();
+app.UseAuthorization();
+```
+
+Tenant and domain accessors read server-established values from `HttpContext.Items`; inbound headers are resolution inputs only and are never the authoritative context. The middleware validates tenant lifecycle state, optionally invokes an application-registered `ITenantValidator`, creates an immutable execution context, and clears it after the request.
+
+The JWT claim resolver ignores unauthenticated principals. Register only the resolution strategies appropriate to the application. Query-string and header selection must not be treated as authorization: applications must still authorize the authenticated principal's membership in the resolved tenant.
+
+**Compatibility note:** HTTP accessors no longer read tenant/domain IDs from request headers. Consumers that previously used caller-supplied headers as ambient state must use a trusted resolver and the execution context accessor. `ITenantValidator.IsValidAsync` now accepts a cancellation token.

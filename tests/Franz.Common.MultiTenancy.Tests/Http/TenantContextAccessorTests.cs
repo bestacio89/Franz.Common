@@ -16,19 +16,15 @@ public sealed class TenantContextAccessorTests
     }
 
     [Fact]
-    public void GetCurrentTenantId_ReturnsOnlyServerEstablishedItem()
+    public void SetCurrentTenantId_StoresServerEstablishedTenantInRequestItems()
     {
         var context = new DefaultHttpContext();
         var tenantId = Guid.NewGuid();
-        context.Items[HttpTenantContextKeysForTests.TenantId] = tenantId;
         var accessor = new TenantContextAccessor(new HttpContextAccessor { HttpContext = context });
 
-        Assert.Equal(tenantId, accessor.GetCurrentTenantId());
-    }
+        accessor.SetCurrentTenantId(tenantId);
 
-    private static class HttpTenantContextKeysForTests
-    {
-        // The accessor deliberately exposes no mutable request-header contract.
-        public static readonly object TenantId = typeof(TenantContextAccessor);
+        Assert.Equal(tenantId, accessor.GetCurrentTenantId());
+        Assert.False(context.Request.Headers.ContainsKey("X-Tenant-Id"));
     }
 }
