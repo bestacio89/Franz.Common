@@ -62,7 +62,7 @@ public static class ServiceCollectionExtensions
               connectionString,
               ServerVersion.Create(new Version(11, 4, 0), ServerType.MariaDb));
 
-          dbContextBuilder.EnableSensitiveDataLogging();
+          if (databaseOptions.EnableSensitiveDataLogging) dbContextBuilder.EnableSensitiveDataLogging();
 
           // Mask password safely
           var masked = !string.IsNullOrEmpty(databaseOptions.Password)

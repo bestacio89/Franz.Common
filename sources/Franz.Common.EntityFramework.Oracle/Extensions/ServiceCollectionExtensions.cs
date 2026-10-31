@@ -31,7 +31,10 @@ public static class ServiceCollectionExtensions
           // Build proper DataSource string: host:port/serviceName
           var host = databaseOptions.Value.ServerName ?? DefaultServerName;
           var port = databaseOptions.Value.Port > 0 ? databaseOptions.Value.Port.Value : DefaultPort;
-          var serviceName = databaseOptions.Value.DatabaseName ?? DatabaseNamePattern;
+          var serviceName = DatabaseTargetResolver.ResolveDatabaseName(
+              databaseOptions.Value,
+              serviceProvider.GetService<ITenantExecutionContextAccessor>(),
+              serviceProvider.GetService<IDomainContextAccessor>());
 
           var oracleConnectionStringBuilder = new OracleConnectionStringBuilder
           {
@@ -52,7 +55,7 @@ public static class ServiceCollectionExtensions
 
           dbContextBuilder.UseOracle(connectionString);
 
-          dbContextBuilder.EnableSensitiveDataLogging();
+          if (databaseOptions.Value.EnableSensitiveDataLogging) dbContextBuilder.EnableSensitiveDataLogging();
         })
         .AddScoped<DbContextBase>(sp => sp.GetRequiredService<TDbContext>());
 

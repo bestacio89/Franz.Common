@@ -54,7 +54,7 @@ public static class ServiceCollectionExtensions
                   : connectionString.Replace($"_{DatabaseNamePattern}", string.Empty);
 
           dbContextBuilder.UseSqlServer(connectionString);
-          dbContextBuilder.EnableSensitiveDataLogging();
+          if (databaseOptions.Value.EnableSensitiveDataLogging) dbContextBuilder.EnableSensitiveDataLogging();
         })
         .AddScoped<DbContextBase>(sp => sp.GetRequiredService<TDbContext>());
 

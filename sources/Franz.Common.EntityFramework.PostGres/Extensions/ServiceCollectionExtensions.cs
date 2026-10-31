@@ -31,20 +31,10 @@ public static class ServiceCollectionExtensions
                 var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
                 var logger = serviceProvider.GetRequiredService<ILogger<TDbContext>>();
 
-                var databaseName = string.IsNullOrWhiteSpace(databaseOptions.DatabaseName)
-                    ? DatabaseNamePattern
-                    : databaseOptions.DatabaseName;
-
-                // Prefer validated tenant identity; preserve legacy domain-based routing as fallback.
-                var tenantId = serviceProvider.GetService<ITenantExecutionContextAccessor>()?.Current?.TenantId;
-                var domainId = tenantId.HasValue
-                    ? null
-                    : serviceProvider.GetService<IDomainContextAccessor>()?.GetCurrentDomainId();
-                var databaseKey = tenantId?.ToString("D") ?? domainId?.ToString("D");
-
-                databaseName = databaseKey is not null
-                    ? databaseName.Replace(DatabaseNamePattern, databaseKey, StringComparison.Ordinal)
-                    : databaseName.Replace($"_{DatabaseNamePattern}", string.Empty, StringComparison.Ordinal);
+                var databaseName = DatabaseTargetResolver.ResolveDatabaseName(
+                    databaseOptions,
+                    serviceProvider.GetService<ITenantExecutionContextAccessor>(),
+                    serviceProvider.GetService<IDomainContextAccessor>());
 
                 var builder = new NpgsqlConnectionStringBuilder
                 {
