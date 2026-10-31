@@ -1,3 +1,4 @@
+using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.EntityFramework.Extensions;
 using Franz.Common.MultiTenancy;
@@ -13,7 +14,6 @@ namespace Franz.Common.EntityFramework.Postgres.Extensions;
 public static class ServiceCollectionExtensions
 {
     private const string DefaultServerName = "localhost";
-    private const string DatabaseNamePattern = "{dbName}";
     private const string DefaultUserName = "postgres";
     private const string DefaultPassword = "password";
     private const int DefaultPort = 5432;
@@ -31,20 +31,10 @@ public static class ServiceCollectionExtensions
                 var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
                 var logger = serviceProvider.GetRequiredService<ILogger<TDbContext>>();
 
-                var databaseName = string.IsNullOrWhiteSpace(databaseOptions.DatabaseName)
-                    ? DatabaseNamePattern
-                    : databaseOptions.DatabaseName;
-
-                // Prefer validated tenant identity; preserve legacy domain-based routing as fallback.
-                var tenantId = serviceProvider.GetService<ITenantExecutionContextAccessor>()?.Current?.TenantId;
-                var domainId = tenantId.HasValue
-                    ? null
-                    : serviceProvider.GetService<IDomainContextAccessor>()?.GetCurrentDomainId();
-                var databaseKey = tenantId?.ToString("D") ?? domainId?.ToString("D");
-
-                databaseName = databaseKey is not null
-                    ? databaseName.Replace(DatabaseNamePattern, databaseKey, StringComparison.Ordinal)
-                    : databaseName.Replace($"_{DatabaseNamePattern}", string.Empty, StringComparison.Ordinal);
+                var databaseName = DatabaseTargetResolver.ResolveDatabaseName(
+                    databaseOptions,
+                    serviceProvider.GetService<ITenantExecutionContextAccessor>(),
+                    serviceProvider.GetService<IDomainContextAccessor>());
 
                 var builder = new NpgsqlConnectionStringBuilder
                 {
