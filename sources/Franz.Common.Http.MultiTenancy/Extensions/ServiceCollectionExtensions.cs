@@ -20,6 +20,7 @@ public static class MultiTenancyServiceCollectionExtensions
         services.TryAddScoped<ITenantExecutionContextAccessor, TenantExecutionContextAccessor>();
         services.TryAddScoped<ITenantResolutionPipeline, DefaultTenantResolutionPipeline>();
         services.TryAddScoped<IDomainResolutionPipeline, DefaultDomainResolutionPipeline>();
+        services.TryAddScoped<TenantResolutionMiddleware>();
         return services;
     }
 }
