@@ -2,9 +2,12 @@ using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.Auditing;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.MultiTenancy;
+using Franz.Common.EntityFramework.ProviderContract.Tests;
 using Microsoft.EntityFrameworkCore;
 
 namespace Franz.Common.EntityFramework.Postgres.Tests;
+
+using ProviderTenantOwnedTestEntity = Franz.Common.EntityFramework.ProviderContract.Tests.TenantOwnedTestEntity;
 
 public class TestDbContext(
     DbContextOptions<TestDbContext> options,
@@ -15,10 +18,12 @@ public class TestDbContext(
 {
   public DbSet<TestEntity> TestEntities => Set<TestEntity>();
   public DbSet<TenantOwnedTestEntity> TenantOwnedEntities => Set<TenantOwnedTestEntity>();
+  public DbSet<ProviderTenantOwnedTestEntity> ProviderContractTenantOwnedEntities => Set<ProviderTenantOwnedTestEntity>();
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
+    modelBuilder.Entity<ProviderTenantOwnedTestEntity>().ToTable("provider_contract_tenant_owned_entities");
   }
 }
 
