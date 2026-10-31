@@ -57,12 +57,12 @@ public sealed class OutboxMessageListenerTenantScopeTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => listener.Listen(cancellation.Token));
 
-        initializer.BeginCount.Should().Be(1);
-        initializer.LastMessage.Should().NotBeNull();
-        initializer.DisposeCount.Should().Be(1);
+        Assert.Equal(1, initializer.BeginCount);
+        Assert.NotNull(initializer.LastMessage);
+        Assert.Equal(1, initializer.DisposeCount);
         await messageStore.Received(1).MarkAsSentAsync(stored.Id, Arg.Any<CancellationToken>());
         await inboxStore.Received(1).MarkProcessedAsync(stored.Id, Arg.Any<CancellationToken>());
-        provider.GetRequiredService<MessageContextAccessor>().Current.Should().BeNull();
+        Assert.Null(provider.GetRequiredService<MessageContextAccessor>().Current);
     }
 
     private sealed class TrackingTenantMessageContextInitializer : ITenantMessageContextInitializer
