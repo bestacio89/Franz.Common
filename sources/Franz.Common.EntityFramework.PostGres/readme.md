@@ -189,3 +189,12 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ## Dependency maintenance — October 2026
 
 PostgreSQL EF Core dependencies are aligned with the .NET 10 servicing baseline. Validate migrations, transactions, and repository behavior with the PostgreSQL Testcontainers suite before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## Database-per-tenant routing
+
+When `Database:DatabaseName` contains the `{dbName}` token, `AddPostgresDatabase` prefers `ITenantExecutionContextAccessor.Current.TenantId` as the database key. For backward compatibility, if no tenant execution context is available, the current adapter retains its legacy `IDomainContextAccessor.GetCurrentDomainId()` fallback; when neither identity is available, the token suffix is removed. This domain fallback is transitional: PR #162 will move routing policy into `Franz.Common.EntityFramework` and make domain-based routing an explicit opt-in, separate from tenant routing. For a shared-database deployment, configure a concrete database name without the token. Never derive tenant routing from a raw request header or unvalidated message metadata.
+
+For shared-database deployments, keep the `DbContextBase` tenant query/write enforcement enabled. For stronger isolation, define PostgreSQL row-level security policies in migrations and set the tenant session variable inside the same explicit transaction using a transaction-local setting (`set_config(..., true)`). A session-level setting must not be used with pooled connections because it can leak between tenants. The application role should not own protected tables or have `BYPASSRLS`.
+
+EF sensitive-data logging is disabled by default and can be enabled explicitly through `Database:EnableSensitiveDataLogging` for controlled development diagnostics only.

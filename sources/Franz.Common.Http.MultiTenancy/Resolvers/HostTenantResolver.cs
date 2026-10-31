@@ -1,47 +1,40 @@
-﻿// Resolvers/HostTenantResolver.cs
-using System.Threading.Tasks;
 using Franz.Common.MultiTenancy;
+using Franz.Common.MultiTenancy.Models;
 using Franz.Common.MultiTenancy.TenantResolution;
 using Microsoft.AspNetCore.Http;
 
-#nullable enable
-namespace Franz.Common.Http.MultiTenancy.Resolvers
+namespace Franz.Common.Http.MultiTenancy.Resolvers;
+
+/// <summary>Resolves a tenant only through a verified canonical hostname mapping.</summary>
+public sealed class HostTenantResolver(ITenantStore store) : ITenantResolver
 {
-  public class HostTenantResolver : ITenantResolver
-  {
-    private readonly ITenantStore _store;
-
-    public HostTenantResolver(ITenantStore store)
-    {
-      _store = store;
-    }
-
     public int Order => 50;
 
     public async Task<TenantResolutionResult?> ResolveTenantAsync(object? context)
     {
-      if (context is not HttpContext httpContext)
-        return null; // not applicable for this resolver
+        if (context is not HttpContext httpContext)
+            return null;
+        var host = httpContext.Request.Host.Host;
+        if (string.IsNullOrWhiteSpace(host))
+            return null;
 
-      var host = httpContext.Request.Host.Host;
-      if (string.IsNullOrWhiteSpace(host))
-        return null; // not applicable (no host)
+        string normalizedHost;
+        try { normalizedHost = TenantDomain.NormalizeHost(host); }
+        catch (ArgumentException)
+        {
+            return TenantResolutionResult.FailedResult(TenantResolutionSource.Host, "The request host is invalid.");
+        }
 
-      var tenant = await _store.FindByHostAsync(host);
-      if (tenant != null)
-      {
-        return TenantResolutionResult.Success(
-          tenant,
-          TenantResolutionSource.Host,
-          $"Resolved tenant '{tenant.Name}' from host '{host}'."
-        );
-      }
+        var tenant = await store.FindByHostAsync(normalizedHost).ConfigureAwait(false);
+        if (tenant is null)
+            return TenantResolutionResult.FailedResult(TenantResolutionSource.Host, "No tenant matched the request host.");
 
-      // We *attempted* with this source but couldn't resolve — return a failed result so the pipeline can log it and try next.
-      return TenantResolutionResult.FailedResult(
-        TenantResolutionSource.Host,
-        $"No tenant matched host '{host}'."
-      );
+        var verifiedMapping = tenant.Domains.Any(domain =>
+            domain.IsVerified && domain.Host == normalizedHost &&
+            (domain.TenantId == Guid.Empty || domain.TenantId == tenant.Id));
+
+        return verifiedMapping
+            ? TenantResolutionResult.Success(tenant, TenantResolutionSource.Host)
+            : TenantResolutionResult.FailedResult(TenantResolutionSource.Host, "The tenant hostname is not verified or does not belong to the resolved tenant.");
     }
-  }
 }
