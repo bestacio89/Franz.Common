@@ -91,6 +91,25 @@ public abstract class RelationalTenantIsolationContract
     }
 
     [Fact]
+    public async Task TenantOwnedUpdates_RejectOwnershipMutation()
+    {
+        var tenantId = Guid.NewGuid();
+        var foreignTenantId = Guid.NewGuid();
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            await db.Database.EnsureCreatedAsync();
+            var entity = new TenantOwnedTestEntity { Name = $"ownership-{Guid.NewGuid():N}" };
+            db.Set<TenantOwnedTestEntity>().Add(entity);
+            await db.SaveChangesAsync();
+
+            entity.TenantId = foreignTenantId;
+
+            await Assert.ThrowsAsync<TenantIsolationException>(() => db.SaveChangesAsync());
+        });
+    }
+
+    [Fact]
     public async Task ExecuteUpdateAsync_RespectsTenantQueryFilters()
     {
         var tenantA = Guid.NewGuid();
