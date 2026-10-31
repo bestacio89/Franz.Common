@@ -1,0 +1,1 @@
+// Tenant assignment validation is performed eagerly by BulkUpdateBuilder<TEntity>.
