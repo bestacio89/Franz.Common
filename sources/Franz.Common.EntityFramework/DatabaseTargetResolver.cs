@@ -15,6 +15,8 @@ public static class DatabaseTargetResolver
     {
         ArgumentNullException.ThrowIfNull(options);
         var configuredName = options.DatabaseName;
+        if (string.IsNullOrWhiteSpace(configuredName))
+            throw new InvalidOperationException("Database:DatabaseName must be configured before resolving a database target.");
         var hasToken = configuredName.Contains(DatabaseNameToken, StringComparison.Ordinal);
 
         return options.IsolationMode switch
