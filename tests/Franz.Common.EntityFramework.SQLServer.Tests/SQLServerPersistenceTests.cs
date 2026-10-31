@@ -1,7 +1,7 @@
-﻿using FluentAssertions;
+using FluentAssertions;
+using Franz.Common.Business.Domain.Factories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Franz.Common.Business.Domain.Factories;
 
 namespace Franz.Common.EntityFramework.SQLServer.Tests;
 
@@ -14,9 +14,11 @@ public class SqlServerPersistenceTests : IClassFixture<SqlServerFixture>
   [Fact]
   public async Task AddAsync_WithSqlServer_ShouldApplyAuditingAndPatternReplacement()
   {
-    // Arrange
     var domainId = Guid.NewGuid();
-    var sp = _fixture.BuildServiceProvider(domainId.ToString());
+    var sp = _fixture.BuildServiceProvider(
+        domainId.ToString(),
+        databaseName: "franz_{dbName}",
+        isolationMode: "DomainDatabase");
     using var scope = sp.CreateScope();
 
     var db = scope.ServiceProvider.GetRequiredService<TestDbContext>();
@@ -24,11 +26,9 @@ public class SqlServerPersistenceTests : IClassFixture<SqlServerFixture>
 
     await db.Database.EnsureCreatedAsync();
 
-    // Act: Verify Connection String replacement
     var connectionString = db.Database.GetConnectionString();
-    connectionString.Should().Contain($"Initial Catalog=franz_{domainId}");
+    connectionString.Should().Contain($"Initial Catalog=franz_{domainId:D}");
 
-    // Act: Persistence
     var entity = factory.Create();
     entity.Name = "SQL Server Architect";
     var operationTime = DateTimeOffset.UtcNow;
@@ -36,7 +36,6 @@ public class SqlServerPersistenceTests : IClassFixture<SqlServerFixture>
     db.TestEntities.Add(entity);
     await db.SaveChangesAsync();
 
-    // Assert
     var saved = await db.TestEntities.FindAsync(entity.Id);
     saved.Should().NotBeNull();
     saved!.DateCreated.Should().BeCloseTo(operationTime, TimeSpan.FromSeconds(2));
@@ -46,7 +45,6 @@ public class SqlServerPersistenceTests : IClassFixture<SqlServerFixture>
   [Fact]
   public async Task SoftDelete_OnSqlServer_ShouldRespectGlobalQueryFilter()
   {
-    // Arrange
     var sp = _fixture.BuildServiceProvider();
     using var scope = sp.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<TestDbContext>();
@@ -56,12 +54,9 @@ public class SqlServerPersistenceTests : IClassFixture<SqlServerFixture>
     db.TestEntities.Add(entity);
     await db.SaveChangesAsync();
 
-    // Act
     db.TestEntities.Remove(entity);
     await db.SaveChangesAsync();
 
-    // Assert
-    // Re-query in fresh scope to bypass local cache
     using var verifyScope = sp.CreateScope();
     var verifyDb = verifyScope.ServiceProvider.GetRequiredService<TestDbContext>();
 

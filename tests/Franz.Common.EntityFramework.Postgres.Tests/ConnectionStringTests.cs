@@ -1,9 +1,7 @@
-﻿using FluentAssertions;
+using FluentAssertions;
+using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Franz.Common.EntityFramework.Postgres.Tests;
 
@@ -16,30 +14,28 @@ public class ConnectionStringTests : IClassFixture<PostgresFixture>
   [Fact]
   public void AddPostgresDatabase_WithDomainId_ShouldReplacePattern()
   {
-    // Arrange
-    var domainId = Guid.NewGuid().ToString();
-    var sp = _fixture.BuildServiceProvider(domainId);
+    var domainId = Guid.NewGuid();
+    var sp = _fixture.BuildServiceProvider(
+        domainId.ToString(),
+        databaseName: "test_{dbName}",
+        isolationMode: "DomainDatabase");
 
-    // Act
     var db = sp.GetRequiredService<TestDbContext>();
     var connectionString = db.Database.GetConnectionString();
 
-    // Assert
-    connectionString.Should().Contain($"Database=test_{domainId}");
+    connectionString.Should().Contain($"Database=test_{domainId:D}");
   }
 
   [Fact]
-  public void AddPostgresDatabase_WithoutDomainId_ShouldRemovePattern()
+  public void AddPostgresDatabase_WithoutDomainId_ShouldFailClosed()
   {
-    // Arrange
-    var sp = _fixture.BuildServiceProvider(null);
+    var sp = _fixture.BuildServiceProvider(
+        databaseName: "test_{dbName}",
+        isolationMode: "DomainDatabase");
 
-    // Act
-    var db = sp.GetRequiredService<TestDbContext>();
-    var connectionString = db.Database.GetConnectionString();
+    var act = () => sp.GetRequiredService<TestDbContext>();
 
-    // Assert
-    connectionString.Should().Contain("Database=test");
-    connectionString.Should().NotContain("{dbName}");
+    act.Should().Throw<InvalidOperationException>()
+        .WithMessage("*DomainDatabase routing requires a domain context*");
   }
 }
