@@ -93,7 +93,7 @@ public class KafkaConsumer : IKafkaConsumer
     }
   }
 
-  private static ConsumeResult<string, string> ConsumeRequired(
+  private ConsumeResult<string, string> ConsumeRequired(
       string topic,
       CancellationToken cancellationToken)
   {
