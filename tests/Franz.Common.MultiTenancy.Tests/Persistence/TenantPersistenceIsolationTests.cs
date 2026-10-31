@@ -59,6 +59,26 @@ public sealed class TenantPersistenceIsolationTests
     }
 
     [Fact]
+    public async Task SaveChanges_RejectsDetachedUpdateForAnotherTenant()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        var ownerTenantId = Guid.NewGuid();
+        var currentTenantId = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+
+        await using (var ownerContext = CreateContext(databaseName, ownerTenantId))
+        {
+            ownerContext.Entities.Add(new TestEntity { Id = entityId, Name = "owner" });
+            await ownerContext.SaveChangesAsync();
+        }
+
+        await using var currentContext = CreateContext(databaseName, currentTenantId);
+        currentContext.Entities.Update(new TestEntity { Id = entityId, TenantId = currentTenantId, Name = "changed" });
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => currentContext.SaveChangesAsync());
+    }
+
+    [Fact]
     public async Task SaveChanges_RejectsTenantOwnedWritesWithoutExecutionContext()
     {
         await using var context = CreateContext(Guid.NewGuid().ToString(), null);
@@ -100,7 +120,7 @@ public sealed class TenantPersistenceIsolationTests
 
     public sealed class TestEntity : IEntity<Guid>, ITenantEntity
     {
-        public Guid Id { get; private set; } = Guid.NewGuid();
+        public Guid Id { get; set; } = Guid.NewGuid();
         public Guid TenantId { get; set; }
         public string Name { get; set; } = string.Empty;
         public bool IsDeleted { get; private set; }
