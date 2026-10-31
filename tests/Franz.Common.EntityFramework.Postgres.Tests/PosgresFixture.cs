@@ -26,7 +26,7 @@ public class PostgresFixture : IAsyncLifetime
   public IServiceProvider BuildServiceProvider(
       string? domainId = null,
       Action<IServiceCollection>? extraRegistrations = null,
-      string databaseName = "test_{dbName}")
+      string databaseName = "franz_test")
   {
     var services = new ServiceCollection();
 
