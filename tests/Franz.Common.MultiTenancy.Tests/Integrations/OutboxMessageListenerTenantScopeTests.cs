@@ -48,11 +48,13 @@ public sealed class OutboxMessageListenerTenantScopeTests
             provider.GetRequiredService<ILogger<OutboxMessageListener>>());
 
         using var cancellation = new CancellationTokenSource();
-        listener.OnMessageReceivedAsync = _ =>
-        {
-            cancellation.Cancel();
-            return Task.CompletedTask;
-        };
+        listener.OnMessageReceivedAsync = _ => Task.CompletedTask;
+        messageStore.MarkAsSentAsync(stored.Id, Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                cancellation.Cancel();
+                return Task.CompletedTask;
+            });
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => listener.Listen(cancellation.Token));
