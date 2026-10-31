@@ -1,4 +1,5 @@
 using Franz.Common.EntityFramework;
+using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
@@ -36,7 +37,10 @@ public static class ServiceCollectionExtensions
           var mySqlConnectionStringBuilder = new MySqlConnectionStringBuilder
           {
             Server = string.IsNullOrWhiteSpace(databaseOptions.ServerName) ? DefaultServerName : databaseOptions.ServerName,
-            Database = string.IsNullOrWhiteSpace(databaseOptions.DatabaseName) ? DefaultDatabaseName : databaseOptions.DatabaseName,
+            Database = DatabaseTargetResolver.ResolveDatabaseName(
+              databaseOptions,
+              serviceProvider.GetService<ITenantExecutionContextAccessor>(),
+              serviceProvider.GetService<IDomainContextAccessor>()),
             UserID = string.IsNullOrWhiteSpace(databaseOptions.UserName) ? DefaultUserName : databaseOptions.UserName,
             Password = string.IsNullOrWhiteSpace(databaseOptions.Password) ? DefaultPassword : databaseOptions.Password,
             Port = (uint)(databaseOptions.Port > 0 ? databaseOptions.Port : DefaultPort),
@@ -48,14 +52,6 @@ public static class ServiceCollectionExtensions
           };
 
           var connectionString = mySqlConnectionStringBuilder.ConnectionString;
-
-          // Multi-tenant substitution
-          var domainContextAccessor = serviceProvider.GetService<IDomainContextAccessor>();
-          var domainId = domainContextAccessor?.GetCurrentDomainId();
-
-          connectionString = domainId.HasValue
-                  ? connectionString.Replace("{dbName}", domainId.Value.ToString())
-                  : connectionString.Replace($"_{{dbName}}", string.Empty);
 
           // Force MariaDB 11.4
           dbContextBuilder.UseMySql(
