@@ -1,12 +1,15 @@
-﻿using Franz.Common.Business.Domain;
+using Franz.Common.Business.Domain;
 using Franz.Common.Business.Repositories;
 using Franz.Common.Errors;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
+using System.Linq.Expressions;
 
 namespace Franz.Common.EntityFramework.Repositories;
 
 public class EntityRepository<TDbContext, TEntity, TId>
-    : IEntityRepository<TEntity, TId>
+    : IEntityRepository<TEntity, TId>,
+      IEntityFrameworkBulkUpdateRepository<TEntity>
     where TDbContext : DbContextBase
     where TEntity : Entity<TId>
 {
@@ -14,16 +17,10 @@ public class EntityRepository<TDbContext, TEntity, TId>
 
   public EntityRepository(TDbContext dbContext)
   {
-    DbContext = dbContext;
+    DbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
   }
 
-  // =========================
-  // READ
-  // =========================
-
-  public async Task<TEntity> GetByIdAsync(
-      TId id,
-      CancellationToken cancellationToken = default)
+  public async Task<TEntity> GetByIdAsync(TId id, CancellationToken cancellationToken = default)
   {
     var entity = await DbContext.Set<TEntity>()
         .FirstOrDefaultAsync(x => x.Id!.Equals(id), cancellationToken);
@@ -34,8 +31,7 @@ public class EntityRepository<TDbContext, TEntity, TId>
     return entity;
   }
 
-  public async Task<IReadOnlyList<TEntity>> GetAllAsync(
-      CancellationToken cancellationToken = default)
+  public async Task<IReadOnlyList<TEntity>> GetAllAsync(CancellationToken cancellationToken = default)
   {
     return await DbContext.Set<TEntity>()
         .Where(x => !x.IsDeleted)
@@ -43,54 +39,47 @@ public class EntityRepository<TDbContext, TEntity, TId>
         .ToListAsync(cancellationToken);
   }
 
-  // =========================
-  // CREATE
-  // =========================
-
-  public async Task AddAsync(
-      TEntity entity,
-      CancellationToken cancellationToken = default)
+  public async Task AddAsync(TEntity entity, CancellationToken cancellationToken = default)
   {
     await DbContext.Set<TEntity>().AddAsync(entity, cancellationToken);
     await DbContext.SaveChangesAsync(cancellationToken);
   }
 
-  public async Task AddRangeAsync(
-      IEnumerable<TEntity> entities,
-      CancellationToken cancellationToken = default)
+  public async Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken cancellationToken = default)
   {
     await DbContext.Set<TEntity>().AddRangeAsync(entities, cancellationToken);
     await DbContext.SaveChangesAsync(cancellationToken);
   }
 
-  // =========================
-  // UPDATE
-  // =========================
-
-  public async Task UpdateAsync(
-      TEntity entity,
-      CancellationToken cancellationToken = default)
+  public async Task UpdateAsync(TEntity entity, CancellationToken cancellationToken = default)
   {
     DbContext.Set<TEntity>().Update(entity);
     await DbContext.SaveChangesAsync(cancellationToken);
   }
 
-  public async Task UpdateRangeAsync(
-      IEnumerable<TEntity> entities,
-      CancellationToken cancellationToken = default)
+  public async Task UpdateRangeAsync(IEnumerable<TEntity> entities, CancellationToken cancellationToken = default)
   {
     DbContext.Set<TEntity>().UpdateRange(entities);
     await DbContext.SaveChangesAsync(cancellationToken);
   }
 
-  // =========================
-  // DELETE (SOFT BY DEFAULT)
-  // =========================
-
-  public async Task DeleteAsync(
-      TEntity entity,
-      bool hardDelete = false,
+  /// <inheritdoc />
+  public Task<int> ExecuteBulkUpdateAsync(
+      Expression<Func<TEntity, bool>> predicate,
+      Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> setPropertyCalls,
       CancellationToken cancellationToken = default)
+  {
+    ArgumentNullException.ThrowIfNull(predicate);
+    ArgumentNullException.ThrowIfNull(setPropertyCalls);
+
+    BulkUpdateExpressionValidator.Validate<TEntity>(setPropertyCalls);
+
+    return DbContext.Set<TEntity>()
+        .Where(predicate)
+        .ExecuteUpdateAsync(setPropertyCalls, cancellationToken);
+  }
+
+  public async Task DeleteAsync(TEntity entity, bool hardDelete = false, CancellationToken cancellationToken = default)
   {
     if (!hardDelete)
     {
@@ -105,11 +94,10 @@ public class EntityRepository<TDbContext, TEntity, TId>
     await DbContext.SaveChangesAsync(cancellationToken);
   }
 
-  public async Task DeleteRangeAsync(
-      IEnumerable<TEntity> entities,
-      bool hardDelete = false,
-      CancellationToken cancellationToken = default)
+  public async Task DeleteRangeAsync(IEnumerable<TEntity> entities, bool hardDelete = false, CancellationToken cancellationToken = default)
   {
+    ArgumentNullException.ThrowIfNull(entities);
+
     if (!hardDelete)
     {
       foreach (var entity in entities)
