@@ -2,6 +2,7 @@ using Franz.Common.Business.Domain;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Microsoft.EntityFrameworkCore;
+using Xunit;
 
 namespace Franz.Common.EntityFramework.ProviderContract.Tests;
 
@@ -17,9 +18,7 @@ public sealed class TenantOwnedTestEntity : Entity<Guid>, ITenantEntity
 /// </summary>
 public abstract class RelationalTenantIsolationContract
 {
-    protected abstract Task WithContextAsync(
-        Guid? tenantId,
-        Func<DbContext, Task> action);
+    protected abstract Task WithContextAsync(Guid? tenantId, Func<DbContext, Task> action);
 
     [Fact]
     public async Task TenantOwnedQueries_AreRestrictedToTheExecutionTenant()
@@ -38,7 +37,6 @@ public abstract class RelationalTenantIsolationContract
 
         await WithContextAsync(tenantB, async db =>
         {
-            await db.Database.EnsureCreatedAsync();
             db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = nameB });
             await db.SaveChangesAsync();
         });
@@ -46,7 +44,7 @@ public abstract class RelationalTenantIsolationContract
         await WithContextAsync(tenantA, async db =>
         {
             var rows = await db.Set<TenantOwnedTestEntity>().AsNoTracking().ToListAsync();
-            rows.Select(x => x.Name).Should().ContainSingle().Which.Should().Be(nameA);
+            Assert.Equal(nameA, Assert.Single(rows).Name);
         });
 
         await WithContextAsync(null, async db =>
@@ -56,7 +54,7 @@ public abstract class RelationalTenantIsolationContract
                 .Where(x => x.Name == nameA || x.Name == nameB)
                 .ToListAsync();
 
-            rows.Should().BeEmpty();
+            Assert.Empty(rows);
         });
     }
 
@@ -69,9 +67,7 @@ public abstract class RelationalTenantIsolationContract
             db.Set<TenantOwnedTestEntity>().Add(
                 new TenantOwnedTestEntity { Name = $"unscoped-{Guid.NewGuid():N}" });
 
-            var act = () => db.SaveChangesAsync();
-
-            await act.Should().ThrowAsync<TenantIsolationException>();
+            await Assert.ThrowsAsync<TenantIsolationException>(() => db.SaveChangesAsync());
         });
     }
 
@@ -90,9 +86,7 @@ public abstract class RelationalTenantIsolationContract
                 Name = $"foreign-{Guid.NewGuid():N}"
             });
 
-            var act = () => db.SaveChangesAsync();
-
-            await act.Should().ThrowAsync<TenantIsolationException>();
+            await Assert.ThrowsAsync<TenantIsolationException>(() => db.SaveChangesAsync());
         });
     }
 
@@ -122,7 +116,7 @@ public abstract class RelationalTenantIsolationContract
                 .Where(x => x.Name == marker)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Name, "updated-by-tenant-a"));
 
-            affected.Should().Be(1);
+            Assert.Equal(1, affected);
         });
 
         await WithContextAsync(tenantB, async db =>
@@ -131,7 +125,7 @@ public abstract class RelationalTenantIsolationContract
                 .AsNoTracking()
                 .SingleAsync(x => x.Name == marker);
 
-            row.TenantId.Should().Be(tenantB);
+            Assert.Equal(tenantB, row.TenantId);
         });
     }
 
@@ -161,7 +155,7 @@ public abstract class RelationalTenantIsolationContract
                 .Where(x => x.Name == marker)
                 .ExecuteDeleteAsync();
 
-            affected.Should().Be(1);
+            Assert.Equal(1, affected);
         });
 
         await WithContextAsync(tenantB, async db =>
@@ -171,7 +165,7 @@ public abstract class RelationalTenantIsolationContract
                 .Where(x => x.Name == marker)
                 .CountAsync();
 
-            remaining.Should().Be(1);
+            Assert.Equal(1, remaining);
         });
     }
 }
@@ -181,9 +175,7 @@ public sealed class TenantExecutionContextAccessor(TenantExecutionContext? curre
     : ITenantExecutionContextAccessor
 {
     public TenantExecutionContext? Current { get; private set; } = current;
-
     public void Initialize(TenantExecutionContext context) => Current = context;
-
     public void Clear() => Current = null;
 
     public static TenantExecutionContextAccessor ForTenant(Guid? tenantId)
