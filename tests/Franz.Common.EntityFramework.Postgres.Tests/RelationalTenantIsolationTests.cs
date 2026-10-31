@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Franz.Common.EntityFramework.Postgres.Tests;
 
 public sealed class RelationalTenantIsolationTests(PostgresFixture fixture)
-    : RelationalTenantIsolationContract
+    : RelationalTenantIsolationContract, IClassFixture<PostgresFixture>
 {
     protected override async Task WithContextAsync(Guid? tenantId, Func<DbContext, Task> action)
     {
