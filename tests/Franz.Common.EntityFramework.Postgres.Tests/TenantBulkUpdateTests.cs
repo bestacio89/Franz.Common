@@ -2,6 +2,7 @@ using FluentAssertions;
 using Franz.Common.EntityFramework.Repositories;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Franz.Common.EntityFramework.Postgres.Tests;
@@ -69,7 +70,7 @@ public sealed class TenantBulkUpdateTests : IClassFixture<PostgresFixture>
         var context = scope.ServiceProvider.GetRequiredService<TestDbContext>();
         var repository = new EntityRepository<TestDbContext, TenantOwnedTestEntity, Guid>(context);
 
-        var act = () => repository.ExecuteBulkUpdateAsync(
+        Func<Task> act = async () => await repository.ExecuteBulkUpdateAsync(
             _ => true,
             setters => setters.SetProperty(entity => entity.TenantId, Guid.NewGuid()));
 
