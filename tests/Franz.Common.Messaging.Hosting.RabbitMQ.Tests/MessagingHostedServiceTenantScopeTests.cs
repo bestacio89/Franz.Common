@@ -1,5 +1,6 @@
 #nullable enable
 using FluentAssertions;
+using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Hosting;
 using Franz.Common.Messaging.Hosting.Executing;
 using Franz.Common.Messaging.Messages;
