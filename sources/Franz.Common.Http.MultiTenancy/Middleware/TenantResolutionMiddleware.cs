@@ -10,13 +10,12 @@ namespace Franz.Common.Http.MultiTenancy.Middleware;
 
 /// <summary>Establishes a validated tenant context before application middleware and handlers execute.</summary>
 public sealed class TenantResolutionMiddleware(
-    RequestDelegate next,
     ITenantResolutionPipeline pipeline,
     ITenantExecutionContextAccessor executionContextAccessor,
     IOptions<TenantResolutionOptions> options,
-    IServiceProvider serviceProvider)
+    IServiceProvider serviceProvider) : IMiddleware
 {
-    public async Task InvokeAsync(HttpContext context)
+    public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
         var result = await pipeline.ResolveAsync(context).ConfigureAwait(false);
         var tenant = result?.Tenant;
