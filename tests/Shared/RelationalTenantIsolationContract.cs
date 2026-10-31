@@ -1,4 +1,6 @@
 using Franz.Common.Business.Domain;
+using Franz.Common.EntityFramework;
+using Franz.Common.EntityFramework.Repositories;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Microsoft.EntityFrameworkCore;
@@ -197,6 +199,68 @@ public abstract class RelationalTenantIsolationContract
                 .SingleAsync(x => x.Name == marker);
 
             Assert.Equal(tenantB, row.TenantId);
+        });
+    }
+
+    [Fact]
+    public async Task RepositoryBulkUpdate_RespectsTenantQueryFilters()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var marker = $"repository-bulk-{Guid.NewGuid():N}";
+
+        await WithContextAsync(tenantA, async db =>
+        {
+            await db.Database.EnsureCreatedAsync();
+            db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
+            await db.SaveChangesAsync();
+        });
+
+        await WithContextAsync(tenantB, async db =>
+        {
+            db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
+            await db.SaveChangesAsync();
+        });
+
+        await WithContextAsync(tenantA, async db =>
+        {
+            var repository = new EntityRepository<DbContextBase, TenantOwnedTestEntity, Guid>(
+                (DbContextBase)db);
+            var affected = await repository.ExecuteBulkUpdateAsync(
+                entity => entity.Name == marker,
+                update => update.SetProperty(entity => entity.Name, "updated-by-repository"));
+
+            Assert.Equal(1, affected);
+        });
+
+        await WithContextAsync(tenantB, async db =>
+        {
+            var row = await db.Set<TenantOwnedTestEntity>()
+                .AsNoTracking()
+                .SingleAsync(entity => entity.Name == marker);
+
+            Assert.Equal(tenantB, row.TenantId);
+        });
+    }
+
+    [Fact]
+    public async Task RepositoryBulkUpdate_RejectsTenantOwnershipMutation()
+    {
+        var tenantId = Guid.NewGuid();
+        var foreignTenantId = Guid.NewGuid();
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            await db.Database.EnsureCreatedAsync();
+            var repository = new EntityRepository<DbContextBase, TenantOwnedTestEntity, Guid>(
+                (DbContextBase)db);
+
+            Assert.Throws<TenantIsolationException>(() =>
+            {
+                repository.ExecuteBulkUpdateAsync(
+                    _ => true,
+                    update => update.SetProperty(entity => entity.TenantId, foreignTenantId));
+            });
         });
     }
 
