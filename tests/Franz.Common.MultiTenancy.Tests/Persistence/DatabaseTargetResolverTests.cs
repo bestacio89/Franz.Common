@@ -58,5 +58,6 @@ public sealed class DatabaseTargetResolverTests
     private sealed class StubDomainAccessor(Guid? domainId) : IDomainContextAccessor
     {
         public Guid? GetCurrentDomainId() => domainId;
+        public void SetCurrentDomainId(Guid value) => throw new NotSupportedException();
     }
 }

@@ -1,3 +1,4 @@
+using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.EntityFramework.Extensions;
 using Franz.Common.MultiTenancy;
