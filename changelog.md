@@ -1,6 +1,20 @@
 
 # 📈 **Franz Framework – Full Changelog**
 
+## Unreleased — Multi-Tenancy Security Hardening
+
+### ✨ Added
+- Immutable validated tenant execution context and explicit tenant lifecycle states.
+- Independent domain identifiers and IDNA hostname normalization.
+- Resolver conflict detection and HTTP request-scoped tenant context.
+- Fail-closed HTTP tenant requirement, tenant lifecycle validation, and regression tests.
+
+### 🔒 Security
+- HTTP tenant/domain accessors now read server-established request items, never caller-controlled headers.
+- JWT tenant claims are considered only for authenticated principals.
+- **Compatibility:** `ITenantValidator.IsValidAsync` now accepts an optional cancellation token; HTTP accessors no longer treat inbound tenant headers as current tenant state.
+
+
 ---
 
 ## Version 1.2.65 – Foundation 🏗️

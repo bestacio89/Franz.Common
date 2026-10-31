@@ -1,37 +1,22 @@
-using Franz.Common.Headers;
 using Franz.Common.MultiTenancy;
 using Microsoft.AspNetCore.Http;
 
 namespace Franz.Common.Http.MultiTenancy.Accessors;
 
-public class DomainContextAccessor : IDomainContextAccessor
+/// <summary>Reads only server-established domain state, never caller-supplied headers.</summary>
+public sealed class DomainContextAccessor(IHttpContextAccessor httpContextAccessor) : IDomainContextAccessor
 {
-  private readonly IHttpContextAccessor _httpContextAccessor;
-
-  public DomainContextAccessor(IHttpContextAccessor httpContextAccessor)
-  {
-    _httpContextAccessor = httpContextAccessor;
-  }
-
-  public Guid? GetCurrentDomainId()
-  {
-    if (_httpContextAccessor.HttpContext?.Request.Headers.ContainsKey(HeaderConstants.DomainId) == true)
+    public Guid? GetCurrentDomainId()
     {
-      var domainId = _httpContextAccessor.HttpContext.Request.Headers[HeaderConstants.DomainId];
-
-      if (Guid.TryParse(domainId, out var guid))
-        return guid;
+        var items = httpContextAccessor.HttpContext?.Items;
+        return items is not null && items.TryGetValue(HttpTenantContextKeys.DomainId, out var value) && value is Guid id
+            ? id
+            : null;
     }
 
-    return null;
-  }
-
-  public void SetCurrentDomainId(Guid domainId)
-  {
-    // Set the domain ID in the HTTP context headers
-    if (_httpContextAccessor.HttpContext != null)
+    public void SetCurrentDomainId(Guid domainId)
     {
-      _httpContextAccessor.HttpContext.Request.Headers[HeaderConstants.DomainId] = domainId.ToString();
+        var items = httpContextAccessor.HttpContext?.Items;
+        if (items is not null) items[HttpTenantContextKeys.DomainId] = domainId;
     }
-  }
 }

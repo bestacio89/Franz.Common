@@ -1,36 +1,22 @@
-using Franz.Common.Headers;
 using Franz.Common.MultiTenancy;
 using Microsoft.AspNetCore.Http;
 
 namespace Franz.Common.Http.MultiTenancy.Accessors;
 
-public class TenantContextAccessor : ITenantContextAccessor
+/// <summary>Reads only server-established tenant state; request headers are never authoritative here.</summary>
+public sealed class TenantContextAccessor(IHttpContextAccessor httpContextAccessor) : ITenantContextAccessor
 {
-  private readonly IHttpContextAccessor _httpContextAccessor;
-
-  public TenantContextAccessor(IHttpContextAccessor httpContextAccessor)
-  {
-    _httpContextAccessor = httpContextAccessor;
-  }
-
-  public Guid? GetCurrentTenantId()
-  {
-    if (_httpContextAccessor.HttpContext?.Request.Headers.ContainsKey(HeaderConstants.TenantId) == true)
+    public Guid? GetCurrentTenantId()
     {
-      var tenantId = _httpContextAccessor.HttpContext.Request.Headers[HeaderConstants.TenantId];
-
-      if (Guid.TryParse(tenantId, out var guid))
-        return guid;
+        var items = httpContextAccessor.HttpContext?.Items;
+        return items is not null && items.TryGetValue(HttpTenantContextKeys.TenantId, out var value) && value is Guid id
+            ? id
+            : null;
     }
 
-    return null;
-  }
-
-  public void SetCurrentTenantId(Guid tenantId)
-  {
-    if (_httpContextAccessor.HttpContext != null)
+    public void SetCurrentTenantId(Guid tenantId)
     {
-      _httpContextAccessor.HttpContext.Request.Headers[HeaderConstants.TenantId] = tenantId.ToString();
+        var items = httpContextAccessor.HttpContext?.Items;
+        if (items is not null) items[HttpTenantContextKeys.TenantId] = tenantId;
     }
-  }
 }
