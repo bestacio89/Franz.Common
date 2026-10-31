@@ -3,6 +3,11 @@
 
 ## Unreleased — Multi-Tenancy Security Hardening
 
+### Persistence
+- Added tenant-owned entity contract, tenant-aware global query filters, automatic tenant stamping, and cross-tenant write rejection in `DbContextBase`.
+- Applied tenant checks to synchronous and asynchronous save paths; added persistence isolation regression tests.
+- Documented raw SQL, bulk operation, unique constraint, and database RLS responsibilities.
+
 ### ✨ Added
 - Immutable validated tenant execution context and explicit tenant lifecycle states.
 - Independent domain identifiers and IDNA hostname normalization.
