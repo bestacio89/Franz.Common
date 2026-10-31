@@ -1,4 +1,5 @@
 using Franz.Common.Errors;
+using Franz.Common.Messaging.MultiTenancy;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Hosting.Executing;
 using Franz.Common.Messaging.Hosting.Properties;
@@ -59,6 +60,11 @@ public sealed class KafkaMessagingHostedService : BackgroundService
           scope.ServiceProvider.GetRequiredService<MessageContextAccessor>();
 
       messageContextAccessor.Set(new MessageContext(args.Message));
+
+    var tenantInitializer = scope.ServiceProvider.GetService<ITenantMessageContextInitializer>();
+    await using var tenantExecutionScope = tenantInitializer is null
+        ? null
+        : await tenantInitializer.BeginAsync();
 
       var executers =
           scope.ServiceProvider.GetServices<IMessagingStrategyExecuter>();
