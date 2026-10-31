@@ -28,6 +28,7 @@ Every provider suite executes the same tests against its real database engine:
 - Inserts cannot claim another tenant's identity.
 - EF Core `ExecuteUpdateAsync` respects the global tenant query filter.
 - EF Core `ExecuteDeleteAsync` respects the global tenant query filter.
+- The framework repository's `ExecuteBulkUpdateAsync` respects tenant filters and rejects assignments to `TenantId`.
 
 The contract uses a dedicated table (`provider_contract_tenant_owned_entities`) to avoid collisions with provider-specific persistence fixtures.
 
@@ -50,7 +51,7 @@ A capability that is unsupported by a provider must be explicitly documented and
 
 EF Core global query filters constrain EF queries, including supported set-based operations that retain those filters. They do not secure arbitrary SQL, stored procedures, direct ADO.NET commands, provider-native bulk APIs, or connections that bypass the configured DbContext. Those paths require trusted tenant predicates or independent database enforcement and dedicated tests.
 
-The SaveChanges tenant ownership checks do not automatically run for EF Core set-based operations because those operations bypass the change tracker and SaveChanges pipeline. The shared contract therefore verifies tenant row filtering for set-based update/delete; it does not claim that arbitrary set-based updates cannot mutate the TenantId column. Do not expose tenant-ownership mutation through bulk APIs unless that API independently rejects it or the database enforces the invariant.
+The SaveChanges tenant ownership checks do not automatically run for direct EF Core `ExecuteUpdateAsync` calls because those operations bypass the change tracker and SaveChanges pipeline. The framework's `EntityRepository.ExecuteBulkUpdateAsync` uses `BulkUpdateBuilder<TEntity>` to reject direct assignments to `TenantId`; the shared contract verifies that protection and tenant-filtered affected-row behavior. Direct EF Core set-based calls remain a lower-level escape hatch and must not be used to mutate tenant ownership. Database enforcement is required if applications must defend against code paths that bypass the framework repository.
 
 ## Non-relational providers
 
