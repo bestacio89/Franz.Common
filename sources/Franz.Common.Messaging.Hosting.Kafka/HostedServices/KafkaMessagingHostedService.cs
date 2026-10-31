@@ -61,6 +61,9 @@ public sealed class KafkaMessagingHostedService : BackgroundService
 
       messageContextAccessor.Set(new MessageContext(args.Message));
 
+    try
+    {
+
     var tenantInitializer = scope.ServiceProvider.GetService<ITenantMessageContextInitializer>();
     await using var tenantExecutionScope = tenantInitializer is null
         ? null
@@ -83,6 +86,11 @@ public sealed class KafkaMessagingHostedService : BackgroundService
         throw new TechnicalException(Resources.StrategyExecuterNotFoundException);
 
       await executer.ExecuteAsync(args.Message);
+    }
+    finally
+    {
+      messageContextAccessor.Clear();
+    }
     }
     catch (Exception ex)
     {
