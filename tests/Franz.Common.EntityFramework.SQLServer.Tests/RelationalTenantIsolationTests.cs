@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Franz.Common.EntityFramework.SQLServer.Tests;
 
 public sealed class RelationalTenantIsolationTests(SqlServerFixture fixture)
-    : RelationalTenantIsolationContract
+    : RelationalTenantIsolationContract, IClassFixture<SqlServerFixture>
 {
     protected override async Task WithContextAsync(Guid? tenantId, Func<DbContext, Task> action)
     {
