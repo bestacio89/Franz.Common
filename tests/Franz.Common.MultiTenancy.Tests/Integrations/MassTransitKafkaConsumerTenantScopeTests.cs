@@ -25,7 +25,7 @@ public sealed class MassTransitKafkaConsumerTenantScopeTests
 
         var initializer = new TrackingTenantMessageContextInitializer();
         var services = new ServiceCollection();
-        services.AddScoped<ScopedProbe>();
+        services.AddScoped(_ => new ScopedProbe());
         services.AddSingleton<ITenantMessageContextInitializer>(initializer);
         using var provider = services.BuildServiceProvider();
 
@@ -87,6 +87,7 @@ public sealed class MassTransitKafkaConsumerTenantScopeTests
 
     private sealed class Payload
     {
+        public Payload() { }
         public string Value { get; set; } = string.Empty;
     }
 
