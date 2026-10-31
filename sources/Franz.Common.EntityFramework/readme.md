@@ -396,3 +396,15 @@ Franz.Common.EntityFramework v2.2.1 is now:
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## Tenant-owned persistence
+
+Entities that belong to a tenant implement `Franz.Common.MultiTenancy.ITenantEntity` and expose a mapped `Guid TenantId`. When a validated `ITenantExecutionContextAccessor` is registered in the DbContext scope, `DbContextBase` applies tenant-aware global query filters and enforces ownership during inserts, updates, deletes, and synchronous/asynchronous saves.
+
+- New tenant-owned entities are stamped with the current tenant when their tenant ID is empty.
+- Explicit cross-tenant inserts and writes are rejected.
+- Tenant-owned queries return no rows without a validated tenant context.
+- Tenant identity is immutable after insertion.
+
+Global query filters are defense in depth, not a substitute for database permissions. Raw SQL, bulk APIs, and deliberate `IgnoreQueryFilters` usage must be separately controlled. For high-assurance shared-database deployments, enable database row-level security with a transaction-scoped tenant setting and a restricted application database role. Define tenant-scoped unique constraints and composite tenant-aware foreign keys in the application model; the framework does not silently rewrite business uniqueness semantics.
