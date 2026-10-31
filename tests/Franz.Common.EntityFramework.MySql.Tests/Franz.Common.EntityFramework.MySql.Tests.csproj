@@ -37,6 +37,6 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\\Shared\\RelationalTenantIsolationContract.cs" Link="ProviderContract\\RelationalTenantIsolationContract.cs" />
+    <Compile Include="..\Shared\RelationalTenantIsolationContract.cs" Link="ProviderContract\RelationalTenantIsolationContract.cs" />
   </ItemGroup>
 </Project>
