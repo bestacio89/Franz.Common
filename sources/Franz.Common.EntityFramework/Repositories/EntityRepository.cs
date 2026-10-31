@@ -3,7 +3,6 @@ using Franz.Common.Business.Repositories;
 using Franz.Common.Errors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
-using Microsoft.EntityFrameworkCore.Query;
 using System.Linq.Expressions;
 
 namespace Franz.Common.EntityFramework.Repositories;
@@ -67,7 +66,7 @@ public class EntityRepository<TDbContext, TEntity, TId>
   /// <inheritdoc />
   public Task<int> ExecuteBulkUpdateAsync(
       Expression<Func<TEntity, bool>> predicate,
-      Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> setPropertyCalls,
+      Expression<Func<UpdateSettersBuilder<TEntity>, UpdateSettersBuilder<TEntity>>> setPropertyCalls,
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(predicate);

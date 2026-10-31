@@ -17,6 +17,6 @@ public interface IEntityFrameworkBulkUpdateRepository<TEntity>
     /// </summary>
     Task<int> ExecuteBulkUpdateAsync(
         Expression<Func<TEntity, bool>> predicate,
-        Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> setPropertyCalls,
+        Expression<Func<UpdateSettersBuilder<TEntity>, UpdateSettersBuilder<TEntity>>> setPropertyCalls,
         CancellationToken cancellationToken = default);
 }
