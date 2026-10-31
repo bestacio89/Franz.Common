@@ -40,6 +40,9 @@ public sealed class MessagingHostedService : IHostedService
     var messageContextAccessor = scope.ServiceProvider.GetRequiredService<MessageContextAccessor>();
     messageContextAccessor.Set(new MessageContext(message));
 
+    try
+    {
+
     var tenantInitializer = scope.ServiceProvider.GetService<ITenantMessageContextInitializer>();
     await using var tenantExecutionScope = tenantInitializer is null
         ? null
@@ -63,6 +66,11 @@ public sealed class MessagingHostedService : IHostedService
 
     // ✅ Non-blocking execution
     await executer.ExecuteAsync(message);
+    }
+    finally
+    {
+    messageContextAccessor.Clear();
+    }
   }
 
   public async Task StopAsync(CancellationToken cancellationToken)
