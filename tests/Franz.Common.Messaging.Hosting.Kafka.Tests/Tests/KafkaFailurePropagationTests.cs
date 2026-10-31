@@ -45,6 +45,8 @@ public sealed class KafkaFailurePropagationTests
     tenantInitializer.LastMessage.Should().BeSameAs(message);
     tenantInitializer.DisposeCount.Should().Be(1,
         "tenant execution context must be cleared even when message handling fails");
+    provider.GetRequiredService<MessageContextAccessor>().Current.Should().BeNull(
+        "ambient message context must be cleared after a failed delivery");
 
     await hostedService.StopAsync(CancellationToken.None);
   }
