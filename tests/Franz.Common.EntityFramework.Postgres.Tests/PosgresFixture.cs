@@ -25,7 +25,8 @@ public class PostgresFixture : IAsyncLifetime
 
   public IServiceProvider BuildServiceProvider(
       string? domainId = null,
-      Action<IServiceCollection>? extraRegistrations = null)
+      Action<IServiceCollection>? extraRegistrations = null,
+      string databaseName = "test_{dbName}")
   {
     var services = new ServiceCollection();
 
@@ -34,7 +35,7 @@ public class PostgresFixture : IAsyncLifetime
     {
       ["Database:ServerName"] = Container.Hostname,
       ["Database:Port"] = Container.GetMappedPublicPort(5432).ToString(),
-      ["Database:DatabaseName"] = "test_{dbName}", // Testing pattern replacement
+      ["Database:DatabaseName"] = databaseName, // Supports tenant database and shared database test configurations
       ["Database:UserName"] = "postgres",
       ["Database:Password"] = "password"
     };

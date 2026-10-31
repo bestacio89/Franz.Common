@@ -7,7 +7,7 @@
 - Host-based resolution now requires a verified canonical domain mapping owned by the resolved tenant.
 
 ### Persistence integrations
-- PostgreSQL database-per-tenant routing prefers the validated tenant ID and preserves domain-based routing only as a compatibility fallback.
+- PostgreSQL database-per-tenant routing requires a validated tenant ID; domain identity is never used as a database-routing substitute. Shared-database configuration remains explicit through a concrete database name.
 - EF sensitive-data logging is opt-in and disabled by default.
 - Authenticated HTTP principals now require an application-provided tenant membership authorizer; missing or denied authorization fails with HTTP 403.
 

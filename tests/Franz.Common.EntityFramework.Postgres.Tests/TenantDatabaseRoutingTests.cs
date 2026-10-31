@@ -30,6 +30,27 @@ public sealed class TenantDatabaseRoutingTests : IClassFixture<PostgresFixture>
         connectionString.Should().NotContain(domainId.ToString());
     }
 
+    [Fact]
+    public void AddPostgresDatabase_RejectsTenantDatabaseRoutingWithoutValidatedTenantContext()
+    {
+        var provider = _fixture.BuildServiceProvider(Guid.NewGuid().ToString());
+
+        var act = () => provider.GetRequiredService<TestDbContext>();
+
+        act.Should().Throw<TenantIsolationException>()
+            .WithMessage("*validated tenant execution context*");
+    }
+
+    [Fact]
+    public void AddPostgresDatabase_PreservesSharedDatabaseWhenNoTenantTemplateIsConfigured()
+    {
+        var provider = _fixture.BuildServiceProvider(databaseName: "shared");
+
+        var connectionString = provider.GetRequiredService<TestDbContext>().Database.GetConnectionString();
+
+        connectionString.Should().Contain("Database=shared");
+    }
+
     private sealed class StubTenantExecutionContextAccessor(TenantExecutionContext? current) : ITenantExecutionContextAccessor
     {
         public TenantExecutionContext? Current { get; private set; } = current;

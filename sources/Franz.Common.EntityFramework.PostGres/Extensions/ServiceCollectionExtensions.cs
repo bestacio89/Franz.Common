@@ -31,10 +31,27 @@ public static class ServiceCollectionExtensions
                 var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
                 var logger = serviceProvider.GetRequiredService<ILogger<TDbContext>>();
 
+                var databaseName = string.IsNullOrWhiteSpace(databaseOptions.DatabaseName)
+                    ? DatabaseNamePattern
+                    : databaseOptions.DatabaseName;
+
+                if (databaseName.Contains(DatabaseNamePattern, StringComparison.Ordinal))
+                {
+                    var tenantId = serviceProvider.GetService<ITenantExecutionContextAccessor>()?.Current?.TenantId;
+                    if (tenantId is null || tenantId == Guid.Empty)
+                        throw new TenantIsolationException(
+                            "Database-per-tenant routing requires a validated tenant execution context.");
+
+                    databaseName = databaseName.Replace(
+                        DatabaseNamePattern,
+                        tenantId.Value.ToString("D"),
+                        StringComparison.Ordinal);
+                }
+
                 var builder = new NpgsqlConnectionStringBuilder
                 {
                     Host = string.IsNullOrWhiteSpace(databaseOptions.ServerName) ? DefaultServerName : databaseOptions.ServerName,
-                    Database = string.IsNullOrWhiteSpace(databaseOptions.DatabaseName) ? DatabaseNamePattern : databaseOptions.DatabaseName,
+                    Database = databaseName,
                     Username = string.IsNullOrWhiteSpace(databaseOptions.UserName) ? DefaultUserName : databaseOptions.UserName,
                     Password = string.IsNullOrWhiteSpace(databaseOptions.Password) ? DefaultPassword : databaseOptions.Password,
                     Port = (int)(databaseOptions.Port > 0 ? databaseOptions.Port.Value : DefaultPort),
@@ -44,19 +61,6 @@ public static class ServiceCollectionExtensions
                 };
 
                 var connectionString = builder.ConnectionString;
-
-                // Prefer the validated tenant identity for database-per-tenant routing.
-                // Domain-based routing remains as a compatibility fallback for existing applications.
-                var tenantId = serviceProvider.GetService<ITenantExecutionContextAccessor>()?.Current?.TenantId;
-                var domainId = tenantId.HasValue
-                    ? null
-                    : serviceProvider.GetService<IDomainContextAccessor>()?.GetCurrentDomainId();
-                var databaseKey = tenantId?.ToString() ?? domainId?.ToString();
-
-                connectionString = databaseKey is not null
-                    ? connectionString.Replace(DatabaseNamePattern, databaseKey)
-                    : connectionString.Replace($"_{DatabaseNamePattern}", string.Empty);
-
                 dbContextBuilder.UseNpgsql(connectionString);
                 if (databaseOptions.EnableSensitiveDataLogging) dbContextBuilder.EnableSensitiveDataLogging();
 
