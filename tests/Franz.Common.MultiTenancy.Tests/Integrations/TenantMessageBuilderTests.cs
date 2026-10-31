@@ -19,7 +19,8 @@ public sealed class TenantMessageBuilderTests
         services.AddMessagingMultitenancyContext();
 
         using var provider = services.BuildServiceProvider();
-        var builders = provider.GetServices<IMessageBuilder>().ToArray();
+        using var scope = provider.CreateScope();
+        var builders = scope.ServiceProvider.GetServices<IMessageBuilder>().ToArray();
 
         Assert.Contains(builders, builder => builder is TenantMessageBuilder);
         Assert.Contains(builders, builder => builder is DomainMessageBuilder);
