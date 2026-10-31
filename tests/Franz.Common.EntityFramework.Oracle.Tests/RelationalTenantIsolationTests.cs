@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Franz.Common.EntityFramework.Oracle.Tests;
 
 public sealed class RelationalTenantIsolationTests(OracleFixture fixture)
-    : RelationalTenantIsolationContract
+    : RelationalTenantIsolationContract, IClassFixture<OracleFixture>
 {
     protected override async Task WithContextAsync(Guid? tenantId, Func<DbContext, Task> action)
     {
