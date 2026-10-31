@@ -13,7 +13,7 @@ public sealed class TenantDatabaseRoutingTests : IClassFixture<PostgresFixture>
     public TenantDatabaseRoutingTests(PostgresFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public void AddPostgresDatabase_PrefersValidatedTenantIdOverDomainId()
+    public void AddPostgresDatabase_UsesValidatedTenantIdWhenTenantIsolationIsEnabled()
     {
         var tenantId = Guid.NewGuid();
         var domainId = Guid.NewGuid();
@@ -21,24 +21,30 @@ public sealed class TenantDatabaseRoutingTests : IClassFixture<PostgresFixture>
         var context = new TenantExecutionContext(tenant, domainId, TenantResolutionSource.Unknown, DateTimeOffset.UtcNow);
         var accessor = new StubTenantExecutionContextAccessor(context);
 
-        var provider = _fixture.BuildServiceProvider(domainId.ToString(), services =>
-            services.AddSingleton<ITenantExecutionContextAccessor>(accessor));
+        var provider = _fixture.BuildServiceProvider(
+            domainId.ToString(),
+            services => services.AddSingleton<ITenantExecutionContextAccessor>(accessor),
+            databaseName: "test_{dbName}",
+            isolationMode: "TenantDatabase");
 
         var connectionString = provider.GetRequiredService<TestDbContext>().Database.GetConnectionString();
 
-        connectionString.Should().Contain($"Database=test_{tenantId}");
+        connectionString.Should().Contain($"Database=test_{tenantId:D}");
         connectionString.Should().NotContain(domainId.ToString());
     }
 
     [Fact]
-    public void AddPostgresDatabase_PreservesLegacyDomainRoutingWithoutTenantExecutionContext()
+    public void AddPostgresDatabase_UsesDomainRoutingOnlyWhenExplicitlyEnabled()
     {
         var domainId = Guid.NewGuid();
-        var provider = _fixture.BuildServiceProvider(domainId.ToString(), isolationMode: "DomainDatabase");
+        var provider = _fixture.BuildServiceProvider(
+            domainId.ToString(),
+            databaseName: "test_{dbName}",
+            isolationMode: "DomainDatabase");
 
         var connectionString = provider.GetRequiredService<TestDbContext>().Database.GetConnectionString();
 
-        connectionString.Should().Contain($"Database=test_{domainId}");
+        connectionString.Should().Contain($"Database=test_{domainId:D}");
     }
 
     [Fact]
