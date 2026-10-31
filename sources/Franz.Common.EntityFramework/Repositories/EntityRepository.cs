@@ -3,6 +3,7 @@ using Franz.Common.Business.Repositories;
 using Franz.Common.Errors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Query;
 using System.Linq.Expressions;
 
 namespace Franz.Common.EntityFramework.Repositories;
