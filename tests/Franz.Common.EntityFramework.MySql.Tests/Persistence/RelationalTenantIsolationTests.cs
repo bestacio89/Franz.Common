@@ -1,4 +1,5 @@
 using Franz.Common.EntityFramework.ProviderContract.Tests;
+using Franz.Common.EntityFramework.MySql.Tests.Fixtures;
 using Franz.Common.Mediator.Dispatchers;
 using Microsoft.EntityFrameworkCore;
 using Microting.EntityFrameworkCore.MySql.Infrastructure;
