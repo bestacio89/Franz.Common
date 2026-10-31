@@ -45,6 +45,17 @@ public sealed class TenantResolutionMiddleware(
             return;
         }
 
+        if (context.User.Identity?.IsAuthenticated == true)
+        {
+            var authorizer = serviceProvider.GetService<ITenantRequestAuthorizer>();
+            if (authorizer is null ||
+                !await authorizer.IsAuthorizedAsync(context.User, tenant, context.RequestAborted).ConfigureAwait(false))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+        }
+
         Guid? domainId = null;
         var host = context.Request.Host.Host;
         if (!string.IsNullOrWhiteSpace(host))

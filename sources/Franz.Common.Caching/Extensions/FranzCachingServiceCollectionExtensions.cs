@@ -201,4 +201,16 @@ public static class FranzCachingServiceCollectionExtensions
 
     return services.AddFranzCachingCore();
   }
+
+  /// <summary>
+  /// Replaces the global cache-key strategy with a scoped strategy that prefixes every key
+  /// with the validated tenant ID. Call after the cache provider registration.
+  /// </summary>
+  public static IServiceCollection AddTenantScopedCacheKeys(this IServiceCollection services)
+  {
+    services.TryAddSingleton<DefaultCacheKeyStrategy>();
+    services.Replace(ServiceDescriptor.Scoped<ICacheKeyStrategy, TenantScopedCacheKeyStrategy>());
+    return services;
+  }
+
 }
