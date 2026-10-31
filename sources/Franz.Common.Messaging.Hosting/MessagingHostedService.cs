@@ -47,11 +47,10 @@ public sealed class MessagingHostedService : IHostedService
 
     try
     {
-
-    var tenantInitializer = scope.ServiceProvider.GetService<ITenantMessageContextInitializer>();
-    await using var tenantExecutionScope = tenantInitializer is null
-        ? null
-        : await tenantInitializer.BeginAsync(message);
+      var tenantInitializer = scope.ServiceProvider.GetService<ITenantMessageContextInitializer>();
+      await using var tenantExecutionScope = tenantInitializer is null
+          ? null
+          : await tenantInitializer.BeginAsync(message);
 
     var strategyExecuters = scope.ServiceProvider.GetServices<IMessagingStrategyExecuter>();
 
