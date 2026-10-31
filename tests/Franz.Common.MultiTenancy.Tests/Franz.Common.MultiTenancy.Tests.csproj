@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\sources\Franz.Common.Http.MultiTenancy\Franz.Common.Http.MultiTenancy.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.MultiTenancy\Franz.Common.Messaging.MultiTenancy.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Caching\Franz.Common.Caching.csproj" />
   </ItemGroup>
   <ItemGroup>
