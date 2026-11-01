@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Franz.Common.Http.MultiTenancy.Accessors;
 using Franz.Common.Http.MultiTenancy.Configuration;
 using Franz.Common.Http.MultiTenancy.Middleware;
+using Franz.Common.Http.MultiTenancy;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Franz.Common.MultiTenancy.TenantResolution;
