@@ -22,6 +22,17 @@ namespace Franz.Common.Mediator.Tests.Dispatchers;
 
 public class FranzDispatcherTests
 {
+  public FranzDispatcherTests()
+  {
+    // These tests construct FranzDispatcher directly rather than using AddFranzMediator(assemblies).
+    // Register the generated-equivalent invokers explicitly so the tests exercise dispatch behavior
+    // without relying on the removed runtime reflection fallback.
+    GeneratedMediatorInvokerRegistry.RegisterCommand<TestCommand, string>();
+    GeneratedMediatorInvokerRegistry.RegisterVoidCommand<TestVoidCommand>();
+    GeneratedMediatorInvokerRegistry.RegisterQuery<TestQuery, int>();
+    GeneratedMediatorInvokerRegistry.RegisterEvent<TestEvent>();
+  }
+
   #region Test Contracts & Types
 
   public record TestCommand(string Input) : ICommand<string>;
