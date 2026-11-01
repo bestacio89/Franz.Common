@@ -99,7 +99,7 @@ public sealed class FrameworkRuntimeContractTests
       new ServiceDescriptor(typeof(IContract), typeof(ContractImplementation), ServiceLifetime.Singleton)
     };
     var strategy = new RegistrationStrategySkipExistingPair();
-    var conflictingDescriptor = ServiceDescriptor.Scoped<IContract, ContractImplementation>();
+    var conflictingDescriptor = new ServiceDescriptor(typeof(IContract), typeof(ContractImplementation), ServiceLifetime.Scoped);
 
     Assert.Throws<InvalidOperationException>(() => strategy.Apply(services, conflictingDescriptor));
 
