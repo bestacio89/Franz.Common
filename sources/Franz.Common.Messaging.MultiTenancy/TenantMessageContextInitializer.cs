@@ -7,27 +7,61 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Franz.Common.Messaging.MultiTenancy;
 
-public sealed class TenantMessageContextInitializer(
-    IMessageContextAccessor messageContextAccessor,
-    ITenantStore tenantStore,
-    ITenantExecutionContextAccessor executionContextAccessor,
-    ITenantMessageAuthorizer authorizer,
-    IServiceProvider serviceProvider) : ITenantMessageContextInitializer
+public sealed class TenantMessageContextInitializer : ITenantMessageContextInitializer
 {
-    public async Task<IAsyncDisposable> BeginAsync(CancellationToken cancellationToken = default)
+    private readonly IMessageContextAccessor? _messageContextAccessor;
+    private readonly ITenantStore _tenantStore;
+    private readonly ITenantExecutionContextAccessor _executionContextAccessor;
+    private readonly ITenantMessageAuthorizer _authorizer;
+    private readonly IServiceProvider _serviceProvider;
+
+    public TenantMessageContextInitializer(
+        ITenantStore tenantStore,
+        ITenantExecutionContextAccessor executionContextAccessor,
+        ITenantMessageAuthorizer authorizer,
+        IServiceProvider serviceProvider)
     {
-        var message = messageContextAccessor.Current?.Message
+        _tenantStore = tenantStore;
+        _executionContextAccessor = executionContextAccessor;
+        _authorizer = authorizer;
+        _serviceProvider = serviceProvider;
+    }
+
+    public TenantMessageContextInitializer(
+        IMessageContextAccessor messageContextAccessor,
+        ITenantStore tenantStore,
+        ITenantExecutionContextAccessor executionContextAccessor,
+        ITenantMessageAuthorizer authorizer,
+        IServiceProvider serviceProvider)
+        : this(tenantStore, executionContextAccessor, authorizer, serviceProvider)
+    {
+        _messageContextAccessor = messageContextAccessor;
+    }
+
+    public Task<IAsyncDisposable> BeginAsync(CancellationToken cancellationToken = default)
+    {
+        var message = _messageContextAccessor?.Current?.Message
             ?? throw new TenantResolutionException("A current message is required to establish tenant context.");
+
+        return BeginAsync(message, cancellationToken);
+    }
+
+    public async Task<IAsyncDisposable> BeginAsync(
+        Message message,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+
         var tenantId = ReadRequiredGuid(message, HeaderConstants.TenantId, "tenant");
-        var tenant = await tenantStore.FindByIdAsync(tenantId).ConfigureAwait(false)
+        var tenant = await _tenantStore.FindByIdAsync(tenantId).ConfigureAwait(false)
             ?? throw new TenantResolutionException("The message references an unknown tenant.");
         if (tenant.Status != TenantStatus.Active)
             throw new TenantResolutionException("The message tenant is not active.");
 
-        var validator = serviceProvider.GetService<ITenantValidator>();
+        var validator = _serviceProvider.GetService<ITenantValidator>();
         if (validator is not null && !await validator.IsValidAsync(tenant.Id, cancellationToken).ConfigureAwait(false))
             throw new TenantResolutionException("The message tenant failed validation.");
-        if (!await authorizer.IsAuthorizedAsync(tenant, message, cancellationToken).ConfigureAwait(false))
+        if (!await _authorizer.IsAuthorizedAsync(tenant, message, cancellationToken).ConfigureAwait(false))
             throw new TenantResolutionException("The message producer is not authorized for the resolved tenant.");
 
         Guid? domainId = null;
@@ -42,8 +76,8 @@ public sealed class TenantMessageContextInitializer(
         }
 
         var context = new TenantExecutionContext(tenant, domainId, TenantResolutionSource.Header, DateTimeOffset.UtcNow);
-        executionContextAccessor.Initialize(context);
-        return new TenantMessageExecutionScope(executionContextAccessor);
+        _executionContextAccessor.Initialize(context);
+        return new TenantMessageExecutionScope(_executionContextAccessor);
     }
 
     private static Guid ReadRequiredGuid(Message message, string headerName, string identityName)
@@ -57,9 +91,15 @@ public sealed class TenantMessageContextInitializer(
     private sealed class TenantMessageExecutionScope(ITenantExecutionContextAccessor accessor) : IAsyncDisposable
     {
         private bool _disposed;
+
         public ValueTask DisposeAsync()
         {
-            if (!_disposed) { accessor.Clear(); _disposed = true; }
+            if (!_disposed)
+            {
+                accessor.Clear();
+                _disposed = true;
+            }
+
             return ValueTask.CompletedTask;
         }
     }
