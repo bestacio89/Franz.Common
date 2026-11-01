@@ -84,6 +84,11 @@ public static class GeneratedMediatorInvokerRegistry
   public static Func<FranzDispatcher, IEvent, CancellationToken, Task> GetEventPublisher(Type eventType)
       => GetRequired(EventPublishers, eventType, eventType, "event publisher");
 
+  public static bool TryGetEventPublisher(
+      Type eventType,
+      out Func<FranzDispatcher, IEvent, CancellationToken, Task>? publisher)
+      => EventPublishers.TryGetValue(eventType, out publisher);
+
   private static void RegisterProcessors<TRequest, TResponse>()
   {
     RegisterPreProcessor<TRequest>();
