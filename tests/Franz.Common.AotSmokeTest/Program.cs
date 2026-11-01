@@ -36,17 +36,17 @@ public static class Program
             return 3;
 
         await dispatcher.SendAsync(new AotVoidCommand());
-        if (!scope.ServiceProvider.GetRequiredService<ICommandHandler<AotVoidCommand, Unit>>().Equals(null))
+        if (!scope.ServiceProvider.GetRequiredService<AotVoidCommandHandler>().Executed)
             return 4;
 
         var notification = new AotNotification();
         await dispatcher.PublishNotificationAsync(notification);
-        if (!scope.ServiceProvider.GetRequiredService<INotificationHandler<AotNotification>>().Equals(null))
+        if (!scope.ServiceProvider.GetRequiredService<AotNotificationHandler>().Executed)
             return 5;
 
         var @event = new AotEvent(DateTimeOffset.UtcNow);
         await dispatcher.PublishEventAsync(@event);
-        if (!scope.ServiceProvider.GetRequiredService<IEventHandler<AotEvent>>().Equals(null))
+        if (!scope.ServiceProvider.GetRequiredService<AotEventHandler>().Executed)
             return 6;
 
         var stream = (FranzDispatcher)dispatcher;
@@ -102,22 +102,37 @@ public sealed class AotQueryHandler : IQueryHandler<AotQuery, int>
 public sealed record AotVoidCommand : ICommand;
 public sealed class AotVoidCommandHandler : ICommandHandler<AotVoidCommand>
 {
+    public bool Executed { get; private set; }
+
     public Task Handle(AotVoidCommand command, CancellationToken cancellationToken)
-        => Task.CompletedTask;
+    {
+        Executed = true;
+        return Task.CompletedTask;
+    }
 }
 
 public sealed record AotNotification : INotification;
 public sealed class AotNotificationHandler : INotificationHandler<AotNotification>
 {
+    public bool Executed { get; private set; }
+
     public Task Handle(AotNotification notification, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+    {
+        Executed = true;
+        return Task.CompletedTask;
+    }
 }
 
 public sealed record AotEvent(DateTimeOffset OccurredOn) : IEvent;
 public sealed class AotEventHandler : IEventHandler<AotEvent>
 {
+    public bool Executed { get; private set; }
+
     public Task HandleAsync(AotEvent @event, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+    {
+        Executed = true;
+        return Task.CompletedTask;
+    }
 }
 
 public sealed record AotStreamQuery(int Count) : IStreamQuery<int>;
