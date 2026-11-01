@@ -49,8 +49,11 @@ internal static class FranzMediatorGeneratedRegistration
       {
         builder.AppendLine(
             $"        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof({handler.ServiceType}), typeof({handler.ImplementationType})));");
-        transientRegistrations.AppendLine(
-            $"        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof({handler.ServiceType}), typeof({handler.ImplementationType})));");
+        if (handler.HandlerKind is "Command" or "Query")
+        {
+          transientRegistrations.AppendLine(
+              $"        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof({handler.ServiceType}), typeof({handler.ImplementationType})));");
+        }
       }
 
       var invokerKey = $"{handler.HandlerKind}|{handler.RequestType}|{handler.ResponseType}";
