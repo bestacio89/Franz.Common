@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Http.MultiTenancy\Franz.Common.Http.MultiTenancy.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Http.Authentication\Franz.Common.Http.Authentication.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.MultiTenancy\Franz.Common.Messaging.MultiTenancy.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
