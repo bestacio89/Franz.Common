@@ -1,11 +1,14 @@
 using System;
 using System.Reflection;
+using System.Diagnostics.CodeAnalysis;
 using Franz.Common.Mapping.Abstractions;
 using Franz.Common.Reflection.Extensions;
 
 namespace Franz.Common.Mapping.Core;
 
-public class BaseAutoMapper<TSource, TDestination> : IMapper<TSource, TDestination>
+public class BaseAutoMapper<
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] TSource,
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] TDestination> : IMapper<TSource, TDestination>
     where TDestination : new()
 {
     public virtual TDestination Map(TSource source)
