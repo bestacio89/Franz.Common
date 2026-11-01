@@ -144,6 +144,10 @@ namespace Franz.Common.Integration.Tests.DependencyInjection
       var second = scope.ServiceProvider.GetRequiredService<IScopedDependency>();
 
       first.Should().NotBeSameAs(second);
+
+      scope.Dispose();
+      ((FakeScopedService)first).IsDisposed.Should().BeTrue();
+      ((FakeScopedService)second).IsDisposed.Should().BeTrue();
     }
   }
 }
