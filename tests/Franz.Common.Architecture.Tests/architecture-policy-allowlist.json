@@ -181,12 +181,6 @@
   },
   {
     "rule": "GENERIC_REFLECTION",
-    "path": "sources/Franz.Common.Mediator/Dispatchers/Dispatcher.cs",
-    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap.",
-    "ruleId": "SRC-003"
-  },
-  {
-    "rule": "GENERIC_REFLECTION",
     "path": "sources/Franz.Common.Messaging.Sagas/Core/SagaOrchestrator.cs",
     "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap.",
     "ruleId": "SRC-003"
