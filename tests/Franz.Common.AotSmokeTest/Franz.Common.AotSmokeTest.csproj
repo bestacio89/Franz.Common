@@ -26,7 +26,8 @@
     <ProjectReference
       Include="../../sources/Microsoft.Common.Mediator.SourceGenerator/Franz.Common.Mediator.SourceGenerator.csproj"
       OutputItemType="Analyzer"
-      ReferenceOutputAssembly="false" />
+      ReferenceOutputAssembly="false"
+      GlobalPropertiesToRemove="PublishAot;PublishTrimmed;TrimMode" />
     <Analyzer Include="../../sources/Franz.Common.Mapping.Generators/bin/Release/netstandard2.0/Franz.Common.Mapping.Generators.dll" />
   </ItemGroup>
 </Project>
