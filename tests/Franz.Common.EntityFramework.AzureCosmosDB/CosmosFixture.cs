@@ -22,8 +22,7 @@ public sealed class CosmosFixture : IAsyncLifetime
           .WithPortBinding(8081, true)
           .WithWaitStrategy(Wait.ForUnixContainer()
               .UntilInternalTcpPortIsAvailable(8081))
-          .WithStartupTimeout(TimeSpan.FromMinutes(5))
-          .Build();
+                    .Build();
 
   public async Task InitializeAsync()
   {
