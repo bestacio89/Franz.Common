@@ -258,6 +258,8 @@ They validate Franz.Common itself:
 - Existing findings are recorded as exact file/rule exceptions with reasons. New findings fail; resolved exceptions must be removed.
 - The mediator source generator remains targeted at `netstandard2.0`.
 - DDD contracts verify entity identity ownership, lifecycle-state encapsulation, repository/factory generic constraints, aggregate event constraints, and value-object equality contracts.
+- Runtime contracts verify DI registration idempotency and lifetime conflicts, scoped mediator composition, cancellation-aware async abstractions, sender disposal, and validated tenant execution-context construction.
+- A [framework contract coverage ledger](Docs/Architecture/framework-contract-coverage.md) distinguishes enforced architecture rules from behavior covered by integration tests and guarantees that remain unverified.
 
 This suite is included in the Franz.Common solution, runs in this repository's GitHub pull-request validation workflow, and has a dedicated test job in the Azure pipeline test stages.
 
