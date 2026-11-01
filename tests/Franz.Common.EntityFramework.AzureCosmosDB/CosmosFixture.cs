@@ -2,6 +2,8 @@
 using Franz.Common.Business.Domain.Factories;
 using Franz.Common.Business.Domain.IdGenerators;
 using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.MultiTenancy;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -52,6 +54,7 @@ public sealed class CosmosFixture : IAsyncLifetime
 
     // Core infrastructure
     services.AddLogging();
+    services.AddScoped<ITenantExecutionContextAccessor, CosmosTestTenantExecutionContextAccessor>();
 
     services.AddSingleton(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
     services.AddSingleton<IIdGenerator<Guid>, GuidV7Generator>();
@@ -64,6 +67,7 @@ public sealed class CosmosFixture : IAsyncLifetime
     );
 
     services.AddCosmosInfrastructure<TestCosmosDbContext>(configuration);
+    services.AddCosmosTenantRepository<CosmosSdkTenantDocument>("TenantDocuments");
 
     var provider = services.BuildServiceProvider();
 
@@ -72,6 +76,10 @@ public sealed class CosmosFixture : IAsyncLifetime
     {
       var db = scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
       await db.Database.EnsureCreatedAsync();
+      var cosmosClient = scope.ServiceProvider.GetRequiredService<CosmosClient>();
+      await cosmosClient.GetDatabase(databaseName).CreateContainerIfNotExistsAsync(
+        new ContainerProperties("TenantDocuments", "/tenantId"),
+        throughput: 400);
     }
 
     return new IsolatedCosmosContext(provider);

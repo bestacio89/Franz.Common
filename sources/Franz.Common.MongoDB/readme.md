@@ -23,6 +23,26 @@ dotnet add package Franz.Common.MongoDB
 
 Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
 
+## Tenant-owned MongoDB documents — 2.3.5
+
+Tenant-owned Mongo documents implement `IMongoTenantEntity`, which combines a string document ID with the framework's validated `Guid TenantId` contract.
+
+Register a tenant-scoped repository after configuring MongoDB and the Franz tenant execution accessor:
+
+```csharp
+services.AddMongoTenantRepository<OrderDocument>("orders");
+```
+
+The repository enforces tenant identity in MongoDB filters for point reads, queries, replacements, and deletes. Inserts stamp an empty TenantId from the validated execution context and reject foreign ownership claims. Batch inserts validate every document before sending the batch. Invoke `CreateTenantIdentityIndexAsync` from a controlled index migration, not per request; it creates a compound `TenantId + Id` lookup index.
+
+MongoDB enforces a collection-wide unique `_id`; tenant document IDs therefore remain globally unique within a collection. The compound tenant lookup index is non-unique. The repository does not promise that the same `_id` can be reused by different tenants.
+
+The repository also exposes tenant-filtered atomic `UpdateOneAsync`/`UpdateManyAsync`, bulk writes, immutable tenant ownership update builders, optional client sessions and transaction execution. `MongoTenantUpdateBuilder<TEntity>` rejects attempts to change or unset `TenantId`; bulk definitions are fully validated before the driver receives the batch. `ExecuteInTransactionAsync` uses the driver's transaction retry behavior and requires a replica-set or sharded MongoDB deployment.
+
+For event sourcing, `AddMongoTenantAggregateRepository<TAggregate, TEvent>()` registers the aggregate repository with the validated tenant execution accessor. Stored events are stamped from the execution context and replay/delete queries include TenantId. The non-tenant mode sees only events with a null TenantId, so it cannot read tenant-owned event streams.
+
+The older generic `MongoRepository<TEntity>` remains available for non-tenant collections. Do not use it for tenant-owned documents: it does not apply tenant filters. The generic `AddMongoMessageStore` inbox/outbox stores and raw MongoDB collection access are not implicitly tenant-filtered; they require their own tenant-aware storage contract and must not be assumed protected by these repository APIs.
+
 ## Package-specific guide
 
 ---
@@ -162,7 +182,7 @@ if (!await _inboxStore.HasProcessedAsync(message.Id))
 
 ## 📝 Version Information
 
-* **Current Version:** v2.3.4
+* **Current Version:** v2.3.5
 * Part of the private **Franz Framework** ecosystem.
 
 ---

@@ -3,6 +3,7 @@ using Franz.Common.AzureCosmosDB.Options;
 using Franz.Common.Business.Domain;
 using Franz.Common.EntityFramework.Auditing;
 using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -14,12 +15,14 @@ public class TestCosmosDbContext : CosmosDbContextBase
       DbContextOptions<TestCosmosDbContext> options,
       IDispatcher dispatcher,
       IOptions<CosmosOptions> cosmosOptions,
-      ICurrentUserService? currentUser = null)
-      : base(options, dispatcher, cosmosOptions, currentUser)
+      ICurrentUserService? currentUser = null,
+      ITenantExecutionContextAccessor? tenantContextAccessor = null)
+      : base(options, dispatcher, cosmosOptions, currentUser, tenantContextAccessor)
   {
   }
 
   public DbSet<CosmosEntity> Items => Set<CosmosEntity>();
+  public DbSet<TenantCosmosEntity> TenantItems => Set<TenantCosmosEntity>();
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {

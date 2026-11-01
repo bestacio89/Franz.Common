@@ -30,7 +30,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 High-performance, pipeline-driven gRPC for distributed microservices
 
 ---
-**Current Version:** v2.3.4
+**Current Version:** v2.3.5
 
 ---
 
@@ -323,6 +323,40 @@ This makes Franz one of the **strictest, most consistent, and most architectural
 
 The gRPC client dependency is updated to the current compatible `Grpc.Net.Client` release. The legacy `Grpc` package remains at 2.46.6 because NuGet does not publish version 2.83.0 for that package ID; do not copy the client version onto the legacy package. Restore and integration tests must pass before publishing this maintenance update. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
 
+
+## Tenant execution — 2.3.5
+
+The server tenant behavior now removes caller-supplied `x-tenant-id` metadata before invoking the application-provided `IFranzTenantResolver`. A resolved tenant must be a valid non-empty Guid. The behavior requires an application-provided `IFranzTenantAuthorizer` for membership authorization, optionally applies the shared `ITenantValidator`, establishes a scoped `TenantExecutionContext` for downstream persistence, and clears it in a `finally` block.
+
+Enable strict tenant enforcement for tenant-required services:
+
+```json
+{
+  "Franz": {
+    "Grpc": {
+      "RequireTenant": true
+    }
+  }
+}
+```
+
+Register trusted resolution and membership services:
+
+```csharp
+services.AddFranzGrpcDefaults();
+services.AddFranzGrpcServer(configuration);
+services.AddScoped<IFranzTenantResolver, ApplicationGrpcTenantResolver>();
+services.AddScoped<IFranzTenantAuthorizer, ApplicationGrpcTenantAuthorizer>();
+services.AddScoped<ITenantValidator, ApplicationTenantValidator>();
+```
+
+When `RequireTenant` is enabled, unresolved tenants fail with `PermissionDenied`; resolved tenants require a membership authorizer, tenant validator, and execution-context accessor. The default no-op resolver therefore fails closed in strict mode.
+
+When an ASP.NET HTTP middleware has already established a validated tenant context for the same request, the gRPC server behavior reuses it and leaves cleanup to the HTTP request scope. For gRPC-only hosts, the behavior resolves, authorizes, initializes and clears its own scoped context.
+
+On the client, the tenant behavior propagates only the tenant from the current validated `ITenantExecutionContextAccessor`. It removes any caller-created tenant metadata when no validated execution context exists. Tenant IDs in gRPC metadata are propagation data, never authorization evidence. Tenant and general authorization implementations (including `IFranzAuthorizationService`) must obtain caller identity from the authenticated host security context, not from `x-user-id` or `x-tenant-id` metadata.
+
+The server and client behavior providers are scoped so behavior instances cannot be cached across dependency-injection scopes.
 
 ## Tenant identity trust boundary
 

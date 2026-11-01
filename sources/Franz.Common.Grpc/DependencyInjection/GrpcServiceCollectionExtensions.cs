@@ -1,8 +1,11 @@
 ﻿using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Grpc.Abstractions;
 using Franz.Common.Grpc.Client;
+using Franz.Common.Grpc.Client.Interceptors;
 using Franz.Common.Grpc.Configuration;
+using Franz.Common.Grpc.Hosting;
 using Franz.Common.Grpc.Hosting.NoOp;
+using Franz.Common.MultiTenancy;
 using Franz.Common.Grpc.Server;
 using Franz.Common.Grpc.Server.Interceptors;
 using Microsoft.Extensions.Configuration;
@@ -30,6 +33,8 @@ public static class GrpcServiceCollectionExtensions
       this IServiceCollection services,
       IConfiguration configuration)
   {
+    services.TryAddScoped<ITenantExecutionContextAccessor, GrpcTenantExecutionContextAccessor>();
+
     // Bind global options
     services.Configure<FranzGrpcOptions>(
         configuration.GetSection("Franz:Grpc"));
@@ -44,7 +49,7 @@ public static class GrpcServiceCollectionExtensions
         .AddNoDuplicateScoped(typeof(IGrpcServerBehavior<,>), typeof(ExceptionMappingServerBehavior<,>));
 
     // Behavior provider (resolves ordered behaviors)
-    services.AddNoDuplicateSingleton<IGrpcServerBehaviorProvider, GrpcServerBehaviorProvider>();
+    services.AddNoDuplicateScoped<IGrpcServerBehaviorProvider, GrpcServerBehaviorProvider>();
 
     return services;
   }
@@ -58,12 +63,15 @@ public static class GrpcServiceCollectionExtensions
       this IServiceCollection services,
       IConfiguration configuration)
   {
+    services.TryAddScoped<ITenantExecutionContextAccessor, GrpcTenantExecutionContextAccessor>();
+
     // Bind client-specific options
     services.Configure<FranzGrpcClientOptions>(
         configuration.GetSection("Franz:Grpc:Client"));
 
     // Behavior provider and factory
-    services.AddNoDuplicateSingleton<IGrpcClientBehaviorProvider, GrpcClientBehaviorProvider>();
+    services.AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(TenantResolutionClientBehavior<,>));
+    services.AddNoDuplicateScoped<IGrpcClientBehaviorProvider, GrpcClientBehaviorProvider>();
     services.AddNoDuplicateSingleton<IFranzGrpcClientFactory, FranzGrpcClientFactory>();
 
     return services;

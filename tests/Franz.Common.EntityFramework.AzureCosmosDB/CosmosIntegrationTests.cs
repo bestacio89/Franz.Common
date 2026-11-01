@@ -2,6 +2,10 @@
 using Franz.Common.Business.Domain.Factories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Azure.Cosmos;
+using Franz.Common.MultiTenancy;
+using Franz.Common.MultiTenancy.Models;
+using Franz.Common.AzureCosmosDB.Repositories;
 using Xunit;
 
 namespace Franz.Common.AzureCosmosDB.Tests;
@@ -15,6 +19,172 @@ public sealed class CosmosIntegrationTests : IClassFixture<CosmosFixture>
   {
     _fixture = fixture;
   }
+
+
+  [Fact]
+  public async Task TenantOwnedDocuments_ArePartitionedAndFilteredByValidatedTenant()
+  {
+    var testContext = await _fixture.CreateIsolatedDatabaseContextAsync();
+    var tenantA = Guid.NewGuid();
+    var tenantB = Guid.NewGuid();
+    var labelA = $"tenant-a-{Guid.NewGuid():N}";
+    var labelB = $"tenant-b-{Guid.NewGuid():N}";
+
+    try
+    {
+      using (var tenantAScope = testContext.CreateScope())
+      {
+        var accessor = tenantAScope.ServiceProvider.GetRequiredService<ITenantExecutionContextAccessor>();
+        accessor.Initialize(CreateTenantContext(tenantA));
+        var db = tenantAScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+        db.TenantItems.Add(new TenantCosmosEntity { Label = labelA });
+        await db.SaveChangesAsync();
+      }
+
+      using (var tenantBScope = testContext.CreateScope())
+      {
+        var accessor = tenantBScope.ServiceProvider.GetRequiredService<ITenantExecutionContextAccessor>();
+        accessor.Initialize(CreateTenantContext(tenantB));
+        var db = tenantBScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+        db.TenantItems.Add(new TenantCosmosEntity { Label = labelB });
+        await db.SaveChangesAsync();
+      }
+
+      using (var tenantAScope = testContext.CreateScope())
+      {
+        var accessor = tenantAScope.ServiceProvider.GetRequiredService<ITenantExecutionContextAccessor>();
+        accessor.Initialize(CreateTenantContext(tenantA));
+        var db = tenantAScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+        var visible = await db.TenantItems.AsNoTracking().ToListAsync();
+
+        visible.Should().ContainSingle();
+        visible[0].Label.Should().Be(labelA);
+        visible[0].TenantId.Should().Be(tenantA);
+      }
+
+      using (var unscopedScope = testContext.CreateScope())
+      {
+        var db = unscopedScope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
+        var visible = await db.TenantItems.AsNoTracking().ToListAsync();
+        visible.Should().BeEmpty();
+
+        db.TenantItems.Add(new TenantCosmosEntity { Label = "unscoped" });
+        await Assert.ThrowsAsync<TenantIsolationException>(() => db.SaveChangesAsync());
+      }
+    }
+    finally
+    {
+      await testContext.CleanUpAsync();
+    }
+  }
+
+  [Fact]
+  public async Task NativeCosmosRepository_ConstrainsPointReadsQueriesAndReadManyToTenantPartition()
+  {
+    var testContext = await _fixture.CreateIsolatedDatabaseContextAsync();
+    var tenantA = Guid.NewGuid();
+    var tenantB = Guid.NewGuid();
+    var documentId = Guid.NewGuid().ToString("N");
+
+    try
+    {
+      using (var tenantAScope = testContext.CreateScope())
+      {
+        var accessor = tenantAScope.ServiceProvider.GetRequiredService<ITenantExecutionContextAccessor>();
+        accessor.Initialize(CreateTenantContext(tenantA));
+        var repository = tenantAScope.ServiceProvider
+            .GetRequiredService<CosmosTenantRepository<CosmosSdkTenantDocument>>();
+
+        var created = await repository.CreateAsync(new CosmosSdkTenantDocument
+        {
+          Id = documentId,
+          Label = "tenant-a"
+        });
+        created.RequestCharge.Should().BeGreaterThan(0);
+      }
+
+      using (var tenantBScope = testContext.CreateScope())
+      {
+        var accessor = tenantBScope.ServiceProvider.GetRequiredService<ITenantExecutionContextAccessor>();
+        accessor.Initialize(CreateTenantContext(tenantB));
+        var repository = tenantBScope.ServiceProvider
+            .GetRequiredService<CosmosTenantRepository<CosmosSdkTenantDocument>>();
+
+        await repository.CreateAsync(new CosmosSdkTenantDocument
+        {
+          Id = documentId,
+          Label = "tenant-b"
+        });
+      }
+
+      using (var tenantAScope = testContext.CreateScope())
+      {
+        var accessor = tenantAScope.ServiceProvider.GetRequiredService<ITenantExecutionContextAccessor>();
+        accessor.Initialize(CreateTenantContext(tenantA));
+        var repository = tenantAScope.ServiceProvider
+            .GetRequiredService<CosmosTenantRepository<CosmosSdkTenantDocument>>();
+
+        var pointRead = await repository.GetByIdWithMetadataAsync(documentId);
+        pointRead.Resource.Label.Should().Be("tenant-a");
+        pointRead.Resource.TenantId.Should().Be(tenantA);
+        pointRead.RequestCharge.Should().BeGreaterThan(0);
+        pointRead.ETag.Should().NotBeNullOrWhiteSpace();
+
+        var queryPage = await repository.QueryPageAsync(
+            new QueryDefinition("SELECT * FROM c"),
+            maxItemCount: 1);
+        queryPage.Items.Should().ContainSingle();
+        queryPage.Items[0].TenantId.Should().Be(tenantA);
+        queryPage.RequestCharge.Should().BeGreaterThan(0);
+
+        var many = await repository.ReadManyWithMetadataAsync(new[] { documentId });
+        many.Items.Should().ContainSingle();
+        many.Items[0].TenantId.Should().Be(tenantA);
+
+        var replacement = await repository.ReplaceAsync(
+            new CosmosSdkTenantDocument
+            {
+              Id = documentId,
+              TenantId = tenantA,
+              Label = "tenant-a-updated"
+            },
+            pointRead.ETag!);
+        replacement.ETag.Should().NotBeNullOrWhiteSpace();
+        replacement.RequestCharge.Should().BeGreaterThan(0);
+
+        var staleWrite = () => repository.ReplaceAsync(
+            new CosmosSdkTenantDocument
+            {
+              Id = documentId,
+              TenantId = tenantA,
+              Label = "stale-write"
+            },
+            pointRead.ETag!);
+        var concurrencyException = await Assert.ThrowsAsync<CosmosException>(staleWrite);
+        concurrencyException.StatusCode.Should().Be(System.Net.HttpStatusCode.PreconditionFailed);
+      }
+
+      using (var unscopedScope = testContext.CreateScope())
+      {
+        var repository = unscopedScope.ServiceProvider
+            .GetRequiredService<CosmosTenantRepository<CosmosSdkTenantDocument>>();
+
+        await Assert.ThrowsAsync<TenantIsolationException>(() =>
+            repository.GetByIdAsync(documentId));
+      }
+    }
+    finally
+    {
+      await testContext.CleanUpAsync();
+    }
+  }
+
+  private static TenantExecutionContext CreateTenantContext(Guid tenantId)
+      => new(
+          new TenantInfo(tenantId, tenantId.ToString("D")),
+          domainId: null,
+          TenantResolutionSource.Unknown,
+          DateTimeOffset.UtcNow);
 
   [Fact]
   public async Task AddAsync_ShouldPersistJsonDocument_WithAuditMetadata()

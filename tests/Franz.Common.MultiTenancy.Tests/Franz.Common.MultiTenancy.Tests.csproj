@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.MassTransit\Franz.Common.Messaging.MassTransit.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Caching\Franz.Common.Caching.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Grpc\Franz.Common.Grpc.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
