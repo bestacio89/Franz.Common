@@ -49,6 +49,9 @@ public static class ServiceCollectionExtensions
         .AddSerialization()
         .AddErrors();
 
+    services.TryAddEnumerable(
+        ServiceDescriptor.Scoped<IErrorResponseStrategy, ValidationErrorResponseStrategy>());
+
     services
         .AddFranzAuthentication();
 
