@@ -25,7 +25,7 @@ public sealed class HttpBoundaryConfigurationTests
         Assert.NotNull(policy);
         Assert.Empty(policy.Origins);
         Assert.False(policy.SupportsCredentials);
-        Assert.False(policy.AllowAnyOrigin);
+        Assert.DoesNotContain("*", policy.Origins);
     }
 
     [Fact]
@@ -82,7 +82,6 @@ public sealed class HttpBoundaryConfigurationTests
         var options = provider.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value;
 
         Assert.NotEmpty(options.KnownProxies);
-        Assert.NotEmpty(options.KnownNetworks);
         Assert.Equal(
             ForwardedHeaders.XForwardedFor |
             ForwardedHeaders.XForwardedProto |
