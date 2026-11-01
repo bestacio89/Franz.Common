@@ -238,3 +238,13 @@ For authenticated principals, the HTTP tenant middleware requires an application
 ## Request resolution is not authorization for 2.3.5
 
 Tenant resolution from a host, route, claim, or header identifies a candidate tenant; it does not establish membership or authorize access by itself. For authenticated principals, register and implement `ITenantRequestAuthorizer`; absent registration or denied membership must fail closed. A tenant identifier supplied by the caller is not membership proof. See the [tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md) for the broader framework boundary.
+
+---
+
+## Cancellation and immutable request context
+
+Tenant resolution now carries `HttpContext.RequestAborted` through the resolution pipeline, HTTP resolvers, tenant-store lookup, tenant validation, and authenticated membership authorization. The cancellation-aware `ITenantStore` overloads have default interface implementations for source/binary compatibility; I/O-backed tenant stores should override them and pass the token to their underlying provider.
+
+After resolution and authorization, the middleware establishes one immutable `TenantExecutionContext`. The HTTP tenant/domain accessors reject attempts to replace tenant or domain identity while that validated context is active. The context is cleared in a `finally` block, including when downstream middleware throws or is cancelled.
+
+The authenticated `IdentityContextAccessor` reads user claims only from an authenticated principal. Tenant and domain values come from the validated execution context. Use `IHeaderContextAccessor` to inspect raw headers; never treat caller-supplied identity headers as proof of identity or membership.
