@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Franz.Common.Business.Helpers;
+using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Extensions;
 using Franz.Common.Mediator.Handlers;
 using Franz.Common.Mediator.Registration;
