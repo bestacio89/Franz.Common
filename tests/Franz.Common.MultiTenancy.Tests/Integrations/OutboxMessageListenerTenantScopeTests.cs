@@ -82,7 +82,10 @@ public sealed class OutboxMessageListenerTenantScopeTests
         Assert.Null(messageContextAccessor.Current);
     }
 
-    private sealed class TestEvent : IEvent { }
+    private sealed class TestEvent : IEvent
+    {
+        public DateTimeOffset OccurredOn { get; } = DateTimeOffset.UtcNow;
+    }
 
     private sealed class TrackingTenantMessageContextInitializer : ITenantMessageContextInitializer
     {
