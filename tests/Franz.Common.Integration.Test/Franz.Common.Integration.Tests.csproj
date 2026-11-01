@@ -27,6 +27,10 @@
     <ProjectReference Include="..\..\sources\Franz.Common.Mediator.OpenTelemetry\Franz.Common.Mediator.OpenTelemetry.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Mediator.Polly\Franz.Common.Mediator.Polly.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
+    <ProjectReference
+      Include="..\..\sources\Microsoft.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.EntityFramework\Franz.Common.Messaging.EntityFramework.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.MediatR\Franz.Common.Messaging.Hosting.Mediator.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
