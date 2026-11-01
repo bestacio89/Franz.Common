@@ -80,7 +80,7 @@ public sealed class FrameworkRuntimeContractTests
   {
     var services = new ServiceCollection();
     var strategy = new RegistrationStrategySkipExistingPair();
-    var descriptor = ServiceDescriptor.Scoped<IContract, ContractImplementation>();
+    var descriptor = new ServiceDescriptor(typeof(IContract), typeof(ContractImplementation), ServiceLifetime.Scoped);
 
     strategy.Apply(services, descriptor);
     strategy.Apply(services, descriptor);
@@ -96,7 +96,7 @@ public sealed class FrameworkRuntimeContractTests
   {
     var services = new ServiceCollection
     {
-      ServiceDescriptor.Singleton<IContract, ContractImplementation>()
+      new ServiceDescriptor(typeof(IContract), typeof(ContractImplementation), ServiceLifetime.Singleton)
     };
     var strategy = new RegistrationStrategySkipExistingPair();
     var conflictingDescriptor = ServiceDescriptor.Scoped<IContract, ContractImplementation>();
@@ -110,14 +110,13 @@ public sealed class FrameworkRuntimeContractTests
   [Fact]
   public void Tenant_execution_context_rejects_invalid_or_inactive_tenants()
   {
-    var emptyIdTenant = new TenantInfo(Guid.Empty, "invalid");
     var validTenant = new TenantInfo(Guid.NewGuid(), "active");
     var suspendedTenant = new TenantInfo(Guid.NewGuid(), "suspended")
     {
       Status = TenantStatus.Suspended
     };
 
-    Assert.Throws<ArgumentException>(() => CreateExecutionContext(emptyIdTenant));
+    Assert.Throws<ArgumentException>(() => new TenantInfo(Guid.Empty, "invalid"));
     Assert.Throws<ArgumentException>(() => CreateExecutionContext(suspendedTenant));
 
     var context = CreateExecutionContext(validTenant);
