@@ -27,6 +27,12 @@ jobs:
         with:
           dotnet-version: 10.0.400
 
+      - name: Pull integration-test images
+        run: |
+          docker pull gvenzl/oracle-free:23-slim-faststart
+          docker pull mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+          docker pull mongo:7.0
+
       - name: Restore with NuGet security auditing
         id: restore
         shell: bash
