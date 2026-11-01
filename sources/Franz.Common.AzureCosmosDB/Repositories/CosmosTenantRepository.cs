@@ -64,6 +64,40 @@ public sealed class CosmosTenantRepository<TDocument>
     /// Executes a caller-defined Cosmos SQL query inside the validated tenant partition.
     /// The SDK partition-key option prevents the query from crossing tenant partitions.
     /// </summary>
+
+    /// <summary>
+    /// Reads one page from a tenant-partition-scoped query and returns its continuation token.
+    /// Pass the returned token to the next call to continue within the same tenant partition.
+    /// </summary>
+    public async Task<CosmosQueryResult<TDocument>> QueryPageAsync(
+        QueryDefinition query,
+        string? continuationToken = null,
+        int? maxItemCount = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (maxItemCount is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxItemCount));
+
+        var tenantId = GetRequiredTenantId();
+        var requestOptions = new QueryRequestOptions
+        {
+            PartitionKey = GetPartitionKey(tenantId),
+            MaxItemCount = maxItemCount
+        };
+
+        using var iterator = _container.GetItemQueryIterator<TDocument>(
+            query,
+            continuationToken,
+            requestOptions);
+
+        var page = await iterator.ReadNextAsync(cancellationToken).ConfigureAwait(false);
+        return new CosmosQueryResult<TDocument>(
+            page.ToList(),
+            page.RequestCharge,
+            page.ContinuationToken);
+    }
+
     public async Task<CosmosQueryResult<TDocument>> QueryWithMetadataAsync(
         QueryDefinition query,
         CancellationToken cancellationToken = default)
