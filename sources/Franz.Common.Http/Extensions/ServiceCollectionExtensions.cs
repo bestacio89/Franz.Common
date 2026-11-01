@@ -3,6 +3,7 @@
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Http.Errors;
 using Franz.Common.Http.Routing;
+using Franz.Common.Http.Errors.Strategy;
 using Franz.Common.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
