@@ -1,6 +1,31 @@
 
 # 📈 **Franz Framework – Full Changelog**
 
+## v2.3.4 — Tenant isolation and messaging execution boundaries
+
+### Tenant-aware messaging execution
+- Establish validated tenant context within delivery-scoped dependency-injection lifetimes across supported generic, Kafka, RabbitMQ, Azure Service Bus, Azure Event Hubs, Outbox and MassTransit Kafka paths.
+- Ensure tenant execution context cleanup on success, exception and cancellation paths.
+- Derive outbound tenant/domain metadata from validated execution context and remove stale domain metadata.
+- Resolve Outbox persistence and dispatch services from a fresh scope per stored message.
+- Provide a scoped-handler MassTransit Kafka overload; fail closed for the legacy captured-handler overload when tenant-aware processing is enabled.
+- Add lifecycle, failure, concurrency, context-cleanup and metadata-propagation coverage.
+
+### Relational tenant isolation
+- Qualify framework-managed tenant isolation contracts against PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23.
+- Verify tenant-scoped reads/writes, fail-closed behavior without tenant context, ownership immutability, cross-tenant write rejection, EF Core set-based update/delete filtering and repository bulk-update protections.
+- Document that raw SQL, stored procedures, direct connections, provider-native bulk APIs and deliberate filter bypasses require explicit tenant enforcement.
+- Keep non-relational Cosmos DB and MongoDB behavior outside the relational provider qualification.
+
+### Package baseline and documentation
+- Set shared package version to 2.3.4 and file version to 2.3.4.0; retain assembly version 2.3.0.0.
+- Preserve existing root and package manuals and extend relevant guides with release-specific contracts and limitations.
+- NuGet publication remains a separate release operation after CI and release checks pass.
+
+---
+
+
+
 ## Unreleased — Multi-Tenancy Security Hardening
 
 ### HTTP membership authorization
