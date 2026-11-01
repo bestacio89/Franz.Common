@@ -39,6 +39,17 @@ public class FranzDispatcherTests
         => Task.FromResult($"Handled:{command.Input}");
   }
 
+  public sealed class CancellationAwareCommandHandler : ICommandHandler<TestCommand, string>
+  {
+    public CancellationToken ReceivedToken { get; private set; }
+
+    public Task<string> Handle(TestCommand command, CancellationToken cancellationToken)
+    {
+      ReceivedToken = cancellationToken;
+      return Task.FromCanceled<string>(cancellationToken);
+    }
+  }
+
   public class TestVoidCommandHandler : ICommandHandler<TestVoidCommand>
   {
     public bool Executed { get; private set; }
@@ -177,6 +188,41 @@ public class FranzDispatcherTests
     // Act & Assert
     await FluentActions.Awaiting(() => dispatcher.SendAsync((ICommand<string>)null!))
         .Should().ThrowAsync<ArgumentNullException>();
+  }
+
+  [Fact]
+  public async Task SendAsync_PropagatesCancellationTokenToCommandHandler()
+  {
+    var handler = new CancellationAwareCommandHandler();
+    var services = new ServiceCollection();
+    services.AddSingleton<ICommandHandler<TestCommand, string>>(handler);
+    using var provider = services.BuildServiceProvider();
+    var dispatcher = new FranzDispatcher(provider);
+    using var cancellation = new CancellationTokenSource();
+    cancellation.Cancel();
+
+    await Assert.ThrowsAnyAsync<OperationCanceledException>(
+      () => dispatcher.SendAsync(new TestCommand("cancel"), cancellation.Token));
+
+    Assert.Equal(cancellation.Token, handler.ReceivedToken);
+  }
+
+  [Fact]
+  public async Task SendAsync_ConcurrentDispatch_UsesThreadSafeInvokerCache()
+  {
+    var services = new ServiceCollection();
+    services.AddTransient<ICommandHandler<TestCommand, string>, TestCommandHandler>();
+    using var provider = services.BuildServiceProvider();
+    var dispatcher = new FranzDispatcher(provider);
+
+    var results = await Task.WhenAll(
+      Enumerable.Range(0, 512)
+        .Select(index => dispatcher.SendAsync(new TestCommand(index.ToString()))));
+
+    Assert.Equal(512, results.Length);
+    Assert.Equal(
+      Enumerable.Range(0, 512).Select(index => $"Handled:{index}"),
+      results);
   }
 
   #endregion
