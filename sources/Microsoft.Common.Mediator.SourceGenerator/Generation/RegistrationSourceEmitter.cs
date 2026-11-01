@@ -39,15 +39,41 @@ internal static class FranzMediatorGeneratedRegistration
         ArgumentNullException.ThrowIfNull(services);
 ");
 
-    var registeredKeys = new HashSet<string>();
+    var registeredHandlers = new HashSet<string>();
+    var registeredInvokers = new HashSet<string>();
 
     foreach (var handler in handlers)
     {
-      var key = $"{handler.ServiceType}|{handler.ImplementationType}";
-      if (!registeredKeys.Add(key))
+      var registrationKey = $"{handler.ServiceType}|{handler.ImplementationType}";
+      if (registeredHandlers.Add(registrationKey))
+      {
+        builder.AppendLine(
+            $"        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof({handler.ServiceType}), typeof({handler.ImplementationType})));");
+      }
+
+      var invokerKey = $"{handler.HandlerKind}|{handler.RequestType}|{handler.ResponseType}";
+      if (!registeredInvokers.Add(invokerKey))
         continue;
 
-      builder.AppendLine($"        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof({handler.ServiceType}), typeof({handler.ImplementationType})));");
+      switch (handler.HandlerKind)
+      {
+        case "Command":
+          builder.AppendLine(
+              $"        GeneratedMediatorInvokerRegistry.RegisterCommand<{handler.RequestType}, {handler.ResponseType}>();");
+          break;
+        case "VoidCommand":
+          builder.AppendLine(
+              $"        GeneratedMediatorInvokerRegistry.RegisterVoidCommand<{handler.RequestType}>();");
+          break;
+        case "Query":
+          builder.AppendLine(
+              $"        GeneratedMediatorInvokerRegistry.RegisterQuery<{handler.RequestType}, {handler.ResponseType}>();");
+          break;
+        case "Event":
+          builder.AppendLine(
+              $"        GeneratedMediatorInvokerRegistry.RegisterEvent<{handler.RequestType}>();");
+          break;
+      }
     }
 
     builder.AppendLine(@"    }
