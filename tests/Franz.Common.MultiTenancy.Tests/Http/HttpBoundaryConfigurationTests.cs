@@ -1,6 +1,7 @@
 using System.Net;
 using Franz.Common.Http.Extensions;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,7 +21,7 @@ public sealed class HttpBoundaryConfigurationTests
 
         using var provider = services.BuildServiceProvider();
         var policy = provider.GetRequiredService<IOptions<CorsOptions>>()
-            .Value.GetPolicy(CorsOptions.DefaultPolicyName);
+            .Value.GetPolicy(new CorsOptions().DefaultPolicyName);
 
         Assert.NotNull(policy);
         Assert.Empty(policy.Origins);
