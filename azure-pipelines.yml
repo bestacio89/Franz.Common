@@ -50,6 +50,16 @@ stages:
   dependsOn: Build
   jobs:
 
+  - job: framework_architecture_tests
+    displayName: Framework Architecture Tests
+    steps:
+    - download: current
+      artifact: drop
+    - script: |
+        dotnet test tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
+      displayName: Run Framework Architecture Tests
+
   # ---------------- UNIT / CORE ----------------
   - job: business_tests
     displayName: Business Tests
