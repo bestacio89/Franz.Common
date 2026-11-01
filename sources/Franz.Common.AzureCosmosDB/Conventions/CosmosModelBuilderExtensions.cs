@@ -37,7 +37,11 @@ public static class CosmosModelBuilderExtensions
 
                 // Cosmos partition keys support string, numeric and Boolean values.
                 // Preserve the framework Guid contract and serialize it as a string.
-                builder.Property<Guid>(nameof(ITenantEntity.TenantId)).HasConversion<string>();
+                builder.Property<Guid>(nameof(ITenantEntity.TenantId))
+                    .HasConversion<string>()
+                    // Cosmos uses its native _etag for optimistic concurrency. TenantId is
+                    // already enforced by the partition key and must not be an EF concurrency token.
+                    .IsConcurrencyToken(false);
 
                 if (hasCustomPartitionKey)
                 {
