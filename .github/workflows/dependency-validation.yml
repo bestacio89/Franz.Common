@@ -80,7 +80,9 @@ jobs:
           set -Eeuo pipefail
           package="$(find sources/Franz.Common.Mediator/bin/Release -maxdepth 1 -name 'Franz.Common.Mediator.*.nupkg' -print -quit)"
           test -n "$package"
-          unzip -Z1 "$package" | grep -Fx 'analyzers/dotnet/cs/Franz.Common.Mediator.SourceGenerator.dll'
+          package_files="$(unzip -Z1 "$package")"
+          grep -Fx 'analyzers/dotnet/cs/Franz.Common.Mediator.SourceGenerator.dll' <<< "$package_files"
+          grep -Fx 'analyzers/dotnet/cs/Microsoft.CodeAnalysis.CSharp.dll' <<< "$package_files"
 
       - name: Publish and execute Native AOT mapper smoke test
         run: |
