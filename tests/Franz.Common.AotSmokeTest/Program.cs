@@ -59,6 +59,14 @@ public static class Program
         if (!values.SequenceEqual(new[] { 1, 2, 3 }))
             return 7;
 
+        var generatedServices = new ServiceCollection();
+        generatedServices.AddFranzMediatorV2(handlerAssembly: typeof(AotCommandHandler).Assembly);
+        using var generatedProvider = generatedServices.BuildServiceProvider();
+        using var generatedScope = generatedProvider.CreateScope();
+        var generatedDispatcher = generatedScope.ServiceProvider.GetRequiredService<IDispatcher>();
+        if (await generatedDispatcher.SendAsync<int>(new AotQuery(10)) != 20)
+            return 9;
+
         return 0;
     }
 }
