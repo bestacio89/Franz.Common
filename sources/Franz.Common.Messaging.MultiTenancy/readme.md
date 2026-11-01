@@ -256,3 +256,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ## 2.3.4 delivery execution boundary
 
 Supported tenant-aware messaging paths establish validated tenant context within a delivery-scoped DI lifetime and clear the execution state when processing exits, including failure and cancellation. Outbound tenant/domain metadata must be derived from validated execution context, not trusted from stale message metadata. Producer authorization and tenant validation remain required; message headers alone are not authorization. See the [messaging execution lifecycle](../../docs/multitenancy-execution-lifecycle.md) for transport-specific behavior and limitations.
+
+
+## Delivery execution boundary (2.3.4)
+
+Supported tenant-aware messaging paths establish validated tenant context within a delivery-scoped DI lifetime and clear the execution state when processing exits, including failure and cancellation. Outbound tenant/domain metadata must be derived from validated execution context, not trusted from stale message metadata. Producer authorization and tenant validation remain required; message headers alone are not authorization. See the [messaging execution lifecycle](../../docs/multitenancy-execution-lifecycle.md) for transport-specific behavior and limitations.

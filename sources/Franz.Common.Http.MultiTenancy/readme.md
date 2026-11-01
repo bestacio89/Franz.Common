@@ -238,3 +238,8 @@ For authenticated principals, the HTTP tenant middleware requires an application
 ## 2.3.4 request resolution is not authorization
 
 Tenant resolution from a host, route, claim, or header identifies a candidate tenant; it does not establish membership or authorize access by itself. For authenticated principals, register and implement `ITenantRequestAuthorizer`; absent registration or denied membership must fail closed. A tenant identifier supplied by the caller is not membership proof. See the [tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md) for the broader framework boundary.
+
+
+## Request resolution is not authorization (2.3.4)
+
+Tenant resolution from a host, route, claim, or header identifies a candidate tenant; it does not establish membership or authorize access by itself. For authenticated principals, register and implement `ITenantRequestAuthorizer`; absent registration or denied membership must fail closed. A tenant identifier supplied by the caller is not membership proof. See the [tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md) for the broader framework boundary.
