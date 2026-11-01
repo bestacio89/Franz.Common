@@ -79,6 +79,23 @@ public sealed class HttpErrorContractTests
     }
 
     [Fact]
+    public async Task GlobalExceptionHandler_MapsFunctionalExceptionTo400()
+    {
+        var handler = new FranzGlobalExceptionHandler(
+            NullLogger<FranzGlobalExceptionHandler>.Instance,
+            new TestHostEnvironment(Environments.Production));
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+
+        await handler.TryHandleAsync(
+            context,
+            new FunctionalException("Invalid operation input."),
+            CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+    }
+
+    [Fact]
     public async Task GlobalExceptionHandler_MapsValidationExceptionTo400WithStructuredErrors()
     {
         var environment = new TestHostEnvironment(Environments.Production);
