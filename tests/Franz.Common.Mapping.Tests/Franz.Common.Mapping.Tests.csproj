@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.Mapping\Franz.Common.Mapping.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Mapping.Generators\Franz.Common.Mapping.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

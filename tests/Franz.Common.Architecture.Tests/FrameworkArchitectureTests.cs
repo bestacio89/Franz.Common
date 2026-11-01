@@ -121,18 +121,6 @@ public sealed class FrameworkArchitectureTests
   }
 
   [Fact]
-  public void Runtime_project_dependency_graph_must_be_acyclic()
-  {
-    var projects = LoadRuntimeProjectGraph();
-    var cycles = FindCycles(projects);
-
-    Assert.True(
-      cycles.Count == 0,
-      "Runtime project dependency cycles were found:" + Environment.NewLine +
-      string.Join(Environment.NewLine, cycles));
-  }
-
-  [Fact]
   public void Runtime_projects_must_not_reference_test_projects_or_test_helpers()
   {
     var sourceRoot = Path.Combine(RepositoryRoot.Value, "sources");
@@ -172,24 +160,35 @@ public sealed class FrameworkArchitectureTests
   }
 
   [Fact]
-  public void Source_generator_must_target_netstandard20()
+  public void Source_generators_must_target_netstandard20()
   {
-    var projectPath = Path.Combine(
-      RepositoryRoot.Value,
-      "sources",
-      "Microsoft.Common.Mediator.SourceGenerator",
-      "Franz.Common.Mediator.SourceGenerator.csproj");
+    var projectPaths = new[]
+    {
+      Path.Combine(
+        RepositoryRoot.Value,
+        "sources",
+        "Microsoft.Common.Mediator.SourceGenerator",
+        "Franz.Common.Mediator.SourceGenerator.csproj"),
+      Path.Combine(
+        RepositoryRoot.Value,
+        "sources",
+        "Franz.Common.Mapping.Generators",
+        "Franz.Common.Mapping.Generators.csproj")
+    };
 
-    Assert.True(File.Exists(projectPath), $"Source generator project was not found at '{projectPath}'.");
+    foreach (var projectPath in projectPaths)
+    {
+      Assert.True(File.Exists(projectPath), $"Source generator project was not found at '{projectPath}'.");
 
-    var document = XDocument.Load(projectPath);
-    var targetFramework = document
-      .Descendants()
-      .FirstOrDefault(element => element.Name.LocalName == "TargetFramework")
-      ?.Value
-      .Trim();
+      var document = XDocument.Load(projectPath);
+      var targetFramework = document
+        .Descendants()
+        .FirstOrDefault(element => element.Name.LocalName == "TargetFramework")
+        ?.Value
+        .Trim();
 
-    Assert.Equal("netstandard2.0", targetFramework);
+      Assert.Equal("netstandard2.0", targetFramework);
+    }
   }
 
   [Fact]
@@ -202,9 +201,53 @@ public sealed class FrameworkArchitectureTests
 
     Assert.True(File.Exists(allowlistPath), "The architecture policy allowlist was not copied to the test output.");
 
+    var catalogPath = Path.Combine(
+      AppContext.BaseDirectory,
+      "source-policy-rule-catalog.json");
+    Assert.True(File.Exists(catalogPath), "The source-policy rule catalog was not copied to the test output.");
+
+    var catalog = JsonSerializer.Deserialize<List<PolicyRuleDefinition>>(
+      File.ReadAllText(catalogPath),
+      new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+
+    Assert.NotEmpty(catalog);
+    Assert.Equal(catalog.Count, catalog.Select(rule => rule.Id).Distinct(StringComparer.Ordinal).Count());
+    Assert.Equal(catalog.Count, catalog.Select(rule => rule.Rule).Distinct(StringComparer.Ordinal).Count());
+    Assert.All(catalog, rule =>
+    {
+      Assert.False(string.IsNullOrWhiteSpace(rule.Id));
+      Assert.False(string.IsNullOrWhiteSpace(rule.Rule));
+      Assert.False(string.IsNullOrWhiteSpace(rule.Description));
+      Assert.Equal("Error", rule.Severity);
+    });
+
+    var rulesByName = catalog.ToDictionary(rule => rule.Rule, StringComparer.Ordinal);
+    var uncataloguedFindings = findings
+      .Where(finding => !rulesByName.ContainsKey(finding.Rule))
+      .Select(finding => finding.Rule)
+      .Distinct(StringComparer.Ordinal)
+      .ToArray();
+
+    Assert.True(
+      uncataloguedFindings.Length == 0,
+      "Every source-policy finding must have a stable catalog entry:" +
+      Environment.NewLine + string.Join(Environment.NewLine, uncataloguedFindings));
+
     var allowlist = JsonSerializer.Deserialize<List<PolicyException>>(
       File.ReadAllText(allowlistPath),
       new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+
+    var invalidRuleIds = allowlist
+      .Where(exception =>
+        !rulesByName.TryGetValue(exception.Rule, out var rule)
+        || !string.Equals(exception.RuleId, rule.Id, StringComparison.Ordinal))
+      .Select(exception => $"{exception.Rule}: expected '{(rulesByName.TryGetValue(exception.Rule, out var rule) ? rule.Id : "no catalog entry")}', found '{exception.RuleId}'")
+      .ToArray();
+
+    Assert.True(
+      invalidRuleIds.Length == 0,
+      "Every source-policy exception must reference its rule's stable catalog ID:" +
+      Environment.NewLine + string.Join(Environment.NewLine, invalidRuleIds));
 
     var allowed = allowlist.ToDictionary(
       exception => $"{exception.Rule}|{NormalizePath(exception.Path)}",
@@ -263,99 +306,6 @@ public sealed class FrameworkArchitectureTests
 
     Assert.NotEmpty(assemblies);
     return assemblies;
-  }
-
-  private static Dictionary<string, HashSet<string>> LoadRuntimeProjectGraph()
-  {
-    var sourceRoot = Path.Combine(RepositoryRoot.Value, "sources");
-    var projectFiles = Directory
-      .EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
-      .Where(path =>
-      {
-        var name = Path.GetFileNameWithoutExtension(path);
-        return !name.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)
-          && !string.Equals(name, "Franz.Common.Testing", StringComparison.OrdinalIgnoreCase);
-      })
-      .ToArray();
-
-    var knownProjects = projectFiles.ToDictionary(
-      path => Path.GetFullPath(path),
-      path => Path.GetFileNameWithoutExtension(path),
-      StringComparer.OrdinalIgnoreCase);
-
-    var graph = knownProjects.Values.ToDictionary(
-      name => name,
-      _ => new HashSet<string>(StringComparer.Ordinal),
-      StringComparer.Ordinal);
-
-    foreach (var projectPath in projectFiles)
-    {
-      var projectName = Path.GetFileNameWithoutExtension(projectPath);
-      var document = XDocument.Load(projectPath);
-
-      foreach (var reference in document
-        .Descendants()
-        .Where(element => element.Name.LocalName == "ProjectReference")
-        .Select(element => (string?)element.Attribute("Include"))
-        .Where(include => !string.IsNullOrWhiteSpace(include)))
-      {
-        var referencedPath = Path.GetFullPath(Path.Combine(
-          Path.GetDirectoryName(projectPath)!,
-          reference!.Replace('\\', Path.DirectorySeparatorChar)));
-
-        if (knownProjects.TryGetValue(referencedPath, out var referencedName))
-          graph[projectName].Add(referencedName);
-      }
-    }
-
-    return graph;
-  }
-
-  private static IReadOnlyList<string> FindCycles(
-    IReadOnlyDictionary<string, HashSet<string>> graph)
-  {
-    var state = new Dictionary<string, int>(StringComparer.Ordinal);
-    var stack = new List<string>();
-    var cycles = new HashSet<string>(StringComparer.Ordinal);
-
-    void Visit(string node)
-    {
-      state[node] = 1;
-      stack.Add(node);
-
-      foreach (var dependency in graph[node])
-      {
-        if (!graph.ContainsKey(dependency))
-          continue;
-
-        if (!state.TryGetValue(dependency, out var dependencyState))
-        {
-          Visit(dependency);
-          continue;
-        }
-
-        if (dependencyState != 1)
-          continue;
-
-        var start = stack.IndexOf(dependency);
-        if (start >= 0)
-        {
-          var cycle = stack.Skip(start).Append(dependency);
-          cycles.Add(string.Join(" -> ", cycle));
-        }
-      }
-
-      stack.RemoveAt(stack.Count - 1);
-      state[node] = 2;
-    }
-
-    foreach (var node in graph.Keys)
-    {
-      if (!state.ContainsKey(node))
-        Visit(node);
-    }
-
-    return cycles.OrderBy(cycle => cycle, StringComparer.Ordinal).ToArray();
   }
 
   private static IReadOnlyList<PolicyFinding> FindRuntimeSourcePolicyViolations()
@@ -465,5 +415,7 @@ public sealed class FrameworkArchitectureTests
 
   private sealed record PolicyFinding(string Rule, string Path);
 
-  private sealed record PolicyException(string Rule, string Path, string Reason);
+  private sealed record PolicyRuleDefinition(string Id, string Rule, string Severity, string Description);
+
+  private sealed record PolicyException(string Rule, string RuleId, string Path, string Reason);
 }

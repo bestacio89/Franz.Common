@@ -1,0 +1,50 @@
+[
+  {
+    "id": "SRC-001",
+    "rule": "DYNAMIC",
+    "severity": "Error",
+    "description": "Runtime dynamic dispatch is prohibited in framework runtime packages."
+  },
+  {
+    "id": "SRC-002",
+    "rule": "ACTIVATOR",
+    "severity": "Error",
+    "description": "Runtime Activator-based construction requires an exact, reviewed exception."
+  },
+  {
+    "id": "SRC-003",
+    "rule": "GENERIC_REFLECTION",
+    "severity": "Error",
+    "description": "Runtime generic reflection construction or invocation requires an exact, reviewed exception."
+  },
+  {
+    "id": "SRC-004",
+    "rule": "ASSEMBLY_SCAN",
+    "severity": "Error",
+    "description": "Runtime assembly enumeration requires an exact, reviewed exception."
+  },
+  {
+    "id": "SEC-001",
+    "rule": "QUERY_FILTER_BYPASS",
+    "severity": "Error",
+    "description": "Bypassing EF Core query filters requires an exact, reviewed exception."
+  },
+  {
+    "id": "SEC-002",
+    "rule": "RAW_SQL",
+    "severity": "Error",
+    "description": "Raw SQL APIs require an exact, reviewed exception and tenant-safety review."
+  },
+  {
+    "id": "GOV-001",
+    "rule": "TEST_PROJECT_IN_SOURCES",
+    "severity": "Error",
+    "description": "Test projects must remain outside runtime source projects."
+  },
+  {
+    "id": "GOV-002",
+    "rule": "TEST_HELPER_IN_RUNTIME",
+    "severity": "Error",
+    "description": "Test-only helpers must not leak into runtime packages."
+  }
+]

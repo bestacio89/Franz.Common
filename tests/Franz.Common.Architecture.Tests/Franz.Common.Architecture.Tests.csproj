@@ -33,6 +33,7 @@
 
   <ItemGroup>
     <None Include="architecture-policy-allowlist.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="source-policy-rule-catalog.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
