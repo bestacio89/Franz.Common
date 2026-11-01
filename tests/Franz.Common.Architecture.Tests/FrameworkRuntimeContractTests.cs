@@ -5,6 +5,7 @@ using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Hosting;
 using Franz.Common.Messaging.Storage;
+using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
@@ -152,10 +153,13 @@ public sealed class FrameworkRuntimeContractTests
     Assert.All(methods, method =>
     {
       var returnType = method.ReturnType;
+      var genericReturnType = returnType.IsGenericType
+        ? returnType.GetGenericTypeDefinition()
+        : null;
       var isAsync = returnType == typeof(Task)
         || returnType == typeof(ValueTask)
-        || returnType.IsGenericType && returnType.GetGenericTypeDefinition() is var genericType
-          && (genericType == typeof(Task<>) || genericType == typeof(ValueTask<>));
+        || genericReturnType == typeof(Task<>)
+        || genericReturnType == typeof(ValueTask<>);
       Assert.True(isAsync, $"{contract.Name}.{methodName} must remain asynchronous.");
       Assert.Contains(method.GetParameters(), parameter =>
         parameter.ParameterType == typeof(CancellationToken));
