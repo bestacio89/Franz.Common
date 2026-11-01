@@ -47,7 +47,7 @@ public sealed class HttpBoundaryConfigurationTests
 
         Assert.NotNull(policy);
         Assert.Equal(
-            ["https://app.example.test", "https://admin.example.test"],
+            new[] { "https://app.example.test", "https://admin.example.test" },
             policy.Origins);
         Assert.True(policy.SupportsCredentials);
         Assert.False(policy.AllowAnyOrigin);
@@ -81,7 +81,8 @@ public sealed class HttpBoundaryConfigurationTests
         using var provider = services.BuildServiceProvider();
         var options = provider.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value;
 
-        Assert.NotEmpty(options.KnownProxies.Concat(options.KnownNetworks));
+        Assert.NotEmpty(options.KnownProxies);
+        Assert.NotEmpty(options.KnownNetworks);
         Assert.Equal(
             ForwardedHeaders.XForwardedFor |
             ForwardedHeaders.XForwardedProto |
