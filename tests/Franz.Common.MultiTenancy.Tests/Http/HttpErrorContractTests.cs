@@ -90,6 +90,12 @@ public sealed class HttpErrorContractTests
         using var provider = services.BuildServiceProvider();
         var strategies = provider.GetServices<IErrorResponseStrategy>();
 
+        Assert.Contains(strategies, strategy => strategy is BadRequestErrorResponseStrategy);
+        Assert.Contains(strategies, strategy => strategy is ForbiddenErrorResponseStrategy);
+        Assert.Contains(strategies, strategy => strategy is NotFoundErrorResponseStrategy);
+        Assert.Contains(strategies, strategy => strategy is PreconditionFailedErrorResponseStrategy);
+        Assert.Contains(strategies, strategy => strategy is UnauthorizedErrorResponseStrategy);
+        Assert.Contains(strategies, strategy => strategy is BusinessErrorResponseStrategy);
         Assert.Contains(strategies, strategy => strategy is DefaultErrorResponseStrategy);
         Assert.NotNull(provider.GetRequiredService<ExceptionFilter>());
     }
