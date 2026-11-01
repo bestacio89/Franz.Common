@@ -3,6 +3,7 @@ using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.Repositories;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
+using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
