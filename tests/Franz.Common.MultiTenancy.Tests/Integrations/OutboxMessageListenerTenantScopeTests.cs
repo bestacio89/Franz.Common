@@ -1,4 +1,5 @@
 using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Hosting.Listeners;
@@ -19,7 +20,8 @@ public sealed class OutboxMessageListenerTenantScopeTests
     {
         var stored = new StoredMessage
         {
-            Body = "{}"
+            Body = "{}",
+            MessageType = typeof(TestEvent).AssemblyQualifiedName
         };
 
         var messageStore = Substitute.For<IMessageStore>();
@@ -32,6 +34,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
 
         var dispatcher = Substitute.For<IDispatcher>();
         var serializer = Substitute.For<IMessageSerializer>();
+        serializer.Deserialize("{}", typeof(TestEvent)).Returns(new TestEvent());
         var initializer = new TrackingTenantMessageContextInitializer();
 
         var services = new ServiceCollection();
@@ -44,12 +47,23 @@ public sealed class OutboxMessageListenerTenantScopeTests
         services.AddSingleton<ITenantMessageContextInitializer>(initializer);
 
         using var provider = services.BuildServiceProvider();
+        var messageContextAccessor = provider.GetRequiredService<MessageContextAccessor>();
+        dispatcher.PublishEventAsync(Arg.Any<IEvent>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                Assert.NotNull(messageContextAccessor.Current);
+                return Task.CompletedTask;
+            });
         var listener = new OutboxMessageListener(
             provider.GetRequiredService<IServiceScopeFactory>(),
             provider.GetRequiredService<ILogger<OutboxMessageListener>>());
 
         using var cancellation = new CancellationTokenSource();
-        listener.OnMessageReceivedAsync = _ => Task.CompletedTask;
+        listener.OnMessageReceivedAsync = _ =>
+        {
+            messageContextAccessor.Clear();
+            return Task.CompletedTask;
+        };
         messageStore.MarkAsSentAsync(stored.Id, Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
@@ -65,8 +79,10 @@ public sealed class OutboxMessageListenerTenantScopeTests
         Assert.Equal(1, initializer.DisposeCount);
         await messageStore.Received(1).MarkAsSentAsync(stored.Id, Arg.Any<CancellationToken>());
         await inboxStore.Received(1).MarkProcessedAsync(stored.Id, Arg.Any<CancellationToken>());
-        Assert.Null(provider.GetRequiredService<MessageContextAccessor>().Current);
+        Assert.Null(messageContextAccessor.Current);
     }
+
+    private sealed class TestEvent : IEvent { }
 
     private sealed class TrackingTenantMessageContextInitializer : ITenantMessageContextInitializer
     {
