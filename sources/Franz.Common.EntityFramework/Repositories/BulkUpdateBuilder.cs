@@ -73,6 +73,16 @@ public sealed class BulkUpdateBuilder<TEntity> where TEntity : class
             ? conversion.Operand
             : selector.Body;
 
+        if (isConcurrencyTrackedEntity &&
+            body is MethodCallExpression propertyCall &&
+            propertyCall.Method.DeclaringType == typeof(EF) &&
+            propertyCall.Method.Name == nameof(EF.Property) &&
+            propertyCall.Arguments.Count == 2 &&
+            propertyCall.Arguments[1] is ConstantExpression { Value: string propertyName } &&
+            propertyName == nameof(IConcurrencyTrackedEntity.ConcurrencyVersion))
+            throw new InvalidOperationException(
+                "Bulk updates cannot assign ConcurrencyVersion directly; the framework advances it automatically.");
+
         if (body is not MemberExpression member || member.Expression != selector.Parameters[0])
         {
             if (isTenantEntity)

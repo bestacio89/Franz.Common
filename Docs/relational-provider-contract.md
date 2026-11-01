@@ -13,8 +13,8 @@ The shared contract is linked into each real-engine test project. It is not an I
 | PostgreSQL | PostgreSQL 16 Testcontainers | Required | Persistence, migrations, provider registration |
 | MariaDB | MariaDB 11.4 Testcontainers | Required | Persistence lifecycle, migrations, transactions, registration |
 | MySQL | MySQL 8.4 Testcontainers | Required | Persistence lifecycle, migrations, transactions, SQL compatibility |
-| SQL Server | SQL Server 2022 Testcontainers | Required | Persistence, soft delete, database-isolation routing |
-| Oracle | Oracle Free 23 Testcontainers | Required | Connectivity, tenant/domain database routing |
+| SQL Server | SQL Server 2022 Testcontainers | Required | Persistence, migrations, soft delete, database-isolation routing |
+| Oracle | Oracle Free 23 Testcontainers | Required | Connectivity, migrations, tenant/domain database routing |
 
 Each test run must report the actual server image/version. A passing contract on one provider does not certify another provider.
 
@@ -38,7 +38,7 @@ The contract uses a dedicated table (`provider_contract_tenant_owned_entities`) 
 
 The shared contract is necessary, not sufficient. Each provider's CI qualification must also retain and pass its provider-specific suites for:
 
-1. Schema creation and migration application from an empty database, followed by an upgrade from the previous supported schema.
+1. Schema creation and migration application from an empty database, incremental upgrade, downgrade, re-application, and preservation of existing data.
 2. CRUD, key generation, auditing, soft-delete filters, and relationship/cascade behavior.
 3. Transaction commit, rollback, cancellation, and failure recovery.
 4. Repository AddRange, UpdateRange, DeleteRange, and SoftDeleteRange semantics.
@@ -53,7 +53,7 @@ A capability that is unsupported by a provider must be explicitly documented and
 
 EF Core global query filters constrain EF queries, including supported set-based operations that retain those filters. They do not secure arbitrary SQL, stored procedures, direct ADO.NET commands, provider-native bulk APIs, or connections that bypass the configured DbContext. Those paths require trusted tenant predicates or independent database enforcement and dedicated tests.
 
-The SaveChanges tenant ownership checks do not automatically run for direct EF Core `ExecuteUpdateAsync` calls because those operations bypass the change tracker and SaveChanges pipeline. The framework's `EntityRepository.ExecuteBulkUpdateAsync` uses `BulkUpdateBuilder<TEntity>` to reject direct assignments to `TenantId`; the shared contract verifies that protection and tenant-filtered affected-row behavior. Direct EF Core set-based calls remain a lower-level escape hatch and must not be used to mutate tenant ownership. They also bypass SaveChanges auditing and framework-managed concurrency-version advancement; use the framework repository operations when those guarantees are required. Database enforcement is required if applications must defend against code paths that bypass the framework repository.
+The SaveChanges tenant ownership checks do not automatically run for direct EF Core `ExecuteUpdateAsync` calls because those operations bypass the change tracker and SaveChanges pipeline. The framework's `EntityRepository.ExecuteBulkUpdateAsync` uses `BulkUpdateBuilder<TEntity>` to reject direct assignments to `TenantId`; the shared contract verifies that protection and tenant-filtered affected-row behavior. Direct EF Core set-based calls remain a lower-level escape hatch and must not be used to mutate tenant ownership. Database enforcement is required if applications must defend against code paths that bypass the framework repository.
 
 ## Non-relational providers
 
