@@ -1,5 +1,6 @@
 using Franz.Common.Errors;
 using Franz.Common.Http.Bootstrap.Exceptions;
+using Franz.Common.Mediator.Validation;
 using Franz.Common.Http.Errors;
 using Franz.Common.Http.Errors.Strategy;
 using Franz.Common.Http.Extensions;
@@ -48,6 +49,22 @@ public sealed class HttpErrorContractTests
     }
 
     [Fact]
+    public void ErrorResponseProvider_UsesValidationStrategyForBadRequest()
+    {
+        var environment = new TestHostEnvironment(Environments.Production);
+        var provider = new ErrorResponseProvider(environment);
+        var validationException = new ValidationException(
+            [new ValidationError("Name", "Name is required.")]);
+        var context = CreateExceptionContext(validationException);
+        var strategy = new ValidationErrorResponseStrategy();
+
+        var response = provider.PrepareResponse(context, strategy);
+
+        Assert.Contains("Name is required.", response.Message, StringComparison.Ordinal);
+        Assert.Equal(StatusCodes.Status400BadRequest, ((ObjectResult)context.Result!).StatusCode);
+    }
+
+    [Fact]
     public void AddErrors_RegistersDefaultStrategyAsFallback()
     {
         var services = new ServiceCollection();
@@ -59,6 +76,30 @@ public sealed class HttpErrorContractTests
 
         Assert.Contains(strategies, strategy => strategy is DefaultErrorResponseStrategy);
         Assert.NotNull(provider.GetRequiredService<ExceptionFilter>());
+    }
+
+    [Fact]
+    public async Task GlobalExceptionHandler_MapsValidationExceptionTo400WithStructuredErrors()
+    {
+        var environment = new TestHostEnvironment(Environments.Production);
+        var handler = new FranzGlobalExceptionHandler(
+            NullLogger<FranzGlobalExceptionHandler>.Instance,
+            environment);
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        var exception = new ValidationException(
+            [new ValidationError("Name", "Name is required.")]);
+
+        var handled = await handler.TryHandleAsync(context, exception, CancellationToken.None);
+
+        context.Response.Body.Position = 0;
+        using var reader = new StreamReader(context.Response.Body);
+        var response = await reader.ReadToEndAsync();
+
+        Assert.True(handled);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        Assert.Contains("\"errors\"", response, StringComparison.Ordinal);
+        Assert.Contains("Name is required.", response, StringComparison.Ordinal);
     }
 
     [Fact]
