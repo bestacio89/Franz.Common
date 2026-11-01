@@ -1,4 +1,4 @@
-﻿using Franz.Common.Mediator.Options;
+using Franz.Common.Mediator.Options;
 using Franz.Common.Mediator.Pipelines.Core;
 using System;
 using System.Threading;
@@ -35,7 +35,12 @@ namespace Franz.Common.Mediator.Pipelines.Transaction
       {
         if (ShouldRollback(ex))
         {
-          await _unitOfWork.RollbackAsync(cancellationToken);
+          // A cancelled request must not prevent rollback of its database transaction.
+          var rollbackToken = cancellationToken.IsCancellationRequested
+              ? CancellationToken.None
+              : cancellationToken;
+
+          await _unitOfWork.RollbackAsync(rollbackToken);
         }
 
         throw;
