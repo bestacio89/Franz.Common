@@ -125,31 +125,6 @@
     "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed."
   },
   {
-    "rule": "DYNAMIC",
-    "path": "sources/Franz.Common.EntityFramework/DbContextBase.cs",
-    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
-  },
-  {
-    "rule": "DYNAMIC",
-    "path": "sources/Franz.Common.Http.Documentation/Extensions/SwaggerGenOptionsExtensions.cs",
-    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
-  },
-  {
-    "rule": "DYNAMIC",
-    "path": "sources/Franz.Common.Mediator/Testing/TestDispatcher.cs",
-    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
-  },
-  {
-    "rule": "DYNAMIC",
-    "path": "sources/Franz.Common.Reflection/Extensions/HostBuilderExtensions.cs",
-    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
-  },
-  {
-    "rule": "DYNAMIC",
-    "path": "sources/Franz.Common.Reflection/ReflectionHelper.cs",
-    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
-  },
-  {
     "rule": "GENERIC_REFLECTION",
     "path": "sources/Franz.Common.Aras/Abstractions/Contexts/Implementations/ArasAggregateContextBase.cs",
     "reason": "Existing MakeGenericMethod-based provider or registration dispatch. Replacing it requires preserving the public provider contract and all supported closed-generic combinations."
