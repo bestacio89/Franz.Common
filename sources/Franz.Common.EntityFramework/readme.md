@@ -450,3 +450,10 @@ Example:
 ```
 
 All EF provider adapters use the shared `DatabaseTargetResolver`; adapters construct provider-specific connection strings only. Domain-based routing is an explicit deployment decision, not a compatibility fallback.
+
+
+## 2.3.4 tenant isolation and bulk-update contract
+
+The relational provider qualification covers tenant-scoped EF Core reads and writes, fail-closed behavior when tenant execution context is absent, tenant ownership immutability, cross-tenant mutation rejection, query-filter behavior for supported set-based operations, and the repository `ExecuteBulkUpdateAsync` contract. The named relational engines in the qualification are PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23.
+
+Do not treat EF Core global query filters as a complete database security boundary. Raw SQL, stored procedures, direct connections, provider-native bulk APIs, and deliberate filter bypasses need explicit tenant enforcement and tests. Cosmos DB and MongoDB are not included in this relational qualification. See the [relational provider contract](../../Docs/relational-provider-contract.md) and [tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md).
