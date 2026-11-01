@@ -104,7 +104,7 @@ public sealed class KafkaFailurePropagationTests
     observedTenants[messageA.Id].Should().Be(tenantA.Id);
     observedTenants[messageB.Id].Should().Be(tenantB.Id);
     accessors.Should().HaveCount(2);
-    accessors.Should().OnlyContain(accessor => accessor.Current is null);
+    Assert.All(accessors, accessor => Assert.Null(accessor.Current));
     await hostedService.StopAsync(CancellationToken.None);
   }
 
