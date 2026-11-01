@@ -45,7 +45,7 @@ A serialization utility library within the **Franz Framework** that simplifies J
 
 ## **Version Information**
 
-**Current Version:** v2.3.4
+**Current Version:** v2.3.5
 - Part of the private **Franz Framework** ecosystem.
 
 ---

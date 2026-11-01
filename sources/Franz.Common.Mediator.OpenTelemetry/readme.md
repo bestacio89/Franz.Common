@@ -28,7 +28,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 OpenTelemetry integration for the **Franz Framework**.
 This package provides **automatic distributed tracing** across applications using the Franz ecosystem, including Mediator pipelines, HTTP calls, and custom instrumentation.
 
-* **Current Version:** v2.3.4
+* **Current Version:** v2.3.5
 * Part of the private **Franz Framework** ecosystem.
 
 ---
