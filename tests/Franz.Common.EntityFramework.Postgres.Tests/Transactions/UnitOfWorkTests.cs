@@ -60,6 +60,31 @@ public sealed class UnitOfWorkTests(PostgresFixture fixture) : IClassFixture<Pos
     }
 
     [Fact]
+    public async Task DisposeSynchronously_RollsBackAnUncompletedTransaction()
+    {
+        var marker = $"uow-sync-dispose-{Guid.NewGuid():N}";
+
+        await using (var provider = (ServiceProvider)fixture.BuildServiceProvider())
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+            await context.Database.EnsureCreatedAsync();
+
+            using var unitOfWork = new EfUnitOfWork<TestDbContext>(context);
+            await unitOfWork.BeginAsync();
+            context.TestEntities.Add(new TestEntity { Name = marker });
+            await context.SaveChangesAsync();
+        }
+
+        await using var verifyProvider = (ServiceProvider)fixture.BuildServiceProvider();
+        await using var verifyScope = verifyProvider.CreateAsyncScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<TestDbContext>();
+
+        Assert.False(await verifyContext.TestEntities.IgnoreQueryFilters()
+            .AnyAsync(entity => entity.Name == marker));
+    }
+
+    [Fact]
     public async Task Begin_RejectsASecondActiveTransaction()
     {
         await using var provider = (ServiceProvider)fixture.BuildServiceProvider();

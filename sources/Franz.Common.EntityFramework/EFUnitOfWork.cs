@@ -7,7 +7,7 @@ namespace Franz.Common.EntityFramework;
 /// <summary>
 /// Coordinates EF Core changes and an optional database transaction for one unit of work.
 /// </summary>
-public class EfUnitOfWork<TDbContext> : IUnitOfWork, IAsyncDisposable
+public class EfUnitOfWork<TDbContext> : IUnitOfWork, IDisposable, IAsyncDisposable
     where TDbContext : DbContext
 {
     private readonly TDbContext _db;
@@ -123,6 +123,30 @@ public class EfUnitOfWork<TDbContext> : IUnitOfWork, IAsyncDisposable
     }
 
     /// <summary>
+    /// Synchronously rolls back any transaction left active when the owning scope is disposed.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+
+        var transaction = _transaction;
+        if (transaction is null)
+            return;
+
+        try
+        {
+            transaction.Rollback();
+        }
+        finally
+        {
+            ReleaseTransaction(transaction);
+        }
+    }
+
+    /// <summary>
     /// Rolls back any transaction left active when the owning scope is disposed.
     /// </summary>
     public async ValueTask DisposeAsync()
@@ -144,6 +168,14 @@ public class EfUnitOfWork<TDbContext> : IUnitOfWork, IAsyncDisposable
         {
             await ReleaseTransactionAsync(transaction);
         }
+    }
+
+    private void ReleaseTransaction(IDbContextTransaction transaction)
+    {
+        if (ReferenceEquals(_transaction, transaction))
+            _transaction = null;
+
+        transaction.Dispose();
     }
 
     private async ValueTask ReleaseTransactionAsync(IDbContextTransaction transaction)

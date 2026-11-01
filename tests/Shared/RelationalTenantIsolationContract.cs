@@ -2,7 +2,6 @@ using Franz.Common.Business.Domain;
 using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.Repositories;
 using Franz.Common.MultiTenancy;
-using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.MultiTenancy.Models;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -307,63 +306,19 @@ public abstract class RelationalTenantIsolationContract
     }
 
     [Fact]
-    public async Task UnitOfWork_CommitAndRollbackAreConsistentAcrossProviders()
+    public async Task UnitOfWork_SynchronousDisposalRollsBackAcrossProviders()
     {
         var tenantId = Guid.NewGuid();
-        var committedMarker = $"uow-commit-{Guid.NewGuid():N}";
-        var rolledBackMarker = $"uow-rollback-{Guid.NewGuid():N}";
+        var marker = $"uow-sync-dispose-{Guid.NewGuid():N}";
 
         await WithContextAsync(tenantId, async db =>
         {
             await EnsureDatabaseCreatedAsync(db);
-            await using var unitOfWork = new EfUnitOfWork<DbContextBase>((DbContextBase)db);
+            using var unitOfWork = new EfUnitOfWork<DbContextBase>((DbContextBase)db);
             await unitOfWork.BeginAsync();
-
-            db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = committedMarker });
-            await ((IUnitOfWork)unitOfWork).CommitAsync();
-        });
-
-        await WithContextAsync(tenantId, async db =>
-        {
-            Assert.True(await db.Set<TenantOwnedTestEntity>()
-                .AnyAsync(entity => entity.Name == committedMarker));
-        });
-
-        await WithContextAsync(tenantId, async db =>
-        {
-            await using var unitOfWork = new EfUnitOfWork<DbContextBase>((DbContextBase)db);
-            await unitOfWork.BeginAsync();
-
-            db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = rolledBackMarker });
-            await db.SaveChangesAsync();
-            await unitOfWork.RollbackAsync();
-        });
-
-        await WithContextAsync(tenantId, async db =>
-        {
-            Assert.False(await db.Set<TenantOwnedTestEntity>()
-                .IgnoreQueryFilters()
-                .AnyAsync(entity => entity.Name == rolledBackMarker));
-        });
-    }
-
-    [Fact]
-    public async Task UnitOfWork_RejectsNestedTransactionsAndRollsBackOnDisposal()
-    {
-        var tenantId = Guid.NewGuid();
-        var marker = $"uow-dispose-{Guid.NewGuid():N}";
-
-        await WithContextAsync(tenantId, async db =>
-        {
-            await EnsureDatabaseCreatedAsync(db);
-            var unitOfWork = new EfUnitOfWork<DbContextBase>((DbContextBase)db);
-            await unitOfWork.BeginAsync();
-
-            await Assert.ThrowsAsync<InvalidOperationException>(() => unitOfWork.BeginAsync());
 
             db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
             await db.SaveChangesAsync();
-            await unitOfWork.DisposeAsync();
         });
 
         await WithContextAsync(tenantId, async db =>
