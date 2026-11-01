@@ -36,17 +36,17 @@ public static class Program
             return 3;
 
         await dispatcher.SendAsync(new AotVoidCommand());
-        if (!scope.ServiceProvider.GetRequiredService<AotVoidCommandHandler>().Executed)
+        if (!((AotVoidCommandHandler)scope.ServiceProvider.GetRequiredService<ICommandHandler<AotVoidCommand>>()).Executed)
             return 4;
 
         var notification = new AotNotification();
         await dispatcher.PublishNotificationAsync(notification);
-        if (!scope.ServiceProvider.GetRequiredService<AotNotificationHandler>().Executed)
+        if (!((AotNotificationHandler)scope.ServiceProvider.GetRequiredService<INotificationHandler<AotNotification>>()).Executed)
             return 5;
 
         var @event = new AotEvent(DateTimeOffset.UtcNow);
         await dispatcher.PublishEventAsync(@event);
-        if (!scope.ServiceProvider.GetRequiredService<AotEventHandler>().Executed)
+        if (!((AotEventHandler)scope.ServiceProvider.GetRequiredService<IEventHandler<AotEvent>>()).Executed)
             return 6;
 
         var stream = (FranzDispatcher)dispatcher;
