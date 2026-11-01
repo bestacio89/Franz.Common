@@ -21,7 +21,7 @@
        downstream projects receive generated module registrations transitively. -->
   <Target Name="IncludeMediatorSourceGeneratorInPackage" BeforeTargets="_GetPackageFiles">
     <ItemGroup>
-      <None Include="$(MSBuildThisFileDirectory)..\Microsoft.Common.Mediator.SourceGenerator\bin\$(Configuration)\netstandard2.0\Franz.Common.Mediator.SourceGenerator.dll"
+      <None Include="$(MSBuildThisFileDirectory)..\Microsoft.Common.Mediator.SourceGenerator\bin\$(Configuration)\netstandard2.0\*.dll"
             Pack="true"
             PackagePath="analyzers/dotnet/cs"
             Visible="false" />
