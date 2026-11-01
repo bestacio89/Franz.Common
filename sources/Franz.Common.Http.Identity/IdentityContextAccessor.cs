@@ -9,14 +9,19 @@ namespace Franz.Common.Http.Identity;
 /// Reads user identity only from an authenticated principal and tenant/domain identity
 /// only from the validated tenant execution context.
 /// </summary>
-public sealed class IdentityContextAccessor : IIdentityContextAccessor
+public class IdentityContextAccessor : IIdentityContextAccessor
 {
     private readonly IHttpContextAccessor httpContextAccessor;
     private readonly ITenantExecutionContextAccessor? tenantExecutionContextAccessor;
 
+    public IdentityContextAccessor(IHttpContextAccessor httpContextAccessor)
+        : this(httpContextAccessor, null)
+    {
+    }
+
     public IdentityContextAccessor(
         IHttpContextAccessor httpContextAccessor,
-        ITenantExecutionContextAccessor? tenantExecutionContextAccessor = null)
+        ITenantExecutionContextAccessor? tenantExecutionContextAccessor)
     {
         this.httpContextAccessor = httpContextAccessor
             ?? throw new ArgumentNullException(nameof(httpContextAccessor));
