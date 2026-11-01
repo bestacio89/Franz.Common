@@ -17,7 +17,7 @@ public sealed class FrameworkArchitectureTests
   private static readonly Lazy<string> RepositoryRoot = new(FindRepositoryRoot);
   private static readonly Lazy<IReadOnlyList<Assembly>> RuntimeAssemblies = new(LoadRuntimeAssemblies);
   private static readonly Lazy<Architecture> ArchitectureModel = new(
-    () => new ArchLoader().LoadAssemblies(RuntimeAssemblies.Value).Build());
+    () => new ArchLoader().LoadAssemblies(RuntimeAssemblies.Value.ToArray()).Build());
 
   [Fact]
   public void Core_packages_must_not_depend_on_infrastructure_adapters()
