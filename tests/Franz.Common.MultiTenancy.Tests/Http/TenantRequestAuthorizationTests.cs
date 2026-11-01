@@ -69,6 +69,23 @@ public sealed class TenantRequestAuthorizationTests
     }
 
     [Fact]
+    public async Task Middleware_RejectsInvalidHostBeforeEstablishingExecutionContext()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Host = new HostString("invalid/path");
+        var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
+        var accessor = CreateExecutionAccessor(context);
+        var middleware = CreateMiddleware(tenant, accessor, new ServiceCollection().BuildServiceProvider());
+        var called = false;
+
+        await middleware.InvokeAsync(context, _ => { called = true; return Task.CompletedTask; });
+
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        Assert.False(called);
+        Assert.Null(accessor.Current);
+    }
+
+    [Fact]
     public async Task Middleware_RejectsMissingTenantWhenTenantIsRequired()
     {
         var context = new DefaultHttpContext();
