@@ -1,58 +1,258 @@
 # Franz.Common.Messaging.MultiTenancy
 
-Validated tenant execution context for Franz messaging producers and consumers.
+> Messaging and distributed integration for the Franz.Common framework on .NET 10.
 
-## Install
+## Overview
+
+The `Franz.Common.Messaging.MultiTenancy` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
 
 ```bash
-dotnet add package Franz.Common.Messaging.MultiTenancy --version 2.3.4
+dotnet add package Franz.Common.Messaging.MultiTenancy
 ```
 
-## Responsibilities
+## Design principles
 
-- Registers scoped tenant/domain accessors and ITenantMessageContextInitializer.
-- Registers tenant and domain message builders through AddMessagingMultitenancyContext.
-- Propagates tenant/domain headers only from validated execution context.
-- Removes stale domain metadata when the current context has no domain.
-- Resolves and validates inbound tenant metadata before consumer execution.
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
 
-## Registration
+## Usage and configuration
+
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+
+## Package-specific guide
+
+A library within the **Franz Framework** that adds multi-tenancy support to messaging workflows. This package provides tools for managing tenant and domain-specific messaging contexts, enabling seamless integration of multi-tenancy in distributed systems.
+
+---
+
+## **Features**
+
+* **Tenant Context Management**:
+
+  * `TenantContextAccessor` for handling tenant-specific data in messaging workflows.
+* **Domain Context Management**:
+
+  * `DomainContextAccessor` for managing domain-specific information during message processing.
+* **Resolvers**:
+
+  * `HeaderTenantResolver` and `HeaderDomainResolver` for resolving multi-tenancy metadata from message headers.
+  * `MessagePropertyTenantResolver` and `MessagePropertyDomainResolver` for resolving multi-tenancy metadata from message properties.
+* **Resolution Pipelines**:
+
+  * `DefaultTenantResolutionPipeline` and `DefaultDomainResolutionPipeline` to coordinate multiple resolvers in order.
+* **Middleware**:
+
+  * `TenantResolutionMiddleware` and `DomainResolutionMiddleware` for automatic resolution per message.
+* **Service Registration**:
+
+  * `ServiceCollectionExtensions` to simplify the setup of multi-tenancy messaging services.
+* **Message Builders**:
+
+  * `TenantMessageBuilder` and `DomainMessageBuilder` for constructing messages with tenant and domain data.
+
+---
+
+## **Version Information**
+
+* **Current Version:** v2.3.4
+* Part of the private **Franz Framework** ecosystem.
+
+---
+
+## **Dependencies**
+
+This package relies on:
+
+* **Franz.Common.Messaging**: Provides foundational messaging utilities and abstractions.
+* **Franz.Common.MultiTenancy**: Core utilities for tenant and domain management.
+
+---
+
+## **Installation**
+
+### **From Private Azure Feed**
+
+Since this package is hosted privately, configure your NuGet client:
+
+```bash
+dotnet nuget add source "https://your-private-feed-url" \
+  --name "AzurePrivateFeed" \
+  --username "YourAzureUsername" \
+  --password "YourAzurePassword" \
+  --store-password-in-clear-text
+```
+
+Install the package:
+
+```bash
+dotnet add package Franz.Common.Messaging.MultiTenancy --Version 1.3.1
+```
+
+---
+
+## **Usage**
+
+### **1. Register Multi-Tenancy Messaging Services**
+
+Use `ServiceCollectionExtensions` to register messaging multi-tenancy services:
 
 ```csharp
-services.AddMessagingMultitenancyContext();
+using Franz.Common.Messaging.MultiTenancy.Extensions;
+
+public class Startup
+{
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddFranzMessagingMultiTenancy();
+    }
+}
 ```
 
-The application must also register ITenantStore and ITenantMessageAuthorizer. Register ITenantValidator when additional application-specific validation is required.
+---
 
-## Producer contract
+### **2. Access Tenant and Domain Contexts**
 
-Message builders read ITenantExecutionContextAccessor. They do not trust arbitrary tenant IDs supplied by application payloads. A tenant header is emitted from validated tenant context; a domain header is emitted only when a validated domain is present.
+Leverage `TenantContextAccessor` and `DomainContextAccessor` to retrieve tenant and domain-specific data:
 
-## Consumer contract
+```csharp
+using Franz.Common.Messaging.MultiTenancy;
 
-ITenantMessageContextInitializer.BeginAsync:
+public class TenantService
+{
+    private readonly ITenantContextAccessor _tenantContextAccessor;
 
-1. Requires exactly one valid tenant identifier in message headers.
-2. Resolves the tenant from ITenantStore and requires active status.
-3. Invokes the optional ITenantValidator.
-4. Authorizes the producer through ITenantMessageAuthorizer.
-5. Validates that any supplied domain is verified and belongs to the resolved tenant.
-6. Initializes the scoped tenant execution accessor and returns an IAsyncDisposable that clears it.
+    public TenantService(ITenantContextAccessor tenantContextAccessor)
+    {
+        _tenantContextAccessor = tenantContextAccessor;
+    }
 
-The initializer supports ambient message context and an explicit Message argument. Custom implementations must implement the explicit-message overload to participate in transport integrations that pass the message directly. Its default interface implementation throws NotSupportedException: source compatibility is retained while unsupported execution fails closed.
+    public Guid? GetCurrentTenantId() => _tenantContextAccessor.GetCurrentTenantId();
+}
+```
 
-## Transport integrations
+```csharp
+using Franz.Common.Messaging.MultiTenancy;
 
-Tenant initialization is invoked automatically in generic messaging, Kafka, RabbitMQ, Azure Service Bus, Azure Event Hubs, Outbox and MassTransit Kafka consumer paths when registered. Each delivery must use its own DI scope. Tenant scope is disposed after the handler pipeline, including failure and cancellation.
+public class DomainService
+{
+    private readonly IDomainContextAccessor _domainContextAccessor;
 
-The MassTransit Kafka adapter's scoped-handler overload receives the per-delivery IServiceProvider. Its legacy captured-handler overload fails closed when tenant-aware processing is enabled.
+    public DomainService(IDomainContextAccessor domainContextAccessor)
+    {
+        _domainContextAccessor = domainContextAccessor;
+    }
 
-## Operational requirements
+    public Guid? GetCurrentDomainId() => _domainContextAccessor.GetCurrentDomainId();
+}
+```
 
-Tenant headers are untrusted transport input. Use authenticated broker identities, producer authorization and tenant-store validation. Do not treat a tenant header as proof that a producer may act for that tenant. Background jobs must re-enter through the same validation boundary and must not reuse an HTTP-scoped accessor.
+---
 
-Framework release line: **2.3.4**; target framework: net10.0.
+### **3. Automatic Tenant/Domain Resolution in Messaging Pipelines**
 
-See [messaging execution lifecycle](../../docs/multitenancy-execution-lifecycle.md) and [tenant isolation audit](../../Docs/tenant-isolation-boundary-audit.md).
+Enable middleware to resolve tenant and domain per-message:
 
-MIT License.
+```csharp
+using Franz.Common.Messaging.MultiTenancy.Middleware;
+
+public class MessagingPipeline
+{
+    public void Configure(IMessagePipelineBuilder pipeline)
+    {
+        pipeline.Use<TenantResolutionMiddleware>();
+        pipeline.Use<DomainResolutionMiddleware>();
+    }
+}
+```
+
+---
+
+### **4. Build Tenant and Domain Messages**
+
+Use `TenantMessageBuilder` and `DomainMessageBuilder` to create tenant and domain-aware messages:
+
+```csharp
+using Franz.Common.Messaging.MultiTenancy;
+
+var tenantMessage = new TenantMessageBuilder()
+    .WithTenantId(Guid.NewGuid())
+    .Build();
+
+var domainMessage = new DomainMessageBuilder()
+    .WithDomainId(Guid.NewGuid())
+    .Build();
+```
+
+---
+
+## **Integration with Franz Framework**
+
+The **Franz.Common.Messaging.MultiTenancy** package integrates seamlessly with:
+
+* **Franz.Common.Messaging**: Provides core messaging abstractions.
+* **Franz.Common.MultiTenancy**: Extends tenant and domain management capabilities into messaging workflows.
+* **Franz.Common.Http.MultiTenancy**: Aligns messaging and HTTP multi-tenancy under the same abstractions and contracts.
+
+---
+
+## **Contributing**
+
+This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
+
+1. Clone the repository. @ [https://github.com/bestacio89/Franz.Common/](https://github.com/bestacio89/Franz.Common/)
+2. Create a feature branch.
+3. Submit a pull request for review.
+
+---
+
+## **License**
+
+This library is licensed under the MIT License. See the `LICENSE` file for more details.
+
+---
+
+## **Changelog**
+
+### Version 1.2.65
+
+* Added `TenantContextAccessor` and `DomainContextAccessor` for managing tenant and domain contexts.
+* Introduced `TenantMessageBuilder` and `DomainMessageBuilder` for constructing tenant and domain-aware messages.
+* Integrated `ServiceCollectionExtensions` for streamlined multi-tenancy messaging setup.
+
+### Version 1.3
+
+* Upgraded to **.NET 9.0.8**
+* Added **new features and improvements**
+* Separated **business concepts** from **mediator concepts**
+* Now compatible with both the **in-house mediator** and **MediatR**
+
+### Version 1.3.1
+
+* Expanded **messaging multi-tenancy abstractions** to align with HTTP and core multi-tenancy:
+
+  * Added `HeaderTenantResolver` and `HeaderDomainResolver`.
+  * Added `MessagePropertyTenantResolver` and `MessagePropertyDomainResolver`.
+  * Introduced `DefaultTenantResolutionPipeline` and `DefaultDomainResolutionPipeline` to orchestrate resolvers.
+  * Added `TenantResolutionMiddleware` and `DomainResolutionMiddleware` for automatic resolution in messaging pipelines.
+* Enhanced `TenantContextAccessor` and `DomainContextAccessor` to fully implement the updated core contracts (`GetCurrentTenantId`, `SetCurrentTenantId`, etc.).
+* Extended `Message` with a `Properties` dictionary for application-level metadata.
+* Added `MessagePropertiesExtensions` for strongly-typed property access.
+* Improved **service registration** via `AddFranzMessagingMultiTenancy`.
+
+---
+
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
+
+
+## 2.3.4 tenant execution boundary notes
+
+Franz.Common 2.3.4 strengthens validated tenant-context propagation and execution-scope cleanup across supported tenant-aware messaging paths. The exact behavior depends on this package's integration and registration path; consult the central [messaging execution lifecycle](../../docs/multitenancy-execution-lifecycle.md) and [tenant-isolation boundary audit](../../Docs/tenant-isolation-boundary-audit.md) before relying on a specific guarantee. Framework-level tenant filters do not automatically protect arbitrary raw SQL, provider-native bulk APIs, or deliberate query-filter bypasses; those paths require explicit tenant enforcement.
