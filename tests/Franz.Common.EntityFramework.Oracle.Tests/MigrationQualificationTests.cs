@@ -62,7 +62,7 @@ public sealed class MigrationQualificationTests(OracleFixture database) : IClass
 
     private static Task<int> GetDescriptionColumnCountAsync(TestDbContext context)
         => context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) AS \"Value\" FROM USER_TAB_COLUMNS " +
+            "SELECT CAST(COUNT(*) AS NUMBER(10)) AS \"Value\" FROM USER_TAB_COLUMNS " +
             "WHERE UPPER(TABLE_NAME) = UPPER('provider_migration_qualification') " +
             "AND UPPER(COLUMN_NAME) = UPPER('Description')")
             .SingleAsync();

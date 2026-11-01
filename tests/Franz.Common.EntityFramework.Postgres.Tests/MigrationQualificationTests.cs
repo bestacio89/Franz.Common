@@ -63,7 +63,7 @@ public sealed class MigrationQualificationTests(PostgresFixture database) : ICla
 
     private static Task<int> GetDescriptionColumnCountAsync(TestDbContext context)
         => context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) AS \"Value\" FROM information_schema.columns " +
+            "SELECT CAST(COUNT(*) AS integer) AS \"Value\" FROM information_schema.columns " +
             "WHERE table_schema = current_schema() AND table_name = 'provider_migration_qualification' " +
             "AND column_name = 'Description'").SingleAsync();
 
