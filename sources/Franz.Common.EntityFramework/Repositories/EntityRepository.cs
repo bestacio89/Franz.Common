@@ -1,6 +1,7 @@
 using Franz.Common.Business.Domain;
 using Franz.Common.Business.Repositories;
 using Franz.Common.Errors;
+using Franz.Common.EntityFramework.Auditing;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
@@ -14,10 +15,12 @@ public class EntityRepository<TDbContext, TEntity, TId>
     where TEntity : Entity<TId>
 {
   protected readonly TDbContext DbContext;
+  private readonly ICurrentUserService? _currentUserService;
 
-  public EntityRepository(TDbContext dbContext)
+  public EntityRepository(TDbContext dbContext, ICurrentUserService? currentUserService = null)
   {
     DbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+    _currentUserService = currentUserService;
   }
 
   public async Task<TEntity> GetByIdAsync(TId id, CancellationToken cancellationToken = default)
@@ -78,6 +81,10 @@ public class EntityRepository<TDbContext, TEntity, TId>
     if (!update.HasAssignments)
       throw new InvalidOperationException("A bulk update must define at least one property assignment.");
 
+    var modifiedAt = DateTimeOffset.UtcNow;
+    var modifiedBy = _currentUserService?.UserId ?? "system";
+    update.SetFrameworkProperty(entity => entity.LastModifiedDate, modifiedAt);
+    update.SetFrameworkProperty(entity => entity.LastModifiedBy, modifiedBy);
     update.AddConcurrencyVersionIncrement();
 
     return DbContext.Set<TEntity>()
@@ -98,12 +105,13 @@ public class EntityRepository<TDbContext, TEntity, TId>
       return query.ExecuteDeleteAsync(cancellationToken);
 
     var deletedAt = DateTimeOffset.UtcNow;
+    var deletedBy = _currentUserService?.UserId ?? "system";
     var update = new BulkUpdateBuilder<TEntity>()
-        .SetProperty(entity => entity.IsDeleted, true)
-        .SetProperty(entity => entity.DateDeleted, deletedAt)
-        .SetProperty(entity => entity.DeletedBy, "system")
-        .SetProperty(entity => entity.LastModifiedDate, deletedAt)
-        .SetProperty(entity => entity.LastModifiedBy, "system");
+        .SetFrameworkProperty(entity => entity.IsDeleted, true)
+        .SetFrameworkProperty(entity => entity.DateDeleted, deletedAt)
+        .SetFrameworkProperty(entity => entity.DeletedBy, deletedBy)
+        .SetFrameworkProperty(entity => entity.LastModifiedDate, deletedAt)
+        .SetFrameworkProperty(entity => entity.LastModifiedBy, deletedBy);
 
     update.AddConcurrencyVersionIncrement();
 
@@ -114,7 +122,7 @@ public class EntityRepository<TDbContext, TEntity, TId>
   {
     if (!hardDelete)
     {
-      entity.MarkDeleted("system");
+      entity.MarkDeleted(_currentUserService?.UserId ?? "system");
       DbContext.Set<TEntity>().Update(entity);
     }
     else

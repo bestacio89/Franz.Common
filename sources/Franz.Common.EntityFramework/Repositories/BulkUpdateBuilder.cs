@@ -34,6 +34,14 @@ public sealed class BulkUpdateBuilder<TEntity> where TEntity : class
         return this;
     }
 
+    internal BulkUpdateBuilder<TEntity> SetFrameworkProperty<TProperty>(
+        Expression<Func<TEntity, TProperty>> property,
+        TProperty value)
+    {
+        _assignments.Add(setters => setters.SetProperty(property, value));
+        return this;
+    }
+
     internal bool HasAssignments => _assignments.Count > 0;
 
     internal void AddConcurrencyVersionIncrement()
@@ -98,5 +106,17 @@ public sealed class BulkUpdateBuilder<TEntity> where TEntity : class
             member.Member.Name == nameof(IConcurrencyTrackedEntity.ConcurrencyVersion))
             throw new InvalidOperationException(
                 "Bulk updates cannot assign ConcurrencyVersion directly; the framework advances it automatically.");
+
+        if (member.Member.Name is
+            nameof(Entity<object>.Id) or
+            nameof(Entity<object>.DateCreated) or
+            nameof(Entity<object>.CreatedBy) or
+            nameof(Entity<object>.LastModifiedDate) or
+            nameof(Entity<object>.LastModifiedBy) or
+            nameof(Entity<object>.IsDeleted) or
+            nameof(Entity<object>.DateDeleted) or
+            nameof(Entity<object>.DeletedBy))
+            throw new InvalidOperationException(
+                "Bulk updates cannot assign framework-managed identity, lifecycle, or audit properties.");
     }
 }

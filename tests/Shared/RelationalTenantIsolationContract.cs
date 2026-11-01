@@ -378,6 +378,21 @@ public abstract class RelationalTenantIsolationContract
     }
 
     [Fact]
+    public void BulkUpdateBuilder_RejectsFrameworkManagedProperties()
+    {
+        var builder = new BulkUpdateBuilder<TenantOwnedTestEntity>();
+
+        Assert.Throws<InvalidOperationException>(
+            () => builder.SetProperty(entity => entity.Id, Guid.NewGuid()));
+        Assert.Throws<InvalidOperationException>(
+            () => builder.SetProperty(entity => entity.IsDeleted, true));
+        Assert.Throws<InvalidOperationException>(
+            () => builder.SetProperty(entity => entity.LastModifiedBy, "forged"));
+        Assert.Throws<InvalidOperationException>(
+            () => builder.SetProperty(entity => entity.ConcurrencyVersion, 42L));
+    }
+
+    [Fact]
     public async Task RepositoryBulkUpdate_AdvancesConcurrencyVersion()
     {
         var tenantId = Guid.NewGuid();
