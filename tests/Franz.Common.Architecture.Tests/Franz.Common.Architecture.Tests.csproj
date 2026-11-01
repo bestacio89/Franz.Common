@@ -19,64 +19,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../sources/Franz.Common.Annotations/Franz.Common.Annotations.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Aras/Franz.Common.Aras.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.AzureCosmosDB/Franz.Common.AzureCosmosDB.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Bootstrap/Franz.Common.Bootstrap.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Business/Franz.Common.Business.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Caching/Franz.Common.Caching.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.DependencyInjection/Franz.Common.DependencyInjection.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.EntityFramework.MariaDB/Franz.Common.EntityFramework.MariaDB.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.EntityFramework.Oracle/Franz.Common.EntityFramework.Oracle.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.EntityFramework.PostGres/Franz.Common.EntityFramework.PostGres.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.EntityFramework.SQLServer/Franz.Common.EntityFramework.SQLServer.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.EntityFramework/Franz.Common.EntityFramework.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Errors/Franz.Common.Errors.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Grpc/Franz.Common.Grpc.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Headers/Franz.Common.Headers.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Hosting/Franz.Common.Hosting.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Http.Authentication/Franz.Common.Http.Authentication.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Http.Bootstrap/Franz.Common.Http.Bootstrap.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Http.Client/Franz.Common.Http.Client.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Http.Documentation/Franz.Common.Http.Documentation.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Http.EntityFramework/Franz.Common.Http.EntityFramework.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Http.Headers/Franz.Common.Http.Headers.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Http.Identity/Franz.Common.Http.Identity.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Http.Messaging/Franz.Common.Http.Messaging.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Http.MultiTenancy/Franz.Common.Http.MultiTenancy.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Http.Refit/Franz.Common.Http.Refit.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Http/Franz.Common.Http.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Identity/Franz.Common.Identity.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.IO/Franz.Common.IO.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Logging/Franz.Common.Logging.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Mapping.Generators/Franz.Common.Mapping.Generators.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Mapping/Franz.Common.Mapping.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Mediator.OpenTelemetry/Franz.Common.Mediator.OpenTelemetry.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Mediator.Polly/Franz.Common.Mediator.Polly.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Mediator/Franz.Common.Mediator.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.AzureEventBus/Franz.Common.Messaging.AzureEventBus.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.AzureEventGrid/Franz.Common.Messaging.AzureEventGrid.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.AzureEventHubs/Franz.Common.Messaging.AzureEventHubs.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.Bootstrap/Franz.Common.Messaging.Bootstrap.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.EntityFramework/Franz.Common.Messaging.EntityFramework.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.Hosting.Azure/Franz.Common.Messaging.Hosting.Azure.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.Hosting.Kafka/Franz.Common.Messaging.Hosting.Kafka.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.Hosting.MediatR/Franz.Common.Messaging.Hosting.Mediator.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.Hosting.RabbitMQ/Franz.Common.Messaging.Hosting.RabbitMQ.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.Hosting/Franz.Common.Messaging.Hosting.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.Identity/Franz.Common.Messaging.Identity.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.Kafka/Franz.Common.Messaging.Kafka.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.MassTransit/Franz.Common.Messaging.MassTransit.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.MultiTenancy/Franz.Common.Messaging.MultiTenancy.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.RabbitMQ/Franz.Common.Messaging.RabbitMQ.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging.Sagas/Franz.Common.Messaging.Sagas.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Messaging/Franz.Common.Messaging.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.MongoDB/Franz.Common.MongoDB.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.MultiTenancy/Franz.Common.MultiTenancy.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Reflection/Franz.Common.Reflection.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.Serialization/Franz.Common.Serialization.csproj" />
-    <ProjectReference Include="../../sources/Franz.Common.SSO/Franz.Common.SSO.csproj" />
     <ProjectReference Include="../../sources/Franz.Common/Franz.Common.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Annotations/Franz.Common.Annotations.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Business/Franz.Common.Business.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.DependencyInjection/Franz.Common.DependencyInjection.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Errors/Franz.Common.Errors.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Headers/Franz.Common.Headers.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Mediator/Franz.Common.Mediator.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Messaging/Franz.Common.Messaging.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.MultiTenancy/Franz.Common.MultiTenancy.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Serialization/Franz.Common.Serialization.csproj" />
   </ItemGroup>
 
   <ItemGroup>
