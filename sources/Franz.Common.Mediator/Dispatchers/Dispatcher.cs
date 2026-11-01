@@ -4,14 +4,13 @@ using Franz.Common.Mediator.Handlers;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Processors;
+using Franz.Common.Mediator.Registration;
 using Franz.Common.Mediator.Validation.Events;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,7 +23,8 @@ public class FranzDispatcher : IDispatcher
 {
   private readonly IServiceProvider _serviceProvider;
 
-  private static readonly ConcurrentDictionary<Type, Func<IServiceProvider, object, CancellationToken, Task<object?>>> ResponseHandlerCache = new();
+  private static readonly ConcurrentDictionary<(Type RequestType, Type ResponseType), Func<IServiceProvider, object, CancellationToken, Task<object?>>> ResponseHandlerCache = new();
+  private static readonly ConcurrentDictionary<(Type RequestType, Type ResponseType), Func<IServiceProvider, object, CancellationToken, Task<object?>>> QueryHandlerCache = new();
   private static readonly ConcurrentDictionary<Type, Func<IServiceProvider, object, CancellationToken, Task>> VoidHandlerCache = new();
   private static readonly ConcurrentDictionary<Type, Func<FranzDispatcher, IEvent, CancellationToken, Task>> EventPublisherCache = new();
 
@@ -54,7 +54,7 @@ public class FranzDispatcher : IDispatcher
       await RunPreProcessorsDynamic(command, ct).ConfigureAwait(false);
 
       var commandType = command.GetType();
-      var invoker = ResponseHandlerCache.GetOrAdd(commandType, static t => CompileResponseInvoker(t, typeof(TResponse)));
+      var invoker = ResponseHandlerCache.GetOrAdd((commandType, typeof(TResponse)), static key => GeneratedMediatorInvokerRegistry.GetCommandInvoker(key.RequestType, key.ResponseType));
 
       var pipelines = ResolveServices<IPipeline<ICommand<TResponse>, TResponse>>();
 
@@ -99,7 +99,7 @@ public class FranzDispatcher : IDispatcher
       await RunPreProcessorsDynamic(command, ct).ConfigureAwait(false);
 
       var commandType = command.GetType();
-      var invoker = VoidHandlerCache.GetOrAdd(commandType, static t => CompileVoidInvoker(t));
+      var invoker = VoidHandlerCache.GetOrAdd(commandType, GeneratedMediatorInvokerRegistry.GetVoidCommandInvoker);
 
       var pipelines = ResolveServices<IPipeline<ICommand, Unit>>();
 
@@ -144,7 +144,7 @@ public class FranzDispatcher : IDispatcher
       await RunPreProcessorsDynamic(query, ct).ConfigureAwait(false);
 
       var queryType = query.GetType();
-      var invoker = ResponseHandlerCache.GetOrAdd(queryType, static t => CompileQueryInvoker(t, typeof(TResponse)));
+      var invoker = QueryHandlerCache.GetOrAdd((queryType, typeof(TResponse)), static key => GeneratedMediatorInvokerRegistry.GetQueryInvoker(key.RequestType, key.ResponseType));
 
       var pipelines = ResolveServices<IPipeline<IQuery<TResponse>, TResponse>>();
 
@@ -325,7 +325,7 @@ public class FranzDispatcher : IDispatcher
     ArgumentNullException.ThrowIfNull(@event);
 
     var eventType = @event.GetType();
-    var publisher = EventPublisherCache.GetOrAdd(eventType, static t => CompileEventPublisher(t));
+    var publisher = EventPublisherCache.GetOrAdd(eventType, GeneratedMediatorInvokerRegistry.GetEventPublisher);
 
     return publisher(this, @event, ct);
   }
@@ -409,7 +409,9 @@ public class FranzDispatcher : IDispatcher
   private Task RunPreProcessorsDynamic(object request, CancellationToken ct)
   {
     var requestType = request.GetType();
-    var invoker = PreProcessorInvokerCache.GetOrAdd(requestType, CompilePreProcessorInvoker);
+    var invoker = PreProcessorInvokerCache.GetOrAdd(
+        requestType,
+        GeneratedMediatorInvokerRegistry.GetPreProcessorInvoker);
     return invoker(_serviceProvider, request, ct);
   }
 
@@ -417,58 +419,10 @@ public class FranzDispatcher : IDispatcher
   {
     var requestType = request.GetType();
     var key = (RequestType: requestType, ResponseType: typeof(TResponse));
-    var invoker = PostProcessorInvokerCache.GetOrAdd(key, k => CompilePostProcessorInvoker(k.RequestType, k.ResponseType));
+    var invoker = PostProcessorInvokerCache.GetOrAdd(
+        key,
+        static pair => GeneratedMediatorInvokerRegistry.GetPostProcessorInvoker(pair.RequestType, pair.ResponseType));
     return invoker(_serviceProvider, request, response, ct);
-  }
-
-  private static Func<IServiceProvider, object, CancellationToken, Task> CompilePreProcessorInvoker(Type requestType)
-  {
-    return (sp, req, ct) =>
-    {
-      var processorType = typeof(IPreProcessor<>).MakeGenericType(requestType);
-      var processors = sp.GetServices(processorType);
-
-      var method = processorType.GetMethod(nameof(IPreProcessor<object>.ProcessAsync))!;
-
-      async Task ExecuteAll()
-      {
-        foreach (var p in processors)
-        {
-          if (p is not null)
-          {
-            var task = (Task)method.Invoke(p, new[] { req, ct })!;
-            await task.ConfigureAwait(false);
-          }
-        }
-      }
-
-      return ExecuteAll();
-    };
-  }
-
-  private static Func<IServiceProvider, object, object?, CancellationToken, Task> CompilePostProcessorInvoker(Type requestType, Type responseType)
-  {
-    return (sp, req, res, ct) =>
-    {
-      var processorType = typeof(IPostProcessor<,>).MakeGenericType(requestType, responseType);
-      var processors = sp.GetServices(processorType);
-
-      var method = processorType.GetMethod(nameof(IPostProcessor<object, object>.ProcessAsync))!;
-
-      async Task ExecuteAll()
-      {
-        foreach (var p in processors)
-        {
-          if (p is not null)
-          {
-            var task = (Task)method.Invoke(p, new[] { req, res, ct })!;
-            await task.ConfigureAwait(false);
-          }
-        }
-      }
-
-      return ExecuteAll();
-    };
   }
 
   private async Task NotifyRequestStarted(object request, Guid correlationId, CancellationToken ct)
@@ -510,83 +464,4 @@ public class FranzDispatcher : IDispatcher
       await observers[i].OnNotificationHandlerFailed(notification, handlerType, correlationId, ex, duration, ct).ConfigureAwait(false);
   }
 
-  // ==================== EXPRESSION TREE COMPILERS ====================
-
-  private static Func<IServiceProvider, object, CancellationToken, Task<object?>> CompileResponseInvoker(Type requestType, Type responseType)
-  {
-    var handlerType = typeof(ICommandHandler<,>).MakeGenericType(requestType, responseType);
-    return BuildCompiledResponseInvoker(handlerType, requestType, responseType);
-  }
-
-  private static Func<IServiceProvider, object, CancellationToken, Task<object?>> CompileQueryInvoker(Type queryType, Type responseType)
-  {
-    var handlerType = typeof(IQueryHandler<,>).MakeGenericType(queryType, responseType);
-    return BuildCompiledResponseInvoker(handlerType, queryType, responseType);
-  }
-
-  private static Func<IServiceProvider, object, CancellationToken, Task<object?>> BuildCompiledResponseInvoker(Type handlerType, Type requestType, Type responseType)
-  {
-    var providerParam = Expression.Parameter(typeof(IServiceProvider), "sp");
-    var requestParam = Expression.Parameter(typeof(object), "req");
-    var ctParam = Expression.Parameter(typeof(CancellationToken), "ct");
-
-    var getServiceMethod = typeof(ServiceProviderServiceExtensions)
-        .GetMethod(nameof(ServiceProviderServiceExtensions.GetRequiredService), new[] { typeof(IServiceProvider), typeof(Type) })!;
-
-    var handlerInstance = Expression.Call(null, getServiceMethod, providerParam, Expression.Constant(handlerType));
-    var castHandler = Expression.Convert(handlerInstance, handlerType);
-    var castRequest = Expression.Convert(requestParam, requestType);
-
-    var handleMethod = handlerType.GetMethod("Handle", new[] { requestType, typeof(CancellationToken) })!;
-    var callHandle = Expression.Call(castHandler, handleMethod, castRequest, ctParam);
-
-    var helperMethod = typeof(FranzDispatcher).GetMethod(nameof(CastTaskToObject), BindingFlags.NonPublic | BindingFlags.Static)!
-        .MakeGenericMethod(responseType);
-
-    var body = Expression.Call(null, helperMethod, callHandle);
-
-    return Expression.Lambda<Func<IServiceProvider, object, CancellationToken, Task<object?>>>(body, providerParam, requestParam, ctParam).Compile();
-  }
-
-  private static Func<IServiceProvider, object, CancellationToken, Task> CompileVoidInvoker(Type commandType)
-  {
-    var handlerType = typeof(ICommandHandler<>).MakeGenericType(commandType);
-
-    var providerParam = Expression.Parameter(typeof(IServiceProvider), "sp");
-    var commandParam = Expression.Parameter(typeof(object), "cmd");
-    var ctParam = Expression.Parameter(typeof(CancellationToken), "ct");
-
-    var getServiceMethod = typeof(ServiceProviderServiceExtensions)
-        .GetMethod(nameof(ServiceProviderServiceExtensions.GetRequiredService), new[] { typeof(IServiceProvider), typeof(Type) })!;
-
-    var handlerInstance = Expression.Call(null, getServiceMethod, providerParam, Expression.Constant(handlerType));
-    var castHandler = Expression.Convert(handlerInstance, handlerType);
-    var castCommand = Expression.Convert(commandParam, commandType);
-
-    var handleMethod = handlerType.GetMethod("Handle", new[] { commandType, typeof(CancellationToken) })!;
-    var body = Expression.Call(castHandler, handleMethod, castCommand, ctParam);
-
-    return Expression.Lambda<Func<IServiceProvider, object, CancellationToken, Task>>(body, providerParam, commandParam, ctParam).Compile();
-  }
-
-  private static Func<FranzDispatcher, IEvent, CancellationToken, Task> CompileEventPublisher(Type eventType)
-  {
-    var dispatcherParam = Expression.Parameter(typeof(FranzDispatcher), "dispatcher");
-    var eventParam = Expression.Parameter(typeof(IEvent), "evt");
-    var ctParam = Expression.Parameter(typeof(CancellationToken), "ct");
-
-    var castEvent = Expression.Convert(eventParam, eventType);
-    var method = typeof(FranzDispatcher).GetMethods()
-        .First(m => m.Name == nameof(PublishEventAsync) && m.IsGenericMethod)
-        .MakeGenericMethod(eventType);
-
-    var body = Expression.Call(dispatcherParam, method, castEvent, ctParam);
-
-    return Expression.Lambda<Func<FranzDispatcher, IEvent, CancellationToken, Task>>(body, dispatcherParam, eventParam, ctParam).Compile();
-  }
-
-  private static async Task<object?> CastTaskToObject<T>(Task<T> task)
-  {
-    return await task.ConfigureAwait(false);
-  }
 }
