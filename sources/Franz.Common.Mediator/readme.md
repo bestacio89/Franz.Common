@@ -110,7 +110,9 @@ await dispatcher.PublishEventAsync(
 Stream queries are exposed by the dispatcher implementation through asynchronous enumeration:
 
 ```csharp
-await foreach (var item in dispatcher.Stream<GetHeroesQuery, HeroDto>(
+var streamDispatcher = (FranzDispatcher)dispatcher;
+
+await foreach (var item in streamDispatcher.Stream<GetHeroesQuery, HeroDto>(
     new GetHeroesQuery(),
     cancellationToken))
 {
