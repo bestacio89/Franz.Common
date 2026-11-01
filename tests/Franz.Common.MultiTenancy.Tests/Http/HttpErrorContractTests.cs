@@ -2,6 +2,7 @@ using Franz.Common.Errors;
 using Franz.Common.Http.Bootstrap.Exceptions;
 using Franz.Common.Http.Errors;
 using Franz.Common.Http.Errors.Strategy;
+using Franz.Common.Http.Extensions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
