@@ -193,3 +193,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 - Added **new features and improvements**
 - Separated **business concepts** from **mediator concepts**
 - Now compatible with both the **in-house mediator** and **MediatR**
+
+
+## Tenant-aware Kafka handlers in 2.3.4
+
+When tenant-aware processing is enabled, prefer the scoped-handler overload so handler dependencies are resolved from the per-delivery service provider and cannot be accidentally captured across tenant executions. The legacy captured-handler overload fails closed under tenant-aware processing because its handler lifetime cannot be proven safe. Verify Kafka header mapping and tenant authorization in the configured consumer pipeline; header presence alone does not establish tenant membership. See the [messaging execution lifecycle](../../docs/multitenancy-execution-lifecycle.md).
