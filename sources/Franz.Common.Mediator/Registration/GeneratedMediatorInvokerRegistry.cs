@@ -55,6 +55,7 @@ public static class GeneratedMediatorInvokerRegistry
             services.GetRequiredService<ICommandHandler<TCommand>>()
                 .Handle((TCommand)request, cancellationToken));
     RegisterPreProcessor<TCommand>();
+    RegisterPostProcessor<TCommand, Unit>();
   }
 
   public static void RegisterEvent<TEvent>()
@@ -92,6 +93,11 @@ public static class GeneratedMediatorInvokerRegistry
   private static void RegisterProcessors<TRequest, TResponse>()
   {
     RegisterPreProcessor<TRequest>();
+    RegisterPostProcessor<TRequest, TResponse>();
+  }
+
+  private static void RegisterPostProcessor<TRequest, TResponse>()
+  {
     PostProcessorInvokers.TryAdd(
         (typeof(TRequest), typeof(TResponse)),
         static async (services, request, response, cancellationToken) =>
