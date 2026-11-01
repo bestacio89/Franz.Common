@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics.CodeAnalysis;
 using Franz.Common.Mapping.Abstractions;
 
 namespace Franz.Common.Mapping.Core;
@@ -10,6 +11,8 @@ public class MappingService(IFranzMapper mapper) : IMappingService, IAsyncDispos
   private readonly IFranzMapper _mapper = mapper;
   private int _disposedState; // 0 = active, 1 = disposed
 
+  [RequiresUnreferencedCode("The configured IFranzMapper may use reflection. Use a generated IMapper<TSource, TDestination> for trimming.")]
+  [RequiresDynamicCode("The configured IFranzMapper may compile runtime mapping plans. Use a generated IMapper<TSource, TDestination> for Native AOT.")]
   public TDestination Map<TSource, TDestination>(TSource source)
   {
     if (Volatile.Read(ref _disposedState) == 1)
@@ -18,6 +21,8 @@ public class MappingService(IFranzMapper mapper) : IMappingService, IAsyncDispos
     return _mapper.Map<TSource, TDestination>(source);
   }
 
+  [RequiresUnreferencedCode("The configured IFranzMapper may use reflection. Use a generated IMapper<TSource, TDestination> for trimming.")]
+  [RequiresDynamicCode("The configured IFranzMapper may compile runtime mapping plans. Use a generated IMapper<TSource, TDestination> for Native AOT.")]
   public ValueTask<TDestination> MapAsync<TSource, TDestination>(
     TSource source,
     CancellationToken cancellationToken = default)
