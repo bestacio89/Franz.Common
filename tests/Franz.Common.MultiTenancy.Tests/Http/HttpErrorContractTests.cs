@@ -49,6 +49,22 @@ public sealed class HttpErrorContractTests
     }
 
     [Fact]
+    public void ErrorResponseProvider_UsesBusinessStrategyForUnprocessableEntity()
+    {
+        var environment = new TestHostEnvironment(Environments.Production);
+        var provider = new ErrorResponseProvider(environment);
+        var context = CreateExceptionContext(new BusinessException(
+            "order.conflict",
+            "The order cannot be completed."));
+        var strategy = new BusinessErrorResponseStrategy();
+
+        var response = provider.PrepareResponse(context, strategy);
+
+        Assert.Equal("The order cannot be completed.", response.Message);
+        Assert.Equal(StatusCodes.Status422UnprocessableEntity, ((ObjectResult)context.Result!).StatusCode);
+    }
+
+    [Fact]
     public void ErrorResponseProvider_UsesValidationStrategyForBadRequest()
     {
         var environment = new TestHostEnvironment(Environments.Production);
