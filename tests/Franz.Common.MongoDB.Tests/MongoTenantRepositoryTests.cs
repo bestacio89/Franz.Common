@@ -2,6 +2,8 @@ using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Franz.Common.MongoDB.Repositories.Implementations;
 using Franz.Common.MongoDB.Repositories.Contracts;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 using Testcontainers.MongoDb;
 
@@ -155,6 +157,7 @@ public sealed class MongoTenantRepositoryTests : IAsyncLifetime
 public sealed class MongoTenantDocument : IMongoTenantEntity
 {
     public string Id { get; set; } = string.Empty;
+    [BsonGuidRepresentation(GuidRepresentation.Standard)]
     public Guid TenantId { get; set; }
     public string Name { get; set; } = string.Empty;
     public int Counter { get; set; }
