@@ -101,6 +101,11 @@ public static class FranzHttpExtensions
 
         builder.Services
             .AddNoDuplicateSingleton<IErrorResponseProvider, ErrorResponseProvider>()
+            .AddNoDuplicateScoped<IErrorResponseStrategy, BadRequestErrorResponseStrategy>()
+            .AddNoDuplicateScoped<IErrorResponseStrategy, ForbiddenErrorResponseStrategy>()
+            .AddNoDuplicateScoped<IErrorResponseStrategy, NotFoundErrorResponseStrategy>()
+            .AddNoDuplicateScoped<IErrorResponseStrategy, PreconditionFailedErrorResponseStrategy>()
+            .AddNoDuplicateScoped<IErrorResponseStrategy, UnauthorizedErrorResponseStrategy>()
             .AddNoDuplicateScoped<IErrorResponseStrategy, BusinessErrorResponseStrategy>()
             .AddNoDuplicateScoped<IErrorResponseStrategy, DefaultErrorResponseStrategy>()
             .AddNoDuplicateScoped<ExceptionFilter>();
