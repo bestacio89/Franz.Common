@@ -1,24 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
-	  <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-	</PropertyGroup>
+  <PropertyGroup>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+  </PropertyGroup>
 
-	<Import Project="..\..\common.targets" />
+  <Import Project="..\..\common.targets" />
 
-	<ItemGroup>
-		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.14" />
-		<PackageReference Include="Microsoft.AspNetCore.Authentication.WsFederation" Version="10.0.14" />
-		<FrameworkReference Include="Microsoft.AspNetCore.App" />
-		<PackageReference Include="Sustainsys.Saml2" Version="2.11.0" />
-		<PackageReference Include="Sustainsys.Saml2.AspNetCore2" Version="2.11.0" />
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.14" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.WsFederation" Version="10.0.14" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Sustainsys.Saml2" Version="2.11.0" />
+    <PackageReference Include="Sustainsys.Saml2.AspNetCore2" Version="2.11.0" />
     <PackageReference Include="System.Drawing.Common" Version="10.0.14" />
-	</ItemGroup>
+  </ItemGroup>
 
-	<ItemGroup>
-	  <ProjectReference Include="..\Franz.Common.Headers\Franz.Common.Headers.csproj" />
-	  <ProjectReference Include="..\Franz.Common.Http\Franz.Common.Http.csproj" />
-	  <ProjectReference Include="..\Franz.Common.Identity\Franz.Common.Identity.csproj" />
-	</ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Franz.Common.Headers\Franz.Common.Headers.csproj" />
+    <ProjectReference Include="..\Franz.Common.Http\Franz.Common.Http.csproj" />
+    <ProjectReference Include="..\Franz.Common.Identity\Franz.Common.Identity.csproj" />
+    <ProjectReference Include="..\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
+  </ItemGroup>
 
 </Project>
