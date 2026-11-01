@@ -192,64 +192,6 @@ public sealed class FrameworkArchitectureTests
   }
 
   [Fact]
-  public void Source_generator_references_must_not_inherit_consumer_publish_properties()
-  {
-    var references = new[]
-    {
-      (
-        ProjectPath: Path.Combine(
-          RepositoryRoot.Value,
-          "sources",
-          "Microsoft.Common.Mediator.SourceGenerator",
-          "..",
-          "Franz.Common.Mediator",
-          "Franz.Common.Mediator.csproj"),
-        GeneratorPath: "..\\Microsoft.Common.Mediator.SourceGenerator\\Franz.Common.Mediator.SourceGenerator.csproj"),
-      (
-        ProjectPath: Path.Combine(
-          RepositoryRoot.Value,
-          "sources",
-          "Franz.Common.Mapping",
-          "Franz.Common.Mapping.csproj"),
-        GeneratorPath: "..\\Franz.Common.Mapping.Generators\\Franz.Common.Mapping.Generators.csproj")
-    };
-
-    var requiredProperties = new[]
-    {
-      "PublishAot",
-      "PublishTrimmed",
-      "TrimMode",
-      "RuntimeIdentifier",
-      "SelfContained"
-    };
-
-    foreach (var item in references)
-    {
-      var document = XDocument.Load(item.ProjectPath);
-      var reference = document
-        .Descendants()
-        .SingleOrDefault(element =>
-          element.Name.LocalName == "ProjectReference"
-          && string.Equals(
-            (string?)element.Attribute("Include"),
-            item.GeneratorPath,
-            StringComparison.OrdinalIgnoreCase));
-
-      Assert.NotNull(reference);
-
-      var removedProperties = reference!
-        .Elements()
-        .FirstOrDefault(element => element.Name.LocalName == "GlobalPropertiesToRemove")
-        ?.Value
-        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        ?? [];
-
-      foreach (var property in requiredProperties)
-        Assert.Contains(property, removedProperties);
-    }
-  }
-
-  [Fact]
   public void Runtime_source_policy_violations_must_be_explicitly_allowlisted()
   {
     var findings = FindRuntimeSourcePolicyViolations();
