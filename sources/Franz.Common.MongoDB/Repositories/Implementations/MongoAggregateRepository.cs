@@ -17,16 +17,24 @@ namespace Franz.Common.MongoDB.Repositories.Implementations
   public class MongoAggregateRepository<TAggregate, TEvent>
       : IAggregateRepository<TAggregate, TEvent>
       where TAggregate : AggregateRoot<TEvent>
-      where TEvent : IDomainEvent, IEvent
+      where TEvent : IDomainEvent
   {
     private readonly IMongoCollection<StoredEvent> _eventCollection;
     private readonly IDispatcher _mediator;
     private readonly ITenantExecutionContextAccessor? _tenantContextAccessor;
 
+    /// <summary>
+    /// Retains the original constructor signature for existing consumers.
+    /// </summary>
+    public MongoAggregateRepository(IMongoDatabase database, IDispatcher mediator)
+        : this(database, mediator, null)
+    {
+    }
+
     public MongoAggregateRepository(
         IMongoDatabase database,
         IDispatcher mediator,
-        ITenantExecutionContextAccessor? tenantContextAccessor = null)
+        ITenantExecutionContextAccessor? tenantContextAccessor)
     {
       ArgumentNullException.ThrowIfNull(database);
       _eventCollection = database.GetCollection<StoredEvent>("Events");
