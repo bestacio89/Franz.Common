@@ -7,8 +7,8 @@ namespace Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fixtures;
 
 public sealed class RabbitMqContainerFixture : IAsyncLifetime
 {
-  private readonly string _user = "guest";
-  private readonly string _password = "guest";
+  private const string _user = "guest";
+  private const string _password = "guest";
 
   public const string Image = "rabbitmq:4.0-management";
 
@@ -21,8 +21,7 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
           .WithCleanUp(true)
           .WithWaitStrategy(Wait.ForUnixContainer()
               .UntilInternalTcpPortIsAvailable(5672))
-          .WithStartupTimeout(TimeSpan.FromMinutes(2))
-          .Build();
+                    .Build();
 
   public string ConnectionString => Container.GetConnectionString();
 
