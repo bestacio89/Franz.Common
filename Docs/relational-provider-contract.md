@@ -56,3 +56,10 @@ The SaveChanges tenant ownership checks do not automatically run for direct EF C
 ## Non-relational providers
 
 Cosmos DB and MongoDB are not part of this relational contract. Their partition-key, document ownership, transaction, and bulk-operation semantics require separate provider-specific contracts. Passing this suite must not be interpreted as certifying those providers.
+
+
+## 2.3.4 qualification scope and limits
+
+The release qualification covers PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23 for the shared relational EF Core contract. The tested behavior includes tenant-scoped reads and writes, missing-context fail-closed behavior, tenant ownership immutability, cross-tenant mutation rejection, supported EF Core set-based query-filter behavior, and repository bulk-update filtering/ownership validation.
+
+This is not a blanket certification of every database feature. Provider-specific raw SQL, stored procedures, direct connections, native bulk libraries, and code that disables or bypasses EF Core query filters sit outside the framework-managed guarantee unless separately guarded and tested. Applications with a high-assurance isolation requirement should apply database permissions and database-native enforcement in addition to application-layer checks. Cosmos DB and MongoDB remain outside this relational contract.

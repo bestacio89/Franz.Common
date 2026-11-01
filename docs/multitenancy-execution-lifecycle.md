@@ -54,3 +54,10 @@ For shared-table tenancy, use database row-level security where available, bind 
 | Raw SQL row isolation | Database policy required | Database policy required | Database policy required | Database policy required | Not equivalent to relational raw SQL |
 
 A passing routing test is not evidence of full persistence isolation. A provider's EF query-filter behavior is not evidence that raw SQL, provider-native bulk APIs, stored procedures, or external database clients enforce tenant boundaries.
+
+
+## Release 2.3.4 qualification notes
+
+The 2.3.4 implementation establishes a fresh DI scope for each supported message delivery and clears tenant execution state when the delivery pipeline exits, including exceptional and cancellation exits. Outbox dispatch resolves its persistence and dispatch services within a per-message scope. The MassTransit Kafka scoped-handler overload is the preferred path when handler dependencies are tenant-sensitive; the legacy captured-handler overload fails closed when tenant-aware processing is enabled.
+
+These guarantees are transport- and registration-path-specific. They do not make untrusted metadata an authorization source, and they do not replace tenant membership or producer authorization. Applications must test their configured adapters and verify that no tenant-sensitive dependency or ambient state escapes the delivery scope.

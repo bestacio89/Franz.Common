@@ -52,3 +52,8 @@ Provider routing/configuration tests are not substitutes for real-engine tenant-
 - [ ] Documentation does not imply global query filters protect paths that bypass EF Core.
 
 A checked release gate is evidence only for the exact commit, provider versions, and execution paths that were tested.
+
+
+## Release 2.3.4 evidence boundary
+
+The 2.3.4 relational qualification names PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23. Qualification is limited to the framework-managed EF Core and repository paths covered by the shared contract suite. It must not be read as certification of arbitrary SQL, stored procedures, provider-native bulk APIs, direct database clients, or non-relational providers. Each consuming application remains responsible for inventorying and independently securing those escape hatches.

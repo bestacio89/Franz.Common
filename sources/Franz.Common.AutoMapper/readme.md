@@ -40,7 +40,7 @@ A utility library within the **Franz Framework** designed to streamline the inte
 
 ## **Version Information**
 
-- **Current Version**: 1.7.8
+- **Current Version**: 2.3.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---

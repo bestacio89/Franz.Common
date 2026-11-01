@@ -30,7 +30,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 High-performance, pipeline-driven gRPC for distributed microservices
 
 ---
-**Current Version:** v2.3.3
+**Current Version:** v2.3.4
 
 ---
 

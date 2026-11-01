@@ -42,7 +42,7 @@ A library within the **Franz Framework** that extends multi-tenancy support for 
 
 ## **Version Information**
 
-**Current Version:** v2.3.3
+**Current Version:** v2.3.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -233,3 +233,8 @@ The JWT claim resolver ignores unauthenticated principals. Register only the res
 ## Authenticated tenant membership
 
 For authenticated principals, the HTTP tenant middleware requires an application-registered `ITenantRequestAuthorizer`. If no authorizer is registered, or membership is denied, the request is rejected with HTTP 403. Implement this contract against your identity/membership store; a tenant ID claim or request header alone is not membership proof. Anonymous tenant access remains subject to the application's endpoint authorization policy.
+
+
+## Request resolution is not authorization for 2.3.4
+
+Tenant resolution from a host, route, claim, or header identifies a candidate tenant; it does not establish membership or authorize access by itself. For authenticated principals, register and implement `ITenantRequestAuthorizer`; absent registration or denied membership must fail closed. A tenant identifier supplied by the caller is not membership proof. See the [tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md) for the broader framework boundary.
