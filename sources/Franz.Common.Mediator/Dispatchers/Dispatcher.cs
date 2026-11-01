@@ -325,8 +325,10 @@ public class FranzDispatcher : IDispatcher
     ArgumentNullException.ThrowIfNull(@event);
 
     var eventType = @event.GetType();
-    var publisher = EventPublisherCache.GetOrAdd(eventType, GeneratedMediatorInvokerRegistry.GetEventPublisher);
+    if (!GeneratedMediatorInvokerRegistry.TryGetEventPublisher(eventType, out var generatedPublisher))
+      return Task.CompletedTask;
 
+    var publisher = EventPublisherCache.GetOrAdd(eventType, static _ => generatedPublisher!);
     return publisher(this, @event, ct);
   }
 
