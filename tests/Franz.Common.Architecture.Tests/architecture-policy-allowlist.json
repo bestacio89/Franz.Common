@@ -25,12 +25,6 @@
   },
   {
     "rule": "ACTIVATOR",
-    "path": "sources/Franz.Common.Mediator/Registration/GeneratedHandlerRegistrationProvider.cs",
-    "reason": "Existing mediator registration construction. Mediator registration and generator behavior are explicitly out of scope for this roadmap and require a separate compatibility review.",
-    "ruleId": "SRC-002"
-  },
-  {
-    "rule": "ACTIVATOR",
     "path": "sources/Franz.Common.Messaging.Kafka/Extensions/ServiceCollectionExtensions.cs",
     "reason": "Existing runtime factory or adapter construction. Replacing these sites requires preserving generic registration, serialization and provider behavior; retain only as an explicit shrinking exception.",
     "ruleId": "SRC-002"
@@ -68,18 +62,6 @@
   {
     "rule": "ASSEMBLY_SCAN",
     "path": "sources/Franz.Common.Mediator/Helpers/HandlerCollector.cs",
-    "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs.",
-    "ruleId": "SRC-004"
-  },
-  {
-    "rule": "ASSEMBLY_SCAN",
-    "path": "sources/Franz.Common.Mediator/Registration/GeneratedHandlerRegistrationProvider.cs",
-    "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs.",
-    "ruleId": "SRC-004"
-  },
-  {
-    "rule": "ASSEMBLY_SCAN",
-    "path": "sources/Franz.Common.Mediator/Registration/ReflectionHandlerRegistrationProvider.cs",
     "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs.",
     "ruleId": "SRC-004"
   },
