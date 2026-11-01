@@ -23,6 +23,16 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
     private readonly ITenantValidator? _tenantValidator;
     private readonly FranzGrpcOptions _options;
 
+    /// <summary>
+    /// Retains the original resolver-only constructor for binary compatibility.
+    /// Tenant resolution remains fail-closed: a resolved tenant requires authorization
+    /// and a validated execution-context accessor, supplied by the full constructor.
+    /// </summary>
+    public TenantResolutionServerBehavior(IFranzTenantResolver tenantResolver)
+        : this(tenantResolver, Options.Create(new FranzGrpcOptions()))
+    {
+    }
+
     public TenantResolutionServerBehavior(
         IFranzTenantResolver tenantResolver,
         IOptions<FranzGrpcOptions> options,

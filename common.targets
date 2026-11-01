@@ -42,6 +42,11 @@
     <PackageReadmeFile>readme.md</PackageReadmeFile>
 
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+
+    <!-- Compare every published framework package with the previous stable release. -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>2.3.4</PackageValidationBaselineVersion>
+    <PackageValidationBaselineName>$(PackageId)</PackageValidationBaselineName>
   </PropertyGroup>
 
   <ItemGroup>
