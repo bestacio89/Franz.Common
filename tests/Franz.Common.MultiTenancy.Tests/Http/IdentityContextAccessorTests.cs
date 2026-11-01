@@ -42,7 +42,8 @@ public sealed class IdentityContextAccessorTests
                 new Claim(ClaimTypes.Email, "user@example.test"),
                 new Claim(ClaimTypes.Name, "Authenticated User"),
                 new Claim(ClaimTypes.Role, "Reader"),
-                new Claim(ClaimTypes.Role, "Writer")
+                new Claim(ClaimTypes.Role, "Writer"),
+                new Claim("role", "Auditor")
             ],
             authenticationType: "test"))
         };
@@ -55,7 +56,7 @@ public sealed class IdentityContextAccessorTests
         Assert.Equal(userId, accessor.GetCurrentId());
         Assert.Equal("user@example.test", accessor.GetCurrentEmail());
         Assert.Equal("Authenticated User", accessor.GetCurrentFullName());
-        Assert.Equal(["Reader", "Writer"], accessor.GetCurrentRoles());
+        Assert.Equal(new[] { "Reader", "Writer", "Auditor" }, accessor.GetCurrentRoles());
     }
 
     [Fact]
