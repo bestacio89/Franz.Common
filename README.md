@@ -251,12 +251,13 @@ The framework's own architecture tests live in
 [`tests/Franz.Common.Architecture.Tests`](tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj).
 They validate Franz.Common itself:
 
-- Runtime project dependencies remain acyclic.
+- Core package dependency direction is enforced independently of provider and transport adapters.
 - Core packages do not depend on infrastructure adapters.
 - Runtime packages do not reference test projects or the test-helper package.
 - Runtime source is checked for dynamic dispatch, runtime activation, generic reflection, assembly scanning, query-filter bypasses, and raw SQL APIs.
 - Existing findings are recorded as exact file/rule exceptions with reasons. New findings fail; resolved exceptions must be removed.
 - The mediator source generator remains targeted at `netstandard2.0`.
+- DDD contracts verify entity identity ownership, lifecycle-state encapsulation, repository/factory generic constraints, aggregate event constraints, and value-object equality contracts.
 
 This suite is included in the Franz.Common solution, runs in this repository's GitHub pull-request validation workflow, and has a dedicated test job in the Azure pipeline test stages.
 
