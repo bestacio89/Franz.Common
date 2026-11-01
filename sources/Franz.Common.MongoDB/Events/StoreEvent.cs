@@ -11,6 +11,7 @@ namespace Franz.Common.MongoDB.Events
   {
     public Guid EventId { get; set; }
     public Guid AggregateId { get; set; }
+    public Guid? TenantId { get; set; }
     public string AggregateType { get; set; } = string.Empty;
     public string EventType { get; set; } = string.Empty;
     public DateTimeOffset OccurredOn { get; set; }

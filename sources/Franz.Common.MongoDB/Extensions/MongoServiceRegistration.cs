@@ -1,4 +1,10 @@
 using Franz.Common.Messaging.Storage;
+using Franz.Common.Business.Domain;
+using Franz.Common.Business.Events;
+using Franz.Common.Mediator.Messages;
+using Franz.Common.MultiTenancy;
+using Franz.Common.MongoDB.Repositories.Contracts;
+using Franz.Common.MongoDB.Repositories.Implementations;
 using Franz.Common.MongoDB.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,6 +58,44 @@ public static class MongoServiceCollectionExtensions
 
     // Register the custom context
     services.AddScoped<TContext>();
+
+    return services;
+  }
+
+  /// <summary>Registers a tenant-scoped native MongoDB repository.</summary>
+  public static IServiceCollection AddMongoTenantRepository<TEntity>(
+      this IServiceCollection services,
+      string collectionName)
+      where TEntity : class, IMongoTenantEntity
+  {
+    ArgumentNullException.ThrowIfNull(services);
+    ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
+
+    services.AddScoped<MongoTenantRepository<TEntity>>(sp =>
+      new MongoTenantRepository<TEntity>(
+        sp.GetRequiredService<IMongoDatabase>(),
+        sp.GetRequiredService<ITenantExecutionContextAccessor>(),
+        collectionName));
+
+    return services;
+  }
+
+  /// <summary>
+  /// Registers the tenant-aware MongoDB event-store repository.
+  /// A validated tenant execution accessor is mandatory for this registration.
+  /// </summary>
+  public static IServiceCollection AddMongoTenantAggregateRepository<TAggregate, TEvent>(
+      this IServiceCollection services)
+      where TAggregate : AggregateRoot<TEvent>
+      where TEvent : IDomainEvent, IEvent
+  {
+    ArgumentNullException.ThrowIfNull(services);
+
+    services.AddScoped<MongoAggregateRepository<TAggregate, TEvent>>(sp =>
+      new MongoAggregateRepository<TAggregate, TEvent>(
+        sp.GetRequiredService<IMongoDatabase>(),
+        sp.GetRequiredService<Franz.Common.Mediator.Dispatchers.IDispatcher>(),
+        sp.GetRequiredService<ITenantExecutionContextAccessor>()));
 
     return services;
   }
