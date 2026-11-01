@@ -27,7 +27,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 
 *A deterministic, high-performance object mapping engine for the Franz Framework.*
 
-* **Current Version:** v2.3.4
+* **Current Version:** v2.3.5
 * **Codename:** *Mapping Engine Formalization & Constructor-Aware Evolution*
 * Part of the **Franz Core Infrastructure Suite**
 
