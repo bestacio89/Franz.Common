@@ -95,11 +95,9 @@ public static class MediatorServiceCollectionExtensions
         },
         configure);
 
-    services.AddFranzLoggingPipeline();
-    services.AddFranzValidationPipeline();
-    services.AddFranzSerilogLoggingPipeline();
-    services.AddFranzSerilogAuditPipeline();
-    services.AddFranzTransactionPipeline();
+    GeneratedHandlerRegistrationRegistry.ApplyDefaultPipelines(
+        typeof(TAssemblyMarker).Assembly,
+        services);
 
     return services;
   }
