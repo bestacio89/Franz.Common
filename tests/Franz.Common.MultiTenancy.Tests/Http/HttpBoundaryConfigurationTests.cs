@@ -44,7 +44,7 @@ public sealed class HttpBoundaryConfigurationTests
 
         using var provider = services.BuildServiceProvider();
         var policy = provider.GetRequiredService<IOptions<CorsOptions>>()
-            .Value.GetPolicy(CorsOptions.DefaultPolicyName);
+            .Value.GetPolicy(new CorsOptions().DefaultPolicyName);
 
         Assert.NotNull(policy);
         Assert.Equal(
