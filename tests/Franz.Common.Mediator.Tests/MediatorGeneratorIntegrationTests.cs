@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Franz.Common.Business.Helpers;
 using Franz.Common.Mediator.Extensions;
 using Franz.Common.Mediator.Handlers;
 using Franz.Common.Mediator.Registration;
@@ -71,4 +72,44 @@ public class MediatorGeneratorIntegrationTests
         descriptor.ServiceType == typeof(ICommandHandler<PingCommand, string>)
         && descriptor.ImplementationType == typeof(PingCommandHandler));
   }
+  [Fact]
+  public async Task GeneratedDispatchers_KeepCommandAndQueryResponseContractsSeparate()
+  {
+    var services = new ServiceCollection();
+    services.AddFranzMediator(new[] { typeof(DualRequestHandler).Assembly });
+    using var provider = services.BuildServiceProvider();
+    using var scope = provider.CreateScope();
+    var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
+
+    var commandResult = await dispatcher.SendAsync<string>(new DualRequest(21));
+    var queryResult = await dispatcher.SendAsync<int>(new DualRequest(21));
+
+    commandResult.Should().Be("command:21");
+    queryResult.Should().Be(42);
+  }
+
+  [Fact]
+  public void LegacyHandlerCollector_UsesGeneratedTransientRegistrations()
+  {
+    var services = new ServiceCollection();
+
+    HandlerCollector.CollectHandlers(services, typeof(PingCommandHandler).Assembly);
+
+    services.Should().ContainSingle(descriptor =>
+        descriptor.ServiceType == typeof(ICommandHandler<PingCommand, string>)
+        && descriptor.ImplementationType == typeof(PingCommandHandler)
+        && descriptor.Lifetime == ServiceLifetime.Transient);
+  }
+
+  public sealed record DualRequest(int Value) : Franz.Common.Mediator.Messages.ICommand<string>, Franz.Common.Mediator.Messages.IQuery<int>;
+
+  public sealed class DualRequestHandler : ICommandHandler<DualRequest, string>, IQueryHandler<DualRequest, int>
+  {
+    public Task<string> Handle(DualRequest request, CancellationToken cancellationToken)
+        => Task.FromResult($"command:{request.Value}");
+
+    Task<int> IQueryHandler<DualRequest, int>.Handle(DualRequest query, CancellationToken cancellationToken)
+        => Task.FromResult(query.Value * 2);
+  }
+
 }
