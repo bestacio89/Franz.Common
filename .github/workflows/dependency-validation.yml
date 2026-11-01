@@ -49,6 +49,9 @@ jobs:
       - name: Build solution
         run: dotnet build Franz.Common.slnx --configuration Release --no-restore
 
+      - name: Test framework architecture policies
+        run: dotnet test tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=architecture-tests.trx"
+
       - name: Test solution
         run: dotnet test Franz.Common.slnx --configuration Release --no-build --blame-hang-timeout 10m --logger "trx;LogFileName=dependency-validation.trx"
 

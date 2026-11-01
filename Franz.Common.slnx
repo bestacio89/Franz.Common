@@ -74,6 +74,7 @@
     <Project Path="sources/Microsoft.Common.Mediator.SourceGenerator/Franz.Common.Mediator.SourceGenerator.csproj" Id="af59ed84-f6a3-44cb-9347-b32b22ed27b8" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj" />
     <Project Path="tests/Franz.Common.Business.Test/Franz.Common.Business.Tests.csproj" />
     <Project Path="tests/Franz.Common.Caching.Testing/Franz.Common.Caching.Tests.csproj" />
     <Project Path="tests/Franz.Common.Entity.Tests/Franz.Common.EntityFramework.Tests.csproj" />

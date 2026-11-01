@@ -64,6 +64,21 @@ stages:
   dependsOn: Build
 
   jobs:
+  - job: framework_architecture_tests
+    displayName: Framework Architecture Tests
+    steps:
+    - download: current
+      artifact: built-sources
+    - task: UseDotNet@2
+      inputs:
+        packageType: sdk
+        version: '10.0.400'
+    - script: |
+        set -euo pipefail
+        dotnet test $(Pipeline.Workspace)/built-sources/tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj \
+          --configuration $(buildConfiguration) --no-build --logger trx
+      displayName: Run Framework Architecture Tests
+
 
   # ---------------- CORE ----------------
   - job: unit_tests
