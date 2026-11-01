@@ -1,4 +1,4 @@
-﻿using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.Mediator.Dispatchers;
 
 namespace Franz.Common.Mediator.Pipelines.Core;
 
@@ -11,11 +11,22 @@ public static class PipelineExecutor
       CancellationToken ct = default)
       where TRequest : notnull
   {
+    ArgumentNullException.ThrowIfNull(pipelines);
+    ArgumentNullException.ThrowIfNull(handler);
+
     if (pipelines.Count == 0)
       return handler(request, ct);
 
-    var runner = new ValuePipelineRunner<TRequest, TResponse>(request, pipelines, handler, ct);
-    return runner.Next();
+    return InvokeAt(0);
+
+    Task<TResponse> InvokeAt(int index)
+    {
+      if (index >= pipelines.Count)
+        return handler(request, ct);
+
+      var pipeline = pipelines[index];
+      return pipeline.Handle(request, () => InvokeAt(index + 1), ct);
+    }
   }
 
   public static Task ExecuteAsync<TRequest>(
@@ -25,87 +36,32 @@ public static class PipelineExecutor
       CancellationToken ct = default)
       where TRequest : notnull
   {
+    ArgumentNullException.ThrowIfNull(pipelines);
+    ArgumentNullException.ThrowIfNull(handler);
+
     if (pipelines.Count == 0)
       return handler(request, ct);
 
-    var runner = new VoidPipelineRunner<TRequest>(request, pipelines, handler, ct);
-    return runner.NextVoid();
-  }
+    return ExecuteCoreAsync();
 
-  private sealed class ValuePipelineRunner<TRequest, TResponse> where TRequest : notnull
-  {
-    private readonly TRequest _request;
-    private readonly IReadOnlyList<IPipeline<TRequest, TResponse>> _pipelines;
-    private readonly Func<TRequest, CancellationToken, Task<TResponse>> _handler;
-    private readonly CancellationToken _ct;
-    private int _index;
-
-    public ValuePipelineRunner(
-        TRequest request,
-        IReadOnlyList<IPipeline<TRequest, TResponse>> pipelines,
-        Func<TRequest, CancellationToken, Task<TResponse>> handler,
-        CancellationToken ct)
+    async Task ExecuteCoreAsync()
     {
-      _request = request;
-      _pipelines = pipelines;
-      _handler = handler;
-      _ct = ct;
-      _index = 0;
+      await InvokeAt(0).ConfigureAwait(false);
     }
 
-    public Task<TResponse> Next()
+    Task<Unit> InvokeAt(int index)
     {
-      if ((uint)_index < (uint)_pipelines.Count)
-      {
-        var pipeline = _pipelines[_index++];
-        return pipeline.Handle(_request, Next, _ct);
-      }
-      return _handler(_request, _ct);
-    }
-  }
+      if (index >= pipelines.Count)
+        return ExecuteTerminalAsync();
 
-  private sealed class VoidPipelineRunner<TRequest> where TRequest : notnull
-  {
-    private readonly TRequest _request;
-    private readonly IReadOnlyList<IPipeline<TRequest, Unit>> _pipelines;
-    private readonly Func<TRequest, CancellationToken, Task> _handler;
-    private readonly CancellationToken _ct;
-    private int _index;
-
-    public VoidPipelineRunner(
-        TRequest request,
-        IReadOnlyList<IPipeline<TRequest, Unit>> pipelines,
-        Func<TRequest, CancellationToken, Task> handler,
-        CancellationToken ct)
-    {
-      _request = request;
-      _pipelines = pipelines;
-      _handler = handler;
-      _ct = ct;
-      _index = 0;
+      var pipeline = pipelines[index];
+      return pipeline.Handle(request, () => InvokeAt(index + 1), ct);
     }
 
-    public async Task NextVoid()
+    async Task<Unit> ExecuteTerminalAsync()
     {
-      await Next().ConfigureAwait(false);
-    }
-
-    private Task<Unit> Next()
-    {
-      if ((uint)_index < (uint)_pipelines.Count)
-      {
-        var pipeline = _pipelines[_index++];
-        return pipeline.Handle(_request, Next, _ct);
-      }
-
-      return ExecuteTerminalAsync();
-    }
-
-    private async Task<Unit> ExecuteTerminalAsync()
-    {
-      await _handler(_request, _ct).ConfigureAwait(false);
+      await handler(request, ct).ConfigureAwait(false);
       return Unit.Value;
     }
   }
 }
-
