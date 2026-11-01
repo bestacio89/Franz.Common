@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Franz.Common.Http.Identity;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
+using Franz.Common.MultiTenancy.TenantResolution;
 using Franz.Common.Identity;
 using Microsoft.AspNetCore.Http;
 
