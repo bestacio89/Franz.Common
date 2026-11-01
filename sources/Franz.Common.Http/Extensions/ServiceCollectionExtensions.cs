@@ -74,7 +74,7 @@ public static class FranzHttpExtensions
         foreach (var value in values)
         {
             var origin = value.TrimEnd('/');
-            if (origin.Contains('*', StringComparison.Ordinal) ||
+            if (origin.Contains('*') ||
                 !Uri.TryCreate(origin, UriKind.Absolute, out var uri) ||
                 (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp) ||
                 !string.IsNullOrEmpty(uri.UserInfo) ||
