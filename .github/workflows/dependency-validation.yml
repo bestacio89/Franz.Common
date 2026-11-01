@@ -132,7 +132,7 @@ jobs:
 
       - name: Publish and execute Native AOT mapper smoke test
         run: |
-          dotnet publish tests/Franz.Common.AotSmokeTest/Franz.Common.AotSmokeTest.csproj --configuration Release --runtime linux-x64 --self-contained true -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=full -p:ILLinkTreatWarningsAsErrors=true
+          dotnet publish tests/Franz.Common.AotSmokeTest/Franz.Common.AotSmokeTest.csproj --configuration Release --runtime linux-x64 --self-contained true --no-restore -p:BuildProjectReferences=false -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=full -p:ILLinkTreatWarningsAsErrors=true
           ./tests/Franz.Common.AotSmokeTest/bin/Release/net10.0/linux-x64/publish/Franz.Common.AotSmokeTest
 
       - name: Test framework architecture policies
