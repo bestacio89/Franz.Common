@@ -95,6 +95,8 @@ public static class MediatorServiceCollectionExtensions
         },
         configure);
 
+    services.TryAddSingleton(new TransactionOptions());
+
     GeneratedHandlerRegistrationRegistry.ApplyDefaultPipelines(
         typeof(TAssemblyMarker).Assembly,
         services);
