@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common.Hosting\Franz.Common.Hosting.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
+    <ProjectReference Include="..\Franz.Common.Messaging.MultiTenancy\Franz.Common.Messaging.MultiTenancy.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.RabbitMQ\Franz.Common.Messaging.RabbitMQ.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
   </ItemGroup>

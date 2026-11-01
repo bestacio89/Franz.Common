@@ -27,7 +27,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 
 ## 🚀 Version
 
-**Current Version:** v2.3.3
+**Current Version:** v2.3.4
 
 ---
 
@@ -396,3 +396,64 @@ Franz.Common.EntityFramework v2.2.1 is now:
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## Tenant-owned persistence
+
+Entities that belong to a tenant implement `Franz.Common.MultiTenancy.ITenantEntity` and expose a mapped `Guid TenantId`. When a validated `ITenantExecutionContextAccessor` is registered in the DbContext scope, `DbContextBase` applies tenant-aware global query filters and enforces ownership during inserts, updates, deletes, and synchronous/asynchronous saves.
+
+- New tenant-owned entities are stamped with the current tenant when their tenant ID is empty.
+- Explicit cross-tenant inserts and writes are rejected.
+- Tenant-owned queries return no rows without a validated tenant context.
+- Tenant identity is immutable after insertion.
+
+Global query filters are defense in depth, not a substitute for database permissions. Raw SQL, bulk APIs, and deliberate `IgnoreQueryFilters` usage must be separately controlled. For high-assurance shared-database deployments, enable database row-level security with a transaction-scoped tenant setting and a restricted application database role. Define tenant-scoped unique constraints and composite tenant-aware foreign keys in the application model; the framework does not silently rewrite business uniqueness semantics.
+
+
+### Register the context accessor in derived DbContexts
+
+A concrete DbContext must accept and forward the scoped accessor to `DbContextBase`; constructor injection does not automatically pass optional base parameters:
+
+```csharp
+public sealed class ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    IDispatcher dispatcher,
+    ITenantExecutionContextAccessor tenantContext)
+    : DbContextBase(options, dispatcher, tenantContextAccessor: tenantContext)
+{
+}
+```
+
+If the accessor is not forwarded, tenant-owned queries intentionally match no rows and tenant-owned writes fail closed.
+
+
+## Provider-neutral database isolation policy
+
+Database routing is configured through `Database:IsolationMode` and `Database:DatabaseName`:
+
+- `SharedDatabase` (default) uses a concrete database name unchanged. A `{dbName}` token is rejected rather than silently removed.
+- `TenantDatabase` requires `DatabaseName` to contain `{dbName}` and requires a validated tenant execution context. Missing tenant identity fails closed; domain identity is never a fallback.
+- `DomainDatabase` explicitly opts in to domain-based database routing. The configured name must contain `{dbName}` and a domain context must be present.
+
+Example:
+
+```json
+{
+  "Database": {
+    "ServerName": "localhost",
+    "DatabaseName": "app_{dbName}",
+    "IsolationMode": "TenantDatabase",
+    "UserName": "app",
+    "EnableSensitiveDataLogging": false
+  }
+}
+```
+
+All EF provider adapters use the shared `DatabaseTargetResolver`; adapters construct provider-specific connection strings only. Domain-based routing is an explicit deployment decision, not a compatibility fallback.
+
+
+## Tenant isolation and bulk-update contract for 2.3.4
+
+The relational provider qualification covers tenant-scoped EF Core reads and writes, fail-closed behavior when tenant execution context is absent, tenant ownership immutability, cross-tenant mutation rejection, query-filter behavior for supported set-based operations, and the repository `ExecuteBulkUpdateAsync` contract. The named relational engines in the qualification are PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23.
+
+Do not treat EF Core global query filters as a complete database security boundary. Raw SQL, stored procedures, direct connections, provider-native bulk APIs, and deliberate filter bypasses need explicit tenant enforcement and tests. Cosmos DB and MongoDB are not included in this relational qualification. See the [relational provider contract](../../Docs/relational-provider-contract.md) and [tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md).

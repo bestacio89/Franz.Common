@@ -1,3 +1,4 @@
+using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.EntityFramework.Extensions;
 using Franz.Common.MultiTenancy;
@@ -12,7 +13,6 @@ namespace Franz.Common.EntityFramework.Oracle.Extensions;
 public static class ServiceCollectionExtensions
 {
   private const string DefaultServerName = "localhost";
-  private const string DatabaseNamePattern = "{dbName}";
   private const string DefaultUserName = "system";
   private const string DefaultPassword = "oracle";
   private const int DefaultPort = 1521;
@@ -28,10 +28,12 @@ public static class ServiceCollectionExtensions
         {
           var databaseOptions = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>();
 
-          // Build proper DataSource string: host:port/serviceName
           var host = databaseOptions.Value.ServerName ?? DefaultServerName;
           var port = databaseOptions.Value.Port > 0 ? databaseOptions.Value.Port.Value : DefaultPort;
-          var serviceName = databaseOptions.Value.DatabaseName ?? DatabaseNamePattern;
+          var serviceName = DatabaseTargetResolver.ResolveDatabaseName(
+              databaseOptions.Value,
+              serviceProvider.GetService<ITenantExecutionContextAccessor>(),
+              serviceProvider.GetService<IDomainContextAccessor>());
 
           var oracleConnectionStringBuilder = new OracleConnectionStringBuilder
           {
@@ -40,19 +42,10 @@ public static class ServiceCollectionExtensions
             Password = databaseOptions.Value.Password ?? DefaultPassword
           };
 
-          var connectionString = oracleConnectionStringBuilder.ConnectionString;
+          dbContextBuilder.UseOracle(oracleConnectionStringBuilder.ConnectionString);
 
-          // Apply domain replacement if needed
-          var domainContextAccessor = serviceProvider.GetService<IDomainContextAccessor>();
-          var domainId = domainContextAccessor?.GetCurrentDomainId();
-
-          connectionString = domainId.HasValue
-                  ? connectionString.Replace(DatabaseNamePattern, domainId.Value.ToString())
-                  : connectionString.Replace($"_{DatabaseNamePattern}", string.Empty);
-
-          dbContextBuilder.UseOracle(connectionString);
-
-          dbContextBuilder.EnableSensitiveDataLogging();
+          if (databaseOptions.Value.EnableSensitiveDataLogging)
+            dbContextBuilder.EnableSensitiveDataLogging();
         })
         .AddScoped<DbContextBase>(sp => sp.GetRequiredService<TDbContext>());
 

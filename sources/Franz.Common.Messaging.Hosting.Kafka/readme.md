@@ -208,7 +208,7 @@ This ensures:
 
 ## 🧾 Version Information
 
-* **Current Version:** v2.3.3
+* **Current Version:** v2.3.4
 * **Target Framework**: **.NET 10.0**
 * Part of the **Franz Framework**
 

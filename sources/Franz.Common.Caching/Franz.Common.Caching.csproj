@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
@@ -10,13 +10,11 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.14" />
     <PackageReference Include="StackExchange.Redis" Version="3.0.17" />
-    <!-- Direct pins prevent vulnerable transitive versions from winning NuGet resolution. -->
     <PackageReference Include="Snappier" Version="1.3.1" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
+    <ProjectReference Include="..\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
   </ItemGroup>
-
 </Project>

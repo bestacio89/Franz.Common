@@ -37,4 +37,7 @@
     <PackageReference Include="SSH.NET" Version="2026.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="../Shared/RelationalTenantIsolationContract.cs" Link="ProviderContract/RelationalTenantIsolationContract.cs" />
+  </ItemGroup>
 </Project>

@@ -33,7 +33,7 @@ It provides a **clean, deterministic, and production-grade foundation** for buil
 
 ## 🚀 Version
 
-**Current Version:** v2.3.3
+**Current Version:** v2.3.4
 
 ---
 

@@ -154,7 +154,6 @@ public sealed record GrpcCallContext
     var correlationId = GetOrCreate(requestHeaders, CorrelationIdHeaderName);
     var requestId = GetOrCreate(requestHeaders, RequestIdHeaderName);
 
-    tenantId ??= requestHeaders.TryGetValue(TenantIdHeaderName, out var t) ? t : null;
     userId ??= requestHeaders.TryGetValue(UserIdHeaderName, out var u) ? u : null;
 
     var method = serverContext.Method ?? string.Empty;

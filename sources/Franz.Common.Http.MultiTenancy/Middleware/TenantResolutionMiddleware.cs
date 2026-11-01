@@ -1,50 +1,80 @@
-﻿// Middleware/TenantResolutionMiddleware.cs
-using System.Linq;
-using System.Threading.Tasks;
+using Franz.Common.Http.MultiTenancy.Accessors;
+using Franz.Common.Http.MultiTenancy.Configuration;
 using Franz.Common.MultiTenancy;
-using Franz.Common.MultiTenancy.TenantResolution;
+using Franz.Common.MultiTenancy.Models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
-namespace Franz.Common.Http.MultiTenancy.Middleware
+namespace Franz.Common.Http.MultiTenancy.Middleware;
+
+/// <summary>Establishes a validated tenant context before application middleware and handlers execute.</summary>
+public sealed class TenantResolutionMiddleware(
+    ITenantResolutionPipeline pipeline,
+    ITenantExecutionContextAccessor executionContextAccessor,
+    IOptions<TenantResolutionOptions> options,
+    IServiceProvider serviceProvider) : IMiddleware
 {
-  public class TenantResolutionMiddleware
-  {
-    private readonly RequestDelegate _next;
-    private readonly ITenantResolutionPipeline _pipeline;
-    private readonly ITenantContextAccessor _tenantContextAccessor;
-    private readonly IDomainContextAccessor _domainContextAccessor;
-
-    public TenantResolutionMiddleware(
-        RequestDelegate next,
-        ITenantResolutionPipeline pipeline,
-        ITenantContextAccessor tenantContextAccessor,
-        IDomainContextAccessor domainContextAccessor)
+    public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
-      _next = next;
-      _pipeline = pipeline;
-      _tenantContextAccessor = tenantContextAccessor;
-      _domainContextAccessor = domainContextAccessor;
-    }
+        var result = await pipeline.ResolveAsync(context).ConfigureAwait(false);
+        var tenant = result?.Tenant;
 
-    public async Task InvokeAsync(HttpContext context)
-    {
-      var result = await _pipeline.ResolveAsync(context);
-
-      if (result?.Tenant != null)
-      {
-        _tenantContextAccessor.SetCurrentTenantId(result.Tenant.Id);
-
-        var matchedDomain = result.Tenant.Domains.FirstOrDefault(d =>
-            string.Equals(d.Host, context.Request.Host.Host,
-                System.StringComparison.OrdinalIgnoreCase));
-
-        if (matchedDomain != null)
+        if (tenant is null || !result!.Succeeded)
         {
-          _domainContextAccessor.SetCurrentDomainId(result.Tenant.Id);
+            if (options.Value.RequireTenant)
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+            await next(context).ConfigureAwait(false);
+            return;
         }
-      }
 
-      await _next(context);
+        if (tenant.Status != TenantStatus.Active)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+
+        var validator = serviceProvider.GetService<ITenantValidator>();
+        if (validator is not null && !await validator.IsValidAsync(tenant.Id, context.RequestAborted).ConfigureAwait(false))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+
+        if (context.User.Identity?.IsAuthenticated == true)
+        {
+            var authorizer = serviceProvider.GetService<ITenantRequestAuthorizer>();
+            if (authorizer is null ||
+                !await authorizer.IsAuthorizedAsync(context.User, tenant, context.RequestAborted).ConfigureAwait(false))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+        }
+
+        Guid? domainId = null;
+        var host = context.Request.Host.Host;
+        if (!string.IsNullOrWhiteSpace(host))
+        {
+            var normalizedHost = TenantDomain.NormalizeHost(host);
+            var domain = tenant.Domains.SingleOrDefault(candidate =>
+                candidate.IsVerified && candidate.Host == normalizedHost &&
+                (candidate.TenantId == Guid.Empty || candidate.TenantId == tenant.Id));
+            if (domain is not null) domainId = domain.Id;
+        }
+
+        var executionContext = new TenantExecutionContext(tenant, domainId, result.Source, DateTimeOffset.UtcNow);
+        executionContextAccessor.Initialize(executionContext);
+        try
+        {
+            await next(context).ConfigureAwait(false);
+        }
+        finally
+        {
+            executionContextAccessor.Clear();
+        }
     }
-  }
 }

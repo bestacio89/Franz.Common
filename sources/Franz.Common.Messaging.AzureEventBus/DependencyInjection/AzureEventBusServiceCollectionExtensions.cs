@@ -60,6 +60,7 @@ public static class AzureEventBusServiceCollectionExtensions
       var dispatcher = sp.GetRequiredService<IDispatcher>();
       var logger = sp.GetRequiredService<ILogger<AzureEventBusProcessor>>();
       var options = sp.GetRequiredService<AzureEventBusOptions>();
+      var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
 
       return new AzureEventBusProcessor(
           client,
@@ -67,7 +68,8 @@ public static class AzureEventBusServiceCollectionExtensions
           mapper,
           dispatcher,
           logger,
-          options.ToProcessorOptions());
+          options.ToProcessorOptions(),
+          scopeFactory);
     });
 
     services.AddSingleton<AzureEventBusConsumer>();

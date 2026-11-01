@@ -37,4 +37,7 @@
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="../Shared/RelationalTenantIsolationContract.cs" Link="ProviderContract/RelationalTenantIsolationContract.cs" />
+  </ItemGroup>
 </Project>

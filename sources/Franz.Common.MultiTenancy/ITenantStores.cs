@@ -1,51 +1,58 @@
-﻿// File: Stores/InMemoryTenantStore.cs
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Franz.Common.MultiTenancy.Models;
-#nullable enable
-namespace Franz.Common.MultiTenancy.Stores
+
+namespace Franz.Common.MultiTenancy.Stores;
+
+/// <summary>In-memory tenant registry for tests and local demonstrations; not a production store.</summary>
+public sealed class InMemoryTenantStore : ITenantStore
 {
-  /// <summary>
-  /// Simple in-memory store — not for production. Helpful for unit tests and quick local demos.
-  /// </summary>
-  public class InMemoryTenantStore : ITenantStore
-  {
-    private readonly ConcurrentDictionary<Guid, TenantInfo> tenants = new();
+    private readonly ConcurrentDictionary<Guid, TenantInfo> _tenants = new();
 
     public InMemoryTenantStore(IEnumerable<TenantInfo>? initial = null)
     {
-      if (initial != null)
-      {
-        foreach (var t in initial)
-          tenants[t.Id] = t;
-      }
+        if (initial is null) return;
+        foreach (var tenant in initial) AddOrUpdate(tenant);
     }
 
     public Task<TenantInfo?> FindByIdAsync(Guid id)
     {
-      tenants.TryGetValue(id, out var t);
-      return Task.FromResult<TenantInfo?>(t);
+        _tenants.TryGetValue(id, out var tenant);
+        return Task.FromResult(tenant);
     }
 
     public Task<TenantInfo?> FindByHostAsync(string host)
     {
-      if (string.IsNullOrWhiteSpace(host)) return Task.FromResult<TenantInfo?>(null);
-      var normalized = host.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(host)) return Task.FromResult<TenantInfo?>(null);
+        string normalized;
+        try { normalized = TenantDomain.NormalizeHost(host); }
+        catch (ArgumentException) { return Task.FromResult<TenantInfo?>(null); }
 
-      var tenant = tenants.Values.FirstOrDefault(t => t.Domains.Any(d => d.Host == normalized));
-      return Task.FromResult<TenantInfo?>(tenant);
+        var matches = _tenants.Values
+            .Where(tenant => tenant.Domains.Any(domain => domain.IsVerified && domain.Host == normalized))
+            .Take(2)
+            .ToArray();
+        if (matches.Length > 1)
+            throw new InvalidOperationException($"Hostname '{normalized}' is mapped to more than one tenant.");
+        return Task.FromResult(matches.SingleOrDefault());
     }
 
     public Task<IEnumerable<TenantInfo>> GetAllAsync()
-        => Task.FromResult(tenants.Values.AsEnumerable());
+        => Task.FromResult<IEnumerable<TenantInfo>>(_tenants.Values.ToArray());
 
     public Task<bool> ExistsAsync(Guid id)
-        => Task.FromResult(tenants.ContainsKey(id));
+        => Task.FromResult(_tenants.ContainsKey(id));
 
-    // helper for tests / bootstrapping
-    public void AddOrUpdate(TenantInfo tenant) => tenants[tenant.Id] = tenant;
-  }
+    public void AddOrUpdate(TenantInfo tenant)
+    {
+        ArgumentNullException.ThrowIfNull(tenant);
+        foreach (var domain in tenant.Domains)
+        {
+            var duplicate = _tenants.Values.Any(existing =>
+                existing.Id != tenant.Id && existing.Domains.Any(candidate =>
+                    candidate.IsVerified && domain.IsVerified && candidate.Host == domain.Host));
+            if (duplicate)
+                throw new InvalidOperationException($"Hostname '{domain.Host}' is already assigned to another tenant.");
+        }
+        _tenants[tenant.Id] = tenant;
+    }
 }
