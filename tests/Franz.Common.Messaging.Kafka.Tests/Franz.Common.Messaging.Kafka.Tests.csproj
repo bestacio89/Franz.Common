@@ -35,6 +35,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Kafka\Franz.Common.Messaging.Kafka.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
+    <ProjectReference
+      Include="..\..\sources\Microsoft.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
