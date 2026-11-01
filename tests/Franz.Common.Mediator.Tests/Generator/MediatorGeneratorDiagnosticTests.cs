@@ -64,7 +64,7 @@ public sealed class MediatorGeneratorDiagnosticTests
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "FRZMED001");
     }
 
-    private static ImmutableArray<Diagnostic> RunGenerator(string source)
+    private static Diagnostic[] RunGenerator(string source)
     {
         var platformAssemblies = (string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!;
         var references = platformAssemblies
@@ -82,6 +82,6 @@ public sealed class MediatorGeneratorDiagnosticTests
             new MediatorRegistrationGenerator().AsSourceGenerator());
 
         driver = driver.RunGenerators(compilation);
-        return driver.GetRunResult().Diagnostics;
+        return driver.GetRunResult().Diagnostics.ToArray();
     }
 }
