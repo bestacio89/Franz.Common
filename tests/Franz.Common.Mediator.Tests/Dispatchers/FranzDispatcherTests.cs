@@ -5,6 +5,7 @@ using Franz.Common.Mediator.Handlers;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Processors;
+using Franz.Common.Mediator.Registration;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
