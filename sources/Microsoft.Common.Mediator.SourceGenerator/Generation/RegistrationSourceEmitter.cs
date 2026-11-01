@@ -30,15 +30,17 @@ internal static class FranzMediatorGeneratedRegistration
     internal static void Initialize()
     {
         RegisterInvokers();
-        GeneratedHandlerRegistrationRegistry.Register(
-            typeof(FranzMediatorGeneratedRegistration).Assembly,
-            RegisterHandlers);
+        var assembly = typeof(FranzMediatorGeneratedRegistration).Assembly;
+        GeneratedHandlerRegistrationRegistry.Register(assembly, RegisterHandlers);
+        GeneratedHandlerRegistrationRegistry.RegisterTransient(assembly, RegisterTransientHandlers);
     }
 
     private static void RegisterHandlers(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 ");
+
+    var transientRegistrations = new StringBuilder();
 
     foreach (var handler in handlers)
     {
@@ -47,6 +49,8 @@ internal static class FranzMediatorGeneratedRegistration
       {
         builder.AppendLine(
             $"        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof({handler.ServiceType}), typeof({handler.ImplementationType})));");
+        transientRegistrations.AppendLine(
+            $"        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof({handler.ServiceType}), typeof({handler.ImplementationType})));");
       }
 
       var invokerKey = $"{handler.HandlerKind}|{handler.RequestType}|{handler.ResponseType}";
@@ -74,6 +78,13 @@ internal static class FranzMediatorGeneratedRegistration
       }
     }
 
+    builder.AppendLine(@"    }
+
+    private static void RegisterTransientHandlers(IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+");
+    builder.Append(transientRegistrations);
     builder.AppendLine(@"    }
 
     private static void RegisterInvokers()
