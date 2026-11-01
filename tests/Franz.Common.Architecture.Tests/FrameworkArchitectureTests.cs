@@ -89,11 +89,15 @@ public sealed class FrameworkArchitectureTests
       var document = XDocument.Load(projectPath);
       foreach (var reference in document
         .Descendants()
-        .Where(element => element.Name.LocalName == "ProjectReference")
+        .Where(element => element.Name.LocalName is "ProjectReference" or "PackageReference")
         .Select(element => (string?)element.Attribute("Include"))
         .Where(include => !string.IsNullOrWhiteSpace(include)))
       {
-        var referencedName = Path.GetFileNameWithoutExtension(reference);
+        var include = reference!.Trim();
+        var referencedName = include.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
+          ? Path.GetFileNameWithoutExtension(include)
+          : include;
+
         if (testProjectNames.Contains(referencedName))
           violations.Add($"{projectName} -> {referencedName}");
       }
