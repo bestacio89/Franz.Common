@@ -35,8 +35,8 @@ public sealed class FrameworkDomainContractTests
     Assert.Equal(keyType, Assert.Single(implementedContract.GetGenericArguments()));
 
     var identity = AssertProperty(entityType, "Id", keyType);
-    Assert.True(identity.GetMethod?.IsPublic);
-    Assert.True(identity.GetSetMethod(nonPublic: true)?.IsPrivate);
+    Assert.True(identity.GetMethod?.IsPublic == true);
+    Assert.True(identity.GetSetMethod(nonPublic: true)?.IsPrivate == true);
 
     foreach (var propertyName in new[]
     {
