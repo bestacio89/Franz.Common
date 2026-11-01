@@ -137,7 +137,7 @@ public sealed class MongoTenantRepository<TEntity>
         var filter = TenantFilter() & Builders<TEntity>.Filter.Eq(document => document.Id, entity.Id);
         var result = session is null
             ? await _collection.DeleteOneAsync(filter, cancellationToken).ConfigureAwait(false)
-            : await _collection.DeleteOneAsync(session, filter, cancellationToken).ConfigureAwait(false);
+            : await _collection.DeleteOneAsync(session, filter, options: null, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (result.DeletedCount == 0)
             throw new Franz.Common.Errors.NotFoundException(
