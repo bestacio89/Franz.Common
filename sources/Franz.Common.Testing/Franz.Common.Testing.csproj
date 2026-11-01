@@ -2,7 +2,6 @@
 	<Import Project="..\..\common.targets" />
 
 	<ItemGroup>
-		<ProjectReference Include="..\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
 		<PackageReference Include="FluentAssertions" Version="8.10.0">
 			<PrivateAssets>none</PrivateAssets>
 		</PackageReference>
