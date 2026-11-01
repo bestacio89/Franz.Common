@@ -61,12 +61,6 @@
   },
   {
     "rule": "ASSEMBLY_SCAN",
-    "path": "sources/Franz.Common.Mediator/Helpers/HandlerCollector.cs",
-    "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs.",
-    "ruleId": "SRC-004"
-  },
-  {
-    "rule": "ASSEMBLY_SCAN",
     "path": "sources/Franz.Common.Messaging.Hosting/Listeners/OutboxMessageListener.cs",
     "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed.",
     "ruleId": "SRC-004"
