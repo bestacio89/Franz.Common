@@ -97,7 +97,7 @@ public static class FranzAuthenticationExtensions
 /// <summary>
 /// Strongly typed JWT settings for symmetric-signature validation.
 /// </summary>
-public sealed class JwtSettings
+public class JwtSettings
 {
     public string Issuer { get; set; } = string.Empty;
     public string Audience { get; set; } = string.Empty;
