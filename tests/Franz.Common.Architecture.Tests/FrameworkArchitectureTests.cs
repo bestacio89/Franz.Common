@@ -12,7 +12,7 @@ namespace Franz.Common.Architecture.Tests;
 public sealed class FrameworkArchitectureTests
 {
   private const string AdapterNamespacePattern =
-    @"^Franz\.Common\.(EntityFramework(\..*)?|MongoDB(\..*)?|AzureCosmosDB(\..*)?|Http(\..*)?|Grpc(\..*)?|Messaging\.(Kafka|RabbitMQ|AzureEventBus|AzureEventGrid|AzureEventHubs|MassTransit)(\..*)?|Messaging\.Hosting\.(Kafka|RabbitMQ)(\..*)?|SSO(\..*)?)$";
+    @"^Franz\.Common\.(EntityFramework(\..*)?|MongoDB(\..*)?|AzureCosmosDB(\..*)?|Http(\..*)?|Grpc(\..*)?|Messaging\..+|SSO(\..*)?)$";
 
   private static readonly Lazy<string> RepositoryRoot = new(FindRepositoryRoot);
   private static readonly Lazy<IReadOnlyList<Assembly>> RuntimeAssemblies = new(LoadRuntimeAssemblies);
