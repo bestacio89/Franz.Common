@@ -78,7 +78,7 @@ Choose **Kafka** or **RabbitMQ** — your application code does not change.
 
 ---
 
-**Current Version:** v2.3.4
+**Current Version:** v2.3.3
 
 ---
 
@@ -127,3 +127,8 @@ This release finalizes RabbitMQ as a **first-class transport** in Franz.
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## 2.3.4 tenant execution boundary notes
+
+Franz.Common 2.3.4 improves tenant execution-context propagation and cleanup for supported messaging flows. Verify transport-specific behavior and handler registration requirements in [the execution lifecycle guide](../../docs/multitenancy-execution-lifecycle.md). Tenant-aware EF filters are not a security boundary for raw SQL or APIs that bypass EF query filters.
