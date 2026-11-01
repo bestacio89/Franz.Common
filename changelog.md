@@ -25,7 +25,6 @@
 ---
 
 
-# 📈 **Franz Framework – Full Changelog**
 
 ## Unreleased — Multi-Tenancy Security Hardening
 
