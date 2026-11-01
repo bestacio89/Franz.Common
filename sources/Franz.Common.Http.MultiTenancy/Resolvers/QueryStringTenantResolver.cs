@@ -8,7 +8,7 @@ public class QueryStringTenantResolver(ITenantStore store, string paramName = "t
 {
     public int Order => 150;
 
-    public Task<TenantResolutionResult?> ResolveTenantAsync(object? context = null
+    public Task<TenantResolutionResult?> ResolveTenantAsync(object? context = null)
         => ResolveTenantAsync(context, CancellationToken.None);
 
     public async Task<TenantResolutionResult?> ResolveTenantAsync(
