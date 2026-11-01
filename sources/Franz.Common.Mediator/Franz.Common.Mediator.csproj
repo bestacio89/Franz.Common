@@ -2,6 +2,11 @@
 
   <Import Project="..\..\common.targets" />
 
+  <PropertyGroup>
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="12.2.0" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

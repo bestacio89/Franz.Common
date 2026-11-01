@@ -57,3 +57,19 @@ A checked release gate is evidence only for the exact commit, provider versions,
 ## Release 2.3.4 evidence boundary
 
 The 2.3.4 relational qualification names PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23. Qualification is limited to the framework-managed EF Core and repository paths covered by the shared contract suite. It must not be read as certification of arbitrary SQL, stored procedures, provider-native bulk APIs, direct database clients, or non-relational providers. Each consuming application remains responsible for inventorying and independently securing those escape hatches.
+
+---
+
+## HTTP ingress and identity boundary
+
+The HTTP edge is responsible for establishing trusted request context before application code runs:
+
+- Forwarded headers are accepted only from configured trusted proxies/networks. The framework preserves ASP.NET Core's default trust restrictions; deployments must add their actual reverse proxies explicitly.
+- CORS is configured with exact origins. An absent origin list grants no cross-origin access, and wildcard origins are rejected. CORS is not authorization.
+- JWT helper configuration requires issuer, audience, and a symmetric signing key of at least 256 bits. OIDC providers using asymmetric keys should use the standard provider-backed JWT bearer configuration.
+- User identity is read from authenticated claims only. Tenant and domain identity is read from the validated tenant execution context.
+- Authenticated tenant membership is independently authorized through `ITenantRequestAuthorizer`; missing registration or denied membership fails closed.
+- Tenant resolution, validation, and membership checks receive the HTTP request cancellation token. I/O tenant stores should override cancellation-aware methods to cancel their provider calls.
+- Tenant/domain execution context cannot be replaced during a validated request and is cleared after downstream execution, including exceptional exits.
+
+These controls protect the HTTP ingress boundary. They do not make arbitrary request headers trustworthy and do not replace database/provider isolation, raw SQL controls, or authorization in background/message consumers.

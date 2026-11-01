@@ -207,3 +207,13 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+---
+
+## HTTP security defaults
+
+- CORS accepts only exact HTTP/HTTPS origins from the semicolon-separated `Cors` configuration value. Wildcards and origin paths are rejected.
+- With no configured origins, the default policy does not grant cross-origin access.
+- Forwarded-header processing preserves ASP.NET Core's trusted-proxy/network restrictions. Add deployment proxy addresses explicitly through `ForwardedHeadersOptions.KnownProxies` or `KnownNetworks`.
+- `AddErrors()` registers a default error strategy, and `ErrorResponseProvider` now uses the selected strategy's message. Production technical errors therefore use the sanitized strategy response rather than raw exception messages.
+- Keep raw request headers separate from authenticated identity. Use `IHeaderContextAccessor` for raw headers; `IdentityContextAccessor` reads authenticated claims only.

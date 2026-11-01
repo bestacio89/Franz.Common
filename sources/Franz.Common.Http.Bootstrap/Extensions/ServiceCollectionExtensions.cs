@@ -6,6 +6,8 @@ using Franz.Common.Http.Headers.Extensions;
 using Franz.Common.Http.Identity.Extensions;
 using Franz.Common.Http.Documentation.Extensions;
 using Franz.Common.Http.Bootstrap.Exceptions;
+using Franz.Common.Http.Errors.Strategy;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Franz.Common.Serialization.Extensions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -46,6 +48,9 @@ public static class ServiceCollectionExtensions
         .AddForwardedHeaders()
         .AddSerialization()
         .AddErrors();
+
+    services.TryAddEnumerable(
+        ServiceDescriptor.Scoped<IErrorResponseStrategy, ValidationErrorResponseStrategy>());
 
     services
         .AddFranzAuthentication();

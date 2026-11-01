@@ -249,3 +249,13 @@ Licensed under the MIT License. See the `LICENSE` file for details.
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+---
+
+## Authenticated identity boundary
+
+`IdentityContextAccessor` reads user ID, email, display name, and roles only from an authenticated `ClaimsPrincipal`. It does not fall back to `X-User-Id`, `X-User-Email`, `X-User-Roles`, or other caller-supplied headers.
+
+Tenant and domain IDs are read from the validated `ITenantExecutionContextAccessor`, not directly from a tenant claim or request header. Register the HTTP multi-tenancy module when the application needs tenant-aware identity context. Use `IHeaderContextAccessor` separately when raw inbound headers are needed for non-authoritative application metadata.
+
+This intentionally tightens the trust boundary without changing the public `IIdentityContextAccessor` contract. Existing applications that used identity headers as ambient identity must move that trust decision into an authentication handler or a trusted service-to-service integration.

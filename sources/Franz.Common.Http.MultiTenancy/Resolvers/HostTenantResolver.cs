@@ -10,10 +10,17 @@ public sealed class HostTenantResolver(ITenantStore store) : ITenantResolver
 {
     public int Order => 50;
 
-    public async Task<TenantResolutionResult?> ResolveTenantAsync(object? context)
+    public Task<TenantResolutionResult?> ResolveTenantAsync(object? context)
+        => ResolveTenantAsync(context, CancellationToken.None);
+
+    public async Task<TenantResolutionResult?> ResolveTenantAsync(
+        object? context,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (context is not HttpContext httpContext)
             return null;
+
         var host = httpContext.Request.Host.Host;
         if (string.IsNullOrWhiteSpace(host))
             return null;
@@ -25,7 +32,7 @@ public sealed class HostTenantResolver(ITenantStore store) : ITenantResolver
             return TenantResolutionResult.FailedResult(TenantResolutionSource.Host, "The request host is invalid.");
         }
 
-        var tenant = await store.FindByHostAsync(normalizedHost).ConfigureAwait(false);
+        var tenant = await store.FindByHostAsync(normalizedHost, cancellationToken).ConfigureAwait(false);
         if (tenant is null)
             return TenantResolutionResult.FailedResult(TenantResolutionSource.Host, "No tenant matched the request host.");
 
@@ -35,6 +42,8 @@ public sealed class HostTenantResolver(ITenantStore store) : ITenantResolver
 
         return verifiedMapping
             ? TenantResolutionResult.Success(tenant, TenantResolutionSource.Host)
-            : TenantResolutionResult.FailedResult(TenantResolutionSource.Host, "The tenant hostname is not verified or does not belong to the resolved tenant.");
+            : TenantResolutionResult.FailedResult(
+                TenantResolutionSource.Host,
+                "The tenant hostname is not verified or does not belong to the resolved tenant.");
     }
 }

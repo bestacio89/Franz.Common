@@ -62,6 +62,26 @@ public class MediatorGeneratorIntegrationTests
   }
 
   [Fact]
+  public void AddFranzMediatorDefault_RegistersOnlyGeneratedClosedGenericPipelines()
+  {
+    var services = new ServiceCollection();
+
+    services.AddFranzMediatorDefault<PingCommandHandler>();
+
+    services.Should().NotContain(descriptor =>
+        descriptor.ServiceType == typeof(Franz.Common.Mediator.Pipelines.Core.IPipeline<,>) ||
+        descriptor.ServiceType == typeof(Franz.Common.Mediator.Pipelines.Core.INotificationPipeline<>) ||
+        descriptor.ServiceType == typeof(Franz.Common.Mediator.Pipelines.Processors.IPreProcessor<>) ||
+        descriptor.ServiceType == typeof(Franz.Common.Mediator.Pipelines.Processors.IPostProcessor<,>));
+
+    services.Should().Contain(descriptor =>
+        descriptor.ServiceType == typeof(Franz.Common.Mediator.Pipelines.Core.IPipeline<
+            Franz.Common.Mediator.Messages.ICommand<string>, string>) &&
+        descriptor.ImplementationType == typeof(Franz.Common.Mediator.Pipelines.Logging.LoggingPipeline<
+            Franz.Common.Mediator.Messages.ICommand<string>, string>));
+  }
+
+  [Fact]
   public void AddFranzMediatorV1_AcceptsGeneratedAssemblyWithNoHandlers()
   {
     var services = new ServiceCollection();

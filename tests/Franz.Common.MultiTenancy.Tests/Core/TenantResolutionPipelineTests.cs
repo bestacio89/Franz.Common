@@ -42,9 +42,51 @@ public sealed class TenantResolutionPipelineTests
         Assert.Equal(tenant.Id, result.Tenant?.Id);
     }
 
+    [Fact]
+    public async Task ResolveAsync_PropagatesCancellationToResolvers()
+    {
+        var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
+        using var cancellation = new CancellationTokenSource();
+        var resolver = new CancellationAwareStubResolver(tenant);
+        var pipeline = new DefaultTenantResolutionPipeline([resolver]);
+
+        await pipeline.ResolveAsync(new object(), cancellation.Token);
+
+        Assert.Equal(cancellation.Token, resolver.CapturedToken);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ThrowsWhenAlreadyCancelled()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var pipeline = new DefaultTenantResolutionPipeline([]);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => pipeline.ResolveAsync(new object(), cancellation.Token));
+    }
+
     private sealed class StubResolver(int order, TenantResolutionResult? result) : ITenantResolver
     {
         public int Order => order;
         public Task<TenantResolutionResult?> ResolveTenantAsync(object? context) => Task.FromResult(result);
+    }
+
+    private sealed class CancellationAwareStubResolver(TenantInfo tenant) : ITenantResolver
+    {
+        public int Order => 0;
+        public CancellationToken CapturedToken { get; private set; }
+
+        public Task<TenantResolutionResult?> ResolveTenantAsync(object? context)
+            => Task.FromResult<TenantResolutionResult?>(
+                TenantResolutionResult.Success(tenant, TenantResolutionSource.Host));
+
+        public Task<TenantResolutionResult?> ResolveTenantAsync(
+            object? context,
+            CancellationToken cancellationToken)
+        {
+            CapturedToken = cancellationToken;
+            return ResolveTenantAsync(context);
+        }
     }
 }

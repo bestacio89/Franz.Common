@@ -3,11 +3,14 @@ using Franz.Common.Mapping.Core;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Franz.Common.Mapping.Extensions;
 
 public static class MappingExtensions
 {
+  [RequiresUnreferencedCode("Assembly profile discovery requires reflection. Register profiles explicitly for trimmed applications.")]
+  [RequiresDynamicCode("Assembly profile discovery activates profile types at runtime. Register profiles explicitly for Native AOT.")]
   public static IServiceCollection AddFranzMapping(
     this IServiceCollection services,
     Action<MappingConfiguration>? configure = null,
@@ -49,6 +52,8 @@ public static class MappingExtensions
     return services;
   }
 
+  [RequiresUnreferencedCode("Assembly profile discovery requires reflection. Register profiles explicitly for trimmed applications.")]
+  [RequiresDynamicCode("Assembly profile discovery activates profile types at runtime. Register profiles explicitly for Native AOT.")]
   public static IServiceCollection AddFranzMapping(
       this IServiceCollection services,
       params Assembly[] assemblies)

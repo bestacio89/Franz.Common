@@ -78,6 +78,13 @@ public sealed class FranzGlobalExceptionHandler : IExceptionHandler
 
     problemDetails.Extensions["traceId"] = httpContext.TraceIdentifier;
 
+    if (exception is ValidationException validationException)
+    {
+      problemDetails.Extensions["errors"] = validationException.Errors
+          .Select(error => new { error.PropertyName, error.ErrorMessage })
+          .ToArray();
+    }
+
     httpContext.Response.StatusCode = (int)statusCode;
     httpContext.Response.ContentType = "application/problem+json";
 
@@ -113,7 +120,9 @@ public sealed class FranzGlobalExceptionHandler : IExceptionHandler
 
       PreconditionFailedException => (HttpStatusCode.PreconditionFailed, "Precondition failed"),
 
-      FunctionalException => (HttpStatusCode.UnprocessableEntity, "Business rule violated"),
+      BusinessException => (HttpStatusCode.UnprocessableEntity, "Business rule violated"),
+
+      FunctionalException => (HttpStatusCode.BadRequest, "Invalid request"),
 
       ValidationException => (HttpStatusCode.BadRequest, "Validation failed"),
 

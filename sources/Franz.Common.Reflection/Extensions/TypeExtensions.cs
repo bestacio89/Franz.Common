@@ -1,26 +1,30 @@
-﻿namespace Franz.Common.Reflection.Extensions;
+using System.Diagnostics.CodeAnalysis;
+
+namespace Franz.Common.Reflection.Extensions;
 
 public static class TypeExtensions
 {
+    [RequiresUnreferencedCode("Runtime type inspection requires interface metadata to be preserved. Use compile-time contracts for trimmed applications.")]
     public static bool Implements<TInterface>(this Type type)
     {
+        ArgumentNullException.ThrowIfNull(type);
+
         var interfaceType = typeof(TInterface);
-
-        var result = type.GetInterfaces().Contains(interfaceType);
-
-        return result;
+        return type.GetInterfaces().Contains(interfaceType);
     }
 
+    [RequiresUnreferencedCode("Runtime type inspection requires interface metadata to be preserved. Use compile-time contracts for trimmed applications.")]
     public static bool DirectlyImplements<TInterface>(this Type type)
     {
+        ArgumentNullException.ThrowIfNull(type);
+
         var searchInterfaceType = typeof(TInterface);
-
         var minimalInterfaces = type.GetInterfaces();
-        if (type.BaseType != null)
-            minimalInterfaces = minimalInterfaces.AsQueryable().Except(type.BaseType.GetInterfaces()).ToArray();
+        var baseType = type.BaseType;
 
-        var result = minimalInterfaces.Any(i => searchInterfaceType.IsAssignableFrom(i));
+        if (baseType is not null)
+            minimalInterfaces = minimalInterfaces.Except(baseType.GetInterfaces()).ToArray();
 
-        return result;
+        return minimalInterfaces.Any(searchInterfaceType.IsAssignableFrom);
     }
 }

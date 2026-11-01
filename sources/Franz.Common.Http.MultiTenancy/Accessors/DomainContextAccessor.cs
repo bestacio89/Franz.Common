@@ -1,4 +1,5 @@
 using Franz.Common.MultiTenancy;
+using Franz.Common.MultiTenancy.Models;
 using Microsoft.AspNetCore.Http;
 
 namespace Franz.Common.Http.MultiTenancy.Accessors;
@@ -17,6 +18,17 @@ public sealed class DomainContextAccessor(IHttpContextAccessor httpContextAccess
     public void SetCurrentDomainId(Guid domainId)
     {
         var items = httpContextAccessor.HttpContext?.Items;
-        if (items is not null) items[HttpTenantContextKeys.DomainId] = domainId;
+        if (items is null)
+            return;
+
+        if (items.TryGetValue(HttpTenantContextKeys.ExecutionContext, out var value) &&
+            value is TenantExecutionContext executionContext)
+        {
+            if (executionContext.DomainId != domainId)
+                throw new InvalidOperationException("The validated domain execution context cannot be replaced during an HTTP request.");
+            return;
+        }
+
+        items[HttpTenantContextKeys.DomainId] = domainId;
     }
 }

@@ -52,3 +52,12 @@ Status definitions:
 ## Scope boundaries
 
 These tests protect stable guarantees made by Franz.Common. They do not impose generic enterprise-application layering rules on framework packages, and they do not replace provider qualification, security review, application architecture tests, or production observability.
+
+---
+
+| HTTP JWT configuration | The symmetric JWT helper requires issuer, audience, and a signing key of at least 256 bits; issuer, audience, lifetime, expiration, signed-token, and signing-key validation cannot be silently disabled by missing configuration. | Enforced | `JwtBearerConfigurationTests` validates fail-fast configuration and all required `TokenValidationParameters`. |
+| HTTP CORS boundary | The default CORS policy grants no cross-origin access without explicit origins; configured origins must be exact HTTP/HTTPS origins without wildcards or paths. | Enforced | `HttpBoundaryConfigurationTests` covers absent origins, exact origins, credentials, and rejected wildcard/invalid origins. |
+| Forwarded-header trust | Forwarded-header processing preserves trusted proxy/network restrictions and allows explicit proxy configuration. | Enforced | `HttpBoundaryConfigurationTests` verifies the default trusted-proxy set remains present and configured proxies are retained. |
+| HTTP identity boundary | User identity comes only from authenticated claims; tenant/domain identity comes only from the validated tenant execution context. | Enforced | `IdentityContextAccessorTests` verifies unauthenticated and conflicting request headers cannot establish identity and that validated tenant context is authoritative. |
+| Tenant HTTP lifecycle | Request-aborted cancellation reaches resolution, validation, and membership authorization; validated tenant/domain context cannot be replaced and is cleared after downstream failure. | Verified | HTTP middleware, resolver, store, accessor, and lifecycle tests cover the exercised paths. I/O tenant stores must override cancellation-aware methods to cancel provider operations. |
+| HTTP error responses | MVC error strategies control their response messages; technical errors are sanitized in production and business exceptions map to HTTP 422 in the global handler. | Verified | `HttpErrorContractTests` covers strategy-based sanitization, default fallback registration, and global business-error classification. |

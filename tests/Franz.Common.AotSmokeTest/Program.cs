@@ -4,6 +4,8 @@ using Franz.Common.Mediator.Extensions;
 using Franz.Common.Mediator.Handlers;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Processors;
+using Franz.Common.Mediator.Pipelines.Core;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using System.Runtime.CompilerServices;
 
@@ -67,8 +69,44 @@ public static class Program
         if (await generatedDispatcher.SendAsync<int>(new AotQuery(10)) != 20)
             return 9;
 
+        var defaultServices = new ServiceCollection();
+        defaultServices.AddLogging();
+        defaultServices.AddSingleton<IHostEnvironment>(Host.CreateApplicationBuilder().Environment);
+        defaultServices.AddScoped<IUnitOfWork, AotUnitOfWork>();
+        defaultServices.AddFranzMediatorDefault<AotCommandHandler>();
+
+        var openGenericPipelineRegistrations = defaultServices.Any(descriptor =>
+            descriptor.ServiceType == typeof(IPipeline<,>) ||
+            descriptor.ServiceType == typeof(INotificationPipeline<>) ||
+            descriptor.ServiceType == typeof(IPreProcessor<>) ||
+            descriptor.ServiceType == typeof(IPostProcessor<,>));
+        if (openGenericPipelineRegistrations)
+            return 12;
+
+        using var defaultProvider = defaultServices.BuildServiceProvider();
+        using var defaultScope = defaultProvider.CreateScope();
+        var defaultDispatcher = defaultScope.ServiceProvider.GetRequiredService<IDispatcher>();
+        if (await defaultDispatcher.SendAsync<int>(new AotQuery(21)) != 42)
+            return 10;
+        if (await defaultDispatcher.SendAsync<Unit>(new AotUnitCommand()) != Unit.Value)
+            return 11;
+
         return 0;
     }
+}
+
+public sealed class AotUnitOfWork : IUnitOfWork
+{
+    public Task BeginAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task RollbackAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+public sealed record AotUnitCommand : ICommand<Unit>;
+public sealed class AotUnitCommandHandler : ICommandHandler<AotUnitCommand, Unit>
+{
+    public Task<Unit> Handle(AotUnitCommand command, CancellationToken cancellationToken)
+        => Task.FromResult(Unit.Value);
 }
 
 public sealed record AotSource(string Name, int Version);

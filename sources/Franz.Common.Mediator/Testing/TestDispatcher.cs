@@ -4,6 +4,7 @@ using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Pipelines.Processors;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,6 +15,8 @@ namespace Franz.Common.Mediator.Testing
   /// <summary>
   /// A lightweight dispatcher for testing handlers without DI.
   /// </summary>
+  [RequiresDynamicCode("The test dispatcher uses dynamic invocation and is intended for tests only.")]
+  [RequiresUnreferencedCode("The test dispatcher uses dynamic invocation and is intended for tests only.")]
   public class TestDispatcher : IDispatcher
   {
     private readonly Dictionary<Type, object> _handlers = new();

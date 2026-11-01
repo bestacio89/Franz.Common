@@ -1,4 +1,5 @@
 ﻿// File: ITenantResolver.cs
+using System.Threading;
 using System.Threading.Tasks;
 using Franz.Common.MultiTenancy.TenantResolution;
 #nullable enable
@@ -11,17 +12,20 @@ namespace Franz.Common.MultiTenancy
   /// </summary>
   public interface ITenantResolver
   {
-    /// <summary>
-    /// Try to resolve a tenant identifier from the provided ambient context object.
-    /// The method accepts an opaque state object to avoid pulling ASP.NET types into the core library.
-    /// The HTTP adapter will pass in a context wrapper that exposes Host/Header/Query/Cookie as needed.
-    /// Return null if resolution failed.
-    /// </summary>
+    /// <summary>Attempts to resolve a tenant from the supplied ambient context.</summary>
     Task<TenantResolutionResult?> ResolveTenantAsync(object? context);
 
     /// <summary>
-    /// Order of execution: lower values execute earlier.
+    /// Cancellation-aware resolution. Existing implementations remain compatible;
+    /// I/O-backed resolvers should override this overload and propagate the token.
     /// </summary>
+    Task<TenantResolutionResult?> ResolveTenantAsync(object? context, CancellationToken cancellationToken)
+    {
+      cancellationToken.ThrowIfCancellationRequested();
+      return ResolveTenantAsync(context);
+    }
+
+    /// <summary>Order of execution: lower values execute earlier.</summary>
     int Order { get; }
   }
 }

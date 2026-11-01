@@ -1,56 +1,38 @@
-﻿// Resolvers/HeaderTenantResolver.cs
-using System;
-using System.Threading.Tasks;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.TenantResolution;
 using Microsoft.AspNetCore.Http;
 
-#nullable enable
-namespace Franz.Common.Http.MultiTenancy.Resolvers
+namespace Franz.Common.Http.MultiTenancy.Resolvers;
+
+public class HeaderTenantResolver(ITenantStore store, string headerName = "X-Tenant-Id") : ITenantResolver
 {
-  public class HeaderTenantResolver : ITenantResolver
-  {
-    private readonly ITenantStore _store;
-    private readonly string _headerName;
-
-    public HeaderTenantResolver(ITenantStore store, string headerName = "X-Tenant-Id")
-    {
-      _store = store;
-      _headerName = headerName;
-    }
-
     public int Order => 100;
 
-    public async Task<TenantResolutionResult?> ResolveTenantAsync(object? context)
+    public Task<TenantResolutionResult?> ResolveTenantAsync(object? context)
+        => ResolveTenantAsync(context, CancellationToken.None);
+
+    public async Task<TenantResolutionResult?> ResolveTenantAsync(
+        object? context,
+        CancellationToken cancellationToken)
     {
-      if (context is not HttpContext httpContext)
-        return null;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (context is not HttpContext httpContext ||
+            !httpContext.Request.Headers.TryGetValue(headerName, out var header))
+            return null;
 
-      if (!httpContext.Request.Headers.TryGetValue(_headerName, out var header))
-        return null; // not applicable, header missing
+        if (!Guid.TryParse(header, out var tenantId))
+            return TenantResolutionResult.FailedResult(
+                TenantResolutionSource.Header,
+                $"Header '{headerName}' was present but not a valid GUID.");
 
-      if (Guid.TryParse(header, out var tenantId))
-      {
-        var tenant = await _store.FindByIdAsync(tenantId);
-        if (tenant != null)
-        {
-          return TenantResolutionResult.Success(
-            tenant,
-            TenantResolutionSource.Header,
-            $"Resolved tenant '{tenant.Name}' from header '{_headerName}'."
-          );
-        }
-
-        return TenantResolutionResult.FailedResult(
-          TenantResolutionSource.Header,
-          $"Tenant '{tenantId}' not found for header '{_headerName}'."
-        );
-      }
-
-      return TenantResolutionResult.FailedResult(
-        TenantResolutionSource.Header,
-        $"Header '{_headerName}' was present but not a valid GUID."
-      );
+        var tenant = await store.FindByIdAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        return tenant is null
+            ? TenantResolutionResult.FailedResult(
+                TenantResolutionSource.Header,
+                $"Tenant '{tenantId}' not found for header '{headerName}'.")
+            : TenantResolutionResult.Success(
+                tenant,
+                TenantResolutionSource.Header,
+                $"Resolved tenant '{tenant.Name}' from header '{headerName}'.");
     }
-  }
 }

@@ -1,68 +1,94 @@
-using Franz.Common.Headers;
-using Franz.Common.Http.Extensions;
 using Franz.Common.Identity;
+using Franz.Common.MultiTenancy;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
 
 namespace Franz.Common.Http.Identity;
 
+/// <summary>
+/// Reads user identity only from an authenticated principal and tenant/domain identity
+/// only from the validated tenant execution context.
+/// </summary>
 public class IdentityContextAccessor : IIdentityContextAccessor
 {
-  private readonly IHttpContextAccessor httpContextAccessor;
+    private readonly IHttpContextAccessor httpContextAccessor;
+    private readonly ITenantExecutionContextAccessor? tenantExecutionContextAccessor;
 
-  public IdentityContextAccessor(IHttpContextAccessor httpContextAccessor)
-  {
-    this.httpContextAccessor = httpContextAccessor;
-  }
-
-  public string? GetCurrentEmail()
-  {
-    return httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.UserEmail, ClaimTypes.Email);
-  }
-
-  public Guid? GetCurrentId()
-  {
-    var userId = httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.UserId, ClaimTypes.NameIdentifier);
-    return Guid.TryParse(userId, out var guid) ? guid : null;
-  }
-
-  public string? GetCurrentFullName()
-  {
-    return httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.UserFullName, ClaimTypes.Name);
-  }
-
-  public string[]? GetCurrentRoles()
-  {
-    var roles = httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.UserRoles, ClaimTypes.Role);
-    return string.IsNullOrWhiteSpace(roles)
-        ? null
-        : roles.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-  }
-
-  public Guid? GetCurrentTenantId()
-  {
-    var tenantId = httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.TenantId, "tenant_id");
-    return Guid.TryParse(tenantId, out var guid) ? guid : null;
-  }
-
-  public Guid? GetCurrentDomainId()
-  {
-    var domainId = httpContextAccessor.HttpContext.TryGetValue(HeaderConstants.DomainId, "domain_id");
-    return Guid.TryParse(domainId, out var guid) ? guid : null;
-  }
-
-  public FranzIdentityContext GetCurrentIdentity()
-  {
-    return new FranzIdentityContext
+    public IdentityContextAccessor(IHttpContextAccessor httpContextAccessor)
+        : this(httpContextAccessor, null)
     {
-      UserId = GetCurrentId(),
-      Email = GetCurrentEmail(),
-      FullName = GetCurrentFullName(),
-      Roles = GetCurrentRoles(),
-      TenantId = GetCurrentTenantId(),
-      DomainId = GetCurrentDomainId()
-    };
-  }
+    }
 
+    public IdentityContextAccessor(
+        IHttpContextAccessor httpContextAccessor,
+        ITenantExecutionContextAccessor? tenantExecutionContextAccessor)
+    {
+        this.httpContextAccessor = httpContextAccessor
+            ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+        this.tenantExecutionContextAccessor = tenantExecutionContextAccessor;
+    }
 
+    public string? GetCurrentEmail() => GetAuthenticatedClaim(ClaimTypes.Email, "email");
+
+    public Guid? GetCurrentId()
+    {
+        var userId = GetAuthenticatedClaim(ClaimTypes.NameIdentifier, "sub");
+        return Guid.TryParse(userId, out var id) ? id : null;
+    }
+
+    public string? GetCurrentFullName() => GetAuthenticatedClaim(ClaimTypes.Name, "name");
+
+    public string[]? GetCurrentRoles()
+    {
+        var principal = GetAuthenticatedPrincipal();
+        if (principal is null)
+            return null;
+
+        var roles = principal.Claims
+            .Where(claim => claim.Type is ClaimTypes.Role or "role")
+            .SelectMany(claim => claim.Value.Split(
+                ',',
+                StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        return roles.Length == 0 ? null : roles;
+    }
+
+    public Guid? GetCurrentTenantId() => tenantExecutionContextAccessor?.Current?.TenantId;
+
+    public Guid? GetCurrentDomainId() => tenantExecutionContextAccessor?.Current?.DomainId;
+
+    public FranzIdentityContext GetCurrentIdentity()
+        => new()
+        {
+            UserId = GetCurrentId(),
+            Email = GetCurrentEmail(),
+            FullName = GetCurrentFullName(),
+            Roles = GetCurrentRoles(),
+            TenantId = GetCurrentTenantId(),
+            DomainId = GetCurrentDomainId()
+        };
+
+    private string? GetAuthenticatedClaim(params string[] claimTypes)
+    {
+        var principal = GetAuthenticatedPrincipal();
+        if (principal is null)
+            return null;
+
+        foreach (var claimType in claimTypes)
+        {
+            var value = principal.FindFirst(claimType)?.Value;
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return null;
+    }
+
+    private ClaimsPrincipal? GetAuthenticatedPrincipal()
+    {
+        var principal = httpContextAccessor.HttpContext?.User;
+        return principal?.Identity?.IsAuthenticated == true ? principal : null;
+    }
 }

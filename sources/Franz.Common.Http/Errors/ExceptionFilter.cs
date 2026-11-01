@@ -3,23 +3,20 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace Franz.Common.Http.Errors;
 
-public class ExceptionFilter : IExceptionFilter
+public class ExceptionFilter(
+    IEnumerable<IErrorResponseStrategy> errorResponsesStrategies,
+    IErrorResponseProvider errorResponseProvider) : IExceptionFilter
 {
-  private readonly IEnumerable<IErrorResponseStrategy> errorResponsesStrategies;
-  private readonly IErrorResponseProvider errorResponseProvider;
+    public void OnException(ExceptionContext context)
+    {
+        var strategy = errorResponsesStrategies
+            .OrderBy(candidate => candidate.Order)
+            .FirstOrDefault(candidate => candidate.IsWaitedErrorType(context.Exception));
 
-  public ExceptionFilter(IEnumerable<IErrorResponseStrategy> errorResponsesStrategies, IErrorResponseProvider errorResponseProvider)
-  {
-    this.errorResponsesStrategies = errorResponsesStrategies;
-    this.errorResponseProvider = errorResponseProvider;
-  }
+        if (strategy is null)
+            throw new InvalidOperationException(
+                "No HTTP error response strategy is registered. Register DefaultErrorResponseStrategy as the fallback.");
 
-  public void OnException(ExceptionContext context)
-  {
-    var errorResponseStrategy = errorResponsesStrategies
-                            .OrderBy(o => o.Order)
-                            .First(e => e.IsWaitedErrorType(context.Exception));
-
-    errorResponseProvider.PrepareResponse(context, errorResponseStrategy);
-  }
+        errorResponseProvider.PrepareResponse(context, strategy);
+    }
 }

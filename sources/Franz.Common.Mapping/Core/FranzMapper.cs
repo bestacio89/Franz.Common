@@ -19,6 +19,8 @@ public sealed class MapConstructorAttribute : Attribute
 }
 
 
+[RequiresUnreferencedCode("The reflection-based mapper inspects runtime model members. Use generated IMapper<TSource, TDestination> implementations for trimming and Native AOT.")]
+[RequiresDynamicCode("The reflection-based mapper compiles runtime mapping plans. Use generated IMapper<TSource, TDestination> implementations for Native AOT.")]
 public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
 {
   private readonly MappingConfiguration _config = config;
@@ -70,6 +72,8 @@ public sealed class FranzMapper(MappingConfiguration config) : IFranzMapper
   }
 
 
+  [RequiresUnreferencedCode("The reflection-based mapper inspects runtime model members. Use generated IMapper<TSource, TDestination> implementations for trimming and Native AOT.")]
+  [RequiresDynamicCode("The reflection-based mapper compiles runtime mapping plans. Use generated IMapper<TSource, TDestination> implementations for Native AOT.")]
   public TDestination Map<TSource, TDestination>(
       [DisallowNull] TSource source)
   {

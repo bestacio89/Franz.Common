@@ -45,3 +45,20 @@ Mediator improvements follow a correctness-first, measurement-driven sequence wh
   - CLIs for scaffolding services using Franz conventions.
 
 All items are subject to reprioritization based on real-world needs.
+
+---
+
+## Framework contract hardening sequence
+
+The active correctness-first framework roadmap is delivered sequentially:
+
+1. **Public contracts and API shape** — complete.
+2. **Dependency injection and lifecycle guarantees** — complete.
+3. **Mediator and mapper generated dispatch, trimming, and Native AOT validation** — complete in PR #180.
+4. **HTTP contracts, authentication, validation, and tenant behavior** — active in PR #181.
+5. **Persistence, transactions, concurrency, bulk operations, and provider parity** — next.
+6. **Observability, resilience, retries, timeouts, and recovery**.
+7. **Messaging delivery guarantees, ordering, and crash recovery**.
+8. **Release hardening, security, compatibility, and reproducible CI**.
+
+Each phase must retain focused behavioral and architecture tests, update the framework contract coverage ledger, and pass the full CI gates before the next phase begins.
