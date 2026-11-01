@@ -52,7 +52,7 @@ public sealed class FrameworkDomainContractTests
       var property = entityType.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
       Assert.NotNull(property);
       Assert.True(
-        property!.GetSetMethod(nonPublic: true)?.IsPrivate,
+        property!.GetSetMethod(nonPublic: true)?.IsPrivate == true,
         $"Entity lifecycle property '{propertyName}' must retain private setter ownership.");
     }
 
@@ -161,7 +161,11 @@ public sealed class FrameworkDomainContractTests
     Type returnType,
     params Type[] parameterTypes)
   {
-    var method = contract.GetMethod(name, BindingFlags.Instance | BindingFlags.Public, parameterTypes);
+    var method = contract
+      .GetMethods(BindingFlags.Instance | BindingFlags.Public)
+      .SingleOrDefault(candidate =>
+        candidate.Name == name
+        && candidate.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(parameterTypes));
 
     Assert.NotNull(method);
     Assert.Equal(returnType, method!.ReturnType);
