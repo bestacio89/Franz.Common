@@ -18,7 +18,7 @@ public class MappingService(IFranzMapper mapper) : IMappingService, IAsyncDispos
     if (Volatile.Read(ref _disposedState) == 1)
       throw new ObjectDisposedException(nameof(MappingService));
 
-    return _mapper.Map<TSource, TDestination>(source);
+    return _mapper.Map<TSource, TDestination>(source!);
   }
 
   [RequiresUnreferencedCode("The configured IFranzMapper may use reflection. Use a generated IMapper<TSource, TDestination> for trimming.")]
