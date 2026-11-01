@@ -61,7 +61,17 @@ public sealed class TenantResolutionMiddleware(
         var host = context.Request.Host.Host;
         if (!string.IsNullOrWhiteSpace(host))
         {
-            var normalizedHost = TenantDomain.NormalizeHost(host);
+            string normalizedHost;
+            try
+            {
+                normalizedHost = TenantDomain.NormalizeHost(host);
+            }
+            catch (ArgumentException)
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
+            }
+
             var domain = tenant.Domains.SingleOrDefault(candidate =>
                 candidate.IsVerified && candidate.Host == normalizedHost &&
                 (candidate.TenantId == Guid.Empty || candidate.TenantId == tenant.Id));
