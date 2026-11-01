@@ -105,7 +105,8 @@ namespace Franz.Common.Integration.Tests.DependencyInjection
         ValidateScopes = true,
         ValidateOnBuild = true
       });
-      var instance = provider.GetRequiredService<FakeScopedService>();
+      using var scope = provider.CreateScope();
+      var instance = scope.ServiceProvider.GetRequiredService<FakeScopedService>();
 
       instance.Should().NotBeNull();
     }
