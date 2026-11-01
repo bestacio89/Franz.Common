@@ -65,7 +65,7 @@ This package simplifies transactional handling, dependency injection, and middle
 
 ## **Version Information**
 
-* **Current Version:** v2.3.4
+* **Current Version:** v2.3.3
   → Adds **environment-aware validation**, stronger governance for multi-database setups, and provider-context alignment.
 * Part of the private **Franz Framework** ecosystem.
 
@@ -242,3 +242,8 @@ The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
 ## Dependency maintenance — October 2026
 
 This package now uses `Microsoft.AspNetCore.App` for ASP.NET Core APIs and patched cryptography dependencies. EF Core package versions are aligned with the .NET 10 servicing baseline. The MariaDB provider still has a known compatibility warning because Pomelo 9.x declares EF Core 9 support; review the [dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md) before relying on MariaDB with EF Core 10.
+
+
+## 2.3.4 compatibility and security notes
+
+The 2.3.4 release aligns with the framework's validated tenant execution-context boundary. HTTP request values and message metadata are resolution inputs, not authorization by themselves; tenant membership and lifecycle validation remain application responsibilities. See [the tenant-isolation boundary audit](../../Docs/tenant-isolation-boundary-audit.md) for the qualified guarantees.

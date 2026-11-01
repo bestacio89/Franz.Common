@@ -55,7 +55,7 @@ This package ensures seamless messaging health monitoring and transactional cons
 
 ## **Version Information**
 
-* **Current Version:** v2.3.4
+* **Current Version:** v2.3.3
 * Part of the private **Franz Framework** ecosystem.
 ---
 
@@ -217,3 +217,8 @@ See the `LICENSE` file for more details.
 ## Dependency maintenance — October 2026
 
 The package now uses the .NET 10 ASP.NET Core shared framework instead of legacy ASP.NET Core 2.3.11 packages, and cryptography dependencies are pinned to patched releases. Kafka, RabbitMQ, and health-check integration behavior must be validated by the solution test suite before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## 2.3.4 compatibility and security notes
+
+The 2.3.4 release aligns with the framework's validated tenant execution-context boundary. HTTP request values and message metadata are resolution inputs, not authorization by themselves; tenant membership and lifecycle validation remain application responsibilities. See [the tenant-isolation boundary audit](../../Docs/tenant-isolation-boundary-audit.md) for the qualified guarantees.
