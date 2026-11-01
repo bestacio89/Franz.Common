@@ -75,6 +75,14 @@ public static class Program
         defaultServices.AddScoped<IUnitOfWork, AotUnitOfWork>();
         defaultServices.AddFranzMediatorDefault<AotCommandHandler>();
 
+        var openGenericPipelineRegistrations = defaultServices.Any(descriptor =>
+            descriptor.ServiceType == typeof(IPipeline<,>) ||
+            descriptor.ServiceType == typeof(INotificationPipeline<>) ||
+            descriptor.ServiceType == typeof(IPreProcessor<>) ||
+            descriptor.ServiceType == typeof(IPostProcessor<,>));
+        if (openGenericPipelineRegistrations)
+            return 12;
+
         using var defaultProvider = defaultServices.BuildServiceProvider();
         using var defaultScope = defaultProvider.CreateScope();
         var defaultDispatcher = defaultScope.ServiceProvider.GetRequiredService<IDispatcher>();
