@@ -29,7 +29,7 @@
 - [Runtime Request Lifecycle](#-runtime-request-lifecycle)
 - [Messaging Flow](#-messaging-flow-kafka--outbox)
 - [Ecosystem Map](#-franz-ecosystem-map)
-- [Architecture Enforcement](#-architecture-enforcement-franz-tribunal)
+- [Architecture Enforcement](#-architecture-enforcement)
 - [Key Features](#-key-features)
 - [Getting Started](#-getting-started)
 - [Build & Test](#-build--test)
@@ -241,20 +241,36 @@ Core --> Cosmos
 
 ---
 
-# 🏛️ Architecture Enforcement (Franz Tribunal)
+# 🏛️ Architecture Enforcement
 
-Franz includes an optional **architecture test suite** based on ArchUnitNET — internally referred to as the **Franz Tribunal**:
+Franz maintains **two separate architecture test suites**. They protect different boundaries and must not be conflated.
 
-- Enforces **layer boundaries** (Domain → Application → Infrastructure).
-- Forbids **circular dependencies**.
-- Enforces **immutable DTOs**.
-- Validates naming conventions: Commands, Queries, Events, Handlers, Controllers.
-- Ensures no domain leakage into infrastructure and vice-versa.
-- Ensures messaging boundaries are respected.
+### Framework architecture tests — this repository
 
-These rules run in CI on every pull request. A violation fails the build — not a code review comment, a hard stop. This makes Franz suitable for **large organizations**, where maintaining architectural discipline across many contributors and services is critical, not optional.
+The framework's own architecture tests live in
+[`tests/Franz.Common.Architecture.Tests`](tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj).
+They validate Franz.Common itself:
 
----
+- Runtime project dependencies remain acyclic.
+- Core packages do not depend on infrastructure adapters.
+- Runtime packages do not reference test projects or the test-helper package.
+- Runtime source is checked for dynamic dispatch, runtime activation, generic reflection, assembly scanning, query-filter bypasses, and raw SQL APIs.
+- Existing findings are recorded as exact file/rule exceptions with reasons. New findings fail; resolved exceptions must be removed.
+- The mediator source generator remains targeted at `netstandard2.0`.
+
+This suite is included in the Franz.Common solution, runs in this repository's GitHub pull-request validation workflow, and has a dedicated test job in the Azure pipeline test stages.
+
+### Application architecture Tribunal — template repository
+
+The **Franz Architectural Tribunal** is an application-level test suite maintained separately in
+[`bestacio89/Franz`](https://github.com/bestacio89/Franz), under:
+
+- `tests/Franz.Testing`
+- `tests/Franz.Testing.ArchitecturalReports`
+
+It validates the architecture of applications built with Franz — including Contracts, API, Domain, Application, and Persistence boundaries, CQRS conventions, and application-level dependency rules. It does **not** validate the internal dependency structure or runtime implementation of the Franz.Common framework packages.
+
+The template repository owns its own CI triggers and test execution. Applications created from the template must run their application-level Tribunal tests in their own CI pipeline.
 
 # 💡 Key Features
 
