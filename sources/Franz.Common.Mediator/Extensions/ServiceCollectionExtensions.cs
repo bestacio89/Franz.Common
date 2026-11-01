@@ -57,8 +57,8 @@ public static class MediatorServiceCollectionExtensions
 
 
   /// <summary>
-  /// Registers Franz Mediator and discovers handlers from assemblies.
-  /// Uses reflection registration provider.
+  /// Registers Franz Mediator and applies compile-time generated handler registrations
+  /// from the explicitly selected assemblies.
   /// </summary>
   public static IServiceCollection AddFranzMediator(
       this IServiceCollection services,
@@ -70,10 +70,7 @@ public static class MediatorServiceCollectionExtensions
 
     services.AddFranzMediator(configure);
 
-    var registrationProvider =
-        new ReflectionHandlerRegistrationProvider(assemblies);
-
-    registrationProvider.Register(services);
+    services.AddFranzHandlerRegistration(assemblies);
 
     return services;
   }

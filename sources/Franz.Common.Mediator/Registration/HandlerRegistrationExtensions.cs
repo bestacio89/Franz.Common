@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 
 namespace Franz.Common.Mediator.Registration;
@@ -10,11 +10,12 @@ public static class HandlerRegistrationExtensions
       params Assembly[] assemblies)
   {
     ArgumentNullException.ThrowIfNull(services);
+    ArgumentNullException.ThrowIfNull(assemblies);
 
-    var provider =
-        new ReflectionHandlerRegistrationProvider(assemblies);
-
-    provider.Register(services);
+    for (var index = 0; index < assemblies.Length; index++)
+    {
+      GeneratedHandlerRegistrationRegistry.Apply(assemblies[index], services);
+    }
 
     return services;
   }

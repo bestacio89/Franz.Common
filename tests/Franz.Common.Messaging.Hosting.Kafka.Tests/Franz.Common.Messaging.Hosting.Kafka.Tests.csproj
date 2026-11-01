@@ -29,6 +29,10 @@
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.Kafka\Franz.Common.Messaging.Hosting.Kafka.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.MultiTenancy\Franz.Common.Messaging.MultiTenancy.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
+    <ProjectReference
+      Include="..\..\sources\Microsoft.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\sources\Franz.Common.MongoDB\Franz.Common.MongoDB.csproj" />
   </ItemGroup>
 

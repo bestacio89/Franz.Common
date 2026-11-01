@@ -74,6 +74,62 @@ jobs:
       - name: Build solution
         run: dotnet build Franz.Common.slnx --configuration Release --no-restore
 
+      - name: Verify mediator package includes its source generator
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          package="$(find sources/Franz.Common.Mediator/bin/Release -maxdepth 1 -name 'Franz.Common.Mediator.*.nupkg' -print -quit)"
+          test -n "$package"
+          package_files="$(unzip -Z1 "$package")"
+          grep -Fx 'analyzers/dotnet/cs/Franz.Common.Mediator.SourceGenerator.dll' <<< "$package_files"
+
+          temp_dir="$(mktemp -d)"
+          feed="$temp_dir/feed"
+          consumer="$temp_dir/consumer"
+          mkdir -p "$feed" "$consumer"
+          find sources -path '*/bin/Release/*.nupkg' -exec cp -n {} "$feed/" \;
+
+          cat > "$consumer/Consumer.csproj" <<'EOF'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <OutputType>Exe</OutputType>
+              <TargetFramework>net10.0</TargetFramework>
+              <ImplicitUsings>enable</ImplicitUsings>
+              <Nullable>enable</Nullable>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="Franz.Common.Mediator" Version="2.3.5" />
+            </ItemGroup>
+          </Project>
+          EOF
+
+          cat > "$consumer/Program.cs" <<'EOF'
+          using Franz.Common.Mediator.Dispatchers;
+          using Franz.Common.Mediator.Extensions;
+          using Franz.Common.Mediator.Handlers;
+          using Franz.Common.Mediator.Messages;
+          using Microsoft.Extensions.DependencyInjection;
+
+          var services = new ServiceCollection();
+          services.AddFranzMediator(new[] { typeof(ConsumerHandler).Assembly });
+          using var provider = services.BuildServiceProvider();
+          using var scope = provider.CreateScope();
+          var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
+          var response = await dispatcher.SendAsync<string>(new ConsumerCommand("package-generated"));
+          return response == "package-generated" ? 0 : 1;
+
+          public sealed record ConsumerCommand(string Value) : ICommand<string>;
+
+          public sealed class ConsumerHandler : ICommandHandler<ConsumerCommand, string>
+          {
+            public Task<string> Handle(ConsumerCommand command, CancellationToken cancellationToken)
+              => Task.FromResult(command.Value);
+          }
+          EOF
+
+          dotnet restore "$consumer/Consumer.csproj" --source "$feed" --source https://api.nuget.org/v3/index.json
+          dotnet run --project "$consumer/Consumer.csproj" --configuration Release --no-restore
+
       - name: Publish and execute Native AOT mapper smoke test
         run: |
           dotnet publish tests/Franz.Common.AotSmokeTest/Franz.Common.AotSmokeTest.csproj --configuration Release --runtime linux-x64 --self-contained true -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=full -p:ILLinkTreatWarningsAsErrors=true

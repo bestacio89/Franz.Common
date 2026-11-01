@@ -1,7 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="PublishAot;PublishTrimmed;TrimMode">
 
   <PropertyGroup>
     <IsSourceGenerator>true</IsSourceGenerator>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Roslyn analyzers target netstandard2.0 and are compiler tooling, not publish outputs. -->
+    <PublishAot>false</PublishAot>
+    <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
 
   <Import Project="..\..\common.targets" />

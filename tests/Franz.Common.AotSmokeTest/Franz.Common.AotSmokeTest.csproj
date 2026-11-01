@@ -13,27 +13,21 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.14" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="Franz.Common">
-      <HintPath>../../sources/Franz.Common/bin/Release/net10.0/Franz.Common.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-    <Reference Include="Franz.Common.Errors">
-      <HintPath>../../sources/Franz.Common.Errors/bin/Release/net10.0/Franz.Common.Errors.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-    <Reference Include="Franz.Common.Reflection">
-      <HintPath>../../sources/Franz.Common.Reflection/bin/Release/net10.0/Franz.Common.Reflection.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-    <Reference Include="Franz.Common.Mapping">
-      <HintPath>../../sources/Franz.Common.Mapping/bin/Release/net10.0/Franz.Common.Mapping.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
+    <ProjectReference Include="../../sources/Franz.Common/Franz.Common.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Errors/Franz.Common.Errors.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Reflection/Franz.Common.Reflection.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Mapping/Franz.Common.Mapping.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Mediator/Franz.Common.Mediator.csproj" />
+    <ProjectReference
+      Include="../../sources/Microsoft.Common.Mediator.SourceGenerator/Franz.Common.Mediator.SourceGenerator.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false"
+      GlobalPropertiesToRemove="PublishAot;PublishTrimmed;TrimMode" />
     <Analyzer Include="../../sources/Franz.Common.Mapping.Generators/bin/Release/netstandard2.0/Franz.Common.Mapping.Generators.dll" />
   </ItemGroup>
 </Project>
