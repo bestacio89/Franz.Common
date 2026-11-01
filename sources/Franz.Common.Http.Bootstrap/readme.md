@@ -26,7 +26,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 ## Package-specific guide
 
 **Package**: `Franz.Common.Http.Bootstrap`
-**Current Version:** v2.3.4
+**Current Version:** v2.3.5
 
 Opinionated HTTP bootstrapper for the Franz Framework.
 Centralizes common ASP.NET Core HTTP wiring (controllers, auth, headers, docs, serialization, health checks, multi-tenancy) and optionally registers config-driven Refit clients so applications get consistent, production-ready defaults with minimal boilerplate.
@@ -206,3 +206,18 @@ This package is part of the private Franz Framework. Contributions are internal;
 ## Dependency maintenance — October 2026
 
 The dependency graph pins Snappier to a patched version to avoid the known high-severity issue in 1.0.0. The package continues to target .NET 10. Verify HTTP bootstrap, serialization, health-check, and compression-related paths with the full test suite before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## HTTP multitenancy pipeline — 2.3.5
+
+`UseHttpArchitecture()` now composes the tenant middleware automatically. Do not add a second `UseFranzMultiTenancy()` call when using the composed pipeline.
+
+The request order is:
+
+1. Exception handling and forwarded/certificate headers.
+2. Routing and CORS.
+3. Authentication.
+4. Tenant resolution and membership authorization.
+5. Endpoint authorization and controller execution.
+
+This order makes authenticated JWT claims available to tenant resolution and ensures endpoint authorization runs only after the validated tenant execution context has been established. Applications must still register an `ITenantRequestAuthorizer` for authenticated tenant membership.
