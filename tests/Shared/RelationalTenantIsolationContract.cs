@@ -306,6 +306,52 @@ public abstract class RelationalTenantIsolationContract
     }
 
     [Fact]
+    public async Task UnitOfWork_FailedCommitReleasesItsTransaction()
+    {
+        var tenantId = Guid.NewGuid();
+        var marker = $"uow-failed-commit-{Guid.NewGuid():N}";
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            await EnsureDatabaseCreatedAsync(db);
+            await using var unitOfWork = new EfUnitOfWork<DbContextBase>((DbContextBase)db);
+            await unitOfWork.BeginAsync();
+
+            db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                ((IUnitOfWork)unitOfWork).CommitAsync(cancellation.Token));
+
+            db.ChangeTracker.Clear();
+            await unitOfWork.BeginAsync();
+            await unitOfWork.RollbackAsync();
+        });
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            Assert.False(await db.Set<TenantOwnedTestEntity>()
+                .IgnoreQueryFilters()
+                .AnyAsync(entity => entity.Name == marker));
+        });
+    }
+
+    [Fact]
+    public async Task UnitOfWork_RejectsTransactionsOwnedByTheDbContext()
+    {
+        await WithContextAsync(Guid.NewGuid(), async db =>
+        {
+            await EnsureDatabaseCreatedAsync(db);
+            await using var externalTransaction = await db.Database.BeginTransactionAsync();
+            await using var unitOfWork = new EfUnitOfWork<DbContextBase>((DbContextBase)db);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => unitOfWork.BeginAsync());
+            await externalTransaction.RollbackAsync();
+        });
+    }
+
+    [Fact]
     public async Task UnitOfWork_SynchronousDisposalRollsBackAcrossProviders()
     {
         var tenantId = Guid.NewGuid();
