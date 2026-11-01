@@ -12,7 +12,7 @@ namespace Franz.Common.Architecture.Tests;
 public sealed class FrameworkArchitectureTests
 {
   private const string AdapterNamespacePattern =
-    @"^Franz\.Common\.(EntityFramework(\..*)?|MongoDB(\..*)?|AzureCosmosDB(\..*)?|Http(\..*)?|Grpc(\..*)?|Messaging\..+|SSO(\..*)?)$";
+    @"^Franz\.Common\.(EntityFramework(\..*)?|MongoDB(\..*)?|CosmosDB(\..*)?|AzureCosmosDB(\..*)?|Http(\..*)?|Grpc(\..*)?|SSO(\..*)?)$";
 
   private static readonly Lazy<string> RepositoryRoot = new(FindRepositoryRoot);
   private static readonly Lazy<IReadOnlyList<Assembly>> RuntimeAssemblies = new(LoadRuntimeAssemblies);
@@ -53,6 +53,68 @@ public sealed class FrameworkArchitectureTests
         .Because($"Core package '{packageName}' must depend on abstractions, not infrastructure adapters.")
         .Check(ArchitectureModel.Value);
     }
+  }
+
+  [Fact]
+  public void Core_packages_must_not_reference_infrastructure_adapter_projects_or_packages()
+  {
+    var corePackages = new HashSet<string>(StringComparer.Ordinal)
+    {
+      "Franz.Common",
+      "Franz.Common.Annotations",
+      "Franz.Common.Business",
+      "Franz.Common.DependencyInjection",
+      "Franz.Common.Errors",
+      "Franz.Common.Headers",
+      "Franz.Common.Mediator",
+      "Franz.Common.Messaging",
+      "Franz.Common.MultiTenancy",
+      "Franz.Common.Serialization"
+    };
+
+    var sourceRoot = Path.Combine(RepositoryRoot.Value, "sources");
+    var violations = new List<string>();
+
+    foreach (var projectPath in Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories))
+    {
+      var projectName = Path.GetFileNameWithoutExtension(projectPath);
+      if (!corePackages.Contains(projectName))
+        continue;
+
+      var document = XDocument.Load(projectPath);
+      foreach (var include in document
+        .Descendants()
+        .Where(element => element.Name.LocalName is "ProjectReference" or "PackageReference")
+        .Select(element => (string?)element.Attribute("Include"))
+        .Where(value => !string.IsNullOrWhiteSpace(value)))
+      {
+        var reference = include!.Trim();
+        var referencedName = reference.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
+          ? Path.GetFileNameWithoutExtension(reference)
+          : reference;
+
+        if (IsInfrastructureAdapterProject(referencedName))
+          violations.Add($"{projectName} -> {referencedName}");
+      }
+    }
+
+    Assert.True(
+      violations.Count == 0,
+      "Core packages must not reference infrastructure adapters:" + Environment.NewLine +
+      string.Join(Environment.NewLine, violations));
+  }
+
+  private static bool IsInfrastructureAdapterProject(string projectName)
+  {
+    return projectName.StartsWith("Franz.Common.EntityFramework", StringComparison.Ordinal)
+      || projectName is "Franz.Common.MongoDB" or "Franz.Common.CosmosDB" or "Franz.Common.AzureCosmosDB"
+      || projectName.StartsWith("Franz.Common.MongoDB.", StringComparison.Ordinal)
+      || projectName.StartsWith("Franz.Common.CosmosDB.", StringComparison.Ordinal)
+      || projectName.StartsWith("Franz.Common.AzureCosmosDB.", StringComparison.Ordinal)
+      || projectName.StartsWith("Franz.Common.Http", StringComparison.Ordinal)
+      || projectName.StartsWith("Franz.Common.Grpc", StringComparison.Ordinal)
+      || projectName.StartsWith("Franz.Common.SSO", StringComparison.Ordinal)
+      || projectName.StartsWith("Franz.Common.Messaging.", StringComparison.Ordinal);
   }
 
   [Fact]
