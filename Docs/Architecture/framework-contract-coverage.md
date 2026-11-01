@@ -21,18 +21,18 @@ Status definitions:
 | Dependency registration | Matching service/implementation pairs are idempotent; a repeated pair with a different lifetime fails rather than silently changing ownership. | Enforced | Direct behavioral tests of the registration strategy. |
 | Dependency injection lifetimes | Marker-based scanning and scoped/singleton/transient registration behavior remain correct for the exercised registration paths. | Verified | Existing dependency-injection integration tests. The architecture suite does not assert a universal lifetime policy for application services. |
 | Mediator composition | Core mediator registration uses a scoped dispatcher and is safe to call repeatedly. | Enforced | Service descriptor contract test. |
-| Mediator execution | Command, query, notification, event, and generated/reflection registration paths retain their tested dispatch behavior. | Verified | Existing mediator unit and integration tests. |
+| Mediator execution | Command, query, notification, event, and generated/reflection registration paths retain their tested dispatch behavior; cancellation reaches command handlers and concurrent dispatch exercises the shared invoker cache. | Verified | Existing mediator unit and integration tests, including explicit cancellation-propagation and 512-way concurrent-dispatch regression tests. |
 | Async cancellation contracts | Unit-of-work, mediator, message publishing/sending, listener, inbox, and outbox abstractions expose cancellation-aware asynchronous operations. | Enforced | Reflection-based API contract tests. This verifies API shape; propagation is exercised by behavioral tests. |
 | Unit-of-work behavior | Transaction begin, commit, rollback, and persistence behavior work for the exercised EF Core paths. | Verified | Existing persistence and transaction tests. |
-| Relational persistence | Tenant filters, repository behavior, bulk updates, transactions, and provider compatibility hold for the tested relational providers. | Verified | Provider-specific integration tests and the relational provider contract. |
+| Relational persistence | Tenant filters, repository behavior, bulk updates, ownership mutation rejection, and tenant isolation hold across PostgreSQL, SQL Server, Oracle, MySQL, and MariaDB. | Verified | The shared real-engine relational tenant-isolation contract runs in all five provider suites; provider-specific persistence and transaction tests add provider-specific evidence. |
 | Non-relational persistence | Cosmos DB and MongoDB behavior remains correct for their separately tested paths. | Verified | Provider-specific tests. These providers are not covered by the relational qualification matrix. |
 | Messaging delivery | Broker delivery, acknowledgement, retries, dead-letter handling, and shutdown behavior work for exercised Kafka and RabbitMQ paths. | Verified | Broker-backed and transport integration tests. |
 | Message resource ownership | The transport sender abstraction remains disposable synchronously and asynchronously. | Enforced | Public interface contract test. |
 | Tenant execution context | Execution context construction rejects empty tenant IDs and non-active tenants; its exposed context properties remain read-only. | Enforced | Constructor behavior and reflection contract tests. |
 | Tenant lifecycle/isolation | HTTP and message execution contexts are initialized once, cleared, and isolated across the tested request/delivery lifecycles. | Verified | Existing tenant lifecycle integration tests. |
-| AOT and trimming | Source-generator target compatibility is enforced, but full Native AOT and trimmed publish behavior is not established by these architecture tests. | Unverified | Requires dedicated publish/sample applications and runtime validation. |
-| Public API compatibility | No automated baseline currently proves that every published package remains binary/source compatible. | Unverified | Requires an explicit public API baseline and compatibility gate. |
-| Security completeness | The source policy catches selected risky API families, but it is not a complete security analyzer and does not prove that arbitrary application/provider-specific paths are tenant-safe. | Unverified | Security and tenant-boundary tests cover defined paths only; raw SQL and direct provider access remain explicit application responsibilities. |
+| AOT and trimming | Both source generators target `netstandard2.0`, but full Native AOT and trimmed publish behavior is not established. Mediator generated-provider discovery still uses reflective type lookup and an `Assembly.GetTypes`/`Activator` compatibility path. | Unverified | Generator target metadata is enforced; generated-provider activation and all runtime packages still require dedicated trimmed and Native AOT consumer publish tests. The reflective fallback remains an explicit source-policy exception. |
+| Public API compatibility | No automated baseline currently proves that every published package remains binary/source compatible. | Unverified | Requires an explicit per-package public API baseline or a release-package ApiCompat comparison and a CI compatibility gate. |
+| Security completeness | The source policy catches selected risky API families, but it is not a complete security analyzer and does not prove that arbitrary application/provider-specific paths are tenant-safe. | Unverified | Source-policy rule IDs and exact exceptions are catalogued; security and tenant-boundary tests cover defined paths only. Raw SQL and direct provider access remain explicit application responsibilities. |
 
 ## Governance rules
 
@@ -42,8 +42,9 @@ Status definitions:
 4. Exceptions must identify an exact rule and path, explain why the exception is necessary, and be removed when the finding is resolved.
 5. Do not duplicate guarantees already enforced by the compiler or build system unless a distinct framework-level contract exists.
 6. Do not promote an area from Verified to Enforced merely because its tests happen to run in the same CI workflow.
-7. Unverified items remain visible; they are not silently implied by a green build.
-8. Framework-level rules belong here. Application-layer conventions belong in the separate Franz Architectural Tribunal in the template repository.
+7. Every source-policy rule has a stable ID, severity, and description in `source-policy-rule-catalog.json`; allowlist exceptions must reference the matching ID.
+8. Unverified items remain visible; they are not silently implied by a green build.
+9. Framework-level rules belong here. Application-layer conventions belong in the separate Franz Architectural Tribunal in the template repository.
 
 ## Scope boundaries
 

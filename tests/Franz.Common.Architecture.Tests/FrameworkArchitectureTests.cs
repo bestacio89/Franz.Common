@@ -160,24 +160,35 @@ public sealed class FrameworkArchitectureTests
   }
 
   [Fact]
-  public void Source_generator_must_target_netstandard20()
+  public void Source_generators_must_target_netstandard20()
   {
-    var projectPath = Path.Combine(
-      RepositoryRoot.Value,
-      "sources",
-      "Microsoft.Common.Mediator.SourceGenerator",
-      "Franz.Common.Mediator.SourceGenerator.csproj");
+    var projectPaths = new[]
+    {
+      Path.Combine(
+        RepositoryRoot.Value,
+        "sources",
+        "Microsoft.Common.Mediator.SourceGenerator",
+        "Franz.Common.Mediator.SourceGenerator.csproj"),
+      Path.Combine(
+        RepositoryRoot.Value,
+        "sources",
+        "Franz.Common.Mapping.Generators",
+        "Franz.Common.Mapping.Generators.csproj")
+    };
 
-    Assert.True(File.Exists(projectPath), $"Source generator project was not found at '{projectPath}'.");
+    foreach (var projectPath in projectPaths)
+    {
+      Assert.True(File.Exists(projectPath), $"Source generator project was not found at '{projectPath}'.");
 
-    var document = XDocument.Load(projectPath);
-    var targetFramework = document
-      .Descendants()
-      .FirstOrDefault(element => element.Name.LocalName == "TargetFramework")
-      ?.Value
-      .Trim();
+      var document = XDocument.Load(projectPath);
+      var targetFramework = document
+        .Descendants()
+        .FirstOrDefault(element => element.Name.LocalName == "TargetFramework")
+        ?.Value
+        .Trim();
 
-    Assert.Equal("netstandard2.0", targetFramework);
+      Assert.Equal("netstandard2.0", targetFramework);
+    }
   }
 
   [Fact]
@@ -190,9 +201,53 @@ public sealed class FrameworkArchitectureTests
 
     Assert.True(File.Exists(allowlistPath), "The architecture policy allowlist was not copied to the test output.");
 
+    var catalogPath = Path.Combine(
+      AppContext.BaseDirectory,
+      "source-policy-rule-catalog.json");
+    Assert.True(File.Exists(catalogPath), "The source-policy rule catalog was not copied to the test output.");
+
+    var catalog = JsonSerializer.Deserialize<List<PolicyRuleDefinition>>(
+      File.ReadAllText(catalogPath),
+      new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+
+    Assert.NotEmpty(catalog);
+    Assert.Equal(catalog.Count, catalog.Select(rule => rule.Id).Distinct(StringComparer.Ordinal).Count());
+    Assert.Equal(catalog.Count, catalog.Select(rule => rule.Rule).Distinct(StringComparer.Ordinal).Count());
+    Assert.All(catalog, rule =>
+    {
+      Assert.False(string.IsNullOrWhiteSpace(rule.Id));
+      Assert.False(string.IsNullOrWhiteSpace(rule.Rule));
+      Assert.False(string.IsNullOrWhiteSpace(rule.Description));
+      Assert.Equal("Error", rule.Severity);
+    });
+
+    var rulesByName = catalog.ToDictionary(rule => rule.Rule, StringComparer.Ordinal);
+    var uncataloguedFindings = findings
+      .Where(finding => !rulesByName.ContainsKey(finding.Rule))
+      .Select(finding => finding.Rule)
+      .Distinct(StringComparer.Ordinal)
+      .ToArray();
+
+    Assert.True(
+      uncataloguedFindings.Length == 0,
+      "Every source-policy finding must have a stable catalog entry:" +
+      Environment.NewLine + string.Join(Environment.NewLine, uncataloguedFindings));
+
     var allowlist = JsonSerializer.Deserialize<List<PolicyException>>(
       File.ReadAllText(allowlistPath),
       new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+
+    var invalidRuleIds = allowlist
+      .Where(exception =>
+        !rulesByName.TryGetValue(exception.Rule, out var rule)
+        || !string.Equals(exception.RuleId, rule.Id, StringComparison.Ordinal))
+      .Select(exception => $"{exception.Rule}: expected '{(rulesByName.TryGetValue(exception.Rule, out var rule) ? rule.Id : "no catalog entry")}', found '{exception.RuleId}'")
+      .ToArray();
+
+    Assert.True(
+      invalidRuleIds.Length == 0,
+      "Every source-policy exception must reference its rule's stable catalog ID:" +
+      Environment.NewLine + string.Join(Environment.NewLine, invalidRuleIds));
 
     var allowed = allowlist.ToDictionary(
       exception => $"{exception.Rule}|{NormalizePath(exception.Path)}",
@@ -360,5 +415,7 @@ public sealed class FrameworkArchitectureTests
 
   private sealed record PolicyFinding(string Rule, string Path);
 
-  private sealed record PolicyException(string Rule, string Path, string Reason);
+  private sealed record PolicyRuleDefinition(string Id, string Rule, string Severity, string Description);
+
+  private sealed record PolicyException(string Rule, string RuleId, string Path, string Reason);
 }
