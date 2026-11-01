@@ -30,8 +30,8 @@ public static class Program
         var commandResult = await dispatcher.SendAsync<string>(new AotCommand("generated-command"));
         if (commandResult != "generated-command")
             return 2;
-        if (!scope.ServiceProvider.GetRequiredService<AotCommandPreProcessor>().Executed
-            || !scope.ServiceProvider.GetRequiredService<AotCommandPostProcessor>().Executed)
+        if (!((AotCommandPreProcessor)scope.ServiceProvider.GetRequiredService<IPreProcessor<AotCommand>>()).Executed
+            || !((AotCommandPostProcessor)scope.ServiceProvider.GetRequiredService<IPostProcessor<AotCommand, string>>()).Executed)
             return 8;
 
         var queryResult = await dispatcher.SendAsync<int>(new AotQuery(21));
