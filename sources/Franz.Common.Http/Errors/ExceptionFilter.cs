@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace Franz.Common.Http.Errors;
 
-public sealed class ExceptionFilter(
+public class ExceptionFilter(
     IEnumerable<IErrorResponseStrategy> errorResponsesStrategies,
     IErrorResponseProvider errorResponseProvider) : IExceptionFilter
 {
