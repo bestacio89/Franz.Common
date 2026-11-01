@@ -1,4 +1,4 @@
-﻿using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Builders;
 using Franz.Common.Business.Domain.Factories;
 using Franz.Common.Business.Domain.IdGenerators;
 using Franz.Common.Business.Extensions;
@@ -25,35 +25,34 @@ public class PostgresFixture : IAsyncLifetime
 
   public IServiceProvider BuildServiceProvider(
       string? domainId = null,
-      Action<IServiceCollection>? extraRegistrations = null)
+      Action<IServiceCollection>? extraRegistrations = null,
+      string databaseName = "franz_test",
+      string? isolationMode = null)
   {
     var services = new ServiceCollection();
 
-    // Configuration Mock
     var configDict = new Dictionary<string, string?>
     {
       ["Database:ServerName"] = Container.Hostname,
       ["Database:Port"] = Container.GetMappedPublicPort(5432).ToString(),
-      ["Database:DatabaseName"] = "test_{dbName}", // Testing pattern replacement
+      ["Database:DatabaseName"] = databaseName,
+      ["Database:IsolationMode"] = isolationMode ?? "SharedDatabase",
       ["Database:UserName"] = "postgres",
       ["Database:Password"] = "password"
     };
     var configuration = new ConfigurationBuilder().AddInMemoryCollection(configDict).Build();
 
-    // Dependencies
     var dispatcher = Substitute.For<IDispatcher>();
     services.AddSingleton(dispatcher);
     services.AddLogging();
     services.AddSingleton<IIdGenerator<Guid>, GuidV7Generator>();
     services.AddTransient(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
-    // Multi-tenancy Mock
+
     var domainAccessor = Substitute.For<IDomainContextAccessor>();
     domainAccessor.GetCurrentDomainId().Returns(domainId != null ? Guid.Parse(domainId) : (Guid?)null);
     services.AddSingleton(domainAccessor);
 
-    // System Under Test (SUT)
     services.AddPostgresDatabase<TestDbContext>(configuration);
-
     extraRegistrations?.Invoke(services);
 
     return services.BuildServiceProvider();

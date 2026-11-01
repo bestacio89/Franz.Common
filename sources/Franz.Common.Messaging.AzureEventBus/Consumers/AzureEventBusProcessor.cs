@@ -4,6 +4,8 @@ using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Messaging.AzureEventBus.Mapping;
 using Franz.Common.Messaging.Messages;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Franz.Common.Messaging.MultiTenancy;
 
 namespace Franz.Common.Messaging.AzureEventBus.Consumers;
 
@@ -17,6 +19,7 @@ public sealed class AzureEventBusProcessor : IAsyncDisposable
   private readonly IAzureEventBusMessageMapper _mapper;
   private readonly IDispatcher _mediator;
   private readonly ILogger<AzureEventBusProcessor> _logger;
+  private readonly IServiceScopeFactory? _scopeFactory;
   public string EntityName { get; set; } = string.Empty;
   public AzureEventBusProcessor(
     ServiceBusClient client,
@@ -24,11 +27,13 @@ public sealed class AzureEventBusProcessor : IAsyncDisposable
     IAzureEventBusMessageMapper mapper,
     IDispatcher mediator,
     ILogger<AzureEventBusProcessor> logger,
-    ServiceBusProcessorOptions options)
+    ServiceBusProcessorOptions options,
+    IServiceScopeFactory? scopeFactory = null)
   {
     _mapper = mapper;
     _mediator = mediator;
     _logger = logger;
+    _scopeFactory = scopeFactory;
 
     _processor = client.CreateProcessor(entityName, options);
 
@@ -66,7 +71,27 @@ public sealed class AzureEventBusProcessor : IAsyncDisposable
     try
     {
       // 🔥 THIS IS THE MAGIC BOUNDARY
-      await _mediator.PublishNotificationAsync(franzMessage, args.CancellationToken);
+      if (_scopeFactory is null)
+      {
+        await _mediator.PublishNotificationAsync(franzMessage, args.CancellationToken);
+      }
+      else
+      {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var tenantInitializer = scope.ServiceProvider.GetService<ITenantMessageContextInitializer>();
+
+        if (tenantInitializer is null)
+        {
+          await _mediator.PublishNotificationAsync(franzMessage, args.CancellationToken);
+        }
+        else
+        {
+          await using var tenantScope = await tenantInitializer
+              .BeginAsync(franzMessage, args.CancellationToken);
+          var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
+          await dispatcher.PublishNotificationAsync(franzMessage, args.CancellationToken);
+        }
+      }
 
       await args.CompleteMessageAsync(args.Message, args.CancellationToken);
     }

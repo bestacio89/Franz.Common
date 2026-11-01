@@ -30,7 +30,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 High-performance, pipeline-driven gRPC for distributed microservices
 
 ---
-**Current Version:** v2.3.3
+**Current Version:** v2.3.4
 
 ---
 
@@ -322,3 +322,8 @@ This makes Franz one of the **strictest, most consistent, and most architectural
 ## Dependency maintenance — October 2026
 
 The gRPC client dependency is updated to the current compatible `Grpc.Net.Client` release. The legacy `Grpc` package remains at 2.46.6 because NuGet does not publish version 2.83.0 for that package ID; do not copy the client version onto the legacy package. Restore and integration tests must pass before publishing this maintenance update. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## Tenant identity trust boundary
+
+Server-side tenant behavior removes caller-supplied `x-tenant-id` metadata before invoking `IFranzTenantResolver`. The resolver must derive the tenant from authenticated server-side identity or another trusted transport signal. Client-side tenant behavior implements `IGrpcClientBehavior<TRequest,TResponse>` and enriches outgoing calls using the client pipeline contract. A tenant ID in metadata is propagation data, not proof of authorization.

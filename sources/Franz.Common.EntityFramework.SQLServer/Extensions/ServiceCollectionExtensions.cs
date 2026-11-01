@@ -1,3 +1,4 @@
+using Franz.Common.EntityFramework;
 using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.EntityFramework.SQLServer.Enums;
 using Franz.Common.MultiTenancy;
@@ -35,7 +36,10 @@ public static class ServiceCollectionExtensions
           var sqlConnectionStringBuilder = new SqlConnectionStringBuilder
           {
             DataSource = $"{serverName},{port}",
-            InitialCatalog = databaseOptions.Value.DatabaseName ?? DatabaseNamePattern,
+            InitialCatalog = DatabaseTargetResolver.ResolveDatabaseName(
+                databaseOptions.Value,
+                serviceProvider.GetService<ITenantExecutionContextAccessor>(),
+                serviceProvider.GetService<IDomainContextAccessor>()),
             UserID = databaseOptions.Value.UserName ?? DefaultUserName,
             Password = databaseOptions.Value.Password ?? DefaultPassword,
             Encrypt = GetMap(Enum.Parse<SslEnforcement>(databaseOptions.Value.SslMode ?? SslDefaultMode,
@@ -46,15 +50,8 @@ public static class ServiceCollectionExtensions
 
           var connectionString = sqlConnectionStringBuilder.ConnectionString;
 
-          var domainContextAccessor = serviceProvider.GetService<IDomainContextAccessor>();
-          var domainId = domainContextAccessor?.GetCurrentDomainId();
-
-          connectionString = domainId.HasValue
-                  ? connectionString.Replace(DatabaseNamePattern, domainId.Value.ToString())
-                  : connectionString.Replace($"_{DatabaseNamePattern}", string.Empty);
-
           dbContextBuilder.UseSqlServer(connectionString);
-          dbContextBuilder.EnableSensitiveDataLogging();
+          if (databaseOptions.Value.EnableSensitiveDataLogging) dbContextBuilder.EnableSensitiveDataLogging();
         })
         .AddScoped<DbContextBase>(sp => sp.GetRequiredService<TDbContext>());
 

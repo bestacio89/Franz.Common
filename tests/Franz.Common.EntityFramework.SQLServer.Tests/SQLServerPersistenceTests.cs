@@ -1,7 +1,9 @@
-﻿using FluentAssertions;
+using FluentAssertions;
+using Franz.Common.Business.Domain.Factories;
+using Franz.Common.MultiTenancy;
+using Franz.Common.MultiTenancy.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Franz.Common.Business.Domain.Factories;
 
 namespace Franz.Common.EntityFramework.SQLServer.Tests;
 
@@ -14,9 +16,11 @@ public class SqlServerPersistenceTests : IClassFixture<SqlServerFixture>
   [Fact]
   public async Task AddAsync_WithSqlServer_ShouldApplyAuditingAndPatternReplacement()
   {
-    // Arrange
     var domainId = Guid.NewGuid();
-    var sp = _fixture.BuildServiceProvider(domainId.ToString());
+    var sp = _fixture.BuildServiceProvider(
+        domainId.ToString(),
+        databaseName: "franz_{dbName}",
+        isolationMode: "DomainDatabase");
     using var scope = sp.CreateScope();
 
     var db = scope.ServiceProvider.GetRequiredService<TestDbContext>();
@@ -24,11 +28,9 @@ public class SqlServerPersistenceTests : IClassFixture<SqlServerFixture>
 
     await db.Database.EnsureCreatedAsync();
 
-    // Act: Verify Connection String replacement
     var connectionString = db.Database.GetConnectionString();
-    connectionString.Should().Contain($"Initial Catalog=franz_{domainId}");
+    connectionString.Should().Contain($"Initial Catalog=franz_{domainId:D}");
 
-    // Act: Persistence
     var entity = factory.Create();
     entity.Name = "SQL Server Architect";
     var operationTime = DateTimeOffset.UtcNow;
@@ -36,7 +38,6 @@ public class SqlServerPersistenceTests : IClassFixture<SqlServerFixture>
     db.TestEntities.Add(entity);
     await db.SaveChangesAsync();
 
-    // Assert
     var saved = await db.TestEntities.FindAsync(entity.Id);
     saved.Should().NotBeNull();
     saved!.DateCreated.Should().BeCloseTo(operationTime, TimeSpan.FromSeconds(2));
@@ -46,7 +47,6 @@ public class SqlServerPersistenceTests : IClassFixture<SqlServerFixture>
   [Fact]
   public async Task SoftDelete_OnSqlServer_ShouldRespectGlobalQueryFilter()
   {
-    // Arrange
     var sp = _fixture.BuildServiceProvider();
     using var scope = sp.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<TestDbContext>();
@@ -56,12 +56,9 @@ public class SqlServerPersistenceTests : IClassFixture<SqlServerFixture>
     db.TestEntities.Add(entity);
     await db.SaveChangesAsync();
 
-    // Act
     db.TestEntities.Remove(entity);
     await db.SaveChangesAsync();
 
-    // Assert
-    // Re-query in fresh scope to bypass local cache
     using var verifyScope = sp.CreateScope();
     var verifyDb = verifyScope.ServiceProvider.GetRequiredService<TestDbContext>();
 
@@ -72,5 +69,37 @@ public class SqlServerPersistenceTests : IClassFixture<SqlServerFixture>
     raw.Should().NotBeNull();
     raw!.IsDeleted.Should().BeTrue();
     raw.DateDeleted.Should().NotBe(default);
+  }
+
+  [Fact]
+  public void AddSqlServerDatabase_UsesTenantIdAndNeverFallsBackToDomainId()
+  {
+    var tenantId = Guid.NewGuid();
+    var domainId = Guid.NewGuid();
+    var context = new TenantExecutionContext(
+        new TenantInfo(tenantId, "tenant"),
+        domainId,
+        TenantResolutionSource.Unknown,
+        DateTimeOffset.UtcNow);
+    var accessor = new StubTenantExecutionContextAccessor(context);
+
+    var provider = _fixture.BuildServiceProvider(
+        domainId.ToString(),
+        services => services.AddSingleton<ITenantExecutionContextAccessor>(accessor),
+        databaseName: "franz_{dbName}",
+        isolationMode: "TenantDatabase");
+
+    var connectionString = provider.GetRequiredService<TestDbContext>().Database.GetConnectionString();
+
+    connectionString.Should().Contain($"Initial Catalog=franz_{tenantId:D}");
+    connectionString.Should().NotContain(domainId.ToString());
+  }
+
+  private sealed class StubTenantExecutionContextAccessor(TenantExecutionContext? current)
+      : ITenantExecutionContextAccessor
+  {
+    public TenantExecutionContext? Current { get; private set; } = current;
+    public void Initialize(TenantExecutionContext context) => Current = context;
+    public void Clear() => Current = null;
   }
 }

@@ -1,3 +1,4 @@
+using Franz.Common.EntityFramework.ProviderContract.Tests;
 using Franz.Common.Mediator.Dispatchers;
 using Microsoft.EntityFrameworkCore;
 using Microting.EntityFrameworkCore.MySql.Infrastructure;
@@ -20,6 +21,7 @@ public abstract class MySqlTestBase(MySqlFixture database)
     return options;
   }
 
-  protected TestDbContext CreateContext() =>
-      new(CreateOptions(), Substitute.For<IDispatcher>());
+  protected TestDbContext CreateContext(Guid? tenantId = null) =>
+      new(CreateOptions(), Substitute.For<IDispatcher>(),
+          tenantContextAccessor: TenantExecutionContextAccessor.ForTenant(tenantId));
 }

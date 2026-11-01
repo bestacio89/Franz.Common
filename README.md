@@ -443,3 +443,22 @@ The dependency baseline and compatibility notes are tracked in [the October 2026
 - **Publishing:** the Azure DevOps publishing pipeline validates package metadata before publishing. Publish only after restore/audit, Release build, and full tests pass.
 
 See [the versioning policy](Docs/governance/versioning-policy.md) and [the dependency upgrade record](Docs/dependency-upgrade-2026-10.md) for the release rules and current compatibility caveats.
+
+
+## Version 2.3.4: tenant isolation and execution boundaries
+
+This release documents the tenant-isolation and messaging execution-boundary work merged before this release-preparation change. These notes describe the framework's supported paths and their limits; they do not imply that arbitrary application code or every external integration is automatically tenant-safe.
+
+### Tenant execution context across messaging
+
+For supported tenant-aware messaging integrations, each delivery is processed with a validated tenant execution context and a delivery-scoped dependency-injection lifetime. The context is cleaned up after success, failure, or cancellation. Outbound tenant/domain metadata is derived from validated execution context rather than trusted from stale or caller-controlled metadata. Outbox dispatch creates a fresh scope per stored message and resolves dispatch dependencies from that scope.
+
+The MassTransit Kafka integration includes a scoped-handler overload that resolves delivery dependencies from the delivery scope. When tenant-aware processing is enabled, the legacy overload that captures a handler instance fails closed rather than silently reusing a handler whose lifetime may cross tenant boundaries. Each transport still requires its documented registration and metadata conventions; see [the execution lifecycle contract](docs/multitenancy-execution-lifecycle.md).
+
+### Relational persistence qualification
+
+The shared relational EF Core contract has been qualified against PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23. The contract covers tenant-scoped reads and writes, missing-context fail-closed behavior, cross-tenant ownership protections, and supported EF Core set-based operations and repository bulk-update behavior.
+
+These guarantees apply to framework-managed paths that participate in the EF Core query-filter and repository contracts. They do not automatically secure raw SQL, stored procedures, direct connections, provider-native bulk APIs, or deliberate query-filter bypasses. Applications must explicitly secure those paths with tenant predicates and appropriate database permissions; database-level enforcement such as row-level security may be necessary for stronger isolation. Cosmos DB and MongoDB are outside this relational qualification and require separate provider-specific contracts.
+
+See the [relational provider contract](Docs/relational-provider-contract.md) and [tenant-isolation audit](Docs/tenant-isolation-boundary-audit.md) for the tested scope and limitations.

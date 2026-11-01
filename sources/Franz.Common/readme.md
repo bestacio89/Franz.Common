@@ -28,7 +28,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 A foundational library in the **Franz Framework** designed to provide core utilities, dependency injection abstractions, and common extensions for .NET applications. This library is part of the private Franz Framework ecosystem, versioned as `1.2.65`, and hosted on a private Azure NuGet feed.
 
 ---
-**Current Version:** v2.3.3
+**Current Version:** v2.3.4
 --- 
 ## **Features**
 
@@ -66,7 +66,7 @@ A foundational library in the **Franz Framework** designed to provide core utili
 
 ## **Version Information**
 
-- **Current Version**: 1.6.10
+- **Current Version**: 2.3.4
 - Part of the private Franz Framework suite, hosted on a private Azure NuGet feed.
 
 ---

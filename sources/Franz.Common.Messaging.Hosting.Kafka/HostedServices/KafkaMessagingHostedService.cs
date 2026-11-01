@@ -1,4 +1,5 @@
 using Franz.Common.Errors;
+using Franz.Common.Messaging.MultiTenancy;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Hosting.Executing;
 using Franz.Common.Messaging.Hosting.Properties;
@@ -60,6 +61,13 @@ public sealed class KafkaMessagingHostedService : BackgroundService
 
       messageContextAccessor.Set(new MessageContext(args.Message));
 
+      try
+      {
+        var tenantInitializer = scope.ServiceProvider.GetService<ITenantMessageContextInitializer>();
+        await using var tenantExecutionScope = tenantInitializer is null
+            ? null
+            : await tenantInitializer.BeginAsync(args.Message);
+
       var executers =
           scope.ServiceProvider.GetServices<IMessagingStrategyExecuter>();
 
@@ -77,6 +85,11 @@ public sealed class KafkaMessagingHostedService : BackgroundService
         throw new TechnicalException(Resources.StrategyExecuterNotFoundException);
 
       await executer.ExecuteAsync(args.Message);
+    }
+    finally
+    {
+      messageContextAccessor.Clear();
+    }
     }
     catch (Exception ex)
     {

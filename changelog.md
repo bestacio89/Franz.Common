@@ -1,6 +1,64 @@
 
 # 📈 **Franz Framework – Full Changelog**
 
+## v2.3.4 — Tenant isolation and messaging execution boundaries
+
+### Tenant-aware messaging execution
+- Establish validated tenant context within delivery-scoped dependency-injection lifetimes across supported generic, Kafka, RabbitMQ, Azure Service Bus, Azure Event Hubs, Outbox and MassTransit Kafka paths.
+- Ensure tenant execution context cleanup on success, exception and cancellation paths.
+- Derive outbound tenant/domain metadata from validated execution context and remove stale domain metadata.
+- Resolve Outbox persistence and dispatch services from a fresh scope per stored message.
+- Provide a scoped-handler MassTransit Kafka overload; fail closed for the legacy captured-handler overload when tenant-aware processing is enabled.
+- Add lifecycle, failure, concurrency, context-cleanup and metadata-propagation coverage.
+
+### Relational tenant isolation
+- Qualify framework-managed tenant isolation contracts against PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23.
+- Verify tenant-scoped reads/writes, fail-closed behavior without tenant context, ownership immutability, cross-tenant write rejection, EF Core set-based update/delete filtering and repository bulk-update protections.
+- Document that raw SQL, stored procedures, direct connections, provider-native bulk APIs and deliberate filter bypasses require explicit tenant enforcement.
+- Keep non-relational Cosmos DB and MongoDB behavior outside the relational provider qualification.
+
+### Package baseline and documentation
+- Set shared package version to 2.3.4 and file version to 2.3.4.0; retain assembly version 2.3.0.0.
+- Preserve existing root and package manuals and extend relevant guides with release-specific contracts and limitations.
+- NuGet publication remains a separate release operation after CI and release checks pass.
+
+---
+
+
+
+## Unreleased — Multi-Tenancy Security Hardening
+
+### HTTP membership authorization
+- Host-based resolution now requires a verified canonical domain mapping owned by the resolved tenant.
+
+### Persistence integrations
+- PostgreSQL database-name routing prefers the validated tenant ID and retains the legacy domain-ID fallback when no tenant execution context is available. This fallback is transitional; PR #162 will move routing policy into the EntityFramework abstraction and make domain-based routing an explicit opt-in, separate from tenant routing. Shared-database configuration remains explicit through a concrete database name.
+- EF sensitive-data logging is opt-in and disabled by default.
+- Authenticated HTTP principals now require an application-provided tenant membership authorizer; missing or denied authorization fails with HTTP 403.
+
+### Distributed execution and integrations
+- Added scoped inbound message tenant initialization with lifecycle validation, optional tenant validation, verified domain ownership, and mandatory producer authorization.
+- Outbound message builders now propagate only validated tenant/domain execution context.
+- Added tenant-prefixed cache key strategy and opt-in DI registration.
+- Corrected gRPC client behavior to use the client pipeline contract; server behavior discards untrusted inbound tenant metadata before resolution.
+
+### Persistence
+- Added tenant-owned entity contract, tenant-aware global query filters, automatic tenant stamping, and cross-tenant write rejection in `DbContextBase`.
+- Applied tenant checks to synchronous and asynchronous save paths; added persistence isolation regression tests.
+- Documented raw SQL, bulk operation, unique constraint, and database RLS responsibilities.
+
+### ✨ Added
+- Immutable validated tenant execution context and explicit tenant lifecycle states.
+- Independent domain identifiers and IDNA hostname normalization.
+- Resolver conflict detection and HTTP request-scoped tenant context.
+- Fail-closed HTTP tenant requirement, tenant lifecycle validation, and regression tests.
+
+### 🔒 Security
+- HTTP tenant/domain accessors now read server-established request items, never caller-controlled headers.
+- JWT tenant claims are considered only for authenticated principals.
+- **Compatibility:** `ITenantValidator.IsValidAsync` now accepts an optional cancellation token; HTTP accessors no longer treat inbound tenant headers as current tenant state.
+
+
 ---
 
 ## Version 1.2.65 – Foundation 🏗️

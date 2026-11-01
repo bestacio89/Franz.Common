@@ -42,7 +42,7 @@ A library within the **Franz Framework** that extends multi-tenancy support for 
 
 ## **Version Information**
 
-**Current Version:** v2.3.3
+**Current Version:** v2.3.4
 - Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -206,3 +206,35 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## Secure request context
+
+Register the HTTP integration and place its middleware after authentication and before authorization/endpoints:
+
+```csharp
+services.AddFranzMultiTenancy(options =>
+{
+    options.RequireTenant = true; // fail closed when no active tenant resolves
+});
+
+app.UseAuthentication();
+app.UseFranzMultiTenancy();
+app.UseAuthorization();
+```
+
+Tenant and domain accessors read server-established values from `HttpContext.Items`; inbound headers are resolution inputs only and are never the authoritative context. The middleware validates tenant lifecycle state, optionally invokes an application-registered `ITenantValidator`, creates an immutable execution context, and clears it after the request.
+
+The JWT claim resolver ignores unauthenticated principals. Register only the resolution strategies appropriate to the application. Query-string and header selection must not be treated as authorization: applications must still authorize the authenticated principal's membership in the resolved tenant.
+
+**Compatibility note:** HTTP accessors no longer read tenant/domain IDs from request headers. Consumers that previously used caller-supplied headers as ambient state must use a trusted resolver and the execution context accessor. `ITenantValidator.IsValidAsync` now accepts a cancellation token.
+
+
+## Authenticated tenant membership
+
+For authenticated principals, the HTTP tenant middleware requires an application-registered `ITenantRequestAuthorizer`. If no authorizer is registered, or membership is denied, the request is rejected with HTTP 403. Implement this contract against your identity/membership store; a tenant ID claim or request header alone is not membership proof. Anonymous tenant access remains subject to the application's endpoint authorization policy.
+
+
+## Request resolution is not authorization for 2.3.4
+
+Tenant resolution from a host, route, claim, or header identifies a candidate tenant; it does not establish membership or authorize access by itself. For authenticated principals, register and implement `ITenantRequestAuthorizer`; absent registration or denied membership must fail closed. A tenant identifier supplied by the caller is not membership proof. See the [tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md) for the broader framework boundary.

@@ -5,6 +5,8 @@ using Franz.Common.Messaging.AzureEventHubs.Infrastructure;
 using Franz.Common.Messaging.AzureEventHubs.Mapping;
 using Franz.Common.Messaging.AzureEventHubs.Serialization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Franz.Common.Messaging.MultiTenancy;
 
 namespace Franz.Common.Messaging.AzureEventHubs.Consumers;
 
@@ -15,19 +17,22 @@ public sealed class AzureEventHubsProcessor
   private readonly AzureEventHubsMessageSerializer _serializer;
   private readonly IDispatcher _dispatcher;
   private readonly ILogger<AzureEventHubsProcessor> _logger;
+  private readonly IServiceScopeFactory? _scopeFactory;
 
   public AzureEventHubsProcessor(
       EventHubsProcessorFactory factory,
       AzureEventHubsMessageMapper mapper,
       AzureEventHubsMessageSerializer serializer,
       IDispatcher dispatcher,
-      ILogger<AzureEventHubsProcessor> logger)
+      ILogger<AzureEventHubsProcessor> logger,
+      IServiceScopeFactory? scopeFactory = null)
   {
     _processor = factory.CreateProcessor(); // 👈 create once
     _mapper = mapper;
     _serializer = serializer;
     _dispatcher = dispatcher;
     _logger = logger;
+    _scopeFactory = scopeFactory;
 
     _processor.ProcessEventAsync += OnEventAsync;
     _processor.ProcessErrorAsync += OnErrorAsync;
@@ -44,7 +49,27 @@ public sealed class AzureEventHubsProcessor
     var body = _serializer.Deserialize(args.Data.EventBody.ToArray());
     var message = _mapper.FromEvent(args, body);
 
-    await _dispatcher.PublishNotificationAsync(message, args.CancellationToken);
+    if (_scopeFactory is null)
+    {
+      await _dispatcher.PublishNotificationAsync(message, args.CancellationToken);
+    }
+    else
+    {
+      await using var scope = _scopeFactory.CreateAsyncScope();
+      var tenantInitializer = scope.ServiceProvider.GetService<ITenantMessageContextInitializer>();
+
+      if (tenantInitializer is null)
+      {
+        await _dispatcher.PublishNotificationAsync(message, args.CancellationToken);
+      }
+      else
+      {
+        await using var tenantScope = await tenantInitializer
+            .BeginAsync(message, args.CancellationToken);
+        var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
+        await dispatcher.PublishNotificationAsync(message, args.CancellationToken);
+      }
+    }
     await args.UpdateCheckpointAsync(args.CancellationToken);
   }
 

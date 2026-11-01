@@ -36,7 +36,7 @@ Provides **unified cache abstractions**, **hybrid caching (L1 + L2)**, Mediator 
 
 ---
 
-* **Current Version:** v2.3.3
+* **Current Version:** v2.3.4
 * **Target Framework**: **.NET 10.0**
 
 ---
@@ -269,3 +269,15 @@ If you want, I can **also make a slightly fancier Markdown/mermaid diagram** tha
 ## Dependency maintenance — October 2026
 
 EPPlus is upgraded to 8.7.2, which includes fixes for the current System.Security.Cryptography.Xml advisories. Snappier is pinned to patched 1.3.1 and Pkcs to 10.0.13. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## Tenant-isolated cache keys
+
+For applications that use the validated tenant execution context, register the tenant-aware strategy after the cache provider:
+
+```csharp
+services.AddFranzMemoryCaching();
+services.AddTenantScopedCacheKeys();
+```
+
+Keys are prefixed with `tenant:{tenantId}:` when a validated tenant context exists and `global:` otherwise. This prevents identical requests from sharing cache entries across tenants. The tenant context accessor must be registered by the HTTP, messaging, or application execution adapter before the cache strategy is resolved. Do not use the global namespace for data that is logically tenant-owned.
