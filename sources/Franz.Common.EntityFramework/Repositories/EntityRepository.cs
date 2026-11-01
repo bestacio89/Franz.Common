@@ -17,7 +17,12 @@ public class EntityRepository<TDbContext, TEntity, TId>
   protected readonly TDbContext DbContext;
   private readonly ICurrentUserService? _currentUserService;
 
-  public EntityRepository(TDbContext dbContext, ICurrentUserService? currentUserService = null)
+  public EntityRepository(TDbContext dbContext)
+      : this(dbContext, null)
+  {
+  }
+
+  public EntityRepository(TDbContext dbContext, ICurrentUserService? currentUserService)
   {
     DbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     _currentUserService = currentUserService;
