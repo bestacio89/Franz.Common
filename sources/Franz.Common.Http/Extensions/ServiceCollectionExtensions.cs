@@ -100,6 +100,7 @@ public static class FranzHttpExtensions
 
         builder.Services
             .AddNoDuplicateSingleton<IErrorResponseProvider, ErrorResponseProvider>()
+            .AddNoDuplicateScoped<IErrorResponseStrategy, DefaultErrorResponseStrategy>()
             .AddNoDuplicateScoped<ExceptionFilter>();
 
         builder.Services.Configure<MvcOptions>(options =>
