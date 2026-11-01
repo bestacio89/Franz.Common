@@ -18,12 +18,27 @@ public abstract class CosmosDbContextBase : DbContextBase
 {
     private readonly CosmosOptions _cosmosOptions;
 
+    /// <summary>
+    /// Retains the original constructor signature for existing derived contexts.
+    /// </summary>
     protected CosmosDbContextBase(
         DbContextOptions options,
         IDispatcher dispatcher,
         IOptions<CosmosOptions> cosmosOptions,
-        ICurrentUserService? currentUser = null,
-        ITenantExecutionContextAccessor? tenantContextAccessor = null)
+        ICurrentUserService? currentUser = null)
+        : this(options, dispatcher, cosmosOptions, currentUser, null)
+    {
+    }
+
+    /// <summary>
+    /// Creates a Cosmos context with an optional validated tenant execution-context accessor.
+    /// </summary>
+    protected CosmosDbContextBase(
+        DbContextOptions options,
+        IDispatcher dispatcher,
+        IOptions<CosmosOptions> cosmosOptions,
+        ICurrentUserService? currentUser,
+        ITenantExecutionContextAccessor? tenantContextAccessor)
         : base(options, dispatcher, currentUser, tenantContextAccessor)
     {
         _cosmosOptions = cosmosOptions?.Value
