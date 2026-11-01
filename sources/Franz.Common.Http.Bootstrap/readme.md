@@ -221,3 +221,27 @@ The request order is:
 5. Endpoint authorization and controller execution.
 
 This order makes authenticated JWT claims available to tenant resolution and ensures endpoint authorization runs only after the validated tenant execution context has been established. Applications must still register an `ITenantRequestAuthorizer` for authenticated tenant membership.
+
+---
+
+## Security configuration
+
+`AddHttpArchitecture()` wires the HTTP services and `UseHttpArchitecture()` composes middleware in the required order. The host still owns the identity-provider configuration and tenant membership policy.
+
+### JWT
+
+For symmetric JWTs, configure `JwtSettings:Issuer`, `JwtSettings:Audience`, and a secret-store-backed `JwtSettings:SigningKey` of at least 32 UTF-8 bytes using `AddFranzAuthentication().ConfigureJwtBearer(configuration)`. The helper fails fast if a required setting is absent and never disables issuer, audience, lifetime, expiration, or signature validation. Use native ASP.NET Core OIDC/JWT configuration for asymmetric provider keys.
+
+### CORS
+
+The `Cors` setting is a semicolon-separated list of exact origins. No configured origins means no cross-origin access is granted. Wildcard origins and subdomain wildcards are rejected.
+
+### Reverse proxies
+
+Forwarded headers are processed only when the immediate sender is in ASP.NET Core's trusted proxy/network list. Add the actual reverse-proxy IPs or networks through `ForwardedHeadersOptions`; do not clear those restrictions or trust arbitrary clients.
+
+### Tenant membership
+
+Register `ITenantRequestAuthorizer` for authenticated tenant membership. The tenant middleware returns 403 if the authorizer is missing or denies access. Tenant IDs from headers or claims are resolution inputs, not membership proof.
+
+See [the authentication and HTTP trust model](../../Docs/security/authentication-model.md).
