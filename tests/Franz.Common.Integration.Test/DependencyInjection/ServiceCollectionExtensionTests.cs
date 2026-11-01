@@ -8,27 +8,57 @@ using System;
 namespace Franz.Common.Integration.Tests.DependencyInjection
 {
   // Dummy marker types for scanning tests
-  public interface IFakeService:IScopedDependency { }
+  public interface IFakeService : IScopedDependency { }
   public interface IOtherService { }
 
-  public sealed class FakeScopedService : IFakeService, IScopedDependency { }
+  public sealed class FakeScopedService : IFakeService, IScopedDependency, IDisposable
+  {
+    public bool IsDisposed { get; private set; }
+
+    public void Dispose() => IsDisposed = true;
+  }
+
   public sealed class FakeSingletonService : IOtherService, ISingletonDependency { }
 
   public class ServiceCollectionExtensionsTests
   {
     [Fact]
-    public void AddDependencies_Should_Register_Scoped_And_Singleton_Services()
+    public void AddDependencies_Should_Register_Marker_Lifetimes_And_Respect_Scope_Boundaries()
     {
       var services = new ServiceCollection();
       services.AddDependencies(asm => asm == typeof(FakeScopedService).Assembly);
 
-      using var provider = services.BuildServiceProvider();
+      var scopedRegistration = services.Single(service => service.ServiceType == typeof(IFakeService));
+      var singletonRegistration = services.Single(service => service.ServiceType == typeof(IOtherService));
 
-      var scoped = provider.GetRequiredService<IFakeService>();
-      var single = provider.GetRequiredService<IOtherService>();
+      scopedRegistration.Lifetime.Should().Be(ServiceLifetime.Scoped);
+      singletonRegistration.Lifetime.Should().Be(ServiceLifetime.Singleton);
+      services.Should().NotContain(service =>
+        service.ServiceType == typeof(IScopedDependency)
+        || service.ServiceType == typeof(ISingletonDependency));
 
-      scoped.Should().BeOfType<FakeScopedService>();
-      single.Should().BeOfType<FakeSingletonService>();
+      using var provider = services.BuildServiceProvider(new ServiceProviderOptions
+      {
+        ValidateScopes = true,
+        ValidateOnBuild = true
+      });
+
+      var firstScope = provider.CreateScope();
+      var first = firstScope.ServiceProvider.GetRequiredService<IFakeService>();
+      var firstAgain = firstScope.ServiceProvider.GetRequiredService<IFakeService>();
+      var singletonFromFirstScope = firstScope.ServiceProvider.GetRequiredService<IOtherService>();
+
+      first.Should().BeSameAs(firstAgain);
+
+      firstScope.Dispose();
+      ((FakeScopedService)first).IsDisposed.Should().BeTrue();
+
+      using var secondScope = provider.CreateScope();
+      var second = secondScope.ServiceProvider.GetRequiredService<IFakeService>();
+      var singletonFromSecondScope = secondScope.ServiceProvider.GetRequiredService<IOtherService>();
+
+      second.Should().NotBeSameAs(first);
+      singletonFromSecondScope.Should().BeSameAs(singletonFromFirstScope);
     }
 
     [Fact]
@@ -70,12 +100,16 @@ namespace Franz.Common.Integration.Tests.DependencyInjection
       var services = new ServiceCollection();
       services.AddSelfScoped<FakeScopedService>(asm => asm == typeof(FakeScopedService).Assembly);
 
-      using var provider = services.BuildServiceProvider();
-      var instance = provider.GetRequiredService<FakeScopedService>();
+      using var provider = services.BuildServiceProvider(new ServiceProviderOptions
+      {
+        ValidateScopes = true,
+        ValidateOnBuild = true
+      });
+      using var scope = provider.CreateScope();
+      var instance = scope.ServiceProvider.GetRequiredService<FakeScopedService>();
 
       instance.Should().NotBeNull();
     }
-
 
     [Fact]
     public void AddImplementedInterfaceSingleton_Should_Register_Singleton_Service()
@@ -83,7 +117,11 @@ namespace Franz.Common.Integration.Tests.DependencyInjection
       var services = new ServiceCollection();
       services.AddImplementedInterfaceSingleton<ISingletonDependency>(asm => asm == typeof(FakeSingletonService).Assembly);
 
-      using var provider = services.BuildServiceProvider();
+      using var provider = services.BuildServiceProvider(new ServiceProviderOptions
+      {
+        ValidateScopes = true,
+        ValidateOnBuild = true
+      });
       var service = provider.GetRequiredService<ISingletonDependency>();
 
       service.Should().BeOfType<FakeSingletonService>();
@@ -95,11 +133,21 @@ namespace Franz.Common.Integration.Tests.DependencyInjection
       var services = new ServiceCollection();
       services.AddImplementedInterfaceTransient<IScopedDependency>(asm => asm == typeof(FakeScopedService).Assembly);
 
-      using var provider = services.BuildServiceProvider();
-      var s1 = provider.GetRequiredService<IScopedDependency>();
-      var s2 = provider.GetRequiredService<IScopedDependency>();
+      using var provider = services.BuildServiceProvider(new ServiceProviderOptions
+      {
+        ValidateScopes = true,
+        ValidateOnBuild = true
+      });
+      using var scope = provider.CreateScope();
 
-      s1.Should().NotBeSameAs(s2); // transient = new instance each time
+      var first = scope.ServiceProvider.GetRequiredService<IScopedDependency>();
+      var second = scope.ServiceProvider.GetRequiredService<IScopedDependency>();
+
+      first.Should().NotBeSameAs(second);
+
+      scope.Dispose();
+      ((FakeScopedService)first).IsDisposed.Should().BeTrue();
+      ((FakeScopedService)second).IsDisposed.Should().BeTrue();
     }
   }
 }
