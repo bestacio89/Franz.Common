@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace Franz.Common.Http.MultiTenancy.Resolvers;
 
-public sealed class HeaderTenantResolver(ITenantStore store, string headerName = "X-Tenant-Id") : ITenantResolver
+public class HeaderTenantResolver(ITenantStore store, string headerName = "X-Tenant-Id") : ITenantResolver
 {
     public int Order => 100;
 
