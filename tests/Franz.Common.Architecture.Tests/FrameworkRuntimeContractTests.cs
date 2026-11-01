@@ -151,7 +151,12 @@ public sealed class FrameworkRuntimeContractTests
 
     Assert.All(methods, method =>
     {
-      Assert.Contains(method.ReturnType, new[] { typeof(Task), typeof(ValueTask) });
+      var returnType = method.ReturnType;
+      var isAsync = returnType == typeof(Task)
+        || returnType == typeof(ValueTask)
+        || returnType.IsGenericType && returnType.GetGenericTypeDefinition() is var genericType
+          && (genericType == typeof(Task<>) || genericType == typeof(ValueTask<>));
+      Assert.True(isAsync, $"{contract.Name}.{methodName} must remain asynchronous.");
       Assert.Contains(method.GetParameters(), parameter =>
         parameter.ParameterType == typeof(CancellationToken));
     });
@@ -167,7 +172,7 @@ public sealed class FrameworkRuntimeContractTests
     Assert.Null(property.SetMethod);
   }
 
-  private interface IContract;
+  private interface IContract { }
 
-  private sealed class ContractImplementation : IContract;
+  private sealed class ContractImplementation : IContract { }
 }
