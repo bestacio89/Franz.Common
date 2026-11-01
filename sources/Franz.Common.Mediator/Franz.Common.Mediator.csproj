@@ -14,7 +14,8 @@
     <ProjectReference
       Include="..\Microsoft.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj"
       OutputItemType="Analyzer"
-      ReferenceOutputAssembly="false" />
+      ReferenceOutputAssembly="false"
+      GlobalPropertiesToRemove="PublishAot;PublishTrimmed;TrimMode" />
   </ItemGroup>
 
   <!-- Ship the generator as a compiler analyzer with the mediator package so
