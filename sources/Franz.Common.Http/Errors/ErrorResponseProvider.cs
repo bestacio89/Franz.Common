@@ -6,7 +6,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Franz.Common.Http.Errors;
 
-public sealed class ErrorResponseProvider(IHostEnvironment hostEnvironment) : IErrorResponseProvider
+public class ErrorResponseProvider(IHostEnvironment hostEnvironment) : IErrorResponseProvider
 {
     public ErrorResponse PrepareResponse(ExceptionContext exceptionContext, IErrorResponseStrategy errorResponse)
     {
