@@ -57,8 +57,8 @@ public sealed class TenantResolutionServerBehaviorTests
 
         await resolver.Received(1).ResolveTenantAsync(
             Arg.Is<GrpcCallContext>(context =>
-                context.TenantId is null &&
-                context.UserId is null &&
+                context.TenantId == null &&
+                context.UserId == null &&
                 !context.RequestHeaders.ContainsKey(GrpcCallContext.TenantIdHeaderName) &&
                 !context.RequestHeaders.ContainsKey(GrpcCallContext.UserIdHeaderName)),
             Arg.Any<CancellationToken>());
