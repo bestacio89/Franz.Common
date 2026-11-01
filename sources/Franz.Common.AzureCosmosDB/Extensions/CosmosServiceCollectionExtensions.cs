@@ -18,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Franz.Common.MultiTenancy;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using System.Text.Json;
 
 namespace Franz.Common.AzureCosmosDB.Extensions;
 
@@ -53,10 +54,10 @@ public static class CosmosServiceCollectionExtensions
     return services;
   }
 
-
   /// <summary>
   /// Registers the native Cosmos SDK client and a tenant-partition-scoped repository.
   /// The target container must be provisioned with /tenantId as its partition-key path.
+  /// Native documents use the Cosmos-required lower-camel JSON contract (id, tenantId).
   /// </summary>
   public static IServiceCollection AddCosmosTenantRepository<TDocument>(
       this IServiceCollection services,
@@ -78,6 +79,8 @@ public static class CosmosServiceCollectionExtensions
         new CosmosClientOptions
         {
           ConnectionMode = ConnectionMode.Gateway,
+          Serializer = new CosmosSystemTextJsonSerializer(
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)),
           HttpClientFactory = () =>
           {
             var handler = new HttpClientHandler();
@@ -154,10 +157,6 @@ public static class CosmosServiceCollectionExtensions
     return services;
   }
 
-  // =====================================================
-  // Options
-  // =====================================================
-
   private static void ConfigureCosmosOptions(
       this IServiceCollection services,
       IConfiguration configuration,
@@ -190,10 +189,6 @@ public static class CosmosServiceCollectionExtensions
     }
   }
 
-  // =====================================================
-  // Cosmos provider configuration (FIXED EF warning)
-  // =====================================================
-
   private static void ConfigureCosmosProvider(
       Microsoft.EntityFrameworkCore.Infrastructure.CosmosDbContextOptionsBuilder builder,
       CosmosOptions settings)
@@ -222,16 +217,8 @@ public static class CosmosServiceCollectionExtensions
     });
 
     builder.ConnectionMode(Microsoft.Azure.Cosmos.ConnectionMode.Gateway);
-
-    // ❌ FIX: removed internal EF API usage
-    // builder.ExecutionStrategy(d => new CosmosExecutionStrategy(d));
-
     builder.LimitToEndpoint();
   }
-
-  // =====================================================
-  // Repository discovery
-  // =====================================================
 
   public static IServiceCollection AddCosmosEntityRepositories<TDbContext>(
       this IServiceCollection services)
@@ -266,6 +253,7 @@ public static class CosmosServiceCollectionExtensions
             i.IsGenericType &&
             i.GetGenericTypeDefinition() == typeof(IEntity<>));
   }
+
   private static IEnumerable<Type> GetEfEntityTypes(Type dbContextType)
   {
     return dbContextType
@@ -273,15 +261,7 @@ public static class CosmosServiceCollectionExtensions
       .Where(p => p.PropertyType.IsGenericType)
       .Where(p => p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
       .Select(p => p.PropertyType.GetGenericArguments().Single())
-
-      // =========================================================
-      // Only persistence entities implementing IEntity<TKey>
-      // =========================================================
-      .Where(t => ImplementsEntityInterface(t))
-
-      // =========================================================
-      // Exclude aggregates explicitly
-      // =========================================================
+      .Where(ImplementsEntityInterface)
       .ToList();
   }
 }
