@@ -62,6 +62,18 @@ public class MediatorGeneratorIntegrationTests
   }
 
   [Fact]
+  public void AddFranzMediatorV1_AcceptsGeneratedAssemblyWithNoHandlers()
+  {
+    var services = new ServiceCollection();
+
+    var act = () => services.AddFranzMediator(
+        new[] { typeof(GeneratedHandlerRegistrationProvider).Assembly });
+
+    act.Should().NotThrow();
+    services.Should().ContainSingle(descriptor => descriptor.ServiceType == typeof(IDispatcher));
+  }
+
+  [Fact]
   public void GeneratedRegistration_IsIdempotentAtServiceRegistrationLevel()
   {
     var services = new ServiceCollection();
