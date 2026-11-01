@@ -1,17 +1,32 @@
 
 # 📈 **Franz Framework – Full Changelog**
 
-## v2.3.5 — HTTP multitenancy pipeline composition
+## v2.3.5 — Tenant-aware HTTP, document persistence and gRPC
 
 ### HTTP request lifecycle
-- Wire `UseFranzMultiTenancy()` into `UseHttpArchitecture()` automatically.
-- Run tenant resolution after authentication so authenticated JWT claims are available.
-- Run tenant resolution before authorization so endpoint authorization executes with the validated tenant execution context.
-- Move forwarded-header processing ahead of routing and authentication, and place exception handling at the start of the pipeline.
-- Preserve request-scoped tenant context cleanup through the existing middleware lifecycle.
+- Compose `UseFranzMultiTenancy()` automatically inside `UseHttpArchitecture()`.
+- Resolve tenants after authentication and before endpoint authorization.
+- Place forwarded-header processing before routing and authentication, with exception handling at the start of the pipeline.
+
+### Native document persistence
+- Add a MongoDB tenant document contract and tenant-scoped repository with mandatory validated tenant filters, insert stamping, cross-tenant ownership rejection, batch insert validation, and a deployment-time compound tenant/document identity index.
+- Add tenant-safe MongoDB atomic updates, bulk writes, immutable tenant ownership update builders, optional client sessions, and replica-set/sharded transaction execution.
+- Scope MongoDB event-sourced aggregate replay, persistence and deletion by validated tenant identity; keep non-tenant event streams isolated with a null tenant key.
+- Apply the shared tenant execution context and fail-closed query/write boundary to EF Core Cosmos contexts.
+- Partition Cosmos tenant-owned entities by tenant identity, converting the Guid tenant identifier to the Cosmos-supported string partition key. Support a hierarchical tenant-first key when an entity also declares a custom partition component.
+- Add a native Cosmos SDK tenant repository that supplies the validated tenant partition key to point reads, queries, create/replace/delete and read-many operations.
+- Expose Cosmos RU charges, activity IDs, ETags and query continuation metadata; require ETags for native replacement to enforce optimistic concurrency.
+- Keep MongoDB and Cosmos provider behavior native; do not claim relational EF bulk-update, transaction or query-filter guarantees for these stores.
+
+### gRPC execution boundary
+- Remove caller-supplied tenant and user metadata before server-side tenant resolution; reuse an already validated HTTP request tenant context without replacing or prematurely clearing it.
+- Require valid Guid tenant identity, application membership authorization, optional shared tenant lifecycle validation, and scoped tenant execution-context initialization/cleanup.
+- Add strict `RequireTenant` configuration; unresolved tenants fail with PermissionDenied when enabled.
+- Propagate client tenant metadata only from a validated execution context.
+- Scope server/client behavior providers to prevent scoped behavior instances from being cached across requests.
 
 ### Release boundary
-- No changes to persistence, database routing, messaging, caching, or distributed integrations.
+- No changes to relational EF provider behavior, messaging transports, cache strategy, or database routing.
 - Set the shared package version to 2.3.5 and file version to 2.3.5.0; retain assembly version 2.3.0.0.
 - NuGet publication remains gated on successful Release build, full tests, and release checks.
 
