@@ -1,3 +1,4 @@
+using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Handlers;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Processors;
