@@ -10,9 +10,12 @@ using Franz.Common.Business.Repositories;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Messaging.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Franz.Common.MultiTenancy;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 
@@ -45,6 +48,62 @@ public static class CosmosServiceCollectionExtensions
           cosmos.DatabaseName,
           cosmosBuilder => ConfigureCosmosProvider(cosmosBuilder, cosmos)
       );
+    });
+
+    return services;
+  }
+
+
+  /// <summary>
+  /// Registers the native Cosmos SDK client and a tenant-partition-scoped repository.
+  /// The target container must be provisioned with /tenantId as its partition-key path.
+  /// </summary>
+  public static IServiceCollection AddCosmosTenantRepository<TDocument>(
+      this IServiceCollection services,
+      string containerName)
+      where TDocument : class, ICosmosTenantDocument
+  {
+    ArgumentNullException.ThrowIfNull(services);
+    ArgumentException.ThrowIfNullOrWhiteSpace(containerName);
+
+    services.TryAddSingleton<CosmosClient>(sp =>
+    {
+      var options = sp.GetRequiredService<IOptions<CosmosOptions>>().Value;
+      if (!options.Enabled)
+        throw new InvalidOperationException("Cosmos DB is disabled in the current configuration.");
+
+      return new CosmosClient(
+        options.AccountEndpoint,
+        options.AccountKey,
+        new CosmosClientOptions
+        {
+          ConnectionMode = ConnectionMode.Gateway,
+          HttpClientFactory = () =>
+          {
+            var handler = new HttpClientHandler();
+            if (options.ApplicationName?.Contains("Tests", StringComparison.OrdinalIgnoreCase) == true)
+            {
+              handler.ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+            }
+
+            var httpClient = new HttpClient(handler);
+            if (!string.IsNullOrWhiteSpace(options.ApplicationName))
+              httpClient.DefaultRequestHeaders.Add("User-Agent", options.ApplicationName);
+
+            return httpClient;
+          }
+        });
+    });
+
+    services.AddScoped<CosmosTenantRepository<TDocument>>(sp =>
+    {
+      var options = sp.GetRequiredService<IOptions<CosmosOptions>>().Value;
+      var client = sp.GetRequiredService<CosmosClient>();
+      var container = client.GetContainer(options.DatabaseName, containerName);
+      var accessor = sp.GetRequiredService<ITenantExecutionContextAccessor>();
+
+      return new CosmosTenantRepository<TDocument>(container, accessor);
     });
 
     return services;
