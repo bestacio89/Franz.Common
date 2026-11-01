@@ -70,13 +70,34 @@ public sealed class FrameworkArchitectureTests
   [Fact]
   public void Runtime_projects_must_not_reference_test_projects_or_test_helpers()
   {
-    var graph = LoadRuntimeProjectGraph();
-    var violations = graph
-      .SelectMany(project => project.Value
-        .Where(reference => reference.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)
-          || string.Equals(reference, "Franz.Common.Testing", StringComparison.OrdinalIgnoreCase))
-        .Select(reference => $"{project.Key} -> {reference}"))
-      .ToArray();
+    var sourceRoot = Path.Combine(RepositoryRoot.Value, "sources");
+    var testProjectNames = Directory
+      .EnumerateFiles(sourceRoot, "*.Tests.csproj", SearchOption.AllDirectories)
+      .Select(Path.GetFileNameWithoutExtension)
+      .Append("Franz.Common.Testing")
+      .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    var violations = new List<string>();
+
+    foreach (var projectPath in Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories))
+    {
+      var projectName = Path.GetFileNameWithoutExtension(projectPath);
+      if (projectName.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(projectName, "Franz.Common.Testing", StringComparison.OrdinalIgnoreCase))
+        continue;
+
+      var document = XDocument.Load(projectPath);
+      foreach (var reference in document
+        .Descendants()
+        .Where(element => element.Name.LocalName == "ProjectReference")
+        .Select(element => (string?)element.Attribute("Include"))
+        .Where(include => !string.IsNullOrWhiteSpace(include)))
+      {
+        var referencedName = Path.GetFileNameWithoutExtension(reference);
+        if (testProjectNames.Contains(referencedName))
+          violations.Add($"{projectName} -> {referencedName}");
+      }
+    }
 
     Assert.Empty(violations);
   }
@@ -282,7 +303,8 @@ public sealed class FrameworkArchitectureTests
 
       if (relativePath.StartsWith("sources/Franz.Common.Testing/", StringComparison.Ordinal)
         || relativePath.StartsWith("sources/Microsoft.Common.Mediator.SourceGenerator/", StringComparison.Ordinal)
-        || relativePath.Split('/').Any(segment => segment.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)))
+        || relativePath.Split('/').Any(segment =>
+          segment is "bin" or "obj" || segment.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)))
         continue;
 
       if (relativePath.Split('/').Contains("Testing", StringComparer.Ordinal))
