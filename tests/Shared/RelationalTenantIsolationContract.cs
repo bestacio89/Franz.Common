@@ -436,6 +436,17 @@ public abstract class RelationalTenantIsolationContract
             () => builder.SetProperty(entity => entity.LastModifiedBy, "forged"));
         Assert.Throws<InvalidOperationException>(
             () => builder.SetProperty(entity => entity.ConcurrencyVersion, 42L));
+
+        var nonTenantBuilder = new BulkUpdateBuilder<PlainEntity>();
+        Assert.Throws<InvalidOperationException>(
+            () => nonTenantBuilder.SetProperty(
+                entity => EF.Property<string?>(entity, nameof(Entity<object>.LastModifiedBy)),
+                "forged"));
+    }
+
+    private sealed class PlainEntity : Entity<Guid>
+    {
+        public string Name { get; set; } = string.Empty;
     }
 
     [Fact]
