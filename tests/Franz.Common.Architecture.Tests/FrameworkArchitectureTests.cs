@@ -1,7 +1,9 @@
 using System.Text.Json;
 using System.Xml.Linq;
+using ArchUnitNET.Domain;
 using ArchUnitNET.Fluent;
 using ArchUnitNET.Loader;
+using ArchUnitNET.xUnit;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using ReflectionAssembly = System.Reflection.Assembly;
@@ -43,15 +45,16 @@ public sealed class FrameworkArchitectureTests
 
       Assert.True(assembly is not null, $"Core package assembly '{packageName}' was not loaded.");
 
-      ArchRuleDefinition
+      IArchRule rule = ArchRuleDefinition
         .Classes()
         .That()
         .ResideInAssembly(assembly!)
         .Should()
         .NotDependOnAnyTypesThat()
         .ResideInNamespaceMatching(AdapterNamespacePattern)
-        .Because($"Core package '{packageName}' must depend on abstractions, not infrastructure adapters.")
-        .Check(ArchitectureModel.Value);
+        .Because($"Core package '{packageName}' must depend on abstractions, not infrastructure adapters.");
+
+      rule.Check(ArchitectureModel.Value);
     }
   }
 
@@ -383,7 +386,14 @@ public sealed class FrameworkArchitectureTests
       var syntaxTree = CSharpSyntaxTree.ParseText(File.ReadAllText(file), path: relativePath);
       var root = syntaxTree.GetRoot();
 
-      foreach (var dynamicType in root.DescendantNodes().OfType<DynamicTypeSyntax>())
+      var usesDynamicTypes = root
+        .DescendantNodes()
+        .OfType<IdentifierNameSyntax>()
+        .Any(identifier =>
+          identifier.Identifier.ValueText == "dynamic"
+          && identifier.Parent is TypeSyntax);
+
+      if (usesDynamicTypes)
         findings.Add(new PolicyFinding("DYNAMIC", relativePath));
 
       foreach (var invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
