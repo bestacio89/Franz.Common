@@ -10,34 +10,30 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
   private readonly string _user = "guest";
   private readonly string _password = "guest";
 
+  public const string Image = "rabbitmq:4.0-management";
+
   public string QueueName { get; } = $"franz-test-{Guid.CreateVersion7():N}";
 
   public RabbitMqContainer Container { get; } =
-      new RabbitMqBuilder("rabbitmq:4.0-management")
-          .WithUsername("guest")
-          .WithPassword("guest")
+      new RabbitMqBuilder(Image)
+          .WithUsername(_user)
+          .WithPassword(_password)
           .WithCleanUp(true)
+          .WithWaitStrategy(Wait.ForUnixContainer()
+              .UntilInternalTcpPortIsAvailable(5672))
+          .WithStartupTimeout(TimeSpan.FromMinutes(2))
           .Build();
 
-  /// <summary>
-  /// Returns the full AMQP URI for the container.
-  /// Format: amqp://guest:guest@localhost:port/
-  /// </summary>
   public string ConnectionString => Container.GetConnectionString();
 
   public async Task InitializeAsync() => await Container.StartAsync();
 
   public async Task DisposeAsync() => await Container.DisposeAsync();
 
-  /// <summary>
-  /// Generates a dictionary compatible with IConfiguration for Messaging:RabbitMQ.
-  /// Prioritizes URI-based BootstrapServers over legacy HostName/Port.
-  /// </summary>
   public Dictionary<string, string?> GetConfiguration()
   {
     return new Dictionary<string, string?>
     {
-      //Map directly to BootStrapServers to test the URI parsing logic
       ["Messaging:RabbitMQ:BootStrapServers"] = ConnectionString,
       ["Messaging:RabbitMQ:UserName"] = _user,
       ["Messaging:RabbitMQ:Password"] = _password,
