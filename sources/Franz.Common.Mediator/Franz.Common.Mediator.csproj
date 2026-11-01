@@ -12,7 +12,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common\Franz.Common.csproj" />
-    <ProjectReference Include="..\Microsoft.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj" />
+    <ProjectReference Include="..\Microsoft.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj" >
+      <GlobalPropertiesToRemove>PublishAot;PublishTrimmed;TrimMode;RuntimeIdentifier;SelfContained</GlobalPropertiesToRemove>
+    </ProjectReference>
   </ItemGroup>
 
   
