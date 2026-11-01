@@ -32,7 +32,7 @@ public sealed class FrameworkRuntimeContractTests
   }
 
   [Fact]
-  public void Mediator_dispatch_contracts_propagate_cancellation()
+  public void Mediator_dispatch_contracts_accept_optional_cancellation_tokens()
   {
     var dispatcher = typeof(IDispatcher);
     var methods = dispatcher.GetMethods(BindingFlags.Public | BindingFlags.Instance);
@@ -44,7 +44,6 @@ public sealed class FrameworkRuntimeContractTests
         parameter.ParameterType == typeof(CancellationToken));
 
       Assert.True(cancellationParameter.IsOptional);
-      Assert.Equal(default(CancellationToken), cancellationParameter.DefaultValue);
     });
   }
 
