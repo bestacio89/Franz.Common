@@ -30,6 +30,9 @@ public static class Program
         var commandResult = await dispatcher.SendAsync<string>(new AotCommand("generated-command"));
         if (commandResult != "generated-command")
             return 2;
+        if (!scope.ServiceProvider.GetRequiredService<AotCommandPreProcessor>().Executed
+            || !scope.ServiceProvider.GetRequiredService<AotCommandPostProcessor>().Executed)
+            return 8;
 
         var queryResult = await dispatcher.SendAsync<int>(new AotQuery(21));
         if (queryResult != 42)
@@ -82,14 +85,24 @@ public sealed class AotCommandHandler : ICommandHandler<AotCommand, string>
 
 public sealed class AotCommandPreProcessor : IPreProcessor<AotCommand>
 {
+    public bool Executed { get; private set; }
+
     public Task ProcessAsync(AotCommand request, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+    {
+        Executed = true;
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class AotCommandPostProcessor : IPostProcessor<AotCommand, string>
 {
+    public bool Executed { get; private set; }
+
     public Task ProcessAsync(AotCommand request, string response, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+    {
+        Executed = true;
+        return Task.CompletedTask;
+    }
 }
 
 public sealed record AotQuery(int Id) : IQuery<int>;
