@@ -1,31 +1,224 @@
 # Franz.Common.Messaging.Hosting
 
-Generic hosted message execution and Outbox dispatch integration for Franz.Common.
+> Messaging and distributed integration for the Franz.Common framework on .NET 10.
 
-## Install
+## Overview
+
+The `Franz.Common.Messaging.Hosting` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+
+## Installation
 
 ```bash
-dotnet add package Franz.Common.Messaging.Hosting --version 2.3.4
+dotnet add package Franz.Common.Messaging.Hosting
 ```
 
-## Responsibilities
+## Design principles
 
-Provides hosted listener execution, message strategy selection and Outbox dispatch coordination. It owns the per-message dependency-injection scope and message-context lifetime for the generic hosted-service path.
+- **Explicit composition:** register only the capabilities the application needs.
+- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
+- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
+- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
 
-When Franz.Common.Messaging.MultiTenancy is registered, the hosted handler initializes validated tenant execution before strategy selection and execution. Message context and tenant context are cleared/disposed after the full handler pipeline, including exceptions.
+## Usage and configuration
 
-## Outbox lifecycle
+Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
 
-OutboxMessageListener creates a fresh async DI scope for each stored message. It resolves message store, inbox store, dispatcher and serializer from that scope, initializes tenant context from the explicit message before callback/domain dispatch, then marks the message processed/sent after successful handling.
+## Package-specific guide
 
-The listener clears ambient message context in a finally block. A nested hosted callback may clear its own ambient context; the Outbox path restores the current message context before subsequent domain dispatch.
+A foundational library within the **Franz Framework** designed to enable and manage hosted messaging services in distributed applications.  
+This package provides hosting utilities, message execution strategies, delegation, transaction management, and seamless integration with **Microsoft.Extensions.Hosting**.
 
-## Constructor compatibility
+---
 
-The listener constructor requires IServiceScopeFactory and ILogger<OutboxMessageListener>. Applications that instantiate OutboxMessageListener manually must update construction to provide those services. Prefer dependency injection.
+## ✨ Features
 
-Framework release line: **2.3.4**; target framework: net10.0.
+- **Hosted Messaging Services**
+  - `MessagingHostedService` for orchestrating background message processing.
+  - Wrapper services for Kafka and Outbox listeners (`KafkaHostedService`, `OutboxHostedService`).
 
-See [messaging execution lifecycle](../../docs/multitenancy-execution-lifecycle.md).
+- **Message Context Management**
+  - `MessageContextAccessor` manages per-message context during execution.
+  - Async-local storage ensures safe context propagation across async flows.
 
-MIT License.
+- **Delegating Message Actions**
+  - `IAsyncMessageActionFilter` and `MessageActionExecutionDelegate` let you extend/control pipelines before/after handling.
+
+- **Transaction Management**
+  - `TransactionFilter` ensures consistency across message processing and persistence.
+
+- **Messaging Execution Strategies**
+  - `IMessagingStrategyExecuter` defines custom strategies for message execution.
+
+- **📥 Inbox Pattern Integration**
+  - Built-in `IInboxStore` support for idempotent message consumption.
+  - Ensures "exactly-once" processing even under retries or replays.
+
+- **📦 Outbox Pattern Integration**
+  - Hosted service wrappers for `OutboxMessageListener` to continuously publish pending messages.
+
+- **Extensions**
+  - `HostBuilderExtensions` for wiring messaging services into the host builder.
+  - `ServiceCollectionExtensions` for DI registration.
+
+- **Observability**
+  - Structured logging with emoji-friendly conventions (✅ success, ⚠️ retries, 🔥 DLQ).
+  - OpenTelemetry hooks for distributed tracing.
+
+---
+
+## 📂 Project Structure
+
+```
+
+Franz.Common.Messaging.Hosting/
+├── Context/
+│    └── MessageContextAccessor.cs
+├── Delegating/
+│    └── IAsyncMessageActionFilter.cs
+├── Executing/
+│    └── IMessagingStrategyExecuter.cs
+├── HostedServices/
+│    ├── MessagingHostedService.cs
+│    ├── KafkaHostedService.cs
+│    └── OutboxHostedService.cs
+├── Transactions/
+│    └── TransactionFilter.cs
+└── Extensions/
+└── HostBuilderExtensions.cs
+
+````
+
+---
+
+## ⚙️ Dependencies
+
+- **Microsoft.Extensions.DependencyInjection.Abstractions** (10.0.14)  
+- **Microsoft.Extensions.Hosting** (10.0.14)  
+- **Franz.Common.Hosting** – general hosting utilities  
+- **Franz.Common.Logging** – centralized structured logging  
+- **Franz.Common.Messaging** – core messaging abstractions  
+
+---
+
+## 🚀 Usage
+
+### 1. Register Messaging Hosted Services
+
+```csharp
+using Franz.Common.Messaging.Hosting.Extensions;
+
+var host = Host.CreateDefaultBuilder(args)
+    .AddMessagingHostedService()
+    .AddKafkaHostedListener()
+    .AddOutboxHostedListener()
+    .Build();
+
+await host.RunAsync();
+````
+
+### 2. Customize Messaging Actions
+
+```csharp
+public class CustomMessageActionFilter : IAsyncMessageActionFilter
+{
+    public async Task OnMessageExecutingAsync(MessageActionExecutingContext context)
+    {
+        Console.WriteLine("🚦 Before message execution");
+    }
+
+    public async Task OnMessageExecutedAsync(MessageActionExecutedContext context)
+    {
+        Console.WriteLine("✅ After message execution");
+    }
+}
+```
+
+### 3. Transaction Management
+
+```csharp
+services.AddControllers(options =>
+{
+    options.Filters.Add<TransactionFilter>();
+});
+```
+
+### 4. Implement Messaging Strategies
+
+```csharp
+public class CustomMessagingStrategyExecuter : IMessagingStrategyExecuter
+{
+    public async Task ExecuteAsync(MessageContext context)
+    {
+        // Custom execution logic
+    }
+}
+```
+
+---
+
+## 📊 Observability
+
+* Emoji-based structured logs (✅ success, ⚠️ retry, 🔥 DLQ, 💤 idle).
+* Tracing via OpenTelemetry spans for Kafka + Outbox messages.
+
+---
+
+## 📝 Version Information
+
+* **Current Version:** v2.3.3
+* Part of the private **Franz Framework** ecosystem.
+---
+
+## 📜 License
+
+This library is licensed under the MIT License. See the `LICENSE` file for details.
+
+---
+
+## 📖 Changelog
+
+### Version 1.2.65
+
+* Upgrade to .NET 9.
+
+### Version 1.3
+
+* Upgraded to **.NET 9.0.8**.
+* Added new features and improvements.
+* Separated business concepts from mediator concepts.
+* Compatibility with both the in-house mediator and **MediatR**.
+
+### Version 1.6.2
+
+* Introduced **KafkaHostedService** and **OutboxHostedService** for clean separation of concerns.
+* Added **Inbox pattern** integration (`IInboxStore`) with hosted listener support.
+* Extended `MessageContextAccessor` with AsyncLocal for per-message scoping.
+* Unified listener abstractions (`IListener`) with async cancellation token support.
+* Introduced consistent DI extensions:
+
+  * `AddKafkaHostedListener()`
+  * `AddOutboxHostedListener()`
+* Enhanced structured logging with emoji conventions for observability.
+* Added OpenTelemetry hooks for distributed tracing of message processing.
+
+### Version 1.6.20
+- Updated to **.NET 10.0**
+
+
+
+### v2.0.1 – Internal Modernization
+
+- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
+- All APIs remain fully backward compatible.
+- Tests, listeners, and pipeline components modernized.
+
+---
+
+## Dependency maintenance — October 2026
+
+This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## 2.3.4 tenant execution boundary notes
+
+This package participates in the Franz.Common 2.3.4 tenant-aware messaging ecosystem. Delivery-scope and tenant-context guarantees vary by transport and registration path; consult [the execution lifecycle guide](../../docs/multitenancy-execution-lifecycle.md) and [the tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md). Do not assume framework query filters secure raw SQL, provider-native bulk APIs, or deliberate filter bypasses.

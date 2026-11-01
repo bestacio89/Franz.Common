@@ -185,7 +185,7 @@ builder.Services.AddOutboxHostedListener();
 
 ## 📝 Version Information
 
-* **Current Version:** v2.3.4
+* **Current Version:** v2.3.3
 * Part of the private **Franz Framework** ecosystem.
 
 ---
@@ -230,3 +230,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 ## Dependency maintenance — October 2026
 
 The messaging core dependency references were reviewed as part of the repository-wide .NET 10 servicing update. The intended public messaging contracts remain unchanged. Verify all transport, serialization, and persistence integration tests against the resolved dependency graph before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## 2.3.4 tenant execution boundary notes
+
+This package participates in the Franz.Common 2.3.4 tenant-aware messaging ecosystem. Delivery-scope and tenant-context guarantees vary by transport and registration path; consult [the execution lifecycle guide](../../docs/multitenancy-execution-lifecycle.md) and [the tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md). Do not assume framework query filters secure raw SQL, provider-native bulk APIs, or deliberate filter bypasses.
