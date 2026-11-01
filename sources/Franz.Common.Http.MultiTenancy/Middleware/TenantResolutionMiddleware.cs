@@ -17,7 +17,8 @@ public sealed class TenantResolutionMiddleware(
 {
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
-        var result = await pipeline.ResolveAsync(context).ConfigureAwait(false);
+        var cancellationToken = context.RequestAborted;
+        var result = await pipeline.ResolveAsync(context, cancellationToken).ConfigureAwait(false);
         var tenant = result?.Tenant;
 
         if (tenant is null || !result!.Succeeded)
@@ -38,7 +39,8 @@ public sealed class TenantResolutionMiddleware(
         }
 
         var validator = serviceProvider.GetService<ITenantValidator>();
-        if (validator is not null && !await validator.IsValidAsync(tenant.Id, context.RequestAborted).ConfigureAwait(false))
+        if (validator is not null &&
+            !await validator.IsValidAsync(tenant.Id, cancellationToken).ConfigureAwait(false))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
@@ -48,7 +50,7 @@ public sealed class TenantResolutionMiddleware(
         {
             var authorizer = serviceProvider.GetService<ITenantRequestAuthorizer>();
             if (authorizer is null ||
-                !await authorizer.IsAuthorizedAsync(context.User, tenant, context.RequestAborted).ConfigureAwait(false))
+                !await authorizer.IsAuthorizedAsync(context.User, tenant, cancellationToken).ConfigureAwait(false))
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return;
