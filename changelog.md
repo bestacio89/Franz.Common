@@ -1,6 +1,22 @@
 
 # 📈 **Franz Framework – Full Changelog**
 
+## v2.3.5 — HTTP multitenancy pipeline composition
+
+### HTTP request lifecycle
+- Wire `UseFranzMultiTenancy()` into `UseHttpArchitecture()` automatically.
+- Run tenant resolution after authentication so authenticated JWT claims are available.
+- Run tenant resolution before authorization so endpoint authorization executes with the validated tenant execution context.
+- Move forwarded-header processing ahead of routing and authentication, and place exception handling at the start of the pipeline.
+- Preserve request-scoped tenant context cleanup through the existing middleware lifecycle.
+
+### Release boundary
+- No changes to persistence, database routing, messaging, caching, or distributed integrations.
+- Set the shared package version to 2.3.5 and file version to 2.3.5.0; retain assembly version 2.3.0.0.
+- NuGet publication remains gated on successful Release build, full tests, and release checks.
+
+---
+
 ## v2.3.4 — Tenant isolation and messaging execution boundaries
 
 ### Tenant-aware messaging execution
