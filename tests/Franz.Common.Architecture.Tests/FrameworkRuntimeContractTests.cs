@@ -94,10 +94,8 @@ public sealed class FrameworkRuntimeContractTests
   [Fact]
   public void Dependency_registration_strategy_rejects_lifetime_conflicts()
   {
-    var services = new ServiceCollection
-    {
-      new ServiceDescriptor(typeof(IContract), typeof(ContractImplementation), ServiceLifetime.Singleton)
-    };
+    var services = new ServiceCollection();
+    services.AddSingleton<IContract, ContractImplementation>();
     var strategy = new RegistrationStrategySkipExistingPair();
     var conflictingDescriptor = new ServiceDescriptor(typeof(IContract), typeof(ContractImplementation), ServiceLifetime.Scoped);
 
