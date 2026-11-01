@@ -171,6 +171,11 @@
   },
   {
     "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.EntityFramework/Extensions/ServiceCollectionExtensions.cs",
+    "reason": "Existing entity-repository registration closes IEntityRepository and EntityRepository generic types from the DbSet entity and key types discovered for the configured DbContext. This is intentional runtime composition in the current API; replacing it requires a typed or source-generated registration design that preserves automatic repository registration and supported entity/key combinations. Track as a separate AOT and registration-contract review; do not remove the exception without that compatibility work."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
     "path": "sources/Franz.Common.Http.EntityFramework/Extensions/MultiDatabaseServiceCollectionExtensions.cs",
     "reason": "Existing MakeGenericMethod-based provider or registration dispatch. Replacing it requires preserving the public provider contract and all supported closed-generic combinations."
   },
