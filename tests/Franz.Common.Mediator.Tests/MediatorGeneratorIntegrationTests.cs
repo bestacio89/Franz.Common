@@ -37,7 +37,7 @@ public class MediatorGeneratorIntegrationTests
   {
     var services = new ServiceCollection();
     var provider = new GeneratedHandlerRegistrationProvider(
-        typeof(GeneratedHandlerRegistrationProvider).Assembly);
+        typeof(string).Assembly);
 
     var act = () => provider.Register(services);
 
