@@ -1,11 +1,11 @@
-using System.Reflection;
 using System.Text.Json;
 using System.Xml.Linq;
-using ArchUnitNET.Domain;
 using ArchUnitNET.Fluent;
 using ArchUnitNET.Loader;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using ReflectionAssembly = System.Reflection.Assembly;
+using ArchArchitecture = ArchUnitNET.Domain.Architecture;
 
 namespace Franz.Common.Architecture.Tests;
 
@@ -15,8 +15,8 @@ public sealed class FrameworkArchitectureTests
     @"^Franz\.Common\.(EntityFramework(\..*)?|MongoDB(\..*)?|CosmosDB(\..*)?|AzureCosmosDB(\..*)?|Http(\..*)?|Grpc(\..*)?|SSO(\..*)?)$";
 
   private static readonly Lazy<string> RepositoryRoot = new(FindRepositoryRoot);
-  private static readonly Lazy<IReadOnlyList<Assembly>> RuntimeAssemblies = new(LoadRuntimeAssemblies);
-  private static readonly Lazy<Architecture> ArchitectureModel = new(
+  private static readonly Lazy<IReadOnlyList<ReflectionAssembly>> RuntimeAssemblies = new(LoadRuntimeAssemblies);
+  private static readonly Lazy<ArchArchitecture> ArchitectureModel = new(
     () => new ArchLoader().LoadAssemblies(RuntimeAssemblies.Value.ToArray()).Build());
 
   [Fact]
@@ -238,7 +238,7 @@ public sealed class FrameworkArchitectureTests
       Environment.NewLine + string.Join(Environment.NewLine, missingReasons));
   }
 
-  private static IReadOnlyList<Assembly> LoadRuntimeAssemblies()
+  private static IReadOnlyList<ReflectionAssembly> LoadRuntimeAssemblies()
   {
     var assemblies = Directory
       .EnumerateFiles(AppContext.BaseDirectory, "*.dll", SearchOption.TopDirectoryOnly)
@@ -253,7 +253,7 @@ public sealed class FrameworkArchitectureTests
           && !name.EndsWith(".Testing", StringComparison.OrdinalIgnoreCase)
           && !name.Contains(".SourceGenerator", StringComparison.OrdinalIgnoreCase);
       })
-      .Select(Assembly.LoadFrom)
+      .Select(ReflectionAssembly.LoadFrom)
       .GroupBy(assembly => assembly.GetName().Name, StringComparer.Ordinal)
       .Select(group => group.First())
       .ToArray();
