@@ -87,6 +87,7 @@
     <Project Path="tests/Franz.Common.Mapping.Tests/Franz.Common.Mapping.Tests.csproj" />
     <Project Path="tests/Franz.Common.Mediator.Tests/Franz.Common.Mediator.Tests.csproj" Id="72f4d006-188b-4a8b-b0c9-31f1aef11c3d" />
     <Project Path="tests/Franz.Common.MultiTenancy.Tests/Franz.Common.MultiTenancy.Tests.csproj" />
+    <Project Path="tests/Franz.Common.MongoDB.Tests/Franz.Common.MongoDB.Tests.csproj" />
     <Project Path="tests/Franz.Common.Messaging.Hosting.Kafka.Tests/Franz.Common.Messaging.Hosting.Kafka.Tests.csproj" />
     <Project Path="tests/Franz.Common.Messaging.Hosting.RabbitMQ.Tests/Franz.Common.Messaging.Hosting.RabbitMQ.Tests.csproj" />
     <Project Path="tests/Franz.Common.Messaging.Kafka.Tests/Franz.Common.Messaging.Kafka.Tests.csproj" />

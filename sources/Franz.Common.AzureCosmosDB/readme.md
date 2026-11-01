@@ -23,6 +23,21 @@ dotnet add package Franz.Common.AzureCosmosDB
 
 Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
 
+## Tenant-owned Cosmos DB documents — 2.3.5
+
+The EF Core Cosmos adapter inherits the tenant query filters and SaveChanges ownership checks from `DbContextBase`. Entities implementing `ITenantEntity` are automatically partitioned by `TenantId`. The Guid tenant identifier is converted to a Cosmos-supported string partition key, stored as `tenantId`. If an entity also implements `ICosmosPartitionKey`, the model uses a hierarchical partition key with tenant identity first and the entity-specific `PartitionKey` second.
+
+For direct Cosmos SDK access, use the native `ICosmosTenantDocument` and `CosmosTenantRepository<TDocument>` contracts. Register the repository after configuring `CosmosOptions` and a validated tenant execution accessor:
+
+```csharp
+services.AddCosmosTenantRepository<OrderDocument>("orders");
+```
+
+The container must be provisioned with `/tenantId` as its partition-key path. The native repository supplies the validated tenant partition key to point reads, queries, creates, replacements, deletes, and read-many operations. Queries are physically constrained to one tenant partition by the SDK request options; they do not rely on EF Core filters.
+
+Cosmos partition keys are immutable container-level infrastructure. Existing containers with another partition-key path cannot be converted in place; migrate their data into a correctly provisioned tenant-partitioned container. Provision containers and throughput through deployment infrastructure, not request-time repository code. Native result contracts expose RU request charge, activity IDs, ETags, and query continuation tokens. Replacements require an explicit ETag for optimistic concurrency; stale writes are rejected by Cosmos with HTTP 412. Read-many operations use the tenant partition key for each point read. Transactional batch remains a separate same-partition operation and is not presented as a cross-partition transaction.
+
+
 ## Package-specific guide
 
 A specialized persistence library within the **Franz Framework**, providing seamless integration with **Azure Cosmos DB**.
@@ -188,7 +203,7 @@ await messageStore.SaveAsync(msg);
 
 ---
 
-**Current Version:** v2.3.4
+**Current Version:** v2.3.5
 
 ## **Changelog**
 
