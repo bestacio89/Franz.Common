@@ -32,8 +32,7 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
       .WithCleanUp(true)
       .WithWaitStrategy(Wait.ForUnixContainer()
           .UntilInternalTcpPortIsAvailable(5672))
-      .WithStartupTimeout(TimeSpan.FromMinutes(2))
-      .Build();
+            .Build();
 
   public string ConnectionString { get; private set; } = default!;
   public ServiceProvider ServiceProvider { get; private set; } = default!;
