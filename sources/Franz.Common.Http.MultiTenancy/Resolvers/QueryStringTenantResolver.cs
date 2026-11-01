@@ -1,53 +1,38 @@
-﻿using System;
-using System.Threading.Tasks;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.TenantResolution;
 using Microsoft.AspNetCore.Http;
 
 namespace Franz.Common.Http.MultiTenancy.Resolvers;
 
-public class QueryStringTenantResolver : ITenantResolver
+public sealed class QueryStringTenantResolver(ITenantStore store, string parameterName = "tenantId") : ITenantResolver
 {
-  private readonly ITenantStore _store;
-  private readonly string _paramName;
+    public int Order => 150;
 
-  public QueryStringTenantResolver(ITenantStore store, string paramName = "tenantId")
-  {
-    _store = store;
-    _paramName = paramName;
-  }
+    public Task<TenantResolutionResult?> ResolveTenantAsync(object? context)
+        => ResolveTenantAsync(context, CancellationToken.None);
 
-  public int Order => 150;
-
-  public async Task<TenantResolutionResult?> ResolveTenantAsync(object? context = null)
-  {
-    if (context is not HttpContext httpContext)
-      return null;
-
-    if (!httpContext.Request.Query.TryGetValue(_paramName, out var value))
-      return null; // not applicable, query parameter missing
-
-    if (Guid.TryParse(value, out var tenantId))
+    public async Task<TenantResolutionResult?> ResolveTenantAsync(
+        object? context,
+        CancellationToken cancellationToken)
     {
-      var tenant = await _store.FindByIdAsync(tenantId);
-      if (tenant != null)
-      {
-        return TenantResolutionResult.Success(
-          tenant,
-          TenantResolutionSource.QueryString,
-          $"Resolved tenant '{tenant.Name}' from query string parameter '{_paramName}'."
-        );
-      }
+        cancellationToken.ThrowIfCancellationRequested();
+        if (context is not HttpContext httpContext ||
+            !httpContext.Request.Query.TryGetValue(parameterName, out var value))
+            return null;
 
-      return TenantResolutionResult.FailedResult(
-        TenantResolutionSource.QueryString,
-        $"Tenant '{tenantId}' not found for query string parameter '{_paramName}'."
-      );
+        if (!Guid.TryParse(value, out var tenantId))
+            return TenantResolutionResult.FailedResult(
+                TenantResolutionSource.QueryString,
+                $"Query string parameter '{parameterName}' was present but not a valid GUID.");
+
+        var tenant = await store.FindByIdAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        return tenant is null
+            ? TenantResolutionResult.FailedResult(
+                TenantResolutionSource.QueryString,
+                $"Tenant '{tenantId}' not found for query string parameter '{parameterName}'.")
+            : TenantResolutionResult.Success(
+                tenant,
+                TenantResolutionSource.QueryString,
+                $"Resolved tenant '{tenant.Name}' from query string parameter '{parameterName}'.");
     }
-
-    return TenantResolutionResult.FailedResult(
-      TenantResolutionSource.QueryString,
-      $"Query string parameter '{_paramName}' was present but not a valid GUID."
-    );
-  }
 }
