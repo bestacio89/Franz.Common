@@ -175,11 +175,15 @@ public sealed class FrameworkArchitectureTests
   private static IReadOnlyList<Assembly> LoadRuntimeAssemblies()
   {
     var assemblies = Directory
-      .EnumerateFiles(AppContext.BaseDirectory, "Franz.Common.*.dll", SearchOption.TopDirectoryOnly)
+      .EnumerateFiles(AppContext.BaseDirectory, "*.dll", SearchOption.TopDirectoryOnly)
       .Where(path =>
       {
         var name = Path.GetFileNameWithoutExtension(path);
-        return !name.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)
+        var isFrameworkAssembly = string.Equals(name, "Franz.Common", StringComparison.Ordinal)
+          || name.StartsWith("Franz.Common.", StringComparison.Ordinal);
+
+        return isFrameworkAssembly
+          && !name.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)
           && !name.EndsWith(".Testing", StringComparison.OrdinalIgnoreCase)
           && !name.Contains(".SourceGenerator", StringComparison.OrdinalIgnoreCase);
       })
