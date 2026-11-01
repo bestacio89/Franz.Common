@@ -23,15 +23,15 @@ public sealed class IdentityContextAccessor : IIdentityContextAccessor
         this.tenantExecutionContextAccessor = tenantExecutionContextAccessor;
     }
 
-    public string? GetCurrentEmail() => GetAuthenticatedClaim(ClaimTypes.Email);
+    public string? GetCurrentEmail() => GetAuthenticatedClaim(ClaimTypes.Email, "email");
 
     public Guid? GetCurrentId()
     {
-        var userId = GetAuthenticatedClaim(ClaimTypes.NameIdentifier);
+        var userId = GetAuthenticatedClaim(ClaimTypes.NameIdentifier, "sub");
         return Guid.TryParse(userId, out var id) ? id : null;
     }
 
-    public string? GetCurrentFullName() => GetAuthenticatedClaim(ClaimTypes.Name);
+    public string? GetCurrentFullName() => GetAuthenticatedClaim(ClaimTypes.Name, "name");
 
     public string[]? GetCurrentRoles()
     {
@@ -39,7 +39,8 @@ public sealed class IdentityContextAccessor : IIdentityContextAccessor
         if (principal is null)
             return null;
 
-        var roles = principal.FindAll(ClaimTypes.Role)
+        var roles = principal.Claims
+            .Where(claim => claim.Type is ClaimTypes.Role or "role")
             .SelectMany(claim => claim.Value.Split(
                 ',',
                 StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
@@ -64,8 +65,21 @@ public sealed class IdentityContextAccessor : IIdentityContextAccessor
             DomainId = GetCurrentDomainId()
         };
 
-    private string? GetAuthenticatedClaim(string claimType)
-        => GetAuthenticatedPrincipal()?.FindFirst(claimType)?.Value;
+    private string? GetAuthenticatedClaim(params string[] claimTypes)
+    {
+        var principal = GetAuthenticatedPrincipal();
+        if (principal is null)
+            return null;
+
+        foreach (var claimType in claimTypes)
+        {
+            var value = principal.FindFirst(claimType)?.Value;
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return null;
+    }
 
     private ClaimsPrincipal? GetAuthenticatedPrincipal()
     {
