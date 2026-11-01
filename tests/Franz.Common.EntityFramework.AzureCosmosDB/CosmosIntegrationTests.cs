@@ -130,10 +130,12 @@ public sealed class CosmosIntegrationTests : IClassFixture<CosmosFixture>
         pointRead.RequestCharge.Should().BeGreaterThan(0);
         pointRead.ETag.Should().NotBeNullOrWhiteSpace();
 
-        var query = await repository.QueryWithMetadataAsync(new QueryDefinition("SELECT * FROM c"));
-        query.Items.Should().ContainSingle();
-        query.Items[0].TenantId.Should().Be(tenantA);
-        query.RequestCharge.Should().BeGreaterThan(0);
+        var queryPage = await repository.QueryPageAsync(
+            new QueryDefinition("SELECT * FROM c"),
+            maxItemCount: 1);
+        queryPage.Items.Should().ContainSingle();
+        queryPage.Items[0].TenantId.Should().Be(tenantA);
+        queryPage.RequestCharge.Should().BeGreaterThan(0);
 
         var many = await repository.ReadManyWithMetadataAsync(new[] { documentId });
         many.Items.Should().ContainSingle();
