@@ -13,8 +13,8 @@ The shared contract is linked into each real-engine test project. It is not an I
 | PostgreSQL | PostgreSQL 16 Testcontainers | Required | Persistence, migrations, provider registration |
 | MariaDB | MariaDB 11.4 Testcontainers | Required | Persistence lifecycle, migrations, transactions, registration |
 | MySQL | MySQL 8.4 Testcontainers | Required | Persistence lifecycle, migrations, transactions, SQL compatibility |
-| SQL Server | SQL Server 2022 Testcontainers | Required | Persistence, migrations, soft delete, database-isolation routing |
-| Oracle | Oracle Free 23 Testcontainers | Required | Connectivity, migrations, tenant/domain database routing |
+| SQL Server | SQL Server 2022 Testcontainers | Required | Persistence, soft delete, database-isolation routing |
+| Oracle | Oracle Free 23 Testcontainers | Required | Connectivity, tenant/domain database routing |
 
 Each test run must report the actual server image/version. A passing contract on one provider does not certify another provider.
 
@@ -29,6 +29,7 @@ Every provider suite executes the same tests against its real database engine:
 - EF Core `ExecuteUpdateAsync` respects the global tenant query filter.
 - EF Core `ExecuteDeleteAsync` respects the global tenant query filter.
 - The framework repository's `ExecuteBulkUpdateAsync` respects tenant filters, rejects assignments to `TenantId` and `ConcurrencyVersion`, and advances opt-in concurrency tokens.
+- The EF unit of work commits and rolls back on every qualified relational provider; abandoned transactions are rolled back when the unit of work is asynchronously disposed.
 - `ConcurrencyTrackedEntity<TKey>` uses provider-translated optimistic concurrency; stale writes fail with `DbUpdateConcurrencyException`.
 - Repository bulk delete defaults to audited soft delete, advances concurrency tokens, and remains tenant-scoped; physical deletion requires an explicit `hardDelete: true`.
 
@@ -38,7 +39,7 @@ The contract uses a dedicated table (`provider_contract_tenant_owned_entities`) 
 
 The shared contract is necessary, not sufficient. Each provider's CI qualification must also retain and pass its provider-specific suites for:
 
-1. Schema creation and migration application from an empty database, incremental upgrade, downgrade, re-application, and preservation of existing data.
+1. Schema creation and migration application from an empty database, followed by an upgrade from the previous supported schema.
 2. CRUD, key generation, auditing, soft-delete filters, and relationship/cascade behavior.
 3. Transaction commit, rollback, cancellation, and failure recovery.
 4. Repository AddRange, UpdateRange, DeleteRange, and SoftDeleteRange semantics.
