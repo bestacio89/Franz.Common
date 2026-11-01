@@ -33,6 +33,13 @@ public sealed record FranzGrpcOptions
   public bool PropagateIdentity { get; init; } = true;
 
   /// <summary>
+  /// Requires every incoming gRPC call to resolve and authorize a tenant.
+  /// When enabled, unresolved tenants or missing/denied tenant authorization fail closed.
+  /// Default: false for backward compatibility; enable for tenant-required services.
+  /// </summary>
+  public bool RequireTenant { get; init; } = false;
+
+  /// <summary>
   /// Controls whether request/response bodies can be logged by LoggingServerBehavior.
   /// Default: false (safe default).
   /// </summary>

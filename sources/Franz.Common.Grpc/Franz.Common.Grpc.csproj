@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common.DependencyInjection\Franz.Common.DependencyInjection.csproj" />
+    <ProjectReference Include="..\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
   </ItemGroup>
 
 

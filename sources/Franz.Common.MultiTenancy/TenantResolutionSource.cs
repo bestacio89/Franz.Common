@@ -8,7 +8,8 @@
     QueryString,    // e.g. ?tenantId=123
     JwtClaim,       // e.g. tenant_id claim in JWT
     Cookie,         // e.g. tenant info in cookies
-    Property,       // ✅ NEW: application/message properties
-    Default         // fallback
+    Property,       // application/message properties
+    Default,        // fallback
+    Grpc            // authenticated gRPC execution boundary
   }
 }
