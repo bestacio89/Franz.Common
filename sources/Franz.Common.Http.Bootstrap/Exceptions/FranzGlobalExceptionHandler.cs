@@ -122,7 +122,7 @@ public sealed class FranzGlobalExceptionHandler : IExceptionHandler
 
       BusinessException => (HttpStatusCode.UnprocessableEntity, "Business rule violated"),
 
-      FunctionalException => (HttpStatusCode.UnprocessableEntity, "Business rule violated"),
+      FunctionalException => (HttpStatusCode.BadRequest, "Invalid request"),
 
       ValidationException => (HttpStatusCode.BadRequest, "Validation failed"),
 
