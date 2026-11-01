@@ -328,7 +328,7 @@ public class FranzDispatcher : IDispatcher
     if (!GeneratedMediatorInvokerRegistry.TryGetEventPublisher(eventType, out var generatedPublisher))
       return Task.CompletedTask;
 
-    var publisher = EventPublisherCache.GetOrAdd(eventType, static _ => generatedPublisher!);
+    var publisher = EventPublisherCache.GetOrAdd(eventType, _ => generatedPublisher!);
     return publisher(this, @event, ct);
   }
 
