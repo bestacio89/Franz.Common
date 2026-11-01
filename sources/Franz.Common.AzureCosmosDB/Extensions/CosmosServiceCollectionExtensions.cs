@@ -26,6 +26,35 @@ public static class CosmosServiceCollectionExtensions
 {
   private const string DefaultSection = "Cosmos";
 
+
+  /// <summary>
+  /// Uses System.Text.Json with web defaults so native Cosmos documents follow
+  /// the required lower-camel property contract (including id and tenantId).
+  /// </summary>
+  private sealed class TenantDocumentCosmosSerializer(JsonSerializerOptions options) : CosmosSerializer
+  {
+    public override T FromStream<T>(Stream stream)
+    {
+      ArgumentNullException.ThrowIfNull(stream);
+
+      using (stream)
+      {
+        if (stream.CanSeek && stream.Length == 0)
+          return default!;
+
+        return JsonSerializer.Deserialize<T>(stream, options)!;
+      }
+    }
+
+    public override Stream ToStream<T>(T input)
+    {
+      var stream = new MemoryStream();
+      JsonSerializer.Serialize(stream, input, options);
+      stream.Position = 0;
+      return stream;
+    }
+  }
+
   public static IServiceCollection AddFranzCosmosDbContext<TContext>(
       this IServiceCollection services,
       IConfiguration configuration,
@@ -79,7 +108,7 @@ public static class CosmosServiceCollectionExtensions
         new CosmosClientOptions
         {
           ConnectionMode = ConnectionMode.Gateway,
-          Serializer = new CosmosSystemTextJsonSerializer(
+          Serializer = new TenantDocumentCosmosSerializer(
             new JsonSerializerOptions(JsonSerializerDefaults.Web)),
           HttpClientFactory = () =>
           {
