@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Franz.Common.EntityFramework.ProviderContract.Tests;
 
-public sealed class TenantOwnedTestEntity : Entity<Guid>, ITenantEntity
+public sealed class TenantOwnedTestEntity : ConcurrencyTrackedEntity<Guid>, ITenantEntity
 {
     public Guid TenantId { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -304,6 +304,194 @@ public abstract class RelationalTenantIsolationContract
             Assert.Equal(1, remaining);
         });
     }
+
+    [Fact]
+    public async Task ConcurrencyTrackedEntities_RejectStaleUpdates()
+    {
+        var tenantId = Guid.NewGuid();
+        var marker = $"concurrency-{Guid.NewGuid():N}";
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            await EnsureDatabaseCreatedAsync(db);
+            var entity = new TenantOwnedTestEntity { Name = marker };
+            db.Set<TenantOwnedTestEntity>().Add(entity);
+            await db.SaveChangesAsync();
+            Assert.Equal(1L, entity.ConcurrencyVersion);
+        });
+
+        TenantOwnedTestEntity? staleEntity = null;
+        await WithContextAsync(tenantId, async db =>
+        {
+            staleEntity = await db.Set<TenantOwnedTestEntity>()
+                .AsNoTracking()
+                .SingleAsync(entity => entity.Name == marker);
+        });
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            var current = await db.Set<TenantOwnedTestEntity>()
+                .SingleAsync(entity => entity.Name == marker);
+            current.Name = "updated-current";
+            await db.SaveChangesAsync();
+            Assert.Equal(2L, current.ConcurrencyVersion);
+        });
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            staleEntity!.Name = "updated-stale";
+            db.Set<TenantOwnedTestEntity>().Update(staleEntity);
+            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => db.SaveChangesAsync());
+        });
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            var persisted = await db.Set<TenantOwnedTestEntity>()
+                .AsNoTracking()
+                .SingleAsync(entity => entity.Name == "updated-current");
+            Assert.Equal(2L, persisted.ConcurrencyVersion);
+        });
+    }
+
+    [Fact]
+    public async Task RepositoryBulkUpdate_AdvancesConcurrencyVersion()
+    {
+        var tenantId = Guid.NewGuid();
+        var marker = $"bulk-concurrency-{Guid.NewGuid():N}";
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            await EnsureDatabaseCreatedAsync(db);
+            db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
+            await db.SaveChangesAsync();
+        });
+
+        TenantOwnedTestEntity? staleEntity = null;
+        await WithContextAsync(tenantId, async db =>
+        {
+            staleEntity = await db.Set<TenantOwnedTestEntity>()
+                .AsNoTracking()
+                .SingleAsync(entity => entity.Name == marker);
+        });
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            var repository = new EntityRepository<DbContextBase, TenantOwnedTestEntity, Guid>(
+                (DbContextBase)db);
+            var affected = await repository.ExecuteBulkUpdateAsync(
+                entity => entity.Name == marker,
+                update => update.SetProperty(entity => entity.Name, "bulk-updated"));
+
+            Assert.Equal(1, affected);
+        });
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            var persisted = await db.Set<TenantOwnedTestEntity>()
+                .AsNoTracking()
+                .SingleAsync(entity => entity.Name == "bulk-updated");
+            Assert.Equal(2L, persisted.ConcurrencyVersion);
+        });
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            staleEntity!.Name = "stale-after-bulk";
+            db.Set<TenantOwnedTestEntity>().Update(staleEntity);
+            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => db.SaveChangesAsync());
+        });
+    }
+
+    [Fact]
+    public async Task RepositoryBulkDelete_SoftDeletesAuditsAndScopesByTenant()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var marker = $"bulk-soft-delete-{Guid.NewGuid():N}";
+
+        await WithContextAsync(tenantA, async db =>
+        {
+            await EnsureDatabaseCreatedAsync(db);
+            db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
+            await db.SaveChangesAsync();
+        });
+
+        await WithContextAsync(tenantB, async db =>
+        {
+            db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
+            await db.SaveChangesAsync();
+        });
+
+        await WithContextAsync(tenantA, async db =>
+        {
+            var repository = new EntityRepository<DbContextBase, TenantOwnedTestEntity, Guid>(
+                (DbContextBase)db);
+            var affected = await repository.ExecuteBulkDeleteAsync(entity => entity.Name == marker);
+
+            Assert.Equal(1, affected);
+            Assert.False(await db.Set<TenantOwnedTestEntity>().AnyAsync(entity => entity.Name == marker));
+
+            var deleted = await db.Set<TenantOwnedTestEntity>()
+                .IgnoreQueryFilters()
+                .SingleAsync(entity => entity.Name == marker && entity.TenantId == tenantA);
+
+            Assert.True(deleted.IsDeleted);
+            Assert.Equal("system", deleted.DeletedBy);
+            Assert.Equal("system", deleted.LastModifiedBy);
+            Assert.NotEqual(default, deleted.DateDeleted);
+            Assert.NotEqual(default, deleted.LastModifiedDate);
+            Assert.Equal(2L, deleted.ConcurrencyVersion);
+        });
+
+        await WithContextAsync(tenantB, async db =>
+        {
+            var retained = await db.Set<TenantOwnedTestEntity>()
+                .SingleAsync(entity => entity.Name == marker);
+            Assert.False(retained.IsDeleted);
+            Assert.Equal(1L, retained.ConcurrencyVersion);
+        });
+    }
+
+    [Fact]
+    public async Task RepositoryBulkDelete_PhysicallyDeletesOnlyWhenExplicitlyRequested()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var marker = $"bulk-hard-delete-{Guid.NewGuid():N}";
+
+        await WithContextAsync(tenantA, async db =>
+        {
+            await EnsureDatabaseCreatedAsync(db);
+            db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
+            await db.SaveChangesAsync();
+        });
+
+        await WithContextAsync(tenantB, async db =>
+        {
+            db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
+            await db.SaveChangesAsync();
+        });
+
+        await WithContextAsync(tenantA, async db =>
+        {
+            var repository = new EntityRepository<DbContextBase, TenantOwnedTestEntity, Guid>(
+                (DbContextBase)db);
+            var affected = await repository.ExecuteBulkDeleteAsync(
+                entity => entity.Name == marker,
+                hardDelete: true);
+
+            Assert.Equal(1, affected);
+            Assert.False(await db.Set<TenantOwnedTestEntity>()
+                .IgnoreQueryFilters()
+                .AnyAsync(entity => entity.Name == marker && entity.TenantId == tenantA));
+        });
+
+        await WithContextAsync(tenantB, async db =>
+        {
+            Assert.True(await db.Set<TenantOwnedTestEntity>()
+                .AnyAsync(entity => entity.Name == marker));
+        });
+    }
+
 }
 
 /// <summary>Test-only accessor factory shared by provider qualification suites.</summary>

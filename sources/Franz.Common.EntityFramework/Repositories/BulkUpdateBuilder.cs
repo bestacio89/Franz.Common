@@ -1,5 +1,7 @@
 using System.Linq.Expressions;
+using Franz.Common.Business.Domain;
 using Franz.Common.MultiTenancy;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 
 namespace Franz.Common.EntityFramework.Repositories;
@@ -32,6 +34,27 @@ public sealed class BulkUpdateBuilder<TEntity> where TEntity : class
         return this;
     }
 
+    internal bool HasAssignments => _assignments.Count > 0;
+
+    internal void AddConcurrencyVersionIncrement()
+    {
+        if (!typeof(IConcurrencyTrackedEntity).IsAssignableFrom(typeof(TEntity)))
+            return;
+
+        var entity = Expression.Parameter(typeof(TEntity), "entity");
+        var currentVersion = Expression.Call(
+            typeof(EF),
+            nameof(EF.Property),
+            new[] { typeof(long) },
+            entity,
+            Expression.Constant(nameof(IConcurrencyTrackedEntity.ConcurrencyVersion)));
+        var nextVersion = Expression.Add(currentVersion, Expression.Constant(1L));
+
+        var propertySelector = Expression.Lambda<Func<TEntity, long>>(currentVersion, entity);
+        var valueSelector = Expression.Lambda<Func<TEntity, long>>(nextVersion, entity);
+        _assignments.Add(setters => setters.SetProperty(propertySelector, valueSelector));
+    }
+
     internal void ApplyTo(UpdateSettersBuilder<TEntity> setters)
     {
         if (_assignments.Count == 0)
@@ -43,17 +66,27 @@ public sealed class BulkUpdateBuilder<TEntity> where TEntity : class
 
     private static void ValidateProperty<TProperty>(Expression<Func<TEntity, TProperty>> selector)
     {
-        if (!typeof(ITenantEntity).IsAssignableFrom(typeof(TEntity)))
-            return;
+        var isTenantEntity = typeof(ITenantEntity).IsAssignableFrom(typeof(TEntity));
+        var isConcurrencyTrackedEntity = typeof(IConcurrencyTrackedEntity).IsAssignableFrom(typeof(TEntity));
 
         var body = selector.Body is UnaryExpression { NodeType: ExpressionType.Convert } conversion
             ? conversion.Operand
             : selector.Body;
 
         if (body is not MemberExpression member || member.Expression != selector.Parameters[0])
-            throw new ArgumentException("Bulk update assignments must target a direct entity property.", nameof(selector));
+        {
+            if (isTenantEntity)
+                throw new ArgumentException("Bulk update assignments must target a direct entity property.", nameof(selector));
 
-        if (member.Member.Name == nameof(ITenantEntity.TenantId))
+            return;
+        }
+
+        if (isTenantEntity && member.Member.Name == nameof(ITenantEntity.TenantId))
             throw new TenantIsolationException("Bulk updates cannot change TenantId. Tenant ownership is immutable.");
+
+        if (isConcurrencyTrackedEntity &&
+            member.Member.Name == nameof(IConcurrencyTrackedEntity.ConcurrencyVersion))
+            throw new InvalidOperationException(
+                "Bulk updates cannot assign ConcurrencyVersion directly; the framework advances it automatically.");
     }
 }

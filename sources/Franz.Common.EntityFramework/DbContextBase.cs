@@ -34,6 +34,7 @@ public abstract class DbContextBase : DbContext
     {
         ApplyTenantIsolation();
         ApplyAuditing();
+        ApplyConcurrencyTokens();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
@@ -44,6 +45,7 @@ public abstract class DbContextBase : DbContext
     {
         ApplyTenantIsolation();
         ApplyAuditing();
+        ApplyConcurrencyTokens();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
@@ -97,6 +99,23 @@ public abstract class DbContextBase : DbContext
         }
     }
 
+    private void ApplyConcurrencyTokens()
+    {
+        foreach (var entry in ChangeTracker.Entries<IConcurrencyTrackedEntity>())
+        {
+            var version = entry.Property<long>(nameof(IConcurrencyTrackedEntity.ConcurrencyVersion));
+
+            if (entry.State == EntityState.Added)
+            {
+                version.CurrentValue = 1L;
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                version.CurrentValue = checked(version.OriginalValue + 1L);
+            }
+        }
+    }
+
     private static bool ImplementsIEntity(Type type)
         => type.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntity<>));
 
@@ -109,11 +128,17 @@ public abstract class DbContextBase : DbContext
             var clrType = entityType.ClrType;
             var isDomainEntity = ImplementsIEntity(clrType);
             var isTenantEntity = typeof(ITenantEntity).IsAssignableFrom(clrType);
-            if (!isDomainEntity && !isTenantEntity)
+            var isConcurrencyTrackedEntity = typeof(IConcurrencyTrackedEntity).IsAssignableFrom(clrType);
+            if (!isDomainEntity && !isTenantEntity && !isConcurrencyTrackedEntity)
                 continue;
 
             if (isTenantEntity)
                 modelBuilder.Entity(clrType).Property<Guid>(nameof(ITenantEntity.TenantId)).IsConcurrencyToken();
+
+            if (isConcurrencyTrackedEntity)
+                modelBuilder.Entity(clrType)
+                    .Property<long>(nameof(IConcurrencyTrackedEntity.ConcurrencyVersion))
+                    .IsConcurrencyToken();
 
             var parameter = Expression.Parameter(clrType, "entity");
             Expression? filterBody = null;

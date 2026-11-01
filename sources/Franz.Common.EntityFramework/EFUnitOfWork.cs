@@ -20,39 +20,18 @@ public class EfUnitOfWork<TDbContext> : IUnitOfWork, IAsyncDisposable
     }
 
     /// <summary>
-    /// Persists pending changes without completing a transaction owned by this unit of work.
+    /// Persists pending changes and commits a transaction owned by this unit of work.
     /// </summary>
-    public Task<int> CommitAsync(CancellationToken ct = default)
-    {
-        ThrowIfDisposed();
-        return _db.SaveChangesAsync(ct);
-    }
-
-    /// <inheritdoc />
-    public async Task BeginAsync(CancellationToken ct = default)
-    {
-        ThrowIfDisposed();
-
-        if (_transaction is not null)
-            throw new InvalidOperationException("A transaction is already active for this unit of work.");
-
-        if (_db.Database.CurrentTransaction is not null)
-            throw new InvalidOperationException(
-                "The DbContext already has an active transaction that is not owned by this unit of work.");
-
-        _transaction = await _db.Database.BeginTransactionAsync(ct);
-    }
-
-    /// <inheritdoc />
-    async Task IUnitOfWork.CommitAsync(CancellationToken ct)
+    public async Task<int> CommitAsync(CancellationToken ct = default)
     {
         ThrowIfDisposed();
 
         var transaction = _transaction;
+        int affectedRows;
 
         try
         {
-            await _db.SaveChangesAsync(ct);
+            affectedRows = await _db.SaveChangesAsync(ct);
 
             if (transaction is not null)
                 await transaction.CommitAsync(ct);
@@ -98,7 +77,27 @@ public class EfUnitOfWork<TDbContext> : IUnitOfWork, IAsyncDisposable
 
         if (transaction is not null)
             await ReleaseTransactionAsync(transaction);
+
+        return affectedRows;
     }
+
+    /// <inheritdoc />
+    public async Task BeginAsync(CancellationToken ct = default)
+    {
+        ThrowIfDisposed();
+
+        if (_transaction is not null)
+            throw new InvalidOperationException("A transaction is already active for this unit of work.");
+
+        if (_db.Database.CurrentTransaction is not null)
+            throw new InvalidOperationException(
+                "The DbContext already has an active transaction that is not owned by this unit of work.");
+
+        _transaction = await _db.Database.BeginTransactionAsync(ct);
+    }
+
+    async Task IUnitOfWork.CommitAsync(CancellationToken ct)
+        => _ = await CommitAsync(ct);
 
     /// <inheritdoc />
     public async Task RollbackAsync(CancellationToken ct = default)

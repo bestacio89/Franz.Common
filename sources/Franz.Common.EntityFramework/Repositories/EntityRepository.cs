@@ -8,7 +8,8 @@ namespace Franz.Common.EntityFramework.Repositories;
 
 public class EntityRepository<TDbContext, TEntity, TId>
     : IEntityRepository<TEntity, TId>,
-      IEntityFrameworkBulkUpdateRepository<TEntity>
+      IEntityFrameworkBulkUpdateRepository<TEntity>,
+      IEntityFrameworkBulkDeleteRepository<TEntity>
     where TDbContext : DbContextBase
     where TEntity : Entity<TId>
 {
@@ -74,9 +75,39 @@ public class EntityRepository<TDbContext, TEntity, TId>
     var update = new BulkUpdateBuilder<TEntity>();
     configure(update);
 
+    if (!update.HasAssignments)
+      throw new InvalidOperationException("A bulk update must define at least one property assignment.");
+
+    update.AddConcurrencyVersionIncrement();
+
     return DbContext.Set<TEntity>()
         .Where(predicate)
         .ExecuteUpdateAsync(update.ApplyTo, cancellationToken);
+  }
+
+  /// <inheritdoc />
+  public Task<int> ExecuteBulkDeleteAsync(
+      Expression<Func<TEntity, bool>> predicate,
+      bool hardDelete = false,
+      CancellationToken cancellationToken = default)
+  {
+    ArgumentNullException.ThrowIfNull(predicate);
+
+    var query = DbContext.Set<TEntity>().Where(predicate);
+    if (hardDelete)
+      return query.ExecuteDeleteAsync(cancellationToken);
+
+    var deletedAt = DateTimeOffset.UtcNow;
+    var update = new BulkUpdateBuilder<TEntity>()
+        .SetProperty(entity => entity.IsDeleted, true)
+        .SetProperty(entity => entity.DateDeleted, deletedAt)
+        .SetProperty(entity => entity.DeletedBy, "system")
+        .SetProperty(entity => entity.LastModifiedDate, deletedAt)
+        .SetProperty(entity => entity.LastModifiedBy, "system");
+
+    update.AddConcurrencyVersionIncrement();
+
+    return query.ExecuteUpdateAsync(update.ApplyTo, cancellationToken);
   }
 
   public async Task DeleteAsync(TEntity entity, bool hardDelete = false, CancellationToken cancellationToken = default)
