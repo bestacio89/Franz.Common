@@ -324,7 +324,7 @@ public sealed class FrameworkArchitectureTests
         if (methodName == "CreateInstance" && invokedExpression.Contains("Activator", StringComparison.Ordinal))
           findings.Add(new PolicyFinding("ACTIVATOR", relativePath));
 
-        if (methodName == "MakeGenericType")
+        if (methodName is "MakeGenericType" or "MakeGenericMethod")
           findings.Add(new PolicyFinding("GENERIC_REFLECTION", relativePath));
 
         if (methodName is "GetTypes" or "GetExportedTypes" or "GetAssemblies")
@@ -333,9 +333,11 @@ public sealed class FrameworkArchitectureTests
         if (methodName == "IgnoreQueryFilters")
           findings.Add(new PolicyFinding("QUERY_FILTER_BYPASS", relativePath));
 
-        if (methodName is "FromSqlRaw" or "FromSqlInterpolated"
-          or "ExecuteSqlRaw" or "ExecuteSqlInterpolated"
-          or "SqlQueryRaw" or "SqlQuery")
+        if (methodName is "FromSql" or "FromSqlRaw" or "FromSqlInterpolated"
+          or "ExecuteSql" or "ExecuteSqlAsync"
+          or "ExecuteSqlRaw" or "ExecuteSqlRawAsync"
+          or "ExecuteSqlInterpolated" or "ExecuteSqlInterpolatedAsync"
+          or "SqlQuery" or "SqlQueryAsync" or "SqlQueryRaw" or "SqlQueryRawAsync")
           findings.Add(new PolicyFinding("RAW_SQL", relativePath));
       }
     }
