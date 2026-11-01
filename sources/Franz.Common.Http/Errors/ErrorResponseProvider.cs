@@ -6,42 +6,32 @@ using Microsoft.Extensions.Hosting;
 
 namespace Franz.Common.Http.Errors;
 
-public class ErrorResponseProvider : IErrorResponseProvider
+public sealed class ErrorResponseProvider(IHostEnvironment hostEnvironment) : IErrorResponseProvider
 {
-  private readonly IHostEnvironment hostEnvironment;
-
-  public ErrorResponseProvider(IHostEnvironment hostEnvironment)
-  {
-    this.hostEnvironment = hostEnvironment;
-  }
-
-  public ErrorResponse PrepareResponse(ExceptionContext exceptionContext, IErrorResponseStrategy errorResponse)
-  {
-    var result = CreateResponse(exceptionContext);
-    result.Message = exceptionContext.Exception.Message;
-    exceptionContext.Result = CreateContextResult(result, errorResponse.ResultStatusCode);
-
-    return result;
-  }
-
-  private ErrorResponse CreateResponse(ExceptionContext context)
-  {
-    var response = new ErrorResponse();
-
-    if (!hostEnvironment.IsProduction())
-      response.StackTrace = context.Exception.StackTrace;
-
-    return response;
-  }
-
-  public static ObjectResult CreateContextResult(ErrorResponse errorResponse, int statusCode)
-  {
-    var result = new ObjectResult(errorResponse)
+    public ErrorResponse PrepareResponse(ExceptionContext exceptionContext, IErrorResponseStrategy errorResponse)
     {
-      StatusCode = statusCode,
-      DeclaredType = typeof(ErrorResponse),
-    };
+        ArgumentNullException.ThrowIfNull(exceptionContext);
+        ArgumentNullException.ThrowIfNull(errorResponse);
 
-    return result;
-  }
+        var result = CreateResponse(exceptionContext);
+        result.Message = errorResponse.CreateMessage(exceptionContext);
+        exceptionContext.Result = CreateContextResult(result, errorResponse.ResultStatusCode);
+
+        return result;
+    }
+
+    private ErrorResponse CreateResponse(ExceptionContext context)
+    {
+        var response = new ErrorResponse();
+        if (!hostEnvironment.IsProduction())
+            response.StackTrace = context.Exception.StackTrace;
+        return response;
+    }
+
+    public static ObjectResult CreateContextResult(ErrorResponse errorResponse, int statusCode)
+        => new(errorResponse)
+        {
+            StatusCode = statusCode,
+            DeclaredType = typeof(ErrorResponse)
+        };
 }
