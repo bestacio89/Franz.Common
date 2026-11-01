@@ -1,257 +1,27 @@
 # Franz.Common.Messaging.Hosting.Kafka
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+Kafka listener hosting for Franz.Common with per-delivery execution scopes.
 
-## Overview
-
-The `Franz.Common.Messaging.Hosting.Kafka` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
-
-## Installation
+## Install
 
 ```bash
-dotnet add package Franz.Common.Messaging.Hosting.Kafka
+dotnet add package Franz.Common.Messaging.Hosting.Kafka --version 2.3.4
 ```
 
-## Design principles
+## Execution lifecycle
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+The Kafka hosted service creates a fresh dependency-injection scope for each delivery, establishes message context, initializes tenant execution when Franz.Common.Messaging.MultiTenancy is registered, selects the matching messaging strategy and awaits completion.
 
-## Usage and configuration
+Tenant execution is disposed and ambient message context is cleared after the complete handler pipeline, including failure paths. Handler failures are logged and rethrown so the transport does not treat unsuccessful processing as successful completion. Concurrent deliveries must not share mutable scoped accessors.
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+## Tenant-aware configuration
 
-## Package-specific guide
+Register AddMessagingMultitenancyContext(), the application-specific tenant store and ITenantMessageAuthorizer. Producers must propagate tenant metadata from validated execution context. Consumers resolve and authorize metadata before invoking handlers.
 
-A **Kafka hosting integration** for the **Franz Framework** that connects the Kafka
-transport layer (`Franz.Common.Messaging.Kafka`) to the .NET hosting runtime
-(`Microsoft.Extensions.Hosting`).
+Do not use a singleton tenant accessor or capture request-scoped services in a long-lived Kafka listener.
 
-This package is responsible **only** for:
-- background execution
-- hosted listeners
-- message dispatch orchestration
+Framework release line: **2.3.4**; target framework: net10.0.
 
-> 🧱 Kafka transport, producers, consumers, and configuration live in  
-> **Franz.Common.Messaging.Kafka**
+See [messaging execution lifecycle](../../docs/multitenancy-execution-lifecycle.md).
 
----
-
-## ✨ Features
-
-### Hosted Services
-- **`KafkaHostedService`**  
-  Runs a Kafka listener inside a .NET `BackgroundService`.
-
-- **`MessagingHostedService`**  
-  Orchestrates message dispatch:
-  - creates scoped execution contexts
-  - resolves messaging strategies
-  - dispatches messages safely
-
-- **`OutboxHostedService`**  
-  Publishes messages stored in an outbox (SQL / Mongo) to Kafka reliably.
-
-### Dependency Injection Extensions
-- `KafkaHostingServiceCollectionExtensions`
-- Simple registration via:
-  - `AddKafkaHostedListener()`
-  - `AddOutboxHostedListener()`
-
-### Separation of Concerns
-- **No Kafka configuration here**
-- **No Kafka consumer creation here**
-- Hosting depends on abstractions only
-
-### Observability
-- Structured logging
-- Emoji-based lifecycle signals
-- Compatible with OpenTelemetry
-- Correlation via `MessageContextAccessor`
-
----
-
-## 📂 Project Structure
-
-```text
-Franz.Common.Messaging.Hosting.Kafka/
-├── Extensions/
-│   └── KafkaHostingServiceCollectionExtensions.cs
-├── HostedServices/
-│   ├── KafkaHostedService.cs
-│   ├── MessagingHostedService.cs
-│   └── OutboxHostedService.cs
-└── README.md
-````
-
----
-
-## ⚙️ Dependencies
-
-* **Microsoft.Extensions.Hosting** (10.0.14)
-* **Microsoft.Extensions.DependencyInjection.Abstractions** (10.0.14)
-* **Franz.Common.Messaging**
-* **Franz.Common.Messaging.Kafka**
-* **Franz.Common.Messaging.Hosting**
-
-> ⚠️ This package assumes Kafka transport is already registered via
-> `Franz.Common.Messaging.Kafka`.
-
----
-
-## 🚀 Usage
-
-### 1️⃣ Register Kafka Transport (required)
-
-```csharp
-using Franz.Common.Messaging.Kafka.Extensions;
-
-services.AddKafkaMessaging(configuration);
-```
-
----
-
-### 2️⃣ Register Kafka Hosted Services
-
-```csharp
-using Franz.Common.Messaging.Hosting.Kafka.Extensions;
-
-services.AddKafkaHostedListener(configuration);
-services.AddOutboxHostedListener(configuration);
-```
-
-This will:
-
-* start background Kafka consumption
-* dispatch messages through Franz messaging strategies
-* process outbox messages reliably
-
----
-
-## 🔄 Kafka Hosted Service Lifecycle
-
-```csharp
-public sealed class KafkaHostedService : BackgroundService
-{
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        // Subscribes to Kafka topics
-        // Listens until host shutdown
-        // Dispatches messages safely
-    }
-}
-```
-
-Behavior:
-
-* graceful shutdown
-* no host crashes on bad messages
-* scope-per-message execution
-
----
-
-## 📦 Outbox Hosted Service
-
-```csharp
-public sealed class OutboxHostedService : BackgroundService
-{
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        // Reads outbox
-        // Publishes to Kafka
-        // Handles retries & DLQ
-    }
-}
-```
-
-Guarantees:
-
-* at-least-once delivery
-* retry control
-* no message loss on crashes
-
----
-
-## 📊 Observability
-
-* Emoji logging conventions:
-
-  * 🚀 startup
-  * 🛑 shutdown
-  * ⚠️ recoverable failure
-  * ❌ execution error
-  * 🔥 DLQ
-* Correlation IDs via `MessageContextAccessor`
-* OpenTelemetry-compatible spans
-
----
-
-## 🧭 Architectural Role
-
-| Concern                 | Package                              |
-| ----------------------- | ------------------------------------ |
-| Kafka transport         | Franz.Common.Messaging.Kafka         |
-| Kafka consumer creation | Franz.Common.Messaging.Kafka         |
-| Hosted execution        | Franz.Common.Messaging.Hosting.Kafka |
-| Dispatch orchestration  | Franz.Common.Messaging.Hosting.Kafka |
-
-This ensures:
-
-* clean Testcontainers integration
-* deterministic CI behavior
-* no hidden threads
-* safe message handling
-
----
-
-## 🧾 Version Information
-
-* **Current Version:** v2.3.3
-* **Target Framework**: **.NET 10.0**
-* Part of the **Franz Framework**
-
----
-
-## 📖 Changelog
-
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
-### **Version 1.7.01**
-
-* 🧱 Enforced strict separation between Kafka transport and hosting
-* 🔌 Removed Kafka consumer creation from hosting layer
-* 🔄 Hosting now depends exclusively on `IListener`
-* ♻️ Fixed lifecycle handling and graceful shutdown
-* 🧪 Improved Testcontainers and CI reliability
-* ⬆️ Upgraded to **.NET 10.0**
-
----
-
-### Version 1.6.20
-
-* Initial Kafka hosting support
-* Added `KafkaHostedService`
-* Added `OutboxHostedService`
-* Introduced hosting DI extensions
-* Integrated `MessageContextAccessor`
-* Emoji-based logging conventions
-
----
-
-## 📜 License
-
-MIT License
-See the `LICENSE` file for details.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT License.

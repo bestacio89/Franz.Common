@@ -1,56 +1,62 @@
-# Multitenancy execution lifecycle and persistence boundaries
+# Multi-tenancy execution lifecycle and persistence boundaries
 
 ## Execution-context contract
 
-A `TenantExecutionContext` is immutable validated identity. Tenant resolution is not authorization: the HTTP and messaging adapters validate tenant status and authorization before establishing the context.
+TenantExecutionContext represents immutable, validated tenant identity. Resolution is not authorization. HTTP and messaging adapters validate tenant lifecycle and caller/producer authorization before establishing execution context.
 
-### HTTP requests
+## HTTP requests
 
-- Register `ITenantExecutionContextAccessor` as scoped through `AddFranzMultiTenancy`.
-- `TenantExecutionContextAccessor` stores the validated context in the current `HttpContext.Items`; it does not use process-wide or static mutable state.
-- `TenantResolutionMiddleware` initializes the context only after resolution, active-status checks, optional tenant validation, and authenticated-user authorization.
-- The middleware clears execution, tenant, and domain entries in a `finally` block after downstream execution.
-- A second initialization in the same request is rejected. This detects incorrect middleware composition instead of silently replacing identity.
+- Register the HTTP integration through AddFranzMultiTenancy.
+- Place UseFranzMultiTenancy after authentication and before authorization/endpoints.
+- The request accessor stores server-established state in HttpContext.Items; inbound tenant headers are resolution inputs, never authoritative ambient state.
+- Middleware validates tenant lifecycle, invokes the configured tenant validator and requires an application-provided ITenantRequestAuthorizer for authenticated principals.
+- Missing authorizer or denied membership fails with HTTP 403.
+- Request context is cleared in a finally path after downstream execution.
 
-### Messages and background consumers
+## Message and background consumers
 
-- Register messaging tenancy services with `AddMessagingMultitenancyContext`; the execution accessor is scoped.
-- The producer propagates tenant metadata in message headers. Headers are untrusted transport input, not proof of tenant membership.
-- `TenantMessageContextInitializer.BeginAsync` resolves the tenant from the store, checks active status, applies the configured validator when present, authorizes the producer, validates any supplied domain against the tenant, and only then initializes execution context.
-- The returned `IAsyncDisposable` owns the message execution lifetime. The Kafka, RabbitMQ, generic messaging hosted-service, Azure Service Bus, Azure Event Hubs and Outbox listener execution paths now invoke the initializer automatically after establishing the message context and before selecting or executing a handler. The returned scope is disposed after the complete handler pipeline on success, failure, and cancellation.
-- The ambient message context is cleared in a `finally` block after tenant-scope disposal, including when tenant validation or handler execution fails. The Outbox listener also creates a fresh DI scope per stored message and resolves its stores, serializer and dispatcher from that scope.
-- The initializer also accepts an explicit `Message`, allowing transport processors that do not use the ambient message accessor to establish the same validated tenant context.
-- A message scope rejects a second initialization. A consumer must not reuse an initialized accessor for another message; create a new DI scope per message.
-- The generic MassTransit Kafka adapter exposes a scoped-handler overload that receives the per-delivery `IServiceProvider`; it maps Kafka headers into the tenant message envelope and invokes the same initializer. Its legacy `Func<T, Task>` overload fails closed when messaging multitenancy is registered, because a captured handler cannot be guaranteed to resolve dependencies from the delivery scope.
-- Background jobs must carry explicit tenant identity in authenticated job/message metadata and re-enter through the same validation and authorization boundary. Do not capture an HTTP accessor, copy a mutable accessor between jobs, or trust a tenant identifier supplied only in an arbitrary job payload.
+Register messaging tenancy services with:
 
-## Persistence guarantees and limitations
+```csharp
+services.AddMessagingMultitenancyContext();
+```
 
-### Tracked EF operations
+The application must also register an ITenantStore and ITenantMessageAuthorizer. The producer propagates tenant/domain metadata from validated execution context; message headers remain untrusted input.
 
-`DbContextBase` applies tenant query filters to tenant-owned entities, stamps new entities with the current tenant, and validates tenant ownership on tracked updates/deletes. Tenant identity is also configured as a concurrency token to protect detached update paths.
+ITenantMessageContextInitializer.BeginAsync resolves the tenant from the store, requires active status, applies optional ITenantValidator validation, authorizes the producer, verifies any supplied domain belongs to the tenant and is verified, then initializes the scoped execution accessor.
 
-### EF Core set-based bulk updates
+The initializer supports ambient-message and explicit-message entry points. Custom implementations must implement BeginAsync(Message, CancellationToken) to participate in transport paths that pass the deserialized message directly. The default interface implementation throws NotSupportedException, preserving source compatibility while failing closed.
 
-`IEntityFrameworkBulkUpdateRepository<TEntity>` uses `ExecuteUpdateAsync` and composes the supplied predicate over the normal DbSet, retaining configured global query filters. The EF-specific contract is intentionally separate from provider-neutral business repository interfaces.
+Framework-managed consumer paths establish a fresh dependency-injection scope per delivery and invoke tenant initialization before handler execution:
 
-Bulk updates bypass materialization, change tracking, `SaveChanges`, save interceptors, audit hooks, and domain-event dispatch. Callers must explicitly set required audit columns and reload or clear tracked instances when consistency requires it. Tenant ownership reassignment is rejected by the repository implementation.
+- Generic messaging hosted service.
+- Kafka hosted service.
+- RabbitMQ hosted service.
+- Azure Service Bus processor.
+- Azure Event Hubs processor.
+- Outbox message listener.
+- MassTransit Kafka scoped-handler adapter.
 
-Support depends on provider translation. Relational providers that support EF Core's `ExecuteUpdateAsync` can execute supported expressions; non-relational providers such as Cosmos may reject the operation. Provider support must be tested against the exact provider/version and expression shapes used by an application.
+The returned IAsyncDisposable owns tenant execution lifetime. The scope is disposed after the complete handler pipeline, including exceptions and cancellation. Ambient message context is cleared in a finally path. Outbox processing creates a new async DI scope per stored message and resolves its message store, inbox store, dispatcher and serializer from that scope.
 
-### Raw SQL
+The generic MassTransit Kafka adapter provides a handler overload receiving the per-delivery IServiceProvider. It maps Kafka headers into a Franz message envelope before tenant validation. Its legacy captured-handler overload fails closed when messaging multitenancy is enabled because it cannot guarantee dependencies are resolved from the delivery scope.
 
-Global query filters do not rewrite arbitrary SQL. The framework cannot claim tenant isolation for raw SQL that targets tenant-owned tables unless the database itself enforces it or the SQL access path applies a trusted tenant predicate.
+Background jobs must carry explicit tenant identity in authenticated job/message metadata and re-enter through the same validation and authorization boundary. Never capture an HTTP-scoped accessor or reuse a mutable accessor across jobs.
 
-For shared-table tenancy, use database row-level security where available, bind tenant identity from a trusted execution context using connection/session initialization that is reset safely on connection return, and test pooled-connection reuse. If those controls are not configured, prohibit unreviewed raw SQL against tenant-owned tables. Never interpolate tenant IDs or other values into SQL strings; use parameters.
+## Persistence guarantees
 
-### Provider qualification matrix
+DbContextBase applies tenant query filters to tenant-owned entities, stamps new entities from the current validated tenant and checks ownership during tracked writes. Tenant identity is immutable after insertion.
 
-| Capability | PostgreSQL | MariaDB | SQL Server | Oracle | Cosmos |
-|---|---|---|---|---|---|
-| Central database target routing | Integration-qualified | Integration-qualified | Integration-qualified | Integration-qualified | Separate provider model |
-| Tenant-owned tracked reads/writes | Real-engine PostgreSQL coverage | Additional persistence qualification required | Additional persistence qualification required | Additional persistence qualification required | Separate partition/SDK semantics |
-| Set-based bulk update | Verify provider/version and translation | Verify provider/version and translation | Verify provider/version and translation | Verify provider/version and translation | Not assumed; provider may not support EF ExecuteUpdate |
-| Raw SQL row isolation | Database policy required | Database policy required | Database policy required | Database policy required | Not equivalent to relational raw SQL |
+The framework repository ExecuteBulkUpdateAsync composes its predicate over the configured DbSet, retaining global query filters, and rejects attempts to assign TenantId. Direct EF Core set-based operations retain query filters but bypass materialization, change tracking, SaveChanges, save interceptors, audit hooks and domain-event dispatch. Callers must explicitly manage audit fields and tracked-instance consistency. Direct low-level set-based calls must not reassign tenant ownership.
 
-A passing routing test is not evidence of full persistence isolation. A provider's EF query-filter behavior is not evidence that raw SQL, provider-native bulk APIs, stored procedures, or external database clients enforce tenant boundaries.
+Provider translation is provider/version and expression-shape dependent; qualify the exact provider and operations used. Cosmos support must not be inferred from relational ExecuteUpdateAsync behaviour.
+
+## Raw SQL
+
+Global query filters do not rewrite arbitrary SQL. Raw SQL against tenant-owned tables requires a trusted tenant predicate or independent database enforcement such as row-level security. If session state is used, initialize it from validated execution context and reset it before a pooled connection is returned. Parameterize all values.
+
+## Relational qualification
+
+The shared tenant-isolation contract is exercised against PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23. Provider-specific migration, transaction, concurrency and SQL translation tests remain required. Cosmos DB and MongoDB require separate contracts.
+
+See [tenant isolation audit](../Docs/tenant-isolation-boundary-audit.md) and [relational provider contract](../Docs/relational-provider-contract.md).

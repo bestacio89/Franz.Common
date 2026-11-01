@@ -1,54 +1,66 @@
 # Tenant isolation boundary audit
 
-## Guarantees exercised by automated tests
+## Scope and evidence
 
-The PostgreSQL integration suite exercises the framework-managed EF Core boundary:
+This document describes the framework-managed EF Core tenant boundary and the application-controlled paths around it. Automated relational contract tests exercise PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23 using real database engines.
 
-- Tenant-owned queries are filtered to the current execution tenant.
-- Queries without a tenant execution context fail closed and return no tenant-owned rows.
-- Writes to tenant-owned entities require a tenant execution context.
-- Inserts cannot claim a tenant other than the current execution tenant.
-- Tracked and detached writes are checked against the current tenant.
-- Bulk updates retain EF Core global query filters and cannot assign a new `TenantId`.
-- HTTP and messaging execution accessors reject accidental context replacement and support explicit cleanup.
-- Message initialization rejects unauthorized producers and invalid or foreign domain metadata.
+The contract is evidence for the tested code paths and exact provider versions. It is not a claim that every database access path, application or deployment is tenant-safe.
 
-These tests establish behavior for the tested code paths and providers; they are not a claim that every external database access path is tenant-safe.
+## Framework-managed EF Core guarantees
 
-## Explicit trust boundaries
+For entities implementing ITenantEntity and exposing a mapped Guid TenantId, the configured DbContextBase tenant accessor enables:
 
-### Raw SQL and direct database access
+- Tenant-owned reads filtered to the validated execution tenant.
+- Fail-closed reads when no tenant execution context is available.
+- Rejection of tenant-owned writes without an execution tenant.
+- Automatic stamping of new tenant-owned entities when TenantId is empty.
+- Rejection of inserts and tracked/detached writes that claim another tenant.
+- Protection against changing tenant ownership after insertion.
+- Tenant filters retained by EF Core ExecuteUpdateAsync and ExecuteDeleteAsync.
+- Tenant-filter preservation and TenantId assignment rejection in the framework repository ExecuteBulkUpdateAsync implementation.
 
-EF Core global query filters do not rewrite raw SQL, stored procedures, direct ADO.NET commands, provider-native bulk APIs, or connections opened outside the framework's repository/context path. A tenant ID included in an HTTP header, message header, or arbitrary job payload is untrusted until resolved and authorized by the relevant adapter.
+The shared provider contract verifies these behaviours on each qualified relational engine.
 
-Do not use raw SQL to access tenant-owned tables unless the command applies a trusted tenant predicate or the database independently enforces row isolation. Prefer database row-level security where supported. If tenant identity is applied through connection/session state, initialize it from the validated execution context and reset it reliably before a pooled connection is returned. Verify pooled-connection reuse and failure paths. Always parameterize values; never interpolate tenant-controlled values into SQL.
+## HTTP and message execution boundaries
 
-The framework does not provide a universal raw-SQL tenant-isolation guarantee. Database credentials and deployment controls must prevent application paths from silently bypassing the chosen boundary.
+HTTP tenant context is established only after resolution, lifecycle validation and authenticated-principal membership authorization. Request headers and claims are resolution inputs, not standalone proof of membership.
 
-### Background work and message consumers
+Messaging tenant metadata is untrusted transport input. The consumer resolves the tenant from the tenant store, requires active status, applies configured validation, authorizes the producer, validates domain ownership/verification and only then initializes execution context. Hosted consumer and Outbox paths use per-delivery scopes and clear context after processing, including failure and cancellation paths.
 
-Create a fresh dependency-injection scope for each message/job. Re-resolve and authorize tenant identity from trusted metadata, initialize the tenant execution context for the duration of the operation, and dispose/clear that context on success, exception, and cancellation. Never capture an HTTP-scoped accessor or reuse a mutable execution accessor between jobs.
+See [messaging execution lifecycle](../docs/multitenancy-execution-lifecycle.md).
 
-The library's context lifecycle tests do not prove that every third-party consumer or job scheduler in an application follows this contract; each adapter integration must be covered by its own tests.
+## Explicit bypasses and application responsibilities
+
+EF Core global query filters do not rewrite or secure raw SQL, stored procedures, direct database connections, external database clients, provider-native bulk APIs or queries that deliberately call IgnoreQueryFilters.
+
+Such paths require a trusted tenant predicate or independent database enforcement such as row-level security. If tenant identity is applied through connection/session state, initialize it from validated execution context and reset it before a pooled connection is returned. Parameterize all values; never interpolate tenant-controlled values into SQL.
+
+Tenant-scoped unique constraints, composite foreign keys and database permissions remain application/schema responsibilities. The framework does not rewrite business uniqueness semantics.
 
 ## Provider qualification
 
-| Capability | PostgreSQL | MariaDB | MySQL | SQL Server / Oracle | Cosmos |
-|---|---|---|---|---|---|
-| Tenant-filtered EF reads and writes | Integration tests required and present in PostgreSQL suite | Must be qualified against real provider | Must be qualified against real provider | Must be qualified against real provider | Separate partition/SDK semantics |
-| EF Core set-based bulk update | Integration tests required and present in PostgreSQL suite | Verify provider/version and translated expressions | Verify provider/version and translated expressions | Verify provider/version and translated expressions | Do not assume `ExecuteUpdateAsync` support |
-| Raw SQL isolation | Database policy or trusted tenant predicate required | Database policy or trusted tenant predicate required | Database policy or trusted tenant predicate required | Database policy or trusted tenant predicate required | Not equivalent to relational raw SQL |
+| Provider | Test engine | Shared tenant contract |
+|---|---|---|
+| PostgreSQL | PostgreSQL 16 | Passed in release qualification |
+| MariaDB | MariaDB 11.4 | Passed in release qualification |
+| MySQL | MySQL 8.4 | Passed in release qualification |
+| SQL Server | SQL Server 2022 | Passed in release qualification |
+| Oracle | Oracle Free 23 | Passed in release qualification |
+| Cosmos DB | Separate SDK/provider model | Not covered by this relational contract |
+| MongoDB | Separate document/provider model | Not covered by this relational contract |
 
-Provider routing/configuration tests are not substitutes for real-engine tenant-isolation tests. Do not mark a provider qualified until tests prove cross-tenant read/write isolation, missing-context fail-closed behavior, ownership immutability, bulk-operation behavior where supported, and connection/session reset behavior where applicable.
+The shared contract is necessary, not sufficient, for provider interchangeability. Each provider must also pass its migration, CRUD, transaction, concurrency, configuration, value-conversion and SQL-translation suites.
 
-## Release gate
+## Release and deployment checklist
 
-- [ ] PostgreSQL tenant isolation integration suite passes in CI.
-- [ ] Existing HTTP and messaging lifecycle tests pass.
-- [ ] Bulk-update tenant-filter and ownership-mutation tests pass.
-- [ ] Every supported relational provider has a named real-engine qualification result, or is explicitly documented as unqualified.
-- [ ] Raw SQL, stored procedure, and direct-connection paths are inventoried by each consuming application and either prohibited for tenant-owned data or independently protected and tested.
-- [ ] Consumer/job adapters prove tenant context cleanup after success, exception, and cancellation.
-- [ ] Documentation does not imply global query filters protect paths that bypass EF Core.
+- [ ] Run the shared tenant contract against the exact database image/version used by the release.
+- [ ] Run provider-specific migration, transaction, CRUD and concurrency suites.
+- [ ] Verify derived DbContexts forward ITenantExecutionContextAccessor to DbContextBase.
+- [ ] Register application-specific HTTP membership and message producer authorizers.
+- [ ] Inventory raw SQL, stored procedures, query-filter bypasses and provider-native bulk paths.
+- [ ] Protect bypasses with trusted tenant predicates or database enforcement and dedicated tests.
+- [ ] Verify tenant context cleanup on success, exception and cancellation.
+- [ ] Test pooled connection/session state reset if database session tenancy is used.
+- [ ] Keep tenant provisioning, suspension, deactivation, backup/recovery and database permissions in the operational runbook.
 
-A checked release gate is evidence only for the exact commit, provider versions, and execution paths that were tested.
+A checked list is evidence only for the exact commit, provider versions, configuration and paths tested.

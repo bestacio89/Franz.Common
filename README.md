@@ -2,444 +2,130 @@
 
 # Franz.Common
 
-**Deterministic Architecture for Event-Driven .NET Microservices**
+**Deterministic architecture and infrastructure foundations for enterprise .NET systems.**
 
-[![.NET](https://img.shields.io/badge/.NET-10%2B-blueviolet)](https://dotnet.microsoft.com)
-[![AOT](https://img.shields.io/badge/Native%20AOT-Compatible-success)](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/)
+[![.NET](https://img.shields.io/badge/.NET-10-blueviolet)](https://dotnet.microsoft.com)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20%7C%20DDD%20%7C%20CQRS-brightgreen)](https://github.com/bestacio89/Franz.Common)
-[![Messaging-Kafka](https://img.shields.io/badge/Messaging-Kafka-231f20?logo=apachekafka&logoColor=white)](https://kafka.apache.org)
-[![Messaging-RabbitMQ](https://img.shields.io/badge/Messaging-RabbitMQ-ff6600?logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com)
-[![Messaging-AzureServiceBus](https://img.shields.io/badge/Messaging-AzureServiceBus-0078d4?logo=microsoftazure&logoColor=white)](https://azure.microsoft.com/en-us/products/service-bus)
-[![Persistence](https://img.shields.io/badge/Persistence-SQL%20%7C%20MongoDB%20%7C%20CosmosDB-blue)](https://github.com/bestacio89/Franz.Common)
-[![Resilience-Polly](https://img.shields.io/badge/Resilience-Polly-blue)](https://github.com/App-vNext/Polly)
-[![Observability-OpenTelemetry](https://img.shields.io/badge/Observability-OpenTelemetry-yellow)](https://opentelemetry.io)
-[![Multi--Tenancy-Built--In](https://img.shields.io/badge/Multi--Tenancy-Built--In-9cf)](https://github.com/bestacio89/Franz.Common)
-[![License-MIT](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE.MD)
-[![NuGet](https://img.shields.io/badge/NuGet-700k%2B%20downloads-success)](https://www.nuget.org/packages?q=Franz.Common)
+[![Messaging](https://img.shields.io/badge/Messaging-Kafka%20%7C%20RabbitMQ%20%7C%20Azure-blue)](https://github.com/bestacio89/Franz.Common)
+[![Multi-tenancy](https://img.shields.io/badge/Multi--tenancy-Validated%20Execution-9cf)](https://github.com/bestacio89/Franz.Common)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE.MD)
 
----
+## Overview
 
-## Table of Contents
+Franz.Common is the shared foundation of a modular .NET 10 framework for building maintainable, observable and resilient enterprise applications and event-driven services. It provides explicit building blocks for DDD, CQRS, persistence, messaging, multi-tenancy, identity, resilience, diagnostics and application composition.
 
-- [Overview](#-overview)
-- [Why Franz?](#-why-franz)
-- [Subpackages](#-subpackages)
-- [Security Principles](#-security-principles)
-- [Architecture Overview](#-architecture-overview)
-- [Runtime Request Lifecycle](#-runtime-request-lifecycle)
-- [Messaging Flow](#-messaging-flow-kafka--outbox)
-- [Ecosystem Map](#-franz-ecosystem-map)
-- [Architecture Enforcement](#-architecture-enforcement-franz-tribunal)
-- [Key Features](#-key-features)
-- [Getting Started](#-getting-started)
-- [Build & Test](#-build--test)
-- [Changelog](#-changelog)
-- [Roadmap](#-roadmap)
-- [Enterprise Adoption & Support](#-enterprise-adoption--support)
-- [Contributing](#-contributing)
-- [License](#-license)
+Franz favours correctness-first engineering: clear ownership, explicit execution boundaries, fail-closed validation, deterministic dependency injection and provider-specific integration tests. Packages are independently consumable; applications opt into the integrations they need.
 
----
+## Core capabilities
 
-# 📘 Overview
+- **DDD and application foundations:** entities, aggregate factories, domain events, validation and application pipelines.
+- **Mediator and mapping:** framework mediator, composable behaviours and mapping/source-generation options.
+- **Persistence:** EF Core repositories, unit-of-work orchestration, auditing, soft deletion, tenant-aware filters and relational provider adapters.
+- **Messaging:** message contracts, Kafka, RabbitMQ, Azure Service Bus, Azure Event Hubs, MassTransit integration and Outbox/Inbox persistence.
+- **Multi-tenancy:** tenant/domain resolution, lifecycle validation, authorization boundaries and scoped execution context across HTTP and message processing.
+- **Resilience and observability:** structured logging, telemetry and resilience integrations.
+- **HTTP and identity:** ASP.NET Core composition, authentication, identity and service-client integrations.
 
-**Franz.Common** is the foundation of the **Franz Framework**, a deterministic, factory-driven, AOT-first architecture layer for **building event-driven microservices in .NET 10**.
+## Multi-tenancy: validated execution boundaries
 
-It eliminates boilerplate, enforces architectural correctness, and provides **DDD, CQRS, messaging, multi-tenancy, resilience, observability, and identity** capabilities — designed for **scalable, long-lived enterprise systems**.
+Tenant identity is represented as validated execution context. Resolving an identifier is not authorization: HTTP and messaging adapters must establish that the tenant exists, is active, and that the caller or producer is authorized.
 
-Franz is **Kafka-first**, but also supports **RabbitMQ, Azure Service Bus, MongoDB, CosmosDB, SQL**, and more.
-
-> **Spring Boot for .NET — but deterministic, clean, and transparent.**
-
----
-
-# 🎯 Why Franz?
+The framework exercises tenant isolation across three boundaries:
 
-Franz was created to bring **predictability, maintainability, and governance** to distributed .NET systems:
+1. **HTTP:** request middleware resolves and validates tenant identity, authorizes authenticated membership through an application-provided authorizer, stores context in the request scope and clears it after execution.
+2. **EF Core persistence:** tenant-owned entities use global query filters, tenant stamping and ownership checks. Tenant identity cannot be reassigned through the framework repository bulk-update API.
+3. **Messaging and Outbox:** consumer execution uses per-delivery dependency-injection scopes, validates message tenant/domain metadata before dispatch, and disposes execution context after success or failure.
 
-- Reduces **80%+** of architectural boilerplate.
-- Enforces **structural correctness** at build time, not at code review.
-- Provides **consistent architecture** across microservices — swap SQL Server for Postgres, Kafka for RabbitMQ, with zero domain changes.
-- Offers **first-class resilience**, **observability**, and **messaging** patterns out of the box.
-- Minimizes cognitive load through **unified abstractions**.
-- Designed for **enterprise requirements** (multi-tenancy, identity, auditability).
-
-Franz isn't a library collection — it's a platform with guarantees. The architecture you get from following the pattern is the architecture you'd get from a senior architect reviewing every PR, except enforced automatically at build time.
-
----
-
-# 📦 Subpackages
-
-Franz follows a **"batteries-included but modular"** philosophy.
-
-### Core
-- `Franz.Common` → Core primitives, serialization, DI, functional utilities.
-
-### Domain & Application
-- `Franz.Common.Business` → DDD aggregates, domain events, factories, pipelines.
-- `Franz.Common.Mediator` → Lightweight CQRS mediator with pipelines.
-
-### Infrastructure
-- `Franz.Common.EntityFramework` → Auditing, soft deletes, domain event dispatching.
-- `Franz.Common.MongoDB` → Mongo outbox/inbox.
-- `Franz.Common.AzureCosmosDB` → Cosmos outbox/inbox.
-
-### Messaging
-- `Franz.Common.Messaging` → Messaging contracts, envelopes, options.
-- `Franz.Common.Messaging.Hosting` → Hosted async listeners.
-- `Franz.Common.Messaging.Kafka`
-- `Franz.Common.Messaging.RabbitMQ`
-
-### HTTP
-- `Franz.Common.Http.Bootstrap`
-- `Franz.Common.Http.Refit`
-- `Franz.Common.Http.Identity`
-- `Franz.Common.Http.Messaging`
-
-### Identity
-- `Franz.Common.Identity`
-- `Franz.Common.SSO` → Keycloak, OIDC, SAML2, WS-Fed integrations.
-
----
-
-# 🔐 Security Principles
-
-Franz enforces strict, deterministic security patterns:
-
-- Mandatory **CorrelationId**, **TraceId**, and **TenantId** propagation.
-- Deterministic error filters (no sensitive data leakage).
-- Centralized **authentication & claims enrichment pipelines**.
-- Optional strict mode:
-  - no unregistered controllers
-  - no unregistered message handlers
-  - validation-first execution
-- Standardized identity flows across **OIDC, SAML2, Keycloak, WS-Fed**.
-
-These principles make Franz suitable for **regulated environments**, including public institutions and financial sectors.
-
----
-
-# 🌐 Architecture Overview
-
-```mermaid
-flowchart TD
-
-subgraph API Layer
-    A[HTTP Request] --> B[Franz.Http Pipeline]
-    B --> C[Correlation + Validation + Error Handling]
-    C --> D[Controller / Minimal API]
-end
-
-subgraph Application Layer
-    D --> E[Franz.Mediator]
-    E --> F[Command / Query Handlers]
-    F --> G[Domain Logic]
-end
-
-subgraph Infrastructure Layer
-    G --> H[(Database)]
-    G --> I[[Kafka Producer]]
-    G --> J[[RabbitMQ Producer]]
-end
-
-subgraph Messaging Layer
-    I --> K[[Kafka Broker]]
-    J --> L[[RabbitMQ Broker]]
-    K --> M[[Kafka Consumer]]
-    L --> N[[Rabbit Consumer]]
-    M --> E
-    N --> E
-end
-```
-
----
-
-# 🔄 Runtime Request Lifecycle
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant API as Franz.Http
-    participant Mediator as Franz.Mediator
-    participant Handler
-    participant Infra as DB / Messaging
-
-    Client->>API: HTTP Request
-    API->>API: Correlation + Validation + Error Filter
-    API->>Mediator: Dispatch(Request)
-    Mediator->>Handler: Execute Handler
-    Handler->>Infra: Query DB / Publish Event
-    Infra-->>Handler: Response / Ack
-    Handler-->>Mediator: Result
-    Mediator-->>API: Standardized Response
-    API-->>Client: HTTP 200 / 400 / 500
-```
-
----
-
-# 📨 Messaging Flow (Kafka + Outbox)
-
-```mermaid
-flowchart LR
-
-subgraph Application
-    A[Command Handler] --> B[Domain Event]
-    B --> C[(Outbox Store)]
-    C --> D[Outbox Dispatcher]
-end
+The shared relational tenant contract is exercised against PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23. It covers tenant-scoped reads, missing-context behaviour, cross-tenant writes and supported EF Core set-based/repository bulk operations.
 
-D -->|Publish| E[(Kafka Broker)]
-E --> F[Consumer Service]
-F --> G[Message Handler]
-G --> H[(Database)]
-```
+**Security boundary:** EF Core query filters are not a universal database security mechanism. Raw SQL, stored procedures, IgnoreQueryFilters, provider-native bulk APIs and external database clients require trusted tenant predicates or independent database enforcement (for example, row-level security). Cosmos DB and MongoDB require separate provider-specific isolation contracts. Applications remain responsible for trusted identity/producer authorization, tenant lifecycle operations, database permissions and deployment controls.
 
----
+See [tenant isolation boundaries](Docs/tenant-isolation-boundary-audit.md), [relational provider contract](Docs/relational-provider-contract.md) and [messaging execution lifecycle](docs/multitenancy-execution-lifecycle.md).
 
-# 🗺️ Franz Ecosystem Map
+## Package map
 
-```mermaid
-flowchart LR
+| Area | Packages |
+|---|---|
+| Core and composition | Franz.Common, Annotations, DependencyInjection, Hosting |
+| Domain and application | Business, Mediator, Mapping |
+| Persistence | EntityFramework and relational provider packages, MongoDB, AzureCosmosDB |
+| Multi-tenancy | MultiTenancy, Http.MultiTenancy, Messaging.MultiTenancy |
+| Messaging | Messaging, Hosting, Kafka, RabbitMQ, Azure Event Bus, Azure Event Hubs, MassTransit and persistence adapters |
+| HTTP and identity | HTTP bootstrap, headers, authentication, identity, Refit, SSO and documentation |
+| Cross-cutting | Caching, errors, logging, serialization, testing, gRPC and OpenTelemetry |
 
-Core[Franz.Common]
-Business[Business Layer]
-Mediator[Mediator]
-HttpBoot[Http Bootstrap]
-Refit[Refit Integration]
-Identity[Identity + SSO]
+Each package includes a package-specific readme.md, which is packed into its NuGet artifact.
 
-subgraph Messaging
-  MsgCore[Messaging Core]
-  MsgHost[Messaging Hosting]
-  Kafka[Kafka Integration]
-  Rabbit[RabbitMQ Integration]
-end
+## Getting started
 
-subgraph Persistence
-  EF[EF Core Extensions]
-  Mongo[MongoDB Outbox]
-  Cosmos[CosmosDB Outbox]
-end
-
-Core --> Business
-Core --> Mediator
-Core --> HttpBoot
-Core --> MsgCore
-Core --> Identity
-
-Business --> EF
-Mediator --> HttpBoot
-HttpBoot --> Refit
-
-MsgCore --> MsgHost
-MsgHost --> Kafka
-MsgHost --> Rabbit
-
-Core --> Mongo
-Core --> Cosmos
-```
-
----
-
-# 🏛️ Architecture Enforcement (Franz Tribunal)
-
-Franz includes an optional **architecture test suite** based on ArchUnitNET — internally referred to as the **Franz Tribunal**:
-
-- Enforces **layer boundaries** (Domain → Application → Infrastructure).
-- Forbids **circular dependencies**.
-- Enforces **immutable DTOs**.
-- Validates naming conventions: Commands, Queries, Events, Handlers, Controllers.
-- Ensures no domain leakage into infrastructure and vice-versa.
-- Ensures messaging boundaries are respected.
-
-These rules run in CI on every pull request. A violation fails the build — not a code review comment, a hard stop. This makes Franz suitable for **large organizations**, where maintaining architectural discipline across many contributors and services is critical, not optional.
-
----
-
-# 💡 Key Features
-
-### ✔ DDD/CQRS First-Class
-Entities, value objects, aggregates, events — all factory-controlled, identity-safe, and persistence-agnostic.
-
-### ✔ High-Performance Entity & Aggregate Factories
-`EntityFactory<TKey, TEntity>` and `AggregateFactory<TAggregate, TEvent>` use **compiled expression tree delegates** cached statically per closed generic type. Constructor resolution happens once at startup — runtime creation is near-native with zero reflection overhead. Misconfigured types are caught at DI registration time via `Validate()`, not at first use.
-
-### ✔ Native Object Mapping
-`FranzMapper` detects value objects structurally via base-class inheritance — no `[Attribute]` decoration required across your domain. Supports immutable records, `init`-only properties, nested object graphs with true circular-reference detection, and full collection coercion (arrays, `HashSet<T>`, `IReadOnlyList<T>`). Zero external mapping library dependency.
-
-### ✔ Mediator with Pipelines
-Logging, validation, telemetry, resilience, transactions — composable, opt-in, zero hidden middleware.
-
-### ✔ Messaging First
-Outbox/inbox, retries, DLQ, correlation propagation. Supports both **service-level** topic routing and **event-level** topic routing — register a Kafka topic per service, or per individual domain event, depending on your consumption pattern.
-
-### ✔ Observability
-Serilog, OpenTelemetry, structured logs, mandatory correlation propagation across HTTP, messaging, and pipelines.
-
-### ✔ Multi-tenancy
-Tenant resolution across HTTP, messaging, pipelines.
-
-### ✔ Polyglot Persistence
-SQL Server, Postgres, Oracle, MariaDB, MongoDB, CosmosDB — all behind unified abstractions. Swapping a provider is a registration change, not a rewrite.
-
----
-
-# 🚀 Getting Started
-
-### Install the core package:
+All framework packages in the 2.3.4 release line target .NET 10. Install only the packages required by your application.
 
 ```bash
-dotnet add package Franz.Common --version 2.3.3
+dotnet add package Franz.Common --version 2.3.4
+dotnet add package Franz.Common.Mediator --version 2.3.4
+dotnet add package Franz.Common.EntityFramework --version 2.3.4
 ```
 
-Messaging example:
+For Kafka hosting and tenant-aware message processing:
 
 ```bash
-dotnet add package Franz.Common.Messaging.Kafka
+dotnet add package Franz.Common.Messaging.Hosting.Kafka --version 2.3.4
+dotnet add package Franz.Common.Messaging.MultiTenancy --version 2.3.4
 ```
 
-Minimal `Program.cs` wiring:
+For messaging multi-tenancy, register AddMessagingMultitenancyContext(), an ITenantStore and the application-specific ITenantMessageAuthorizer. For HTTP multi-tenancy, register the HTTP integration after authentication and before authorization/endpoints, and provide the application-specific ITenantRequestAuthorizer.
 
-```csharp
-builder.Host.UseLog();
-builder.Services
-    .AddFranzSerilogAuditPipeline()
-    .AddFranzEventValidationPipeline()
-    .AddFranzSerilogLoggingPipeline()
-    .AddFranzTelemetry(env, config);
+See [Getting Started](Docs/getting-started.md) and the package READMEs for complete setup.
 
-builder.Services.AddRelationalDatabase<ApplicationDbContext>(env, config);
-builder.Services.AddHttpArchitecture(env, config);
-builder.Services.AddFranzMediator(new[] { typeof(CreateOrderCommandHandler).Assembly });
-builder.Services.AddFranzResilience(config);
-```
+## Messaging execution model
 
-That's the full subsystem wiring for logging, persistence, HTTP, mediator, and resilience — no boilerplate beyond what's shown above.
+Generic messaging, Kafka and RabbitMQ hosted paths create a DI scope per delivery, establish message context, initialize tenant execution when registered, execute the selected strategy and clear ambient context in a finally path. Azure Service Bus and Azure Event Hubs use per-delivery scopes when the scope factory is supplied. The Outbox listener creates a fresh scope per stored message and resolves its stores, serializer and dispatcher from that scope.
 
----
+The generic MassTransit Kafka adapter provides a scoped-handler overload receiving the delivery IServiceProvider. When tenant-aware processing is enabled, its legacy captured-handler overload fails closed because it cannot guarantee dependencies are resolved from the per-delivery scope.
 
-# 🛠️ Build & Test
+Custom ITenantMessageContextInitializer implementations must implement the explicit-message BeginAsync(Message, CancellationToken) overload to participate in transport paths that initialize from a message object. Its default interface implementation throws NotSupportedException. OutboxMessageListener now requires IServiceScopeFactory and ILogger<OutboxMessageListener>; manual constructor call sites must be updated.
+
+## Persistence and provider qualification
+
+The relational adapters share a behavioural contract but are not interchangeable merely because they implement common interfaces. CI qualification covers PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23. Provider migrations, SQL translation, transactions, concurrency, value conversion and operational configuration remain provider-specific responsibilities.
+
+Franz uses EF Core as its persistence execution path. Raw SQL or other deliberate bypasses require independent tenant enforcement and tests.
+
+## Build and test
 
 ```bash
 git clone https://github.com/bestacio89/Franz.Common.git
 cd Franz.Common
-dotnet build
-dotnet test
+dotnet restore Franz.Common.slnx
+dotnet build Franz.Common.slnx --configuration Release --no-restore
+dotnet test Franz.Common.slnx --configuration Release --no-build --no-restore
 ```
 
-Kafka integration tests (real broker via Testcontainers, not mocks):
+Provider and broker integration suites use real engines/brokers through Testcontainers where configured. A test result qualifies only the exact provider version and execution paths exercised.
 
-```bash
-docker-compose up -d
-dotnet test --filter Category=Integration
-```
+## v2.3.4 — Multi-tenancy execution and relational qualification
 
----
+- Added a shared real-engine tenant-isolation contract for PostgreSQL, MariaDB, MySQL, SQL Server and Oracle.
+- Verified tenant-scoped reads/writes, missing-context behaviour, cross-tenant ownership rejection and supported bulk-operation protections.
+- Hardened Kafka, RabbitMQ, Azure Service Bus, Azure Event Hubs, Outbox and MassTransit Kafka tenant execution boundaries.
+- Added per-delivery DI scopes and tenant-context lifecycle handling, including cleanup on failure and cancellation.
+- Added tenant/domain metadata propagation and explicit-message initialization.
+- Updated package READMEs and central architecture/security documentation.
 
-# 📋 Changelog
+This repository change targets package version 2.3.4. NuGet publication remains a separate release operation after restore/audit, Release build, full tests and release approval.
 
-Full version history lives in [`changelog.md`](changelog.md). Recent highlights:
+## Documentation
 
-## v2.3.3 — RabbitMQ Operational Hardening
+- [Architecture overview](Docs/Architecture/system-architecture.md)
+- [Messaging flow](Docs/Architecture/messaging-flow.md)
+- [Tenant isolation audit](Docs/tenant-isolation-boundary-audit.md)
+- [Relational provider contract](Docs/relational-provider-contract.md)
+- [Messaging multi-tenancy lifecycle](docs/multitenancy-execution-lifecycle.md)
+- [Versioning policy](Docs/governance/versioning-policy.md)
+- [Changelog](changelog.md)
 
-- Supervised consumer startup and runtime failure through the generic host.
-- Defined single-owner acknowledgement and replay behavior, bounded delivery buffering, and safer channel/connection lifecycle management.
-- Enforced strict TLS validation by default and clarified transaction-channel ownership.
-- Documented operational contracts and added real-broker dead-letter routing coverage.
+## Contributing and license
 
-The shared build target sets package version 2.3.3 and file version 2.3.3.0 while retaining assembly version 2.3.0.0. NuGet publication remains a separate release step.
+Changes should preserve architectural boundaries, include focused unit/integration/architecture tests and update affected package documentation. Use feature branches and pull requests; squash-merge only after required CI checks pass.
 
-## v2.3.2 — Release Baseline
-
-- Previous coordinated package baseline following .NET 10 dependency maintenance and provider qualification.
-
-## v2.3.0 — Source Generated Runtime & Execution Model Modernization
-
-**Added**
-
-* **Source Generated Dependency Registration**
-  - Added compile-time handler registration through Roslyn source generators.
-  - Eliminates runtime assembly scanning for modern applications.
-  - Provides deterministic registrations compatible with Native AOT scenarios.
-  - Keeps registration failures visible at build time instead of runtime.
-
-* **Dual Registration Strategy**
-  - Introduced two registration modes:
-    - **V1**: reflection-based registration for compatibility and migration scenarios.
-    - **V2**: source-generated registration for modern high-performance applications.
-  - Allows existing applications to migrate without breaking changes.
-
-* **Improved Mediator Runtime Architecture**
-  - Optimized handler resolution through generated registrations.
-  - Reduced runtime discovery overhead.
-  - Improved startup performance by removing unnecessary reflection paths.
-
-**Changed**
-
-* **Mediator execution model modernization**
-  - Handler registration is now deterministic when using the generated model.
-  - Dependency injection composition is generated instead of discovered at runtime.
-  - Runtime behavior remains fully DI-native.
-
-* **Improved dispatcher resilience**
-  - Enhanced internal execution caching.
-  - Improved dynamic handler invocation paths.
-  - Reduced repeated runtime resolution overhead.
-
-* **Pipeline architecture refinement**
-  - Further separated command/query/event execution flows.
-  - Improved consistency between pipeline composition and handler execution.
-
-**Architectural Clarification**
-
-* Franz Mediator now supports two execution philosophies:
-  - **Compatibility first**: runtime discovery through reflection.
-  - **Performance first**: compile-time generated registrations.
-
-* The generated model becomes the recommended approach for new applications.
-
-**Performance Improvements**
-
-* Reduced application startup work.
-* Reduced runtime reflection dependency.
-* Improved Native AOT readiness.
-* More predictable dependency graph generation.
-
-# 🛣️ Roadmap
-
-- GraphQL Adapters and Implementations
-- SignalR Adapters and Implementations
-
----
-
-# 🏢 Enterprise Adoption & Support
-
-Franz is maintained with enterprise environments in mind.
-For support, consulting, integration guidance, or architectural reviews, please contact the maintainer.
-
----
-
-# 🤝 Contributing
-
-Pull requests welcome — internal contributors preferred.
-All PRs must include **tests**, **documentation**, and comply with **Franz Tribunal** rules.
-
----
-
-# 📜 License
-
-MIT License.
-
-## .NET 10 dependency maintenance
-
-The dependency baseline and compatibility notes are tracked in [the October 2026 .NET 10 dependency upgrade record](Docs/dependency-upgrade-2026-10.md). This maintenance work keeps the repository on .NET 10 and updates vulnerable/outdated package references. The [dependency validation workflow](.github/workflows/dependency-validation.yml) runs NuGet audit, Release build, and solution tests. The latest completed CI run passed restore, Release build, and all solution tests with no NU1901–NU1904 advisories. Follow-up cleanup of duplicate/redundant references still requires a fresh run, and the Pomelo EF Core 9 / EF Core 10 compatibility warning remains open. Provider-specific compatibility notes (including EF Core/MariaDB) are recorded in the upgrade document.
-
-
-## Versioning and compatibility
-
-- **Framework packages:** versioned together through `common.targets`; the current documentation baseline targets **2.3.3**.
-- **Target framework:** supported library projects target .NET 10 (`net10.0`). The repository pins SDK `10.0.400` in `global.json`; CI should use that same SDK.
-- **Third-party dependencies:** package versions are selected independently according to compatibility and security requirements. A package's version number is not the Franz.Common release version.
-- **Publishing:** the Azure DevOps publishing pipeline validates package metadata before publishing. Publish only after restore/audit, Release build, and full tests pass.
-
-See [the versioning policy](Docs/governance/versioning-policy.md) and [the dependency upgrade record](Docs/dependency-upgrade-2026-10.md) for the release rules and current compatibility caveats.
+MIT License. See [LICENSE.MD](LICENSE.MD).
