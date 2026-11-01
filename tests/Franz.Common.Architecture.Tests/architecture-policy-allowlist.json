@@ -1,37 +1,12 @@
 [
   {
-    "rule": "DYNAMIC",
-    "path": "sources/Franz.Common.EntityFramework/DbContextBase.cs",
-    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
-  },
-  {
-    "rule": "DYNAMIC",
-    "path": "sources/Franz.Common.Mediator/Testing/TestDispatcher.cs",
-    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
-  },
-  {
-    "rule": "DYNAMIC",
-    "path": "sources/Franz.Common.Reflection/ReflectionHelper.cs",
-    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
-  },
-  {
-    "rule": "DYNAMIC",
-    "path": "sources/Franz.Common.Reflection/Extensions/HostBuilderExtensions.cs",
-    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
-  },
-  {
-    "rule": "DYNAMIC",
-    "path": "sources/Franz.Common.Http.Documentation/Extensions/SwaggerGenOptionsExtensions.cs",
-    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
-  },
-  {
     "rule": "ACTIVATOR",
-    "path": "sources/Franz.Common.Grpc/Client/FranzGrpcClientFactory.cs",
+    "path": "sources/Franz.Common.EntityFramework/Extensions/ModelBuilderExtensions.cs",
     "reason": "Existing runtime factory or adapter construction. Replacing these sites requires preserving generic registration, serialization and provider behavior; retain only as an explicit shrinking exception."
   },
   {
     "rule": "ACTIVATOR",
-    "path": "sources/Franz.Common.Mapping/Extensions/MappingExtensions.cs",
+    "path": "sources/Franz.Common.Grpc/Client/FranzGrpcClientFactory.cs",
     "reason": "Existing runtime factory or adapter construction. Replacing these sites requires preserving generic registration, serialization and provider behavior; retain only as an explicit shrinking exception."
   },
   {
@@ -41,12 +16,12 @@
   },
   {
     "rule": "ACTIVATOR",
-    "path": "sources/Franz.Common.Serialization/Converters/EnumerationJsonConverter.cs",
+    "path": "sources/Franz.Common.Mapping/Extensions/MappingExtensions.cs",
     "reason": "Existing runtime factory or adapter construction. Replacing these sites requires preserving generic registration, serialization and provider behavior; retain only as an explicit shrinking exception."
   },
   {
     "rule": "ACTIVATOR",
-    "path": "sources/Franz.Common.EntityFramework/Extensions/ModelBuilderExtensions.cs",
+    "path": "sources/Franz.Common.Messaging.Kafka/Extensions/ServiceCollectionExtensions.cs",
     "reason": "Existing runtime factory or adapter construction. Replacing these sites requires preserving generic registration, serialization and provider behavior; retain only as an explicit shrinking exception."
   },
   {
@@ -61,58 +36,13 @@
   },
   {
     "rule": "ACTIVATOR",
-    "path": "sources/Franz.Common.Messaging.Kafka/Extensions/ServiceCollectionExtensions.cs",
+    "path": "sources/Franz.Common.Serialization/Converters/EnumerationJsonConverter.cs",
     "reason": "Existing runtime factory or adapter construction. Replacing these sites requires preserving generic registration, serialization and provider behavior; retain only as an explicit shrinking exception."
   },
   {
-    "rule": "GENERIC_REFLECTION",
-    "path": "sources/Franz.Common.Mapping/Extensions/QueryableExtensions.cs",
-    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
-  },
-  {
-    "rule": "GENERIC_REFLECTION",
-    "path": "sources/Franz.Common.Serialization/Converters/EnumerationJsonConverter.cs",
-    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
-  },
-  {
-    "rule": "GENERIC_REFLECTION",
-    "path": "sources/Franz.Common.EntityFramework/Extensions/ModelBuilderExtensions.cs",
-    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
-  },
-  {
-    "rule": "GENERIC_REFLECTION",
-    "path": "sources/Franz.Common.Mediator/Dispatchers/Dispatcher.cs",
-    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
-  },
-  {
-    "rule": "GENERIC_REFLECTION",
-    "path": "sources/Franz.Common.Mapping/Core/FranzMapper.cs",
-    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
-  },
-  {
-    "rule": "GENERIC_REFLECTION",
-    "path": "sources/Franz.Common.Messaging.Sagas/Validation/SagaMappingValidator.cs",
-    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
-  },
-  {
-    "rule": "GENERIC_REFLECTION",
-    "path": "sources/Franz.Common.Messaging.Sagas/Core/SagaOrchestrator.cs",
-    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
-  },
-  {
-    "rule": "GENERIC_REFLECTION",
-    "path": "sources/Franz.Common.AzureCosmosDB/Extensions/CosmosServiceCollectionExtensions.cs",
-    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
-  },
-  {
     "rule": "ASSEMBLY_SCAN",
-    "path": "sources/Franz.Common.Messaging.Kafka/TopicNamer.cs",
-    "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs."
-  },
-  {
-    "rule": "ASSEMBLY_SCAN",
-    "path": "sources/Franz.Common.Mediator/Helpers/HandlerCollector.cs",
-    "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs."
+    "path": "sources/Franz.Common.Http.Documentation/Extensions/SwaggerGenOptionsExtensions.cs",
+    "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed."
   },
   {
     "rule": "ASSEMBLY_SCAN",
@@ -121,7 +51,7 @@
   },
   {
     "rule": "ASSEMBLY_SCAN",
-    "path": "sources/Franz.Common.Messaging.Sagas/Core/SagaRouter.cs",
+    "path": "sources/Franz.Common.Mediator/Helpers/HandlerCollector.cs",
     "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs."
   },
   {
@@ -136,13 +66,138 @@
   },
   {
     "rule": "ASSEMBLY_SCAN",
+    "path": "sources/Franz.Common.Messaging.Hosting/Listeners/OutboxMessageListener.cs",
+    "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed."
+  },
+  {
+    "rule": "ASSEMBLY_SCAN",
+    "path": "sources/Franz.Common.Messaging.Kafka/Extensions/ServiceCollectionExtensions.cs",
+    "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed."
+  },
+  {
+    "rule": "ASSEMBLY_SCAN",
+    "path": "sources/Franz.Common.Messaging.Kafka/MessagingInitializer.cs",
+    "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed."
+  },
+  {
+    "rule": "ASSEMBLY_SCAN",
+    "path": "sources/Franz.Common.Messaging.Kafka/TopicNamer.cs",
+    "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs."
+  },
+  {
+    "rule": "ASSEMBLY_SCAN",
+    "path": "sources/Franz.Common.Messaging.RabbitMQ/RabbitMQMessagingInitializer.cs",
+    "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed."
+  },
+  {
+    "rule": "ASSEMBLY_SCAN",
     "path": "sources/Franz.Common.Messaging.Sagas/Configuration/FranzSagaBuilder.cs",
     "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs."
   },
   {
     "rule": "ASSEMBLY_SCAN",
+    "path": "sources/Franz.Common.Messaging.Sagas/Core/SagaRouter.cs",
+    "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs."
+  },
+  {
+    "rule": "ASSEMBLY_SCAN",
+    "path": "sources/Franz.Common.Messaging.Sagas/Handlers/SagaDispatchingMessageHandler.cs",
+    "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed."
+  },
+  {
+    "rule": "ASSEMBLY_SCAN",
     "path": "sources/Franz.Common.Messaging/Adapters/MessagingDesarializerExtensions.cs",
     "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs."
+  },
+  {
+    "rule": "ASSEMBLY_SCAN",
+    "path": "sources/Franz.Common.Reflection/Extensions/HostBuilderExtensions.cs",
+    "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed."
+  },
+  {
+    "rule": "ASSEMBLY_SCAN",
+    "path": "sources/Franz.Common.Reflection/ReflectionHelper.cs",
+    "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed."
+  },
+  {
+    "rule": "DYNAMIC",
+    "path": "sources/Franz.Common.EntityFramework/DbContextBase.cs",
+    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
+  },
+  {
+    "rule": "DYNAMIC",
+    "path": "sources/Franz.Common.Http.Documentation/Extensions/SwaggerGenOptionsExtensions.cs",
+    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
+  },
+  {
+    "rule": "DYNAMIC",
+    "path": "sources/Franz.Common.Mediator/Testing/TestDispatcher.cs",
+    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
+  },
+  {
+    "rule": "DYNAMIC",
+    "path": "sources/Franz.Common.Reflection/Extensions/HostBuilderExtensions.cs",
+    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
+  },
+  {
+    "rule": "DYNAMIC",
+    "path": "sources/Franz.Common.Reflection/ReflectionHelper.cs",
+    "reason": "Existing runtime dynamic dispatch. Each use requires a dedicated compatibility review before replacement; DbContext auditing is tracked by T6 and mediator dispatch is explicitly out of scope."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.Aras/Abstractions/Contexts/Implementations/ArasAggregateContextBase.cs",
+    "reason": "Existing MakeGenericMethod-based provider or registration dispatch. Replacing it requires preserving the public provider contract and all supported closed-generic combinations."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.Aras/Abstractions/Contexts/Implementations/ArasInnovatorAggregateContext.cs",
+    "reason": "Existing MakeGenericMethod-based provider or registration dispatch. Replacing it requires preserving the public provider contract and all supported closed-generic combinations."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.AzureCosmosDB/Extensions/CosmosServiceCollectionExtensions.cs",
+    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.EntityFramework/Extensions/ModelBuilderExtensions.cs",
+    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.Http.EntityFramework/Extensions/MultiDatabaseServiceCollectionExtensions.cs",
+    "reason": "Existing MakeGenericMethod-based provider or registration dispatch. Replacing it requires preserving the public provider contract and all supported closed-generic combinations."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.Mapping/Core/FranzMapper.cs",
+    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.Mapping/Extensions/QueryableExtensions.cs",
+    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.Mediator/Dispatchers/Dispatcher.cs",
+    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.Messaging.Sagas/Core/SagaOrchestrator.cs",
+    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.Messaging.Sagas/Validation/SagaMappingValidator.cs",
+    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "path": "sources/Franz.Common.Serialization/Converters/EnumerationJsonConverter.cs",
+    "reason": "Existing closed-generic runtime construction. These sites are tracked for targeted source-generated or typed-factory alternatives; mediator dispatch is explicitly excluded from this roadmap."
   },
   {
     "rule": "TEST_HELPER_IN_RUNTIME",
