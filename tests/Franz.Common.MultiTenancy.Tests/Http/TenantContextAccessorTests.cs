@@ -1,5 +1,6 @@
 using Franz.Common.Http.MultiTenancy.Accessors;
 using Franz.Common.MultiTenancy.Models;
+using Franz.Common.MultiTenancy.TenantResolution;
 using Microsoft.AspNetCore.Http;
 
 namespace Franz.Common.MultiTenancy.Tests.Http;
