@@ -32,7 +32,7 @@ Provides **typed Refit clients** pre-wired with **correlation and tenant propaga
 
 ---
 
-* **Current Version:** v2.3.3
+* **Current Version:** v2.3.4
 - Part of the private **Franz Framework** ecosystem.
 ---
 
