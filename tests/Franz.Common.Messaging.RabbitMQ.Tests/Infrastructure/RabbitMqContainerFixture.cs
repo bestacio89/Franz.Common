@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using DotNet.Testcontainers.Builders;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Transactions;
@@ -25,32 +26,25 @@ public sealed class RabbitMqTestCollection : ICollectionFixture<RabbitMqContaine
 /// </summary>
 public sealed class RabbitMqContainerFixture : IAsyncLifetime
 {
-  // --- Testcontainers RabbitMQ ---
-  public RabbitMqContainer Container { get; } = new RabbitMqBuilder("rabbitmq:4.0-management")
+  public const string Image = "rabbitmq:4.0-management";
+
+  public RabbitMqContainer Container { get; } = new RabbitMqBuilder(Image)
       .WithCleanUp(true)
-      .Build();
+      .WithWaitStrategy(Wait.ForUnixContainer()
+          .UntilInternalTcpPortIsAvailable(5672))
+            .Build();
 
-  // --- Connection string dynamically provided by Testcontainer ---
   public string ConnectionString { get; private set; } = default!;
-
-  // --- Service provider for DI ---
   public ServiceProvider ServiceProvider { get; private set; } = default!;
 
-  // --- Initialize container + DI ---
   public Task InitializeAsync() => InitializeAsyncInternal();
 
   private async Task InitializeAsyncInternal()
   {
-    // Start RabbitMQ container
     await Container.StartAsync();
-
-    // Get dynamic connection string (amqp://guest:guest@localhost:port/)
     ConnectionString = Container.GetConnectionString();
 
-    // Build DI container
     var services = new ServiceCollection();
-
-    // Register strongly typed RabbitMQMessagingOptions
     services.AddSingleton(Options.Create(new RabbitMQMessagingOptions
     {
       BootStrapServers = ConnectionString,
@@ -59,24 +53,16 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
       PublisherConfirmTimeoutSeconds = 5
     }));
 
-    // Register AssemblyAccessor
     services.AddSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
-  
-    // Register factories and providers exactly as in production
     services.AddSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>();
     services.AddSingleton<IConnectionProvider, ConnectionProvider>();
-
-    // Register channel pool if used in your tests
     services.AddSingleton<IChannelPool, ChannelPool>();
-
-    // Register messaging initializers & transactions
     services.AddScoped<IMessagingInitializer, RabbitMQMessagingInitializer>();
     services.AddScoped<IMessagingTransaction, RabbitMQMessagingTransaction>();
 
     ServiceProvider = services.BuildServiceProvider();
   }
 
-  // --- Dispose container + DI safely ---
   public async Task DisposeAsync()
   {
     if (ServiceProvider is not null)

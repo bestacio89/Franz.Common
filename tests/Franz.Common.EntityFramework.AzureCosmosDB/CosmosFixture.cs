@@ -1,4 +1,5 @@
-﻿using Franz.Common.AzureCosmosDB.Extensions;
+using DotNet.Testcontainers.Builders;
+using Franz.Common.AzureCosmosDB.Extensions;
 using Franz.Common.Business.Domain.Factories;
 using Franz.Common.Business.Domain.IdGenerators;
 using Franz.Common.Mediator.Dispatchers;
@@ -17,9 +18,11 @@ public sealed class CosmosFixture : IAsyncLifetime
   private string _endpoint = default!;
 
   public CosmosDbContainer Container { get; } =
-      new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
+      new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator@sha256:9a4f69121f20c1d6502db84625c71ebb441ab61b01880a7b2d3d8031c6dac429")
           .WithPortBinding(8081, true)
-          .Build();
+          .WithWaitStrategy(Wait.ForUnixContainer()
+              .UntilInternalTcpPortIsAvailable(8081))
+                    .Build();
 
   public async Task InitializeAsync()
   {

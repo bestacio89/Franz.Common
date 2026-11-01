@@ -16,8 +16,8 @@ concurrency:
 jobs:
   validate:
     name: Restore, audit, build, and test
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,10 +28,35 @@ jobs:
           dotnet-version: 10.0.400
 
       - name: Pull integration-test images
+        shell: bash
         run: |
-          docker pull gvenzl/oracle-free:23-slim-faststart
-          docker pull mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
-          docker pull mongo:7.0
+          set -Eeuo pipefail
+
+          pull_image() {
+            local image="$1"
+            local attempt
+            for attempt in 1 2 3; do
+              echo "::group::Pulling ${image} (attempt ${attempt}/3)"
+              if docker pull "${image}"; then
+                echo "::endgroup::"
+                return 0
+              fi
+              echo "::endgroup::"
+              if (( attempt < 3 )); then
+                sleep "$((attempt * 10))"
+              fi
+            done
+            echo "::error::Unable to pull ${image} after three attempts."
+            return 1
+          }
+
+          pull_image "gvenzl/oracle-free:23-slim-faststart"
+          pull_image "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator@sha256:9a4f69121f20c1d6502db84625c71ebb441ab61b01880a7b2d3d8031c6dac429"
+          pull_image "mongo:7.0"
+          pull_image "rabbitmq:4.0-management"
+          pull_image "confluentinc/cp-kafka:7.4.0"
+
+          docker image ls --digests
 
       - name: Restore with NuGet security auditing
         id: restore
@@ -60,6 +85,34 @@ jobs:
       - name: Test solution
         run: dotnet test Franz.Common.slnx --configuration Release --no-build --blame-hang-timeout 10m --logger "trx;LogFileName=dependency-validation.trx"
 
+      - name: Capture container diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p container-diagnostics
+          {
+            echo "## Docker version"
+            docker version
+            echo "## Docker daemon information"
+            docker info
+            echo "## Docker disk usage"
+            docker system df
+            echo "## All containers"
+            docker ps -a --no-trunc
+            echo "## Container inspection"
+            container_ids="$(docker ps -aq)"
+            if [[ -n "$container_ids" ]]; then
+              docker inspect $container_ids
+              while IFS= read -r container_id; do
+                [[ -z "$container_id" ]] && continue
+                echo "## Container logs: $container_id"
+                docker logs --timestamps --details "$container_id" 2>&1 || true
+              done <<< "$container_ids"
+            fi
+            echo "## Local image inventory"
+            docker image ls --digests --no-trunc
+          } > container-diagnostics/docker-diagnostics.log 2>&1 || true
+
       - name: Enforce vulnerability gate
         if: always() && steps.restore.outputs.vulnerabilities_found == 'true'
         shell: bash
@@ -67,7 +120,7 @@ jobs:
           echo "::error::Resolve all NU1901-NU1904 advisories before merging."
           exit 1
 
-      - name: Upload dependency and test reports
+      - name: Upload dependency, test, and container reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -75,4 +128,5 @@ jobs:
           path: |
             restore-audit.log
             **/TestResults/*.trx
+            container-diagnostics/**
           if-no-files-found: warn
