@@ -15,7 +15,7 @@ The generator is consumed by the Franz.Common.Mediator package and is normally b
 ## Diagnostics
 
 The generator emits warning `FRZMED001` when a statically typed call to
-`IDispatcher.SendAsync` uses a concrete command or query request type for which
+`IDispatcher.SendAsync`, `PublishNotificationAsync`, or `PublishEventAsync` uses a concrete request type for which
 the current compilation contains no matching generated handler registration.
 
 The diagnostic intentionally does not report calls whose request is typed only
