@@ -75,8 +75,6 @@ public sealed class OutboxMessageListener : IListener
     var message = stored.ToMessage();
     var messageContextAccessor = services.GetService<MessageContextAccessor>();
 
-    messageContextAccessor?.Set(new MessageContext(message));
-
     try
     {
       if (await inbox.HasProcessedAsync(message.Id, cancellationToken).ConfigureAwait(false))
@@ -94,6 +92,8 @@ public sealed class OutboxMessageListener : IListener
       if (OnMessageReceivedAsync is not null)
         await OnMessageReceivedAsync(new MessageEventArgs(message)).ConfigureAwait(false);
 
+      // A nested hosted handler may clear the ambient AsyncLocal; restore it for this dispatch scope.
+      messageContextAccessor?.Set(new MessageContext(message));
       var domainObject = TryDeserializeDomainObject(message, serializer);
 
       using var logScope = _logger.BeginScope(new Dictionary<string, object?>
