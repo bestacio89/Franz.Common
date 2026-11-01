@@ -56,7 +56,7 @@ stages:
     - download: current
       artifact: drop
     - script: |
-        dotnet test tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj \
+        dotnet test $(Pipeline.Workspace)/drop/tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj \
           --configuration $(buildConfiguration) --no-build --logger trx
       displayName: Run Framework Architecture Tests
 
