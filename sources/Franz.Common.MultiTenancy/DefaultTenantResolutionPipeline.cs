@@ -13,12 +13,20 @@ public sealed class DefaultTenantResolutionPipeline : ITenantResolutionPipeline
         _resolvers = resolvers.OrderBy(resolver => resolver.Order).ToArray();
     }
 
-    public async Task<TenantResolutionResult?> ResolveAsync(object? context = null)
+    public Task<TenantResolutionResult?> ResolveAsync(object? context = null)
+        => ResolveAsync(context, CancellationToken.None);
+
+    public async Task<TenantResolutionResult?> ResolveAsync(
+        object? context,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         TenantResolutionResult? resolved = null;
         foreach (var resolver in _resolvers)
         {
-            var candidate = await resolver.ResolveTenantAsync(context).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            var candidate = await resolver.ResolveTenantAsync(context, cancellationToken).ConfigureAwait(false);
             if (candidate?.Tenant is null || !candidate.Succeeded) continue;
             if (resolved is null) { resolved = candidate; continue; }
             if (resolved.Tenant.Id != candidate.Tenant.Id)
