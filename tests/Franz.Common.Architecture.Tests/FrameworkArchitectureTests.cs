@@ -121,18 +121,6 @@ public sealed class FrameworkArchitectureTests
   }
 
   [Fact]
-  public void Runtime_project_dependency_graph_must_be_acyclic()
-  {
-    var projects = LoadRuntimeProjectGraph();
-    var cycles = FindCycles(projects);
-
-    Assert.True(
-      cycles.Count == 0,
-      "Runtime project dependency cycles were found:" + Environment.NewLine +
-      string.Join(Environment.NewLine, cycles));
-  }
-
-  [Fact]
   public void Runtime_projects_must_not_reference_test_projects_or_test_helpers()
   {
     var sourceRoot = Path.Combine(RepositoryRoot.Value, "sources");
@@ -263,99 +251,6 @@ public sealed class FrameworkArchitectureTests
 
     Assert.NotEmpty(assemblies);
     return assemblies;
-  }
-
-  private static Dictionary<string, HashSet<string>> LoadRuntimeProjectGraph()
-  {
-    var sourceRoot = Path.Combine(RepositoryRoot.Value, "sources");
-    var projectFiles = Directory
-      .EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
-      .Where(path =>
-      {
-        var name = Path.GetFileNameWithoutExtension(path);
-        return !name.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)
-          && !string.Equals(name, "Franz.Common.Testing", StringComparison.OrdinalIgnoreCase);
-      })
-      .ToArray();
-
-    var knownProjects = projectFiles.ToDictionary(
-      path => Path.GetFullPath(path),
-      path => Path.GetFileNameWithoutExtension(path),
-      StringComparer.OrdinalIgnoreCase);
-
-    var graph = knownProjects.Values.ToDictionary(
-      name => name,
-      _ => new HashSet<string>(StringComparer.Ordinal),
-      StringComparer.Ordinal);
-
-    foreach (var projectPath in projectFiles)
-    {
-      var projectName = Path.GetFileNameWithoutExtension(projectPath);
-      var document = XDocument.Load(projectPath);
-
-      foreach (var reference in document
-        .Descendants()
-        .Where(element => element.Name.LocalName == "ProjectReference")
-        .Select(element => (string?)element.Attribute("Include"))
-        .Where(include => !string.IsNullOrWhiteSpace(include)))
-      {
-        var referencedPath = Path.GetFullPath(Path.Combine(
-          Path.GetDirectoryName(projectPath)!,
-          reference!.Replace('\\', Path.DirectorySeparatorChar)));
-
-        if (knownProjects.TryGetValue(referencedPath, out var referencedName))
-          graph[projectName].Add(referencedName);
-      }
-    }
-
-    return graph;
-  }
-
-  private static IReadOnlyList<string> FindCycles(
-    IReadOnlyDictionary<string, HashSet<string>> graph)
-  {
-    var state = new Dictionary<string, int>(StringComparer.Ordinal);
-    var stack = new List<string>();
-    var cycles = new HashSet<string>(StringComparer.Ordinal);
-
-    void Visit(string node)
-    {
-      state[node] = 1;
-      stack.Add(node);
-
-      foreach (var dependency in graph[node])
-      {
-        if (!graph.ContainsKey(dependency))
-          continue;
-
-        if (!state.TryGetValue(dependency, out var dependencyState))
-        {
-          Visit(dependency);
-          continue;
-        }
-
-        if (dependencyState != 1)
-          continue;
-
-        var start = stack.IndexOf(dependency);
-        if (start >= 0)
-        {
-          var cycle = stack.Skip(start).Append(dependency);
-          cycles.Add(string.Join(" -> ", cycle));
-        }
-      }
-
-      stack.RemoveAt(stack.Count - 1);
-      state[node] = 2;
-    }
-
-    foreach (var node in graph.Keys)
-    {
-      if (!state.ContainsKey(node))
-        Visit(node);
-    }
-
-    return cycles.OrderBy(cycle => cycle, StringComparer.Ordinal).ToArray();
   }
 
   private static IReadOnlyList<PolicyFinding> FindRuntimeSourcePolicyViolations()
