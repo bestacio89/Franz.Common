@@ -265,7 +265,7 @@ This package is designed to evolve:
 
 ## 📝 Version Information
 
-* **Current Version:** v2.3.4
+* **Current Version:** v2.3.3
 * Target Framework: **.NET 10**
 * Part of the **Franz Framework**
 
@@ -294,3 +294,8 @@ it provides a **full, production-ready Azure messaging stack** with clean separa
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## 2.3.4 tenant execution boundary notes
+
+This package documentation is retained in full from the existing guide. Tenant-context propagation and execution-scope guarantees depend on the actual integration and registration path; use [the messaging execution lifecycle](../../docs/multitenancy-execution-lifecycle.md) for the qualified contract. Framework tenant filters do not secure raw SQL or provider-native bulk paths by themselves.
