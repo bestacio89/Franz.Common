@@ -162,7 +162,8 @@ public abstract class DbContextBase : DbContext
                 filterBody = filterBody is null ? tenantFilter : Expression.AndAlso(filterBody, tenantFilter);
             }
 
-            modelBuilder.Entity(clrType).HasQueryFilter(Expression.Lambda(filterBody!, parameter));
+            if (filterBody is not null)
+                modelBuilder.Entity(clrType).HasQueryFilter(Expression.Lambda(filterBody, parameter));
         }
     }
 }
