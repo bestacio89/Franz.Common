@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Http.Errors;
@@ -16,126 +16,155 @@ namespace Franz.Common.Http.Extensions;
 
 public sealed class FranzHttpBuilder
 {
-  public IServiceCollection Services { get; }
+    public IServiceCollection Services { get; }
 
-  internal FranzHttpBuilder(IServiceCollection services)
-  {
-    Services = services;
-  }
+    internal FranzHttpBuilder(IServiceCollection services)
+    {
+        Services = services;
+    }
 }
 
 public static class FranzHttpExtensions
 {
-  private const string CorsValue = "Cors";
+    private const string CorsValue = "Cors";
 
-  // Single owner of MVC registration
-  public static FranzHttpBuilder AddFranzHttp(this IServiceCollection services)
-  {
-    services.AddControllers();
-
-    return new FranzHttpBuilder(services);
-  }
-
-  // CORS
-  public static FranzHttpBuilder AddDefaultCors(
-      this FranzHttpBuilder builder,
-      IConfiguration configuration)
-  {
-    var originValue = configuration.GetValue<string>(CorsValue);
-
-    builder.Services.AddCors(options =>
+    // Single owner of MVC registration
+    public static FranzHttpBuilder AddFranzHttp(this IServiceCollection services)
     {
-      options.AddDefaultPolicy(policy =>
-      {
-        if (!string.IsNullOrWhiteSpace(originValue))
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddControllers();
+        return new FranzHttpBuilder(services);
+    }
+
+    // CORS uses exact, explicitly configured origins. An absent configuration
+    // deliberately produces a same-origin-only policy rather than a permissive default.
+    public static FranzHttpBuilder AddDefaultCors(
+        this FranzHttpBuilder builder,
+        IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var origins = ParseCorsOrigins(configuration.GetValue<string>(CorsValue));
+
+        builder.Services.AddCors(options =>
         {
-          var origins = originValue.Split(
-              ';',
-              StringSplitOptions.RemoveEmptyEntries |
-              StringSplitOptions.TrimEntries);
+            options.AddDefaultPolicy(policy =>
+            {
+                policy.AllowAnyHeader().AllowAnyMethod();
 
-          policy.WithOrigins(origins)
-                .SetIsOriginAllowedToAllowWildcardSubdomains()
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials();
-        }
-        else
+                if (origins.Length > 0)
+                    policy.WithOrigins(origins).AllowCredentials();
+            });
+        });
+
+        return builder;
+    }
+
+    private static string[] ParseCorsOrigins(string? originValue)
+    {
+        if (string.IsNullOrWhiteSpace(originValue))
+            return [];
+
+        var values = originValue.Split(
+            ';',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var origins = new List<string>(values.Length);
+        foreach (var value in values)
         {
-          policy.AllowAnyOrigin()
-                .AllowAnyHeader()
-                .AllowAnyMethod();
+            var origin = value.TrimEnd('/');
+            if (origin.Contains('*', StringComparison.Ordinal) ||
+                !Uri.TryCreate(origin, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp) ||
+                !string.IsNullOrEmpty(uri.UserInfo) ||
+                uri.AbsolutePath != "/" ||
+                !string.IsNullOrEmpty(uri.Query) ||
+                !string.IsNullOrEmpty(uri.Fragment) ||
+                !string.Equals(origin, uri.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"CORS origin '{value}' is invalid. Configure an exact HTTP or HTTPS origin without a path, wildcard, query, or credentials.");
+            }
+
+            origins.Add(uri.GetLeftPart(UriPartial.Authority));
         }
-      });
-    });
 
-    return builder;
-  }
+        return origins.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
 
-  // Errors
-  public static FranzHttpBuilder AddErrors(this FranzHttpBuilder builder)
-  {
-    builder.Services
-        .AddNoDuplicateSingleton<IErrorResponseProvider, ErrorResponseProvider>()
-        .AddNoDuplicateScoped<ExceptionFilter>();
-
-    builder.Services.Configure<MvcOptions>(options =>
+    // Errors
+    public static FranzHttpBuilder AddErrors(this FranzHttpBuilder builder)
     {
-      options.Filters.AddService<ExceptionFilter>();
-    });
+        ArgumentNullException.ThrowIfNull(builder);
 
-    return builder;
-  }
+        builder.Services
+            .AddNoDuplicateSingleton<IErrorResponseProvider, ErrorResponseProvider>()
+            .AddNoDuplicateScoped<ExceptionFilter>();
 
-  // Serialization
-  public static FranzHttpBuilder AddSerialization(this FranzHttpBuilder builder)
-  {
-    builder.Services.AddSingleton(FranzJson.Default);
+        builder.Services.Configure<MvcOptions>(options =>
+        {
+            options.Filters.AddService<ExceptionFilter>();
+        });
 
-    builder.Services.Configure<JsonOptions>(options =>
+        return builder;
+    }
+
+    // Serialization
+    public static FranzHttpBuilder AddSerialization(this FranzHttpBuilder builder)
     {
-      options.JsonSerializerOptions.PropertyNamingPolicy =
-          JsonNamingPolicy.CamelCase;
+        ArgumentNullException.ThrowIfNull(builder);
 
-      options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        builder.Services.AddSingleton(FranzJson.Default);
+        builder.Services.Configure<JsonOptions>(options =>
+        {
+            options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+            options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
 
-      foreach (var converter in FranzJson.Default.Converters)
-      {
-        options.JsonSerializerOptions.Converters.Add(converter);
-      }
-    });
+            foreach (var converter in FranzJson.Default.Converters)
+                options.JsonSerializerOptions.Converters.Add(converter);
+        });
 
-    return builder;
-  }
+        return builder;
+    }
 
-  // Routing
-  public static FranzHttpBuilder AddFrenchRouting(this FranzHttpBuilder builder)
-  {
-    builder.Services.Configure<MvcOptions>(options =>
+    // Routing
+    public static FranzHttpBuilder AddFrenchRouting(this FranzHttpBuilder builder)
     {
-      options.Conventions.Add(
-          new RouteTokenTransformerConvention(
-              new FrenchControllerParameterTransformer()));
-    });
+        ArgumentNullException.ThrowIfNull(builder);
 
-    return builder;
-  }
+        builder.Services.Configure<MvcOptions>(options =>
+        {
+            options.Conventions.Add(
+                new RouteTokenTransformerConvention(
+                    new FrenchControllerParameterTransformer()));
+        });
 
-  // Forwarded Headers
-  public static FranzHttpBuilder AddForwardedHeaders(
-      this FranzHttpBuilder builder)
-  {
-    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+        return builder;
+    }
+
+    // Forwarded headers
+    // The default overload trusts only ASP.NET Core's built-in loopback proxies.
+    // Deployments must explicitly add their reverse proxies/networks.
+    public static FranzHttpBuilder AddForwardedHeaders(this FranzHttpBuilder builder)
+        => builder.AddForwardedHeaders(configure: null);
+
+    public static FranzHttpBuilder AddForwardedHeaders(
+        this FranzHttpBuilder builder,
+        Action<ForwardedHeadersOptions>? configure)
     {
-      options.ForwardedHeaders =
-          ForwardedHeaders.XForwardedFor |
-          ForwardedHeaders.XForwardedProto |
-          ForwardedHeaders.XForwardedHost;
+        ArgumentNullException.ThrowIfNull(builder);
 
-      options.KnownIPNetworks.Clear();
-      options.KnownProxies.Clear();
-    });
+        builder.Services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders =
+                ForwardedHeaders.XForwardedFor |
+                ForwardedHeaders.XForwardedProto |
+                ForwardedHeaders.XForwardedHost;
 
-    return builder;
-  }
+            configure?.Invoke(options);
+        });
+
+        return builder;
+    }
 }
