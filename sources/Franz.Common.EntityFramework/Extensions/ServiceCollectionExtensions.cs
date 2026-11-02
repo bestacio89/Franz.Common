@@ -87,6 +87,14 @@ public static class ServiceCollectionExtensions
       // 3. Register safely
       // =========================================================
       services.AddNoDuplicateScoped(serviceType, implementationType);
+
+      var bulkUpdateServiceType = typeof(IEntityFrameworkBulkUpdateRepository<>)
+          .MakeGenericType(entityType);
+      services.AddNoDuplicateScoped(bulkUpdateServiceType, implementationType);
+
+      var bulkDeleteServiceType = typeof(IEntityFrameworkBulkDeleteRepository<>)
+          .MakeGenericType(entityType);
+      services.AddNoDuplicateScoped(bulkDeleteServiceType, implementationType);
     }
 
     return services;
@@ -94,7 +102,7 @@ public static class ServiceCollectionExtensions
 
   #endregion
 
-  #region AGGREGATES (EXPLICIT ONLY — DO NOT AUTO-SCAN)
+  #region AGGREGATES (EXPLICIT ONLY â€” DO NOT AUTO-SCAN)
 
   /// <summary>
   /// Aggregates are event-sourced and MUST be explicitly registered.

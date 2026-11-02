@@ -66,6 +66,28 @@ public sealed class ProviderMigrationTests(MySqlFixture database)
           $"SELECT MigrationId AS Value FROM {HistoryTable} ORDER BY MigrationId")
           .ToListAsync();
       Assert.Equal([InitialMigration, ExpandMigration], appliedMigrations);
+
+      await migrator.MigrateAsync(InitialMigration);
+
+      var descriptionColumnCountAfterRollback = await context.Database.SqlQueryRaw<int>(
+          $"SELECT COUNT(*) AS Value FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '{TableName}' AND column_name = 'Description'")
+          .SingleAsync();
+      Assert.Equal(0, descriptionColumnCountAfterRollback);
+
+      var preservedNameAfterRollback = await context.Database.SqlQueryRaw<string>(
+          $"SELECT Name AS Value FROM {TableName} WHERE Id = '{id}'").SingleAsync();
+      Assert.Equal(originalName, preservedNameAfterRollback);
+
+      await migrator.MigrateAsync(ExpandMigration);
+
+      var descriptionColumnCountAfterReapply = await context.Database.SqlQueryRaw<int>(
+          $"SELECT COUNT(*) AS Value FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '{TableName}' AND column_name = 'Description'")
+          .SingleAsync();
+      Assert.Equal(1, descriptionColumnCountAfterReapply);
+
+      var preservedNameAfterReapply = await context.Database.SqlQueryRaw<string>(
+          $"SELECT Name AS Value FROM {TableName} WHERE Id = '{id}'").SingleAsync();
+      Assert.Equal(originalName, preservedNameAfterReapply);
     }
     finally
     {
