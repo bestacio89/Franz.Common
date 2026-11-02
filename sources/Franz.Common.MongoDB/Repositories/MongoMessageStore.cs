@@ -60,6 +60,18 @@ public class MongoMessageStore : IMessageStore
                           .SortBy(m => m.Id) // Leverage Guid v7 sequentiality for FIFO
                           .ToListAsync(cancellationToken);
 
+  public async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(
+      int batchSize,
+      CancellationToken cancellationToken = default)
+  {
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
+
+    return await _collection.Find(m => m.SentOn == null && !m.IsDeadLetter)
+        .SortBy(m => m.Id)
+        .Limit(batchSize)
+        .ToListAsync(cancellationToken);
+  }
+
   // 🛠️ FIX: Changed parameter type from string to Guid to match IMessageStore
   public async Task MarkAsSentAsync(Guid id, CancellationToken cancellationToken = default)
   {
