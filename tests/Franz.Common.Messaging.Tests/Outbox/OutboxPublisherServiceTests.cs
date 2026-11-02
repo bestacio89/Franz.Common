@@ -126,7 +126,7 @@ public class OutboxPublisherServiceTests
         .Returns<Message, CancellationToken>((_, _) =>
         {
           cancellation.Cancel();
-          return Task.FromCanceled(cancellation.Token);
+          return ValueTask.FromCanceled(cancellation.Token);
         });
 
     var service = CreateService();
