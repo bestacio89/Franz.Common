@@ -66,6 +66,7 @@ public sealed class ConnectionTests
       HostName = "rabbit.example.test",
       UserName = "test-user",
       Password = "test-password",
+      VirtualHost = "/",
       SslEnabled = true
     });
     var provider = new ConnectionFactoryProvider(options, new AssemblyAccessorWrapper());
