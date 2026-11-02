@@ -43,8 +43,7 @@ public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : I
      CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
     var stopwatch = Stopwatch.StartNew();
 
     using (LogContext.PushProperty("FranzRequest", requestName))
