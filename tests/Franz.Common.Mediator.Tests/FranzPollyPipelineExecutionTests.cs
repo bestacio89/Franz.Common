@@ -20,6 +20,14 @@ public sealed class FranzPollyPipelineExecutionTests
     return registry;
   }
 
+  private static PolicyRegistry CreateTypedRegistry<TPolicy>(string policyName, TPolicy policy)
+      where TPolicy : class
+  {
+    var registry = new PolicyRegistry();
+    registry.Add(policyName, policy);
+    return registry;
+  }
+
   [Theory]
   [InlineData("retry")]
   [InlineData("circuit-breaker")]
@@ -42,27 +50,27 @@ public sealed class FranzPollyPipelineExecutionTests
     {
       "retry" => await new PollyRetryPipeline<TestRequest, string>(
           registry,
-          Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
+          Microsoft.Extensions.Options.Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
           NullLogger<TestRequest>.Instance,
           Array.Empty<IResilienceObserver>()).Handle(request, next),
       "circuit-breaker" => await new PollyCircuitBreakerPipeline<TestRequest, string>(
           registry,
-          Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }),
+          Microsoft.Extensions.Options.Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }),
           NullLogger<TestRequest>.Instance,
           Array.Empty<IResilienceObserver>()).Handle(request, next),
       "advanced-circuit-breaker" => await new PollyAdvancedCircuitBreakerPipeline<TestRequest, string>(
           registry,
-          Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }),
+          Microsoft.Extensions.Options.Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }),
           NullLogger<TestRequest>.Instance,
           Array.Empty<IResilienceObserver>()).Handle(request, next),
       "timeout" => await new PollyTimeoutPipeline<TestRequest, string>(
           registry,
-          Options.Create(new PollyTimeoutPipelineOptions { PolicyName = policyName }),
+          Microsoft.Extensions.Options.Options.Create(new PollyTimeoutPipelineOptions { PolicyName = policyName }),
           NullLogger<TestRequest>.Instance,
           Array.Empty<IResilienceObserver>()).Handle(request, next),
       "bulkhead" => await new PollyBulkheadPipeline<TestRequest, string>(
           registry,
-          Options.Create(new PollyBulkheadPipelineOptions { PolicyName = policyName }),
+          Microsoft.Extensions.Options.Options.Create(new PollyBulkheadPipelineOptions { PolicyName = policyName }),
           NullLogger<TestRequest>.Instance,
           Array.Empty<IResilienceObserver>()).Handle(request, next),
       _ => throw new ArgumentOutOfRangeException(nameof(pipeline))
@@ -81,7 +89,7 @@ public sealed class FranzPollyPipelineExecutionTests
     var handlerInvocations = 0;
     var pipeline = new PollyRetryPipeline<TestRequest, string>(
         registry,
-        Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
+        Microsoft.Extensions.Options.Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
         NullLogger<TestRequest>.Instance,
         Array.Empty<IResilienceObserver>());
 
@@ -105,7 +113,7 @@ public sealed class FranzPollyPipelineExecutionTests
     var registry = CreateRegistry(policyName, Policy.NoOpAsync());
     var pipeline = new PollyRetryPipeline<TestRequest, string>(
         registry,
-        Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
+        Microsoft.Extensions.Options.Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
         NullLogger<TestRequest>.Instance,
         Array.Empty<IResilienceObserver>());
     using var cancellation = new CancellationTokenSource();
@@ -138,13 +146,13 @@ public sealed class FranzPollyPipelineExecutionTests
   public async Task Retry_policy_counts_result_based_retries()
   {
     const string policyName = "result-retry-policy";
-    var registry = CreateRegistry(
+    var registry = CreateTypedRegistry(
         policyName,
         Policy<string>.HandleResult(static result => result == "retry").RetryAsync(1));
     var observer = new RecordingObserver();
     var pipeline = new PollyRetryPipeline<TestRequest, string>(
         registry,
-        Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
+        Microsoft.Extensions.Options.Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
         NullLogger<TestRequest>.Instance,
         [observer]);
     var handlerInvocations = 0;
@@ -178,7 +186,7 @@ public sealed class FranzPollyPipelineExecutionTests
     var registry = CreateRegistry(policyName, Policy.NoOpAsync());
     var pipeline = new PollyRetryPipeline<TestRequest, string>(
         registry,
-        Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
+        Microsoft.Extensions.Options.Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
         NullLogger<TestRequest>.Instance,
         [new ThrowingObserver()]);
     var handlerInvocations = 0;
@@ -188,6 +196,58 @@ public sealed class FranzPollyPipelineExecutionTests
       handlerInvocations++;
       return Task.FromResult("completed");
     });
+
+    Assert.Equal("completed", result);
+    Assert.Equal(1, handlerInvocations);
+  }
+
+  [Theory]
+  [InlineData("retry")]
+  [InlineData("circuit-breaker")]
+  [InlineData("advanced-circuit-breaker")]
+  [InlineData("timeout")]
+  [InlineData("bulkhead")]
+  public async Task Typed_policy_executes_downstream_handler_exactly_once(string pipeline)
+  {
+    const string policyName = "typed-test-policy";
+    var registry = CreateTypedRegistry(policyName, Policy.NoOpAsync<string>());
+    var handlerInvocations = 0;
+    var request = new TestRequest();
+    Func<Task<string>> next = () =>
+    {
+      handlerInvocations++;
+      return Task.FromResult("completed");
+    };
+
+    var result = pipeline switch
+    {
+      "retry" => await new PollyRetryPipeline<TestRequest, string>(
+          registry,
+          Microsoft.Extensions.Options.Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
+          NullLogger<TestRequest>.Instance,
+          Array.Empty<IResilienceObserver>()).Handle(request, next),
+      "circuit-breaker" => await new PollyCircuitBreakerPipeline<TestRequest, string>(
+          registry,
+          Microsoft.Extensions.Options.Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }),
+          NullLogger<TestRequest>.Instance,
+          Array.Empty<IResilienceObserver>()).Handle(request, next),
+      "advanced-circuit-breaker" => await new PollyAdvancedCircuitBreakerPipeline<TestRequest, string>(
+          registry,
+          Microsoft.Extensions.Options.Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }),
+          NullLogger<TestRequest>.Instance,
+          Array.Empty<IResilienceObserver>()).Handle(request, next),
+      "timeout" => await new PollyTimeoutPipeline<TestRequest, string>(
+          registry,
+          Microsoft.Extensions.Options.Options.Create(new PollyTimeoutPipelineOptions { PolicyName = policyName }),
+          NullLogger<TestRequest>.Instance,
+          Array.Empty<IResilienceObserver>()).Handle(request, next),
+      "bulkhead" => await new PollyBulkheadPipeline<TestRequest, string>(
+          registry,
+          Microsoft.Extensions.Options.Options.Create(new PollyBulkheadPipelineOptions { PolicyName = policyName }),
+          NullLogger<TestRequest>.Instance,
+          Array.Empty<IResilienceObserver>()).Handle(request, next),
+      _ => throw new ArgumentOutOfRangeException(nameof(pipeline))
+    };
 
     Assert.Equal("completed", result);
     Assert.Equal(1, handlerInvocations);
