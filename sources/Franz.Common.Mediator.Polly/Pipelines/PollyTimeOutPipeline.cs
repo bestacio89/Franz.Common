@@ -45,6 +45,7 @@ public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TReque
       CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
+    cancellationToken.ThrowIfCancellationRequested();
 
     // Ensure we have a native Guid v7 correlation ID
     var correlationId = MediatorContext.EnsureCorrelationId(); 

@@ -45,6 +45,7 @@ public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : I
      CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
+    cancellationToken.ThrowIfCancellationRequested();
     var correlationId = MediatorContext.EnsureCorrelationId();
     var stopwatch = Stopwatch.StartNew();
 

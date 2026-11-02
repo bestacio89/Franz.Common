@@ -43,6 +43,7 @@ public sealed class PollyRetryPipeline<TRequest, TResponse> : IPipeline<TRequest
       CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
+    cancellationToken.ThrowIfCancellationRequested();
 
     // BAZOOKA REFACTOR: Bridge to the native Guid v7 identity.
     var correlationId = MediatorContext.EnsureCorrelationId();

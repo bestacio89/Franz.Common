@@ -39,6 +39,7 @@ public sealed class PollyResiliencePipeline<TRequest, TResponse> : IPipeline<TRe
   public async Task<TResponse> Handle(TRequest request, Func<Task<TResponse>> next, CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
+    cancellationToken.ThrowIfCancellationRequested();
 
     // Ensure we have a native Guid v7 correlation ID
     var correlationId = MediatorContext.EnsureCorrelationId();
