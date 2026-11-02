@@ -41,12 +41,23 @@ public sealed class OutboxPublisherService : BackgroundService
       {
         await ProcessOutboxOnceAsync(stoppingToken);
       }
+      catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+      {
+        break;
+      }
       catch (Exception ex)
       {
         _logger.LogError(ex, "🔥 Outbox loop iteration failed unexpectedly");
       }
 
-      await Task.Delay(_options.PollingInterval, stoppingToken);
+      try
+      {
+        await Task.Delay(_options.PollingInterval, stoppingToken);
+      }
+      catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+      {
+        break;
+      }
     }
 
     _logger.LogInformation("🛑 OutboxPublisherService stopped");
