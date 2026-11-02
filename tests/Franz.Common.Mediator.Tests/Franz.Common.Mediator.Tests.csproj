@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Mediator.Polly\Franz.Common.Mediator.Polly.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- Enables compile-time code generation for test handlers -->
