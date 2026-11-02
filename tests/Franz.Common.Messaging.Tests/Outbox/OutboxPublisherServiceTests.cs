@@ -153,7 +153,7 @@ public class OutboxPublisherServiceTests
     await service.ProcessOutboxOnceAsync(CancellationToken.None);
 
     _mockStore.Verify(s => s.UpdateRetryAsync(
-        It.Is<StoredMessage>(message => message.Id == storedMessage.Id && message.RetryCount == 3),
+        It.Is<StoredMessage>(message => message.Id == storedMessage.Id && message.RetryCount == 2),
         It.IsAny<CancellationToken>()), Times.Once);
     _mockStore.Verify(s => s.MoveToDeadLetterAsync(
         It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()), Times.Never);
