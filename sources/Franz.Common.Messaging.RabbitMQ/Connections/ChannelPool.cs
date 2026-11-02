@@ -9,7 +9,7 @@ namespace Franz.Common.Messaging.RabbitMQ.Connections;
 /// <summary>
 /// Reuses idle RabbitMQ channels while preserving explicit pool shutdown semantics.
 /// </summary>
-public sealed class ChannelPool : IAsyncDisposable, IChannelPool
+public sealed class ChannelPool : IAsyncDisposable, IChannelPool, IConfirmChannelPool
 {
   private readonly IConnectionProvider _connectionProvider;
   private readonly int _maxRetained;
@@ -49,6 +49,24 @@ public sealed class ChannelPool : IAsyncDisposable, IChannelPool
 
       await SafeDisposeAsync(channel).ConfigureAwait(false);
     }
+  }
+
+  public async ValueTask<IChannel> GetPublisherConfirmChannelAsync(CancellationToken cancellationToken = default)
+  {
+    ObjectDisposedException.ThrowIf(_disposed, this);
+    var connection = await _connectionProvider.GetConnectionAsync(cancellationToken).ConfigureAwait(false);
+    return await connection.CreateChannelAsync(
+        new CreateChannelOptions(
+            publisherConfirmationsEnabled: true,
+            publisherConfirmationTrackingEnabled: true),
+        cancellationToken: cancellationToken).ConfigureAwait(false);
+  }
+
+  public async ValueTask<IChannel> GetTransactionalChannelAsync(CancellationToken cancellationToken = default)
+  {
+    ObjectDisposedException.ThrowIf(_disposed, this);
+    var connection = await _connectionProvider.GetConnectionAsync(cancellationToken).ConfigureAwait(false);
+    return await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
   }
 
   private async ValueTask<IChannel> CreateChannelAsync(CancellationToken ct)
