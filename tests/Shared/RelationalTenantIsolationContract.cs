@@ -248,6 +248,33 @@ public abstract class RelationalTenantIsolationContract
     }
 
     [Fact]
+    public async Task RepositoryBulkOperations_ReturnZeroWhenNoRowsMatch()
+    {
+        var tenantId = Guid.NewGuid();
+        var missingMarker = $"missing-bulk-target-{Guid.NewGuid():N}";
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            await EnsureDatabaseCreatedAsync(db);
+            var repository = new EntityRepository<DbContextBase, TenantOwnedTestEntity, Guid>(
+                (DbContextBase)db);
+
+            var updated = await repository.ExecuteBulkUpdateAsync(
+                entity => entity.Name == missingMarker,
+                update => update.SetProperty(entity => entity.Name, "must-not-exist"));
+            var softDeleted = await repository.ExecuteBulkDeleteAsync(
+                entity => entity.Name == missingMarker);
+            var hardDeleted = await repository.ExecuteBulkDeleteAsync(
+                entity => entity.Name == missingMarker,
+                hardDelete: true);
+
+            Assert.Equal(0, updated);
+            Assert.Equal(0, softDeleted);
+            Assert.Equal(0, hardDeleted);
+        });
+    }
+
+    [Fact]
     public async Task RepositoryBulkUpdate_RejectsTenantOwnershipMutation()
     {
         var tenantId = Guid.NewGuid();
