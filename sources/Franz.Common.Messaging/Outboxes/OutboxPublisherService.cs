@@ -123,5 +123,11 @@ public sealed class OutboxPublisherService : BackgroundService
             _options.MaxRetries);
       }
     }
+    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+    {
+      // Host/request cancellation is control flow, not a delivery failure.
+      // Leave the message pending so a later run can safely resume delivery.
+      throw;
+    }
   }
 }
