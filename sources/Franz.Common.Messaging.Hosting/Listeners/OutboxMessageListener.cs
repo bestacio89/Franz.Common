@@ -250,6 +250,6 @@ public sealed class OutboxMessageListener : IListener
       }
     }
 
-    return genericDepth == 0 ? -1 : -1;
+    return -1;
   }
 }
