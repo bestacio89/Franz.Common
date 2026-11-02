@@ -96,15 +96,14 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
     {
       try
       {
-        if (host is not null)
-          await host.DisposeAsync().ConfigureAwait(false);
+        host?.Dispose();
       }
       finally
       {
         _hostStarted = false;
         await Task.WhenAll(
-            _rabbit.DisposeAsync().AsTask(),
-            _mongo.DisposeAsync().AsTask()).ConfigureAwait(false);
+            _rabbit.DisposeAsync(),
+            _mongo.DisposeAsync()).ConfigureAwait(false);
       }
     }
   }
