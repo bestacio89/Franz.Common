@@ -35,6 +35,20 @@ public class CosmosEfMessageStore : IMessageStore
         .ToListAsync(cancellationToken);
   }
 
+  public async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(
+      int batchSize,
+      CancellationToken cancellationToken = default)
+  {
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
+
+    return await _dbContext.OutboxMessages
+        .AsNoTracking()
+        .Where(m => m.SentOn == null && !m.IsDeadLetter)
+        .OrderBy(m => m.Id)
+        .Take(batchSize)
+        .ToListAsync(cancellationToken);
+  }
+
   // 🛠️ FIX: Changed messageId parameter type from string to Guid
   public async Task MarkAsSentAsync(Guid messageId, CancellationToken cancellationToken = default)
   {
