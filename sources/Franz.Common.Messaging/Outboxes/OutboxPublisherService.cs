@@ -125,7 +125,6 @@ public sealed class OutboxPublisherService : BackgroundService
 
       if (stored.RetryCount >= _options.MaxRetries)
       {
-        stored.NextAttemptAt = CalculateNextAttempt(Math.Max(1, stored.RetryCount), stored.LastTriedOn.Value);
         if (_options.DeadLetterEnabled)
         {
           await _messageStore.MoveToDeadLetterAsync(stored, ct);
@@ -138,6 +137,7 @@ public sealed class OutboxPublisherService : BackgroundService
         }
         else
         {
+          stored.NextAttemptAt = CalculateNextAttempt(Math.Max(1, stored.RetryCount), stored.LastTriedOn.Value);
           await _messageStore.UpdateRetryAsync(stored, ct);
 
           _logger.LogError(
