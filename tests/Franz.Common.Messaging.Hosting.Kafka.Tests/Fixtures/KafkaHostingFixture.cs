@@ -74,8 +74,7 @@ public sealed class KafkaHostingFixture : IAsyncLifetime
     {
       try
       {
-        if (host is not null)
-          await host.DisposeAsync().ConfigureAwait(false);
+        host?.Dispose();
       }
       finally
       {
