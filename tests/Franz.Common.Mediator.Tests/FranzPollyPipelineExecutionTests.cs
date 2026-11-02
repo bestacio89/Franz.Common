@@ -161,4 +161,36 @@ public sealed class FranzPollyPipelineExecutionTests
     Assert.Equal(1, observer.LastContext.RetryCount);
   }
 
+  private sealed class ThrowingObserver : IResilienceObserver
+  {
+    public void OnPolicyExecuted(
+        string policyName,
+        Franz.Common.Mediator.Polly.Context.ResilienceContext context)
+    {
+      throw new InvalidOperationException("Telemetry sink failure.");
+    }
+  }
+
+  [Fact]
+  public async Task Observer_failure_does_not_change_successful_policy_outcome()
+  {
+    const string policyName = "observer-policy";
+    var registry = CreateRegistry(policyName, Policy.NoOpAsync());
+    var pipeline = new PollyRetryPipeline<TestRequest, string>(
+        registry,
+        Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
+        NullLogger<TestRequest>.Instance,
+        [new ThrowingObserver()]);
+    var handlerInvocations = 0;
+
+    var result = await pipeline.Handle(new TestRequest(), () =>
+    {
+      handlerInvocations++;
+      return Task.FromResult("completed");
+    });
+
+    Assert.Equal("completed", result);
+    Assert.Equal(1, handlerInvocations);
+  }
+
 }
