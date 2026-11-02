@@ -43,6 +43,7 @@ public class KafkaConsumer : IKafkaConsumer
       if (_scopeFactory is null)
       {
         await handler(message).ConfigureAwait(false);
+        _consumer.Commit(result);
         continue;
       }
 
@@ -55,6 +56,7 @@ public class KafkaConsumer : IKafkaConsumer
       }
 
       await handler(message).ConfigureAwait(false);
+      _consumer.Commit(result);
     }
   }
 
@@ -82,6 +84,7 @@ public class KafkaConsumer : IKafkaConsumer
       if (tenantInitializer is null)
       {
         await handler(scope.ServiceProvider, payload).ConfigureAwait(false);
+        _consumer.Commit(result);
         continue;
       }
 
@@ -90,6 +93,7 @@ public class KafkaConsumer : IKafkaConsumer
           .BeginAsync(tenantMessage, cancellationToken).ConfigureAwait(false);
 
       await handler(scope.ServiceProvider, payload).ConfigureAwait(false);
+      _consumer.Commit(result);
     }
   }
 
