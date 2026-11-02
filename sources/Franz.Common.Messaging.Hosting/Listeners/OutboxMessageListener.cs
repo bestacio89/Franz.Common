@@ -94,7 +94,9 @@ public sealed class OutboxMessageListener : IListener
 
       // A nested hosted handler may clear the ambient AsyncLocal; restore it for this dispatch scope.
       messageContextAccessor?.Set(new MessageContext(message));
-      var domainObject = TryDeserializeDomainObject(message, serializer);
+      var domainObject = TryDeserializeDomainObject(message, serializer)
+          ?? throw new InvalidOperationException(
+              $"Outbox message '{message.Id}' could not be resolved to a command or event.");
 
       using var logScope = _logger.BeginScope(new Dictionary<string, object?>
       {
