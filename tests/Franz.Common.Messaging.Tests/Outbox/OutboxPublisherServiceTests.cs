@@ -160,6 +160,31 @@ public class OutboxPublisherServiceTests
   }
 
   [Fact]
+  public async Task ProcessOutboxOnce_WhenSenderFails_ShouldPersistExponentialRetryEligibility()
+  {
+    var storedMessage = new StoredMessage { Id = Guid.CreateVersion7() };
+    _options.InitialRetryDelay = TimeSpan.FromSeconds(2);
+    _options.MaxRetryDelay = TimeSpan.FromSeconds(10);
+    _mockStore.Setup(s => s.GetPendingAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<StoredMessage> { storedMessage });
+    _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
+        .ThrowsAsync(new InvalidOperationException("Transient failure"));
+
+    StoredMessage? persisted = null;
+    _mockStore.Setup(s => s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()))
+        .Callback<StoredMessage, CancellationToken>((message, _) => persisted = message)
+        .Returns(Task.CompletedTask);
+
+    await CreateService().ProcessOutboxOnceAsync(CancellationToken.None);
+
+    persisted.Should().NotBeNull();
+    persisted!.RetryCount.Should().Be(1);
+    persisted.NextAttemptAt.Should().NotBeNull();
+    persisted.NextAttemptAt!.Value.Should().BeOnOrAfter(persisted.LastTriedOn!.Value.AddSeconds(2));
+    persisted.NextAttemptAt.Value.Should().BeOnOrBefore(persisted.LastTriedOn.Value.AddSeconds(2.1));
+  }
+
+  [Fact]
   public async Task ProcessOutboxOnce_WhenHostCancellationOccursDuringSend_ShouldNotRecordDeliveryFailure()
   {
     var storedMessage = new StoredMessage { Id = Guid.CreateVersion7() };
