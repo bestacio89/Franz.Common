@@ -68,7 +68,24 @@ public static class ServiceCollectionExtensions
     if (!section.Exists())
       throw new TechnicalException("RabbitMQ messaging configuration missing");
 
-    services.AddOptions<RabbitMQMessagingOptions>().Bind(section);
+    services.AddOptions<RabbitMQMessagingOptions>()
+        .Bind(section)
+        .Validate(options =>
+            !string.IsNullOrWhiteSpace(options.BootStrapServers) ||
+            (!string.IsNullOrWhiteSpace(options.HostName) &&
+             !string.IsNullOrWhiteSpace(options.UserName) &&
+             !string.IsNullOrWhiteSpace(options.Password)),
+            "Configure Messaging:RabbitMQ:BootStrapServers with an amqp(s) URI, or configure HostName, UserName, and Password explicitly.")
+        .Validate(options =>
+            string.IsNullOrWhiteSpace(options.BootStrapServers) ||
+            (Uri.TryCreate(options.BootStrapServers, UriKind.Absolute, out var uri) &&
+             (uri.Scheme == Uri.UriSchemeAmqp || uri.Scheme == "amqps")),
+            "Messaging:RabbitMQ:BootStrapServers must be an absolute amqp:// or amqps:// URI.")
+        .Validate(options =>
+            options.PublisherConfirmTimeoutSeconds > 0,
+            "Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds must be greater than zero.")
+        .ValidateOnStart();
+
     return services;
   }
 
