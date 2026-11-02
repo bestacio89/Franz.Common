@@ -117,41 +117,17 @@ public sealed class KafkaSender(
   // LIFECYCLE
   // =========================
 
-  public async ValueTask DisposeAsync()
+  // The producer is owned by dependency injection and registered as a singleton.
+  // A scoped sender must never flush or dispose that shared infrastructure.
+  public ValueTask DisposeAsync()
   {
-    if (Interlocked.Exchange(ref _disposed, 1) == 1)
-      return;
-
-    try
-    {
-      producer.Flush(TimeSpan.FromSeconds(5));
-    }
-    catch
-    {
-      // ignore shutdown errors
-    }
-
-    producer.Dispose();
-    GC.SuppressFinalize(this);
-
-    await ValueTask.CompletedTask;
+    Dispose();
+    return ValueTask.CompletedTask;
   }
 
   public void Dispose()
   {
-    if (Interlocked.Exchange(ref _disposed, 1) == 1)
-      return;
-
-    try
-    {
-      producer.Flush(TimeSpan.FromSeconds(5));
-    }
-    catch
-    {
-      // ignore shutdown errors
-    }
-
-    producer.Dispose();
+    Interlocked.Exchange(ref _disposed, 1);
     GC.SuppressFinalize(this);
   }
 }
