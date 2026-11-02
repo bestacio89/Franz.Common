@@ -67,47 +67,41 @@ public sealed class PollyRetryPipeline<TRequest, TResponse> : IPipeline<TRequest
       try
       {
         TResponse result;
+        var attemptCount = 0;
+
+        async Task<TResponse> ExecuteAttemptAsync()
+        {
+          attemptCount++;
+          resilienceContext.RetryCount = attemptCount - 1;
+
+          if (attemptCount > 1)
+          {
+            _logger.LogWarning(
+                "🔁 {Request} [{CorrelationId}] retry attempt {RetryCount} (policy {Policy})",
+                requestName, correlationId, resilienceContext.RetryCount, _policy.PolicyKey);
+          }
+
+          return await next().ConfigureAwait(false);
+        }
 
         if (_policy is IAsyncPolicy<TResponse> typedPolicy)
         {
-          result = await typedPolicy.ExecuteAsync(async (ctx, ct) =>
-          {
-            try
-            {
-              return await next();
-            }
-            catch (Exception ex)
-            {
-              resilienceContext.RetryCount++;
-              _logger.LogWarning(ex,
-                  "🔁 {Request} [{CorrelationId}] retry attempt {RetryCount} (policy {Policy})",
-                  requestName, correlationId, resilienceContext.RetryCount, _policy.PolicyKey);
-              throw;
-            }
-          }, pollyContext, cancellationToken);
+          result = await typedPolicy.ExecuteAsync(
+              (_, _) => ExecuteAttemptAsync(),
+              pollyContext,
+              cancellationToken);
         }
         else
         {
-          // Untyped execution
-          await _policy.ExecuteAsync(async (ctx, ct) =>
-          {
-            try
-            {
-              await next();
-            }
-            catch (Exception ex)
-            {
-              resilienceContext.RetryCount++;
-              _logger.LogWarning(ex,
-                  "🔁 {Request} [{CorrelationId}] retry attempt {RetryCount} (policy {Policy})",
-                  requestName, correlationId, resilienceContext.RetryCount, _policy.PolicyKey);
-              throw;
-            }
-          }, pollyContext, cancellationToken);
-
-          // Note: Ensure the handler is called one final time to capture the typed result 
-          // only if the policy didn't throw.
-          result = await next();
+          // Capture the response inside Polly so every retry attempt owns exactly one downstream execution.
+          result = default!;
+          await _policy.ExecuteAsync(
+              async (_, _) =>
+              {
+                result = await ExecuteAttemptAsync().ConfigureAwait(false);
+              },
+              pollyContext,
+              cancellationToken);
         }
 
         stopwatch.Stop();
