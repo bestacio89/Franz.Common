@@ -146,9 +146,13 @@ public static class ServiceCollectionExtensions
             .AddSingleton<IReplayStrategy>(sp =>
             {
               var options = sp.GetRequiredService<IOptions<RabbitMQMessagingOptions>>().Value;
+              var provider = sp.GetRequiredService<IModelProvider>();
+              var accessor = sp.GetRequiredService<IAssemblyAccessor>();
+              var messagingOptions = sp.GetRequiredService<IOptions<MessagingOptions>>();
+
               return string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase)
-                  ? ActivatorUtilities.CreateInstance<ProgressiveFourStepReplayStrategy>(sp)
-                  : ActivatorUtilities.CreateInstance<NoReplayStrategy>(sp);
+                  ? new ProgressiveFourStepReplayStrategy(provider, accessor, messagingOptions)
+                  : new NoReplayStrategy(provider, accessor, messagingOptions);
             });
 
     return services;
