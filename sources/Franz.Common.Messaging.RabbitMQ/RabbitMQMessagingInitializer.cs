@@ -5,6 +5,7 @@ using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
+using Franz.Common.Messaging.RabbitMQ.Replay;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
