@@ -36,6 +36,9 @@ public class StoredMessage
 
   public DateTime? LastTriedOn { get; set; }
 
+  /// <summary>Earliest UTC time at which this message may be retried.</summary>
+  public DateTime? NextAttemptAt { get; set; }
+
   public bool IsDeadLetter { get; set; } = false;
 
   // =====================================================
