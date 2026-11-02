@@ -82,6 +82,50 @@ public sealed class OutboxMessageListenerTenantScopeTests
         Assert.Null(messageContextAccessor.Current);
     }
 
+    [Fact]
+    public async Task Listen_WhenMessageCannotBeDeserialized_DoesNotMarkItProcessedOrSent()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var stored = new StoredMessage
+        {
+            Body = "{}",
+            MessageType = "Unknown.Message.Type"
+        };
+
+        var messageStore = Substitute.For<IMessageStore>();
+        messageStore.GetPendingAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>([stored]));
+
+        var inboxStore = Substitute.For<IInboxStore>();
+        inboxStore.HasProcessedAsync(stored.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(false));
+
+        var serializer = Substitute.For<IMessageSerializer>();
+        serializer.Deserialize("{}", Arg.Any<Type>()).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return null;
+        });
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IMessageStore>(messageStore);
+        services.AddSingleton<IInboxStore>(inboxStore);
+        services.AddSingleton<IDispatcher>(Substitute.For<IDispatcher>());
+        services.AddSingleton<IMessageSerializer>(serializer);
+
+        using var provider = services.BuildServiceProvider();
+        var listener = new OutboxMessageListener(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            provider.GetRequiredService<ILogger<OutboxMessageListener>>());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => listener.Listen(cancellation.Token));
+
+        await inboxStore.DidNotReceive().MarkProcessedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await messageStore.DidNotReceive().MarkAsSentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
     private sealed class TestEvent : IEvent
     {
         public DateTimeOffset OccurredOn { get; } = DateTimeOffset.UtcNow;
