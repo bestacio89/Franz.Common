@@ -126,13 +126,13 @@ public sealed class OutboxMessageListenerTenantScopeTests
         await messageStore.DidNotReceive().MarkAsSentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
-    public static TheoryData<string, Type> ResolvableMessageTypeNames =>
-    [
-        new(typeof(PublicTestEvent).AssemblyQualifiedName!, typeof(PublicTestEvent)),
-        new(typeof(TestEvent).AssemblyQualifiedName!, typeof(TestEvent)),
-        new(typeof(TestEvent).FullName!, typeof(TestEvent)),
-        new(typeof(GenericTestEvent<string>).AssemblyQualifiedName!, typeof(GenericTestEvent<string>))
-    ];
+    public static TheoryData<string, Type> ResolvableMessageTypeNames => new()
+    {
+        { typeof(PublicTestEvent).AssemblyQualifiedName!, typeof(PublicTestEvent) },
+        { typeof(TestEvent).AssemblyQualifiedName!, typeof(TestEvent) },
+        { typeof(TestEvent).FullName!, typeof(TestEvent) },
+        { typeof(GenericTestEvent<string>).AssemblyQualifiedName!, typeof(GenericTestEvent<string>) }
+    };
 
     [Theory]
     [MemberData(nameof(ResolvableMessageTypeNames))]
