@@ -95,6 +95,12 @@ public sealed class OutboxPublisherService : BackgroundService
 
       _logger.LogInformation("✅ Successfully sent message {MessageId}", stored.Id);
     }
+    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+    {
+      // Host/request cancellation is control flow, not a delivery failure.
+      // Leave the message pending so a later run can safely resume delivery.
+      throw;
+    }
     catch (Exception ex)
     {
       stored.RetryCount++;
@@ -122,12 +128,6 @@ public sealed class OutboxPublisherService : BackgroundService
             stored.RetryCount,
             _options.MaxRetries);
       }
-    }
-    catch (OperationCanceledException) when (ct.IsCancellationRequested)
-    {
-      // Host/request cancellation is control flow, not a delivery failure.
-      // Leave the message pending so a later run can safely resume delivery.
-      throw;
     }
   }
 }
