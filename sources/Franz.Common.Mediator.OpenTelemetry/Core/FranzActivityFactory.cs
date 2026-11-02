@@ -25,11 +25,12 @@ public static class FranzActivityFactory
     ArgumentNullException.ThrowIfNull(source);
     ArgumentNullException.ThrowIfNull(env);
 
+    var correlationId = MediatorContext.EnsureCorrelationId();
     var name = typeof(T).Name;
     var operation = InferOperation(name);
     var activity = source.StartActivity($"{operation}.{name}", ActivityKind.Internal);
 
-    Enrich(activity, env);
+    Enrich(activity, env, correlationId);
     activity?.SetTag(FranzSemanticConventions.MediatorType, operation);
     activity?.SetTag(FranzSemanticConventions.MediatorName, name);
 
@@ -44,22 +45,22 @@ public static class FranzActivityFactory
     ArgumentNullException.ThrowIfNull(source);
     ArgumentNullException.ThrowIfNull(env);
 
+    var correlationId = MediatorContext.EnsureCorrelationId();
     var name = typeof(T).Name;
     var activity = source.StartActivity($"event.{name}", ActivityKind.Consumer);
 
-    Enrich(activity, env);
+    Enrich(activity, env, correlationId);
     activity?.SetTag(FranzSemanticConventions.EventName, name);
     activity?.SetTag(FranzSemanticConventions.EventType, typeof(T).FullName ?? name);
 
     return activity;
   }
 
-  private static void Enrich(Activity? activity, IHostEnvironment env)
+  private static void Enrich(Activity? activity, IHostEnvironment env, Guid correlationId)
   {
     if (activity is null)
       return;
 
-    var correlationId = MediatorContext.EnsureCorrelationId();
     var context = MediatorContext.Current;
 
     activity.SetTag(FranzSemanticConventions.CorrelationId, correlationId);
