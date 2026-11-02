@@ -22,6 +22,19 @@ public interface IMessageStore
   Task<IReadOnlyList<StoredMessage>> GetPendingAsync(CancellationToken cancellationToken = default);
 
   /// <summary>
+  /// Retrieves at most <paramref name="batchSize"/> pending messages.
+  /// Providers should apply the limit in the database query where supported.
+  /// </summary>
+  async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(
+      int batchSize,
+      CancellationToken cancellationToken = default)
+  {
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
+    var pending = await GetPendingAsync(cancellationToken).ConfigureAwait(false);
+    return pending.Take(batchSize).ToArray();
+  }
+
+  /// <summary>
   /// Marks a message as successfully dispatched using its unique Guid identifier.
   /// </summary>
   // 🛠️ FIX: Changed from string messageId to Guid messageId
