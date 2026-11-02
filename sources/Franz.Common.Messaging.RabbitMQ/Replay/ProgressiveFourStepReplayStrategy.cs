@@ -9,9 +9,11 @@ using Franz.Common.Messaging;
 
 namespace Franz.Common.Messaging.RabbitMQ.Replay;
 
-public sealed class ProgressiveFourStepReplayStrategy : IReplayStrategy
+public class ProgressiveFourStepReplayStrategy : IReplayStrategy
 {
   public const string ReplayHeader = "x-replay";
+  // Retained for binary/source compatibility with existing consumers.
+  public const string DelayHeader = "x-delay";
   public const string ExceptionMessageHeader = "x-exception-message";
   public const string ExceptionStackTraceHeader = "x-exception-stacktrace";
   private const int MaxHeaderTextLength = 4_096;
