@@ -64,6 +64,8 @@ public sealed class ConnectionTests
     var options = Options.Create(new RabbitMQMessagingOptions
     {
       HostName = "rabbit.example.test",
+      UserName = "test-user",
+      Password = "test-password",
       SslEnabled = true
     });
     var provider = new ConnectionFactoryProvider(options, new AssemblyAccessorWrapper());
