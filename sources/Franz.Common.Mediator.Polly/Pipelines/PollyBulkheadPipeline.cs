@@ -44,8 +44,7 @@ public sealed class PollyBulkheadPipeline<TRequest, TResponse> : IPipeline<TRequ
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
 
     // BAZOOKA REFACTOR: Bridge to the native Guid v7 identity.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
     var context = new ResilienceContext
@@ -72,16 +71,12 @@ public sealed class PollyBulkheadPipeline<TRequest, TResponse> : IPipeline<TRequ
         }
         else
         {
-          // FIX: We must only call next() once. Polly wraps the execution.
-          // If the policy is untyped, we let it manage the delegate execution.
-          await _policy.ExecuteAsync(async ct => {
-            // No assignment here since ExecuteAsync (untyped) doesn't return TResponse
-            await next();
+          // Capture the result inside the policy; never invoke the downstream chain outside it.
+          result = default!;
+          await _policy.ExecuteAsync(async ct =>
+          {
+            result = await next().ConfigureAwait(false);
           }, cancellationToken);
-
-          // Note: This is a complex fallback. In a pure "spine" refactor, 
-          // ensure your Registry preferably contains IAsyncPolicy<TResponse>.
-          result = await next();
         }
 
         stopwatch.Stop();
