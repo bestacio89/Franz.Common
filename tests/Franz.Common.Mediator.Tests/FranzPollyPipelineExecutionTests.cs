@@ -5,7 +5,6 @@ using Franz.Common.Mediator.Polly.Pipelines;
 using Franz.Common.Mediator.Polly.Observers;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Registry;
 
