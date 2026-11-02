@@ -30,11 +30,6 @@ public class MongoMessageStore : IMessageStore
             new CreateIndexModel<StoredMessage>(
                 Builders<StoredMessage>.IndexKeys.Ascending(m => m.SentOn)),
 
-            // Message IDs are the idempotency key for outbox and dead-letter transitions.
-            new CreateIndexModel<StoredMessage>(
-                Builders<StoredMessage>.IndexKeys.Ascending(m => m.Id),
-                new CreateIndexOptions { Unique = true }),
-
             // For retry cycle handling and DLQ triage
             new CreateIndexModel<StoredMessage>(
                 Builders<StoredMessage>.IndexKeys.Ascending(m => m.RetryCount)),
@@ -46,10 +41,9 @@ public class MongoMessageStore : IMessageStore
 
     _collection.Indexes.CreateMany(indexModels);
 
-    _deadLetterCollection.Indexes.CreateOne(
-        new CreateIndexModel<StoredMessage>(
-            Builders<StoredMessage>.IndexKeys.Ascending(m => m.Id),
-            new CreateIndexOptions { Unique = true }));
+    // MongoDB creates a unique index for the document _id automatically.
+    // StoredMessage.Id is mapped to _id by the driver's Id convention, so
+    // creating another index on Id is both redundant and rejected by MongoDB.
   }
 
   public async Task SaveAsync(Message message, CancellationToken cancellationToken = default)
