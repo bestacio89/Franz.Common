@@ -68,7 +68,7 @@ public sealed class OutboxPublisherService : BackgroundService
   // =====================================================
   public async Task ProcessOutboxOnceAsync(CancellationToken ct)
   {
-    var pending = await _messageStore.GetPendingAsync(ct);
+    var pending = await _messageStore.GetPendingAsync(_options.BatchSize, ct);
 
     if (pending.Count == 0)
     {
