@@ -22,6 +22,13 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
   public IConsumer<string, string> Build()
   {
     var options = _options.Consumer;
+    if (options.EnableAutoCommit || options.EnableAutoOffsetStore)
+    {
+      throw new InvalidOperationException(
+          "Franz Kafka consumers commit offsets only after successful handler completion. " +
+          "EnableAutoCommit and EnableAutoOffsetStore must both be false.");
+    }
+
     var config = new ConsumerConfig
     {
       BootstrapServers = _options.BootstrapServers,
