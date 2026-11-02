@@ -307,10 +307,50 @@ public abstract class RelationalTenantIsolationContract
     }
 
     [Fact]
-    public async Task UnitOfWork_FailedCommitReleasesItsTransaction()
+    public async Task UnitOfWork_FailedDatabaseCommitReleasesItsTransaction()
     {
         var tenantId = Guid.NewGuid();
         var marker = $"uow-failed-commit-{Guid.NewGuid():N}";
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            await EnsureDatabaseCreatedAsync(db);
+            var entity = new TenantOwnedTestEntity { Name = marker };
+            db.Set<TenantOwnedTestEntity>().Add(entity);
+            await db.SaveChangesAsync();
+
+            var stale = await db.Set<TenantOwnedTestEntity>()
+                .AsNoTracking()
+                .SingleAsync(item => item.Id == entity.Id);
+
+            entity.Name = $"{marker}-current";
+            await db.SaveChangesAsync();
+            Assert.Equal(2L, entity.ConcurrencyVersion);
+
+            await using var unitOfWork = new EfUnitOfWork<DbContextBase>((DbContextBase)db);
+            await unitOfWork.BeginAsync();
+            db.Set<TenantOwnedTestEntity>().Update(stale);
+
+            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+                unitOfWork.CommitAsync());
+
+            db.ChangeTracker.Clear();
+            await unitOfWork.BeginAsync();
+            await unitOfWork.RollbackAsync();
+
+            var persisted = await db.Set<TenantOwnedTestEntity>()
+                .AsNoTracking()
+                .SingleAsync(item => item.Id == entity.Id);
+            Assert.Equal($"{marker}-current", persisted.Name);
+            Assert.Equal(2L, persisted.ConcurrencyVersion);
+        });
+    }
+
+    [Fact]
+    public async Task UnitOfWork_CancelledCommitReleasesItsTransaction()
+    {
+        var tenantId = Guid.NewGuid();
+        var marker = $"uow-cancelled-commit-{Guid.NewGuid():N}";
 
         await WithContextAsync(tenantId, async db =>
         {
@@ -362,6 +402,30 @@ public abstract class RelationalTenantIsolationContract
         {
             await EnsureDatabaseCreatedAsync(db);
             using var unitOfWork = new EfUnitOfWork<DbContextBase>((DbContextBase)db);
+            await unitOfWork.BeginAsync();
+
+            db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
+            await db.SaveChangesAsync();
+        });
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            Assert.False(await db.Set<TenantOwnedTestEntity>()
+                .IgnoreQueryFilters()
+                .AnyAsync(entity => entity.Name == marker));
+        });
+    }
+
+    [Fact]
+    public async Task UnitOfWork_AsynchronousDisposalRollsBackAcrossProviders()
+    {
+        var tenantId = Guid.NewGuid();
+        var marker = $"uow-async-dispose-{Guid.NewGuid():N}";
+
+        await WithContextAsync(tenantId, async db =>
+        {
+            await EnsureDatabaseCreatedAsync(db);
+            await using var unitOfWork = new EfUnitOfWork<DbContextBase>((DbContextBase)db);
             await unitOfWork.BeginAsync();
 
             db.Set<TenantOwnedTestEntity>().Add(new TenantOwnedTestEntity { Name = marker });
