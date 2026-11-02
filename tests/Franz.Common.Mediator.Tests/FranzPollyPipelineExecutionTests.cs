@@ -122,4 +122,43 @@ public sealed class FranzPollyPipelineExecutionTests
     Assert.Equal(0, handlerInvocations);
   }
 
+  private sealed class RecordingObserver : IResilienceObserver
+  {
+    public Franz.Common.Mediator.Polly.Context.ResilienceContext? LastContext { get; private set; }
+
+    public void OnPolicyExecuted(
+        string policyName,
+        Franz.Common.Mediator.Polly.Context.ResilienceContext context)
+    {
+      LastContext = context;
+    }
+  }
+
+  [Fact]
+  public async Task Retry_policy_counts_result_based_retries()
+  {
+    const string policyName = "result-retry-policy";
+    var registry = CreateRegistry(
+        policyName,
+        Policy<string>.HandleResult(static result => result == "retry").RetryAsync(1));
+    var observer = new RecordingObserver();
+    var pipeline = new PollyRetryPipeline<TestRequest, string>(
+        registry,
+        Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
+        NullLogger<TestRequest>.Instance,
+        [observer]);
+    var handlerInvocations = 0;
+
+    var result = await pipeline.Handle(new TestRequest(), () =>
+    {
+      handlerInvocations++;
+      return Task.FromResult(handlerInvocations == 1 ? "retry" : "completed");
+    });
+
+    Assert.Equal("completed", result);
+    Assert.Equal(2, handlerInvocations);
+    Assert.NotNull(observer.LastContext);
+    Assert.Equal(1, observer.LastContext.RetryCount);
+  }
+
 }
