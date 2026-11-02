@@ -29,9 +29,9 @@ Every provider suite executes the same tests against its real database engine:
 - EF Core `ExecuteUpdateAsync` respects the global tenant query filter.
 - EF Core `ExecuteDeleteAsync` respects the global tenant query filter.
 - The framework repository's `ExecuteBulkUpdateAsync` respects tenant filters, stamps modification audit fields, rejects assignments to identity/lifecycle/audit/tenant/concurrency properties, and advances opt-in concurrency tokens.
-- The EF unit of work commits and rolls back on every qualified relational provider; abandoned transactions are rolled back when the unit of work is asynchronously disposed.
+- The EF unit of work commits and rolls back on every qualified relational provider; both synchronous and asynchronous disposal roll back abandoned transactions. Failed database commits caused by stale optimistic-concurrency state release the transaction and permit a subsequent transaction, and cancellation cleanup is tested separately.
 - `ConcurrencyTrackedEntity<TKey>` uses provider-translated optimistic concurrency; stale writes fail with `DbUpdateConcurrencyException`.
-- Repository bulk delete defaults to audited soft delete, advances concurrency tokens, and remains tenant-scoped; physical deletion requires an explicit `hardDelete: true`.
+- Repository bulk delete defaults to audited soft delete, advances concurrency tokens, and remains tenant-scoped; physical deletion requires an explicit `hardDelete: true`. Bulk update, soft delete, and hard delete return zero affected rows when no records match.
 
 The contract uses a dedicated table (`provider_contract_tenant_owned_entities`) to avoid collisions with provider-specific persistence fixtures.
 
