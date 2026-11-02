@@ -46,8 +46,6 @@ public static class MessageMappingExtensions
     var message = new Message(stored.Body)
     {
       Id = stored.Id,
-      CorrelationId = stored.CorrelationId,
-      MessageType = stored.MessageType,
       Properties = (stored.Properties ?? new Dictionary<string, object>())
         .Where(kvp => kvp.Value is not null)
         .ToDictionary(
@@ -55,6 +53,11 @@ public static class MessageMappingExtensions
           kvp => kvp.Value!,
           StringComparer.OrdinalIgnoreCase)
     };
+
+    // MessageType and CorrelationId are projections over Properties.
+    // Restore the persisted dictionary before applying their canonical values.
+    message.CorrelationId = stored.CorrelationId;
+    message.MessageType = stored.MessageType;
 
     if (stored.Headers is not null)
     {
