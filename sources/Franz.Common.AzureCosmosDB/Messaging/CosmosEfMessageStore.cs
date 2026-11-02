@@ -43,7 +43,7 @@ public class CosmosEfMessageStore : IMessageStore
 
     return await _dbContext.OutboxMessages
         .AsNoTracking()
-        .Where(m => m.SentOn == null && !m.IsDeadLetter)
+        .Where(m => m.SentOn == null && !m.IsDeadLetter && (m.NextAttemptAt == null || m.NextAttemptAt <= DateTime.UtcNow))
         .OrderBy(m => m.Id)
         .Take(batchSize)
         .ToListAsync(cancellationToken);
