@@ -22,7 +22,7 @@ namespace Franz.Common.Mediator.Polly.Pipelines;
 /// </summary>
 public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 {
-  private readonly object _policy;
+  private readonly IsPolicy _policy;
   private readonly string _policyName;
   private readonly ILogger<TRequest> _logger;
   private readonly IEnumerable<IResilienceObserver> _observers;
@@ -34,7 +34,7 @@ public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TReque
       IEnumerable<IResilienceObserver> observers)
   {
     _policyName = options.Value.PolicyName;
-    _policy = registry.Get<object>(_policyName);
+    _policy = registry.Get<IsPolicy>(_policyName);
     _logger = logger;
     _observers = observers;
   }
