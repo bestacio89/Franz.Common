@@ -21,6 +21,7 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
   private readonly MongoContainerFixture _mongo;
 
   public IHost? Host { get; private set; }
+  private bool _hostStarted;
 
   public IServiceProvider Services =>
       Host?.Services ?? throw new InvalidOperationException("Host not started. Call InitializeAsync first.");
@@ -32,6 +33,19 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
   }
 
   public async Task InitializeAsync()
+  {
+    try
+    {
+      await InitializeCoreAsync();
+    }
+    catch
+    {
+      await DisposeAsync();
+      throw;
+    }
+  }
+
+  private async Task InitializeCoreAsync()
   {
     // 1️⃣ Start containers in parallel
     // Senior Note: Parallel startup minimizes cold-start latency for the integration suite.
@@ -62,20 +76,37 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
     }
 
     await Host.StartAsync();
+    _hostStarted = true;
   }
 
   public async Task DisposeAsync()
   {
-    // 3️⃣ Graceful shutdown of the Host before killing infrastructure
-    if (Host != null)
-    {
-      await Host.StopAsync();
-      Host.Dispose();
-    }
+    // Stop and asynchronously dispose the host before disposing its dependencies.
+    // Nested finally blocks ensure every container is disposed even when one
+    // shutdown operation fails.
+    var host = Host;
+    Host = null;
 
-    await Task.WhenAll(
-        _rabbit.DisposeAsync(),
-        _mongo.DisposeAsync());
+    try
+    {
+      if (host is not null && _hostStarted)
+        await host.StopAsync().ConfigureAwait(false);
+    }
+    finally
+    {
+      try
+      {
+        if (host is not null)
+          await host.DisposeAsync().ConfigureAwait(false);
+      }
+      finally
+      {
+        _hostStarted = false;
+        await Task.WhenAll(
+            _rabbit.DisposeAsync().AsTask(),
+            _mongo.DisposeAsync().AsTask()).ConfigureAwait(false);
+      }
+    }
   }
 
   private static async Task DeclareListenerTopologyAsync(IServiceProvider services)
