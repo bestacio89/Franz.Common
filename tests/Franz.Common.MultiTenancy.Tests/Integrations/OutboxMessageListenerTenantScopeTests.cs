@@ -25,7 +25,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
         };
 
         var messageStore = Substitute.For<IMessageStore>();
-        messageStore.GetPendingAsync(Arg.Any<CancellationToken>())
+        messageStore.GetPendingAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>([stored]));
 
         var inboxStore = Substitute.For<IInboxStore>();
@@ -93,7 +93,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
         };
 
         var messageStore = Substitute.For<IMessageStore>();
-        messageStore.GetPendingAsync(Arg.Any<CancellationToken>())
+        messageStore.GetPendingAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>([stored]));
 
         var inboxStore = Substitute.For<IInboxStore>();
@@ -148,7 +148,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
         };
 
         var messageStore = Substitute.For<IMessageStore>();
-        messageStore.GetPendingAsync(Arg.Any<CancellationToken>())
+        messageStore.GetPendingAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>([stored]));
 
         var inboxStore = Substitute.For<IInboxStore>();
@@ -197,7 +197,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
         };
 
         var messageStore = Substitute.For<IMessageStore>();
-        messageStore.GetPendingAsync(Arg.Any<CancellationToken>())
+        messageStore.GetPendingAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>([stored]));
 
         var inboxStore = Substitute.For<IInboxStore>();
