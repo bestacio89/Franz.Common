@@ -22,14 +22,31 @@ public sealed class OutboxMessageListener : IListener
   private readonly ILogger<OutboxMessageListener> _logger;
   private readonly int _batchSize;
 
+  /// <summary>
+  /// Creates a listener with the default polling batch size for binary compatibility.
+  /// </summary>
+  public OutboxMessageListener(
+      IServiceScopeFactory scopeFactory,
+      ILogger<OutboxMessageListener> logger)
+      : this(scopeFactory, logger, Options.Create(new OutboxOptions()))
+  {
+  }
+
+  /// <summary>
+  /// Creates a listener using the configured outbox polling batch size.
+  /// </summary>
   public OutboxMessageListener(
       IServiceScopeFactory scopeFactory,
       ILogger<OutboxMessageListener> logger,
-      IOptions<OutboxOptions>? options = null)
+      IOptions<OutboxOptions> options)
   {
+    ArgumentNullException.ThrowIfNull(scopeFactory);
+    ArgumentNullException.ThrowIfNull(logger);
+    ArgumentNullException.ThrowIfNull(options);
+
     _scopeFactory = scopeFactory;
     _logger = logger;
-    _batchSize = options?.Value.BatchSize ?? 10;
+    _batchSize = options.Value.BatchSize;
     ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_batchSize);
   }
 
