@@ -41,6 +41,7 @@ public sealed class EventTracingPipeline<TEvent> : IEventPipeline<TEvent>
       Func<Task> next,
       CancellationToken cancellationToken = default)
   {
+    cancellationToken.ThrowIfCancellationRequested();
     using var activity = FranzActivityFactory.StartEventActivity<TEvent>(_activitySource, _env);
 
     try

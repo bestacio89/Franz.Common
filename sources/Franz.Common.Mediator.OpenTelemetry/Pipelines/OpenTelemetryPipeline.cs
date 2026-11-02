@@ -29,6 +29,7 @@ public class OpenTelemetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TR
       Func<Task<TResponse>> next,
       CancellationToken cancellationToken = default)
   {
+    cancellationToken.ThrowIfCancellationRequested();
     using var activity = FranzActivityFactory.StartMediatorActivity<TRequest>(_activitySource, _env);
 
     try

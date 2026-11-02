@@ -110,6 +110,32 @@ public sealed class FranzActivityFactoryTests
     }
   }
 
+  [Fact]
+  public void Empty_execution_context_is_stable_and_has_no_correlation_id()
+  {
+    Assert.Same(MediatorExecutionContext.Empty, MediatorExecutionContext.Empty);
+    Assert.Equal(Guid.Empty, MediatorExecutionContext.Empty.CorrelationId);
+  }
+
+  [Fact]
+  public void EnsureCorrelationId_persists_one_identity_for_the_ambient_execution()
+  {
+    MediatorContext.Reset();
+
+    try
+    {
+      var correlationId = MediatorContext.EnsureCorrelationId();
+
+      Assert.NotEqual(Guid.Empty, correlationId);
+      Assert.Equal(correlationId, MediatorContext.EnsureCorrelationId());
+      Assert.Equal(correlationId, MediatorContext.Current.CorrelationId);
+    }
+    finally
+    {
+      MediatorContext.Reset();
+    }
+  }
+
   private sealed record TestEvent : Franz.Common.Mediator.Messages.IEvent
   {
     public DateTimeOffset OccurredOn { get; } = DateTimeOffset.UtcNow;

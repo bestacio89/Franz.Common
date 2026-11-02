@@ -1,8 +1,10 @@
 using Franz.Common.Mediator.Polly;
+using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Mediator.Polly.Options;
 using Franz.Common.Mediator.Polly.Pipelines;
 using Franz.Common.Mediator.Polly.Observers;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Registry;
@@ -98,16 +100,19 @@ public sealed class FranzPollyPipelineExecutionTests
     Assert.Equal(2, handlerInvocations);
   }
 
-  [Fact]
-  public async Task Cancelled_policy_does_not_invoke_downstream_handler()
+  [Theory]
+  [InlineData("retry")]
+  [InlineData("circuit-breaker")]
+  [InlineData("advanced-circuit-breaker")]
+  [InlineData("timeout")]
+  [InlineData("bulkhead")]
+  [InlineData("composite")]
+  public async Task Cancelled_policy_does_not_invoke_downstream_handler(string pipelineName)
   {
     const string policyName = "cancelled-policy";
     var registry = CreateRegistry(policyName, Policy.NoOpAsync());
-    var pipeline = new PollyRetryPipeline<TestRequest, string>(
-        registry,
-        Microsoft.Extensions.Options.Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
-        NullLogger<TestRequest>.Instance,
-        Array.Empty<IResilienceObserver>());
+    registry.Add("mediator:Default", Policy.NoOpAsync());
+    var pipeline = CreatePipeline(pipelineName, registry, policyName);
     using var cancellation = new CancellationTokenSource();
     await cancellation.CancelAsync();
     var handlerInvocations = 0;
@@ -120,6 +125,32 @@ public sealed class FranzPollyPipelineExecutionTests
         }, cancellation.Token));
 
     Assert.Equal(0, handlerInvocations);
+  }
+
+  private static IPipeline<TestRequest, string> CreatePipeline(
+      string pipelineName,
+      PolicyRegistry registry,
+      string policyName)
+  {
+    var observers = Array.Empty<IResilienceObserver>();
+    var logger = NullLogger<TestRequest>.Instance;
+
+    return pipelineName switch
+    {
+      "retry" => new PollyRetryPipeline<TestRequest, string>(
+          registry, Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }), logger, observers),
+      "circuit-breaker" => new PollyCircuitBreakerPipeline<TestRequest, string>(
+          registry, Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }), logger, observers),
+      "advanced-circuit-breaker" => new PollyAdvancedCircuitBreakerPipeline<TestRequest, string>(
+          registry, Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }), logger, observers),
+      "timeout" => new PollyTimeoutPipeline<TestRequest, string>(
+          registry, Options.Create(new PollyTimeoutPipelineOptions { PolicyName = policyName }), logger, observers),
+      "bulkhead" => new PollyBulkheadPipeline<TestRequest, string>(
+          registry, Options.Create(new PollyBulkheadPipelineOptions { PolicyName = policyName }), logger, observers),
+      "composite" => new PollyResiliencePipeline<TestRequest, string>(
+          registry, logger, observers),
+      _ => throw new ArgumentOutOfRangeException(nameof(pipelineName))
+    };
   }
 
   private sealed class RecordingObserver : IResilienceObserver
