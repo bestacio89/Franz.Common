@@ -131,7 +131,6 @@ public sealed class PollyRetryPipeline<TRequest, TResponse> : IPipeline<TRequest
 
   private void NotifyObservers(Context.ResilienceContext context)
   {
-    foreach (var obs in _observers)
-      obs.OnPolicyExecuted(context.PolicyName, context);
+    ResilienceObserverDispatcher.Notify(_observers, _logger, context.PolicyName, context);
   }
 }
