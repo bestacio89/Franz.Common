@@ -149,6 +149,7 @@ public sealed class OutboxPublisherService : BackgroundService
       else
       {
         stored.RetryCount++;
+        stored.NextAttemptAt = CalculateNextAttempt(stored.RetryCount, stored.LastTriedOn.Value);
         await _messageStore.UpdateRetryAsync(stored, ct);
 
         _logger.LogWarning(
@@ -159,5 +160,22 @@ public sealed class OutboxPublisherService : BackgroundService
             _options.MaxRetries);
       }
     }
+  }
+
+  private DateTime CalculateNextAttempt(int retryCount, DateTime failedAtUtc)
+  {
+    if (_options.InitialRetryDelay <= TimeSpan.Zero)
+      throw new InvalidOperationException("InitialRetryDelay must be greater than zero.");
+
+    if (_options.MaxRetryDelay < _options.InitialRetryDelay)
+      throw new InvalidOperationException("MaxRetryDelay must be greater than or equal to InitialRetryDelay.");
+
+    var exponent = Math.Clamp(retryCount - 1, 0, 30);
+    var multiplier = Math.Pow(2, exponent);
+    var delayTicks = Math.Min(
+        _options.InitialRetryDelay.Ticks * multiplier,
+        _options.MaxRetryDelay.Ticks);
+
+    return failedAtUtc.AddTicks((long)delayTicks);
   }
 }
