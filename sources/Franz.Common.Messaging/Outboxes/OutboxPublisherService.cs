@@ -120,41 +120,43 @@ public sealed class OutboxPublisherService : BackgroundService
     }
     catch (Exception ex)
     {
-      stored.RetryCount++;
       stored.LastError = ex.Message;
       stored.LastTriedOn = DateTime.UtcNow;
 
-      if (stored.RetryCount >= _options.MaxRetries && _options.DeadLetterEnabled)
+      if (stored.RetryCount >= _options.MaxRetries)
       {
-        await _messageStore.MoveToDeadLetterAsync(stored, ct);
-
-        _logger.LogError(
-            ex,
-            "Message {MessageId} moved to dead-letter storage after {Retries} retries.",
-            stored.Id,
-            stored.RetryCount);
-      }
-      else
-      {
-        await _messageStore.UpdateRetryAsync(stored, ct);
-
-        if (stored.RetryCount >= _options.MaxRetries)
+        if (_options.DeadLetterEnabled)
         {
+          await _messageStore.MoveToDeadLetterAsync(stored, ct);
+
+          _logger.LogError(
+              ex,
+              "Message {MessageId} moved to dead-letter storage after {Retries} retries.",
+              stored.Id,
+              stored.RetryCount);
+        }
+        else
+        {
+          await _messageStore.UpdateRetryAsync(stored, ct);
+
           _logger.LogError(
               ex,
               "Message {MessageId} exhausted {MaxRetries} retries, but dead-lettering is disabled; it remains pending.",
               stored.Id,
               _options.MaxRetries);
         }
-        else
-        {
-          _logger.LogWarning(
-              ex,
-              "Message {MessageId} failed (Attempt {RetryCount}/{MaxCount}). Will retry.",
-              stored.Id,
-              stored.RetryCount,
-              _options.MaxRetries);
-        }
+      }
+      else
+      {
+        stored.RetryCount++;
+        await _messageStore.UpdateRetryAsync(stored, ct);
+
+        _logger.LogWarning(
+            ex,
+            "Message {MessageId} failed; retry {RetryCount}/{MaxRetries} has been scheduled.",
+            stored.Id,
+            stored.RetryCount,
+            _options.MaxRetries);
       }
     }
   }
