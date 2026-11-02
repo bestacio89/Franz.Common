@@ -60,6 +60,7 @@ public sealed class RabbitMQMessagingPublisher(
 
     using var confirmationTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
     confirmationTimeout.CancelAfter(TimeSpan.FromSeconds(_options.PublisherConfirmTimeoutSeconds));
+    var publishCompleted = false;
 
     try
     {
@@ -82,6 +83,8 @@ public sealed class RabbitMQMessagingPublisher(
 
       if (_transaction is not null)
         await _transaction.CompleteAsync(ct).ConfigureAwait(false);
+
+      publishCompleted = true;
     }
     catch (Exception publishException)
     {
@@ -104,8 +107,15 @@ public sealed class RabbitMQMessagingPublisher(
     }
     finally
     {
-      if (dedicatedChannel || _transaction is RabbitMQMessagingTransaction)
+      if (_transaction is RabbitMQMessagingTransaction)
         await DisposeTransactionalChannelAsync(channel).ConfigureAwait(false);
+      else if (advancedPool is not null)
+      {
+        if (publishCompleted)
+          advancedPool.ReturnPublisherConfirmChannel(channel);
+        else
+          await DisposeTransactionalChannelAsync(channel).ConfigureAwait(false);
+      }
       else
         _channelPool.Return(channel);
     }

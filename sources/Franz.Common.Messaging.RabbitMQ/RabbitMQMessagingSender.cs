@@ -63,6 +63,7 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
 
     using var confirmationTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
     confirmationTimeout.CancelAfter(TimeSpan.FromSeconds(_options?.Value.PublisherConfirmTimeoutSeconds ?? 5));
+    var publishCompleted = false;
 
     try
     {
@@ -89,6 +90,8 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
 
       if (_transaction is not null)
         await _transaction.CompleteAsync(cancellationToken).ConfigureAwait(false);
+
+      publishCompleted = true;
     }
     catch (Exception sendException)
     {
@@ -111,8 +114,15 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
     }
     finally
     {
-      if (dedicatedChannel || _transaction is RabbitMQMessagingTransaction)
+      if (_transaction is RabbitMQMessagingTransaction)
         await DisposeChannelAsync(channel).ConfigureAwait(false);
+      else if (advancedPool is not null)
+      {
+        if (publishCompleted)
+          advancedPool.ReturnPublisherConfirmChannel(channel);
+        else
+          await DisposeChannelAsync(channel).ConfigureAwait(false);
+      }
       else
         _channelPool.Return(channel);
     }

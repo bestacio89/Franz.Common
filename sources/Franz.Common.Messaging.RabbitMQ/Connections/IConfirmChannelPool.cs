@@ -11,4 +11,6 @@ public interface IConfirmChannelPool
   ValueTask<IChannel> GetPublisherConfirmChannelAsync(CancellationToken cancellationToken = default);
 
   ValueTask<IChannel> GetTransactionalChannelAsync(CancellationToken cancellationToken = default);
+
+  void ReturnPublisherConfirmChannel(IChannel? channel);
 }
