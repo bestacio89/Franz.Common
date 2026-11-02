@@ -44,6 +44,8 @@ public sealed class MassTransitKafkaConsumerTenantScopeTests
             cancellation.Token);
 
         Assert.True(handlerExecuted);
+        consumer.Received(1).Commit(
+            Arg.Is<ConsumeResult<string, string>>(delivery => delivery.Topic == "tenant-events"));
         Assert.Equal(1, initializer.BeginCount);
         Assert.Equal(1, initializer.DisposeCount);
         Assert.Equal(tenantId.ToString(), initializer.LastMessage!.Headers[HeaderConstants.TenantId].Single());
