@@ -12,6 +12,7 @@ public class NoReplayStrategy : IReplayStrategy
 {
   public const string ExceptionMessageHeader = "x-exception-message";
   public const string ExceptionStackTraceHeader = "x-exception-stacktrace";
+  private const int MaxHeaderTextLength = 4_096;
 
   private readonly IModelProvider _provider;
   private readonly string _deadLetterQueue;
@@ -36,8 +37,8 @@ public class NoReplayStrategy : IReplayStrategy
       Headers = e.BasicProperties.Headers ?? new Dictionary<string, object?>()
     };
 
-    props.Headers[ExceptionMessageHeader] = ex.Message;
-    props.Headers[ExceptionStackTraceHeader] = ex.StackTrace ?? string.Empty;
+    props.Headers[ExceptionMessageHeader] = Truncate(ex.Message);
+    props.Headers[ExceptionStackTraceHeader] = Truncate(ex.StackTrace ?? string.Empty);
 
     await channel.BasicPublishAsync(
         exchange: "",
@@ -48,4 +49,7 @@ public class NoReplayStrategy : IReplayStrategy
  
     // The listener owns acknowledgement of the original delivery after replay succeeds.
   }
+
+  private static string Truncate(string value)
+      => value.Length <= MaxHeaderTextLength ? value : value[..MaxHeaderTextLength];
 }
