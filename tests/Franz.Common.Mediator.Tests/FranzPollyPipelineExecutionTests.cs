@@ -137,15 +137,15 @@ public sealed class FranzPollyPipelineExecutionTests
     return pipelineName switch
     {
       "retry" => new PollyRetryPipeline<TestRequest, string>(
-          registry, Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }), logger, observers),
+          registry, global::Microsoft.Extensions.Options.Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }), logger, observers),
       "circuit-breaker" => new PollyCircuitBreakerPipeline<TestRequest, string>(
-          registry, Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }), logger, observers),
+          registry, global::Microsoft.Extensions.Options.Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }), logger, observers),
       "advanced-circuit-breaker" => new PollyAdvancedCircuitBreakerPipeline<TestRequest, string>(
-          registry, Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }), logger, observers),
+          registry, global::Microsoft.Extensions.Options.Options.Create(new PollyCircuitBreakerPipelineOptions { PolicyName = policyName }), logger, observers),
       "timeout" => new PollyTimeoutPipeline<TestRequest, string>(
-          registry, Options.Create(new PollyTimeoutPipelineOptions { PolicyName = policyName }), logger, observers),
+          registry, global::Microsoft.Extensions.Options.Options.Create(new PollyTimeoutPipelineOptions { PolicyName = policyName }), logger, observers),
       "bulkhead" => new PollyBulkheadPipeline<TestRequest, string>(
-          registry, Options.Create(new PollyBulkheadPipelineOptions { PolicyName = policyName }), logger, observers),
+          registry, global::Microsoft.Extensions.Options.Options.Create(new PollyBulkheadPipelineOptions { PolicyName = policyName }), logger, observers),
       "composite" => new PollyResiliencePipeline<TestRequest, string>(
           registry, logger, observers),
       _ => throw new ArgumentOutOfRangeException(nameof(pipelineName))
