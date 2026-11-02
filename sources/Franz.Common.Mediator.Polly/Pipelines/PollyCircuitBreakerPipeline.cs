@@ -44,8 +44,7 @@ public sealed class PollyCircuitBreakerPipeline<TRequest, TResponse> : IPipeline
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
 
     // BAZOOKA REFACTOR: Fetch or anchor the native Guid v7 identity.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
     var context = new ResilienceContext { PolicyName = _policy.PolicyKey };
@@ -69,9 +68,12 @@ public sealed class PollyCircuitBreakerPipeline<TRequest, TResponse> : IPipeline
         }
         else
         {
-          // Untyped execution. Note: Ensure next() is only called via policy execution.
-          await _policy.ExecuteAsync(async ct => { await next(); }, cancellationToken);
-          result = await next();
+          // Capture the result inside the policy; never invoke the downstream chain outside it.
+          result = default!;
+          await _policy.ExecuteAsync(async ct =>
+          {
+            result = await next().ConfigureAwait(false);
+          }, cancellationToken);
         }
 
         stopwatch.Stop();
