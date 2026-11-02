@@ -113,4 +113,30 @@ public class OutboxPublisherServiceTests
         s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()),
         Times.Never);
   }
+  [Fact]
+  public async Task ProcessOutboxOnce_WhenHostCancellationOccursDuringSend_ShouldNotRecordDeliveryFailure()
+  {
+    var storedMessage = new StoredMessage { Id = Guid.CreateVersion7() };
+    using var cancellation = new CancellationTokenSource();
+
+    _mockStore.Setup(s => s.GetPendingAsync(It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<StoredMessage> { storedMessage });
+
+    _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
+        .Returns<Message, CancellationToken>((_, _) =>
+        {
+          cancellation.Cancel();
+          return Task.FromCanceled(cancellation.Token);
+        });
+
+    var service = CreateService();
+
+    await FluentActions.Invoking(() => service.ProcessOutboxOnceAsync(cancellation.Token))
+        .Should().ThrowAsync<OperationCanceledException>();
+
+    _mockStore.Verify(s => s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+    _mockStore.Verify(s => s.MoveToDeadLetterAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+    _mockStore.Verify(s => s.MarkAsSentAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+  }
+
 }
