@@ -50,7 +50,7 @@ public class MongoMessageStore : IMessageStore
       => await _collection.InsertOneAsync(message.ToStored(), cancellationToken: cancellationToken);
 
   public async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(CancellationToken cancellationToken = default)
-      => await _collection.Find(m => m.SentOn == null && !m.IsDeadLetter)
+      => await _collection.Find(m => m.SentOn == null && !m.IsDeadLetter && (m.NextAttemptAt == null || m.NextAttemptAt <= DateTime.UtcNow))
                           .SortBy(m => m.Id) // Leverage Guid v7 sequentiality for FIFO
                           .ToListAsync(cancellationToken);
 
@@ -80,7 +80,8 @@ public class MongoMessageStore : IMessageStore
     var update = Builders<StoredMessage>.Update
         .Set(x => x.RetryCount, message.RetryCount)
         .Set(x => x.LastError, message.LastError)
-        .Set(x => x.LastTriedOn, message.LastTriedOn);
+        .Set(x => x.LastTriedOn, message.LastTriedOn)
+        .Set(x => x.NextAttemptAt, message.NextAttemptAt);
 
     await _collection.UpdateOneAsync(
         x => x.Id == message.Id, // message.Id is now a Guid
