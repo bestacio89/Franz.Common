@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using Franz.Common.Mediator.Polly.Context;
 using Microsoft.Extensions.Logging;
 
 namespace Franz.Common.Mediator.Polly.Observers;
@@ -11,7 +14,7 @@ internal static class ResilienceObserverDispatcher
       IEnumerable<IResilienceObserver> observers,
       ILogger logger,
       string policyName,
-      Context.ResilienceContext context)
+      ResilienceContext context)
   {
     ArgumentNullException.ThrowIfNull(observers);
     ArgumentNullException.ThrowIfNull(logger);
