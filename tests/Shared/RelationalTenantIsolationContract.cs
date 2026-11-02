@@ -354,6 +354,9 @@ public abstract class RelationalTenantIsolationContract
             await db.SaveChangesAsync();
             Assert.Equal(2L, entity.ConcurrencyVersion);
 
+            // Detach the current instance so the stale snapshot can be attached under the same key.
+            db.ChangeTracker.Clear();
+
             await using var unitOfWork = new EfUnitOfWork<DbContextBase>((DbContextBase)db);
             await unitOfWork.BeginAsync();
             db.Set<TenantOwnedTestEntity>().Update(stale);
