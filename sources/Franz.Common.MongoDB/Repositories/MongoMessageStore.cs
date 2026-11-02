@@ -30,10 +30,10 @@ public class MongoMessageStore : IMessageStore
             new CreateIndexModel<StoredMessage>(
                 Builders<StoredMessage>.IndexKeys.Ascending(m => m.SentOn)),
 
-            // GUID V7 Index: Naturally handles chronological ordering 
-            // and provides high-performance unique lookups.
+            // Message IDs are the idempotency key for outbox and dead-letter transitions.
             new CreateIndexModel<StoredMessage>(
-                Builders<StoredMessage>.IndexKeys.Ascending(m => m.Id)),
+                Builders<StoredMessage>.IndexKeys.Ascending(m => m.Id),
+                new CreateIndexOptions { Unique = true }),
 
             // For retry cycle handling and DLQ triage
             new CreateIndexModel<StoredMessage>(
@@ -45,6 +45,11 @@ public class MongoMessageStore : IMessageStore
         };
 
     _collection.Indexes.CreateMany(indexModels);
+
+    _deadLetterCollection.Indexes.CreateOne(
+        new CreateIndexModel<StoredMessage>(
+            Builders<StoredMessage>.IndexKeys.Ascending(m => m.Id),
+            new CreateIndexOptions { Unique = true }));
   }
 
   public async Task SaveAsync(Message message, CancellationToken cancellationToken = default)
@@ -79,10 +84,16 @@ public class MongoMessageStore : IMessageStore
 
   public async Task MoveToDeadLetterAsync(StoredMessage message, CancellationToken cancellationToken = default)
   {
-    // Tag as DLQ before moving
+    // Upsert by stable message ID so a retry after a crash between the DLQ write
+    // and outbox deletion cannot create duplicate dead-letter records.
     message.IsDeadLetter = true;
 
-    await _deadLetterCollection.InsertOneAsync(message, cancellationToken: cancellationToken);
+    await _deadLetterCollection.ReplaceOneAsync(
+        m => m.Id == message.Id,
+        message,
+        new ReplaceOptions { IsUpsert = true },
+        cancellationToken);
+
     await _collection.DeleteOneAsync(m => m.Id == message.Id, cancellationToken);
   }
 }
