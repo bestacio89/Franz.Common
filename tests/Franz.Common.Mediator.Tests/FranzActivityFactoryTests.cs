@@ -111,9 +111,8 @@ public sealed class FranzActivityFactoryTests
   }
 
   [Fact]
-  public void Empty_execution_context_is_stable_and_has_no_correlation_id()
+  public void Empty_execution_context_has_no_correlation_id()
   {
-    Assert.Same(MediatorExecutionContext.Empty, MediatorExecutionContext.Empty);
     Assert.Equal(Guid.Empty, MediatorExecutionContext.Empty.CorrelationId);
   }
 

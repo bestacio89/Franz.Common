@@ -18,12 +18,10 @@ public sealed record MediatorExecutionContext
   // Optional: original TraceIdentifier from HTTP
   public string? TraceIdentifier { get; init; }
 
-  private static readonly MediatorExecutionContext EmptyContext = new()
+  public static MediatorExecutionContext Empty => new()
   {
     CorrelationId = Guid.Empty
   };
-
-  public static MediatorExecutionContext Empty => EmptyContext;
 
   public MediatorExecutionContext WithCorrelationId(Guid correlationId) =>
       this with { CorrelationId = correlationId };
