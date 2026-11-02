@@ -45,8 +45,7 @@ public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TReque
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
 
     // Ensure we have a native Guid v7 correlation ID
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId(); 
+    var correlationId = MediatorContext.EnsureCorrelationId(); 
 
     var stopwatch = Stopwatch.StartNew();
     var resilienceContext = new ResilienceContext
