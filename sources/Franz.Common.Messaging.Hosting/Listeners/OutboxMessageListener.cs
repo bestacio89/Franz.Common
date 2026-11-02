@@ -11,6 +11,7 @@ using Franz.Common.Messaging.Serialization;
 using Franz.Common.Messaging.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Messaging.Hosting.Listeners;
 
@@ -18,13 +19,17 @@ public sealed class OutboxMessageListener : IListener
 {
   private readonly IServiceScopeFactory _scopeFactory;
   private readonly ILogger<OutboxMessageListener> _logger;
+  private readonly int _batchSize;
 
   public OutboxMessageListener(
       IServiceScopeFactory scopeFactory,
-      ILogger<OutboxMessageListener> logger)
+      ILogger<OutboxMessageListener> logger,
+      IOptions<OutboxOptions>? options = null)
   {
     _scopeFactory = scopeFactory;
     _logger = logger;
+    _batchSize = options?.Value.BatchSize ?? 10;
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_batchSize);
   }
 
   public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
@@ -42,7 +47,7 @@ public sealed class OutboxMessageListener : IListener
         await using (var pollingScope = _scopeFactory.CreateAsyncScope())
         {
           var messageStore = pollingScope.ServiceProvider.GetRequiredService<IMessageStore>();
-          pending = await messageStore.GetPendingAsync(stoppingToken).ConfigureAwait(false);
+          pending = await messageStore.GetPendingAsync(_batchSize, stoppingToken).ConfigureAwait(false);
         }
 
         foreach (var stored in pending)
