@@ -86,5 +86,8 @@ public sealed class FranzActivityFactoryTests
     }
   }
 
-  private sealed record TestEvent : Franz.Common.Mediator.Messages.IEvent;
+  private sealed record TestEvent : Franz.Common.Mediator.Messages.IEvent
+  {
+    public DateTimeOffset OccurredOn { get; } = DateTimeOffset.UtcNow;
+  }
 }
