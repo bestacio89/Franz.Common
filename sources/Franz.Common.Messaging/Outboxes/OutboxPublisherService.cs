@@ -30,6 +30,12 @@ public sealed class OutboxPublisherService : BackgroundService
   // =====================================================
   protected override async Task ExecuteAsync(CancellationToken stoppingToken)
   {
+    if (!_options.Enabled)
+    {
+      _logger.LogInformation("Outbox publisher is disabled by configuration.");
+      return;
+    }
+
     _logger.LogInformation(
         "🚀 OutboxPublisherService started. Interval: {Interval}ms, MaxRetries: {MaxRetries}",
         _options.PollingInterval.TotalMilliseconds,
@@ -118,13 +124,13 @@ public sealed class OutboxPublisherService : BackgroundService
       stored.LastError = ex.Message;
       stored.LastTriedOn = DateTime.UtcNow;
 
-      if (stored.RetryCount >= _options.MaxRetries)
+      if (stored.RetryCount >= _options.MaxRetries && _options.DeadLetterEnabled)
       {
         await _messageStore.MoveToDeadLetterAsync(stored, ct);
 
         _logger.LogError(
             ex,
-            "💀 Message {MessageId} moved to DLQ after {Retries} retries.",
+            "Message {MessageId} moved to dead-letter storage after {Retries} retries.",
             stored.Id,
             stored.RetryCount);
       }
@@ -132,12 +138,23 @@ public sealed class OutboxPublisherService : BackgroundService
       {
         await _messageStore.UpdateRetryAsync(stored, ct);
 
-        _logger.LogWarning(
-            ex,
-            "⚠️ Message {MessageId} failed (Attempt {RetryCount}/{MaxCount}). Will retry.",
-            stored.Id,
-            stored.RetryCount,
-            _options.MaxRetries);
+        if (stored.RetryCount >= _options.MaxRetries)
+        {
+          _logger.LogError(
+              ex,
+              "Message {MessageId} exhausted {MaxRetries} retries, but dead-lettering is disabled; it remains pending.",
+              stored.Id,
+              _options.MaxRetries);
+        }
+        else
+        {
+          _logger.LogWarning(
+              ex,
+              "Message {MessageId} failed (Attempt {RetryCount}/{MaxCount}). Will retry.",
+              stored.Id,
+              stored.RetryCount,
+              _options.MaxRetries);
+        }
       }
     }
   }
