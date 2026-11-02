@@ -28,8 +28,8 @@ public class KafkaConsumerFactoryTests
         {
       
           AutoOffsetReset = KafkaAutoOffsetReset.Earliest,
-          EnableAutoCommit = true,
-          EnableAutoOffsetStore = true,
+          EnableAutoCommit = false,
+          EnableAutoOffsetStore = false,
           SessionTimeoutMs = 10000,
           MaxPollIntervalMs = 300000,
           FetchMaxBytes = 52428800
@@ -49,6 +49,26 @@ public class KafkaConsumerFactoryTests
   {
     var options = Options.Create(GetDefaultOptions());
     Assert.Throws<ArgumentNullException>(() => new KafkaConsumerFactory(options, null!));
+  }
+
+
+  [Theory]
+  [InlineData(true, false)]
+  [InlineData(false, true)]
+  [InlineData(true, true)]
+  public void Build_ShouldRejectAutomaticOffsetAcknowledgement(
+      bool enableAutoCommit,
+      bool enableAutoOffsetStore)
+  {
+    var options = GetDefaultOptions();
+    options.Consumer.EnableAutoCommit = enableAutoCommit;
+    options.Consumer.EnableAutoOffsetStore = enableAutoOffsetStore;
+
+    var factory = new KafkaConsumerFactory(
+        Options.Create(options),
+        Mock.Of<ILogger<KafkaConsumerFactory>>());
+
+    Assert.Throws<InvalidOperationException>(() => factory.Build());
   }
 
   [Fact]
