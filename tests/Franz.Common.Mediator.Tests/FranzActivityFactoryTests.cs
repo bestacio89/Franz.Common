@@ -86,6 +86,30 @@ public sealed class FranzActivityFactoryTests
     }
   }
 
+  [Fact]
+  public void StartMediatorActivity_ensures_correlation_when_no_listener_is_registered()
+  {
+    MediatorContext.Reset();
+
+    try
+    {
+      using var source = new ActivitySource("Franz.Tests.NoListener");
+      var environment = new Mock<IHostEnvironment>();
+      environment.SetupGet(value => value.EnvironmentName).Returns("Testing");
+
+      using var activity = FranzActivityFactory.StartMediatorActivity<FindOrdersQuery>(
+          source,
+          environment.Object);
+
+      Assert.Null(activity);
+      Assert.NotEqual(Guid.Empty, MediatorContext.CorrelationId);
+    }
+    finally
+    {
+      MediatorContext.Reset();
+    }
+  }
+
   private sealed record TestEvent : Franz.Common.Mediator.Messages.IEvent
   {
     public DateTimeOffset OccurredOn { get; } = DateTimeOffset.UtcNow;
