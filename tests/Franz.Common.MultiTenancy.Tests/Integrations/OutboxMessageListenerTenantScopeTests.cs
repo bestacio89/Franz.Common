@@ -89,7 +89,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
         var stored = new StoredMessage
         {
             Body = "{}",
-            MessageType = "Unknown.Message.Type"
+            MessageType = typeof(TestEvent).AssemblyQualifiedName
         };
 
         var messageStore = Substitute.For<IMessageStore>();
