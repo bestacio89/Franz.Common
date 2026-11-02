@@ -161,17 +161,95 @@ public sealed class OutboxMessageListener : IListener
 
   private static Type? ResolveType(string typeName)
   {
-    var type = Type.GetType(typeName);
+    ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
+
+    // Prefer the CLR resolver. It understands assembly-qualified names,
+    // nested types, and generic type expressions.
+    var type = Type.GetType(
+        typeName,
+        throwOnError: false,
+        ignoreCase: false);
+
     if (type is not null)
       return type;
 
+    // Assembly.GetType expects the type's full name, not its
+    // assembly-qualified name. Find the top-level separator while
+    // preserving commas inside generic type argument expressions.
+    var separatorIndex = FindAssemblySeparator(typeName);
+    var fullTypeName = separatorIndex < 0
+        ? typeName.Trim()
+        : typeName[..separatorIndex].Trim();
+
+    if (fullTypeName.Length == 0)
+      return null;
+
+    if (separatorIndex >= 0)
+    {
+      var assemblyIdentity = typeName[(separatorIndex + 1)..].Trim();
+      var assemblyName = assemblyIdentity.Split(',', 2)[0].Trim();
+
+      if (assemblyName.Length > 0)
+      {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+          if (!string.Equals(
+                  assembly.GetName().Name,
+                  assemblyName,
+                  StringComparison.OrdinalIgnoreCase))
+            continue;
+
+          type = assembly.GetType(
+              fullTypeName,
+              throwOnError: false,
+              ignoreCase: false);
+
+          if (type is not null)
+            return type;
+        }
+      }
+    }
+
+    // Last resort: resolve an unqualified type name against loaded assemblies.
     foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
     {
-      type = assembly.GetType(typeName);
+      type = assembly.GetType(
+          fullTypeName,
+          throwOnError: false,
+          ignoreCase: false);
+
       if (type is not null)
         return type;
     }
 
     return null;
+  }
+
+  private static int FindAssemblySeparator(string typeName)
+  {
+    var genericDepth = 0;
+
+    for (var index = 0; index < typeName.Length; index++)
+    {
+      switch (typeName[index])
+      {
+        case '[':
+          genericDepth++;
+          break;
+
+        case ']':
+          genericDepth--;
+
+          if (genericDepth < 0)
+            return -1;
+
+          break;
+
+        case ',' when genericDepth == 0:
+          return index;
+      }
+    }
+
+    return genericDepth == 0 ? -1 : -1;
   }
 }
