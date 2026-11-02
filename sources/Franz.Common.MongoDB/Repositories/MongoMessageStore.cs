@@ -30,6 +30,9 @@ public class MongoMessageStore : IMessageStore
             new CreateIndexModel<StoredMessage>(
                 Builders<StoredMessage>.IndexKeys.Ascending(m => m.SentOn)),
 
+            new CreateIndexModel<StoredMessage>(
+                Builders<StoredMessage>.IndexKeys.Ascending(m => m.NextAttemptAt)),
+
             // For retry cycle handling and DLQ triage
             new CreateIndexModel<StoredMessage>(
                 Builders<StoredMessage>.IndexKeys.Ascending(m => m.RetryCount)),
@@ -60,7 +63,7 @@ public class MongoMessageStore : IMessageStore
   {
     ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
 
-    return await _collection.Find(m => m.SentOn == null && !m.IsDeadLetter)
+    return await _collection.Find(m => m.SentOn == null && !m.IsDeadLetter && (m.NextAttemptAt == null || m.NextAttemptAt <= DateTime.UtcNow))
         .SortBy(m => m.Id)
         .Limit(batchSize)
         .ToListAsync(cancellationToken);
