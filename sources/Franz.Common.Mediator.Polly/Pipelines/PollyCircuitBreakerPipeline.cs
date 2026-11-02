@@ -21,7 +21,8 @@ namespace Franz.Common.Mediator.Polly.Pipelines;
 /// </summary>
 public sealed class PollyCircuitBreakerPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 {
-  private readonly IAsyncPolicy _policy;
+  private readonly IsPolicy _policy;
+  private readonly string _policyName;
   private readonly ILogger<TRequest> _logger;
   private readonly IEnumerable<IResilienceObserver> _observers;
 
@@ -31,7 +32,8 @@ public sealed class PollyCircuitBreakerPipeline<TRequest, TResponse> : IPipeline
       ILogger<TRequest> logger,
       IEnumerable<IResilienceObserver> observers)
   {
-    _policy = registry.Get<IAsyncPolicy>(options.Value.PolicyName);
+    _policyName = options.Value.PolicyName;
+    _policy = registry.Get<IsPolicy>(_policyName);
     _logger = logger;
     _observers = observers;
   }
@@ -42,22 +44,22 @@ public sealed class PollyCircuitBreakerPipeline<TRequest, TResponse> : IPipeline
       CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
+    cancellationToken.ThrowIfCancellationRequested();
 
     // BAZOOKA REFACTOR: Fetch or anchor the native Guid v7 identity.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
-    var context = new ResilienceContext { PolicyName = _policy.PolicyKey };
+    var context = new ResilienceContext { PolicyName = _policyName };
 
     using (LogContext.PushProperty("FranzRequest", requestName))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))
     using (LogContext.PushProperty("FranzPipeline", nameof(PollyCircuitBreakerPipeline<TRequest, TResponse>)))
-    using (LogContext.PushProperty("FranzPolicy", _policy.PolicyKey))
+    using (LogContext.PushProperty("FranzPolicy", _policyName))
     {
       _logger.LogInformation(
           "▶️ Executing {Request} [{CorrelationId}] with CircuitBreaker {Policy}",
-          requestName, correlationId, _policy.PolicyKey);
+          requestName, correlationId, _policyName);
 
       try
       {
@@ -67,11 +69,19 @@ public sealed class PollyCircuitBreakerPipeline<TRequest, TResponse> : IPipeline
         {
           result = await typedPolicy.ExecuteAsync(async ct => await next(), cancellationToken);
         }
+        else if (_policy is IAsyncPolicy untypedPolicy)
+        {
+          // Capture the result inside the policy; never invoke the downstream chain outside it.
+          result = default!;
+          await untypedPolicy.ExecuteAsync(async ct =>
+          {
+            result = await next().ConfigureAwait(false);
+          }, cancellationToken);
+        }
         else
         {
-          // Untyped execution. Note: Ensure next() is only called via policy execution.
-          await _policy.ExecuteAsync(async ct => { await next(); }, cancellationToken);
-          result = await next();
+          throw new InvalidOperationException(
+              $"Policy '{_policyName}' does not support asynchronous execution.");
         }
 
         stopwatch.Stop();
@@ -82,7 +92,7 @@ public sealed class PollyCircuitBreakerPipeline<TRequest, TResponse> : IPipeline
 
         _logger.LogInformation(
             "✅ {Request} [{CorrelationId}] passed CircuitBreaker in {Elapsed}ms (policy {Policy})",
-            requestName, correlationId, stopwatch.ElapsedMilliseconds, _policy.PolicyKey);
+            requestName, correlationId, stopwatch.ElapsedMilliseconds, _policyName);
 
         NotifyObservers(context);
         return result;
@@ -110,13 +120,13 @@ public sealed class PollyCircuitBreakerPipeline<TRequest, TResponse> : IPipeline
     {
       _logger.LogWarning(
           ex, "⚠️ {Request} [{CorrelationId}] blocked by open circuit ({Policy}) after {Elapsed}ms",
-          reqName, corrId, _policy.PolicyKey, sw.ElapsedMilliseconds);
+          reqName, corrId, _policyName, sw.ElapsedMilliseconds);
     }
     else
     {
       _logger.LogError(
           ex, "❌ {Request} [{CorrelationId}] failed within CircuitBreaker after {Elapsed}ms (policy {Policy})",
-          reqName, corrId, sw.ElapsedMilliseconds, _policy.PolicyKey);
+          reqName, corrId, sw.ElapsedMilliseconds, _policyName);
     }
 
     NotifyObservers(context);
@@ -124,7 +134,6 @@ public sealed class PollyCircuitBreakerPipeline<TRequest, TResponse> : IPipeline
 
   private void NotifyObservers(ResilienceContext context)
   {
-    foreach (var obs in _observers)
-      obs.OnPolicyExecuted(context.PolicyName, context);
+    ResilienceObserverDispatcher.Notify(_observers, _logger, context.PolicyName, context);
   }
 }

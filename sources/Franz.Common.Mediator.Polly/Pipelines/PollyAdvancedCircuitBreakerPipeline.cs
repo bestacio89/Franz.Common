@@ -22,7 +22,8 @@ namespace Franz.Common.Mediator.Polly.Pipelines;
 /// </summary>
 public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 {
-  private readonly IAsyncPolicy _policy;
+  private readonly IsPolicy _policy;
+  private readonly string _policyName;
   private readonly ILogger<TRequest> _logger;
   private readonly IEnumerable<IResilienceObserver> _observers;
 
@@ -34,7 +35,8 @@ public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : I
   {
     _logger = logger;
     _observers = observers;
-    _policy = registry.Get<IAsyncPolicy>(options.Value.PolicyName);
+    _policyName = options.Value.PolicyName;
+    _policy = registry.Get<IsPolicy>(_policyName);
   }
 
   public async Task<TResponse> Handle(
@@ -43,26 +45,44 @@ public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : I
      CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    cancellationToken.ThrowIfCancellationRequested();
+    var correlationId = MediatorContext.EnsureCorrelationId();
     var stopwatch = Stopwatch.StartNew();
 
     using (LogContext.PushProperty("FranzRequest", requestName))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))
-    using (LogContext.PushProperty("FranzPolicy", _policy.PolicyKey))
+    using (LogContext.PushProperty("FranzPolicy", _policyName))
     {
       _logger.LogInformation(
           "▶️ Executing {Request} [{CorrelationId}] via {Policy}",
-          requestName, correlationId, _policy.PolicyKey);
+          requestName, correlationId, _policyName);
 
       var context = new ResilienceContext
       {
-        PolicyName = _policy.PolicyKey
+        PolicyName = _policyName
       };
 
       try
       {
-        var result = await _policy.ExecuteAsync(_ => next(), cancellationToken);
+        TResponse result;
+
+        if (_policy is IAsyncPolicy<TResponse> typedPolicy)
+        {
+          result = await typedPolicy.ExecuteAsync(_ => next(), cancellationToken);
+        }
+        else if (_policy is IAsyncPolicy untypedPolicy)
+        {
+          result = default!;
+          await untypedPolicy.ExecuteAsync(async _ =>
+          {
+            result = await next().ConfigureAwait(false);
+          }, cancellationToken);
+        }
+        else
+        {
+          throw new InvalidOperationException(
+              $"Policy '{_policyName}' does not support asynchronous execution.");
+        }
 
         stopwatch.Stop();
         context.Duration = stopwatch.Elapsed;
@@ -106,7 +126,6 @@ public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : I
 
   private void NotifyObservers(ResilienceContext context)
   {
-    foreach (var obs in _observers)
-      obs.OnPolicyExecuted(context.PolicyName, context);
+    ResilienceObserverDispatcher.Notify(_observers, _logger, context.PolicyName, context);
   }
 }

@@ -39,10 +39,10 @@ public sealed class PollyResiliencePipeline<TRequest, TResponse> : IPipeline<TRe
   public async Task<TResponse> Handle(TRequest request, Func<Task<TResponse>> next, CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
+    cancellationToken.ThrowIfCancellationRequested();
 
     // Ensure we have a native Guid v7 correlation ID
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
     var context = new ResilienceContext { PolicyName = _profileName };
@@ -113,7 +113,6 @@ public sealed class PollyResiliencePipeline<TRequest, TResponse> : IPipeline<TRe
 
   private void NotifyObservers(string profile, ResilienceContext context)
   {
-    foreach (var obs in _observers)
-      obs.OnPolicyExecuted(profile, context);
+    ResilienceObserverDispatcher.Notify(_observers, _logger, profile, context);
   }
 }

@@ -1,0 +1,142 @@
+using System;
+using System.Diagnostics;
+using Franz.Common.Mediator.Context;
+using Franz.Common.Mediator.OpenTelemetry.Core;
+using Microsoft.Extensions.Hosting;
+using Moq;
+
+namespace Franz.Common.Mediator.Tests;
+
+public sealed class FranzActivityFactoryTests
+{
+  private sealed record FindOrdersQuery;
+
+  [Fact]
+  public void StartMediatorActivity_uses_registered_source_and_ensures_correlation_id()
+  {
+    MediatorContext.Reset();
+
+    try
+    {
+      using var source = new ActivitySource("Franz.Tests.Configured");
+      using var listener = new ActivityListener
+      {
+        ShouldListenTo = candidate => candidate.Name == source.Name,
+        Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
+            ActivitySamplingResult.AllDataAndRecorded
+      };
+      ActivitySource.AddActivityListener(listener);
+
+      var environment = new Mock<IHostEnvironment>();
+      environment.SetupGet(value => value.EnvironmentName).Returns("Testing");
+
+      using var activity = FranzActivityFactory.StartMediatorActivity<FindOrdersQuery>(
+          source,
+          environment.Object);
+
+      var startedActivity = Assert.IsType<Activity>(activity);
+      Assert.Equal(source.Name, startedActivity.Source.Name);
+      Assert.Equal("query", startedActivity.GetTagItem(FranzSemanticConventions.MediatorType));
+      Assert.Equal("Testing", startedActivity.GetTagItem(FranzSemanticConventions.Environment));
+
+      var correlationId = Assert.IsType<Guid>(
+          startedActivity.GetTagItem(FranzSemanticConventions.CorrelationId));
+      Assert.NotEqual(Guid.Empty, correlationId);
+      Assert.Equal(correlationId, MediatorContext.CorrelationId);
+    }
+    finally
+    {
+      MediatorContext.Reset();
+    }
+  }
+
+  [Fact]
+  public void StartEventActivity_uses_registered_source_and_ensures_correlation_id()
+  {
+    MediatorContext.Reset();
+
+    try
+    {
+      using var source = new ActivitySource("Franz.Tests.Events");
+      using var listener = new ActivityListener
+      {
+        ShouldListenTo = candidate => candidate.Name == source.Name,
+        Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
+            ActivitySamplingResult.AllDataAndRecorded
+      };
+      ActivitySource.AddActivityListener(listener);
+
+      var environment = new Mock<IHostEnvironment>();
+      environment.SetupGet(value => value.EnvironmentName).Returns("Testing");
+
+      using var activity = FranzActivityFactory.StartEventActivity<TestEvent>(
+          source,
+          environment.Object);
+
+      var startedActivity = Assert.IsType<Activity>(activity);
+      Assert.Equal(source.Name, startedActivity.Source.Name);
+
+      var correlationId = Assert.IsType<Guid>(
+          startedActivity.GetTagItem(FranzSemanticConventions.CorrelationId));
+      Assert.NotEqual(Guid.Empty, correlationId);
+    }
+    finally
+    {
+      MediatorContext.Reset();
+    }
+  }
+
+  [Fact]
+  public void StartMediatorActivity_ensures_correlation_when_no_listener_is_registered()
+  {
+    MediatorContext.Reset();
+
+    try
+    {
+      using var source = new ActivitySource("Franz.Tests.NoListener");
+      var environment = new Mock<IHostEnvironment>();
+      environment.SetupGet(value => value.EnvironmentName).Returns("Testing");
+
+      using var activity = FranzActivityFactory.StartMediatorActivity<FindOrdersQuery>(
+          source,
+          environment.Object);
+
+      Assert.Null(activity);
+      Assert.NotEqual(Guid.Empty, MediatorContext.CorrelationId);
+    }
+    finally
+    {
+      MediatorContext.Reset();
+    }
+  }
+
+  [Fact]
+  public void Empty_execution_context_has_no_correlation_id()
+  {
+    Assert.Equal(Guid.Empty, MediatorExecutionContext.Empty.CorrelationId);
+  }
+
+  [Fact]
+  public void EnsureCorrelationId_persists_one_identity_for_the_ambient_execution()
+  {
+    MediatorContext.Reset();
+
+    try
+    {
+      var correlationId = MediatorContext.EnsureCorrelationId();
+
+      Assert.NotEqual(Guid.Empty, correlationId);
+      Assert.Equal(correlationId, MediatorContext.EnsureCorrelationId());
+      Assert.Equal(correlationId, MediatorContext.Current.CorrelationId);
+    }
+    finally
+    {
+      MediatorContext.Reset();
+    }
+  }
+
+  private sealed record TestEvent : Franz.Common.Mediator.Messages.IEvent
+  {
+    public DateTimeOffset OccurredOn { get; } = DateTimeOffset.UtcNow;
+  }
+}

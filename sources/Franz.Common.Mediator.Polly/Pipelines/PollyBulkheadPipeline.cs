@@ -21,7 +21,8 @@ namespace Franz.Common.Mediator.Polly.Pipelines;
 /// </summary>
 public sealed class PollyBulkheadPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 {
-  private readonly IAsyncPolicy _policy;
+  private readonly IsPolicy _policy;
+  private readonly string _policyName;
   private readonly ILogger<TRequest> _logger;
   private readonly IEnumerable<IResilienceObserver> _observers;
 
@@ -31,7 +32,8 @@ public sealed class PollyBulkheadPipeline<TRequest, TResponse> : IPipeline<TRequ
       ILogger<TRequest> logger,
       IEnumerable<IResilienceObserver> observers)
   {
-    _policy = registry.Get<IAsyncPolicy>(options.Value.PolicyName);
+    _policyName = options.Value.PolicyName;
+    _policy = registry.Get<IsPolicy>(_policyName);
     _logger = logger;
     _observers = observers;
   }
@@ -42,25 +44,25 @@ public sealed class PollyBulkheadPipeline<TRequest, TResponse> : IPipeline<TRequ
       CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
+    cancellationToken.ThrowIfCancellationRequested();
 
     // BAZOOKA REFACTOR: Bridge to the native Guid v7 identity.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
     var context = new ResilienceContext
     {
-      PolicyName = _policy.PolicyKey
+      PolicyName = _policyName
     };
 
     using (LogContext.PushProperty("FranzRequest", requestName))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))
     using (LogContext.PushProperty("FranzPipeline", nameof(PollyBulkheadPipeline<TRequest, TResponse>)))
-    using (LogContext.PushProperty("FranzPolicy", _policy.PolicyKey))
+    using (LogContext.PushProperty("FranzPolicy", _policyName))
     {
       _logger.LogInformation(
           "▶️ Executing {Request} [{CorrelationId}] with Bulkhead {Policy}",
-          requestName, correlationId, _policy.PolicyKey);
+          requestName, correlationId, _policyName);
 
       try
       {
@@ -70,18 +72,19 @@ public sealed class PollyBulkheadPipeline<TRequest, TResponse> : IPipeline<TRequ
         {
           result = await typedPolicy.ExecuteAsync(async ct => await next(), cancellationToken);
         }
+        else if (_policy is IAsyncPolicy untypedPolicy)
+        {
+          // Capture the result inside the policy; never invoke the downstream chain outside it.
+          result = default!;
+          await untypedPolicy.ExecuteAsync(async ct =>
+          {
+            result = await next().ConfigureAwait(false);
+          }, cancellationToken);
+        }
         else
         {
-          // FIX: We must only call next() once. Polly wraps the execution.
-          // If the policy is untyped, we let it manage the delegate execution.
-          await _policy.ExecuteAsync(async ct => {
-            // No assignment here since ExecuteAsync (untyped) doesn't return TResponse
-            await next();
-          }, cancellationToken);
-
-          // Note: This is a complex fallback. In a pure "spine" refactor, 
-          // ensure your Registry preferably contains IAsyncPolicy<TResponse>.
-          result = await next();
+          throw new InvalidOperationException(
+              $"Policy '{_policyName}' does not support asynchronous execution.");
         }
 
         stopwatch.Stop();
@@ -93,7 +96,7 @@ public sealed class PollyBulkheadPipeline<TRequest, TResponse> : IPipeline<TRequ
           _logger.LogInformation(
               "✅ {Request} [{CorrelationId}] completed via Bulkhead in {Elapsed}ms (policy {Policy}) — Available={Available}, Queue={Queue}",
               requestName, correlationId, stopwatch.ElapsedMilliseconds,
-              _policy.PolicyKey, bulkheadPolicy.BulkheadAvailableCount, bulkheadPolicy.QueueAvailableCount);
+              _policyName, bulkheadPolicy.BulkheadAvailableCount, bulkheadPolicy.QueueAvailableCount);
         }
 
         NotifyObservers(context);
@@ -122,13 +125,13 @@ public sealed class PollyBulkheadPipeline<TRequest, TResponse> : IPipeline<TRequ
     {
       _logger.LogWarning(
           ex, "⚠️ {Request} [{CorrelationId}] rejected by Bulkhead {Policy} after {Elapsed}ms",
-          reqName, corrId, _policy.PolicyKey, sw.ElapsedMilliseconds);
+          reqName, corrId, _policyName, sw.ElapsedMilliseconds);
     }
     else
     {
       _logger.LogError(
           ex, "❌ {Request} [{CorrelationId}] faulted under Bulkhead {Policy} after {Elapsed}ms",
-          reqName, corrId, _policy.PolicyKey, sw.ElapsedMilliseconds);
+          reqName, corrId, _policyName, sw.ElapsedMilliseconds);
     }
 
     NotifyObservers(context);
@@ -136,7 +139,6 @@ public sealed class PollyBulkheadPipeline<TRequest, TResponse> : IPipeline<TRequ
 
   private void NotifyObservers(ResilienceContext context)
   {
-    foreach (var obs in _observers)
-      obs.OnPolicyExecuted(context.PolicyName, context);
+    ResilienceObserverDispatcher.Notify(_observers, _logger, context.PolicyName, context);
   }
 }

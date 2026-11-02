@@ -22,7 +22,8 @@ namespace Franz.Common.Mediator.Polly.Pipelines;
 /// </summary>
 public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 {
-  private readonly IAsyncPolicy _policy;
+  private readonly IsPolicy _policy;
+  private readonly string _policyName;
   private readonly ILogger<TRequest> _logger;
   private readonly IEnumerable<IResilienceObserver> _observers;
 
@@ -32,7 +33,8 @@ public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TReque
       ILogger<TRequest> logger,
       IEnumerable<IResilienceObserver> observers)
   {
-    _policy = registry.Get<IAsyncPolicy>(options.Value.PolicyName);
+    _policyName = options.Value.PolicyName;
+    _policy = registry.Get<IsPolicy>(_policyName);
     _logger = logger;
     _observers = observers;
   }
@@ -43,25 +45,25 @@ public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TReque
       CancellationToken cancellationToken = default)
   {
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
+    cancellationToken.ThrowIfCancellationRequested();
 
     // Ensure we have a native Guid v7 correlation ID
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId(); 
+    var correlationId = MediatorContext.EnsureCorrelationId(); 
 
     var stopwatch = Stopwatch.StartNew();
     var resilienceContext = new ResilienceContext
     {
-      PolicyName = _policy.PolicyKey
+      PolicyName = _policyName
     };
 
     using (LogContext.PushProperty("FranzRequest", requestName))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))
     using (LogContext.PushProperty("FranzPipeline", nameof(PollyTimeoutPipeline<TRequest, TResponse>)))
-    using (LogContext.PushProperty("FranzPolicy", _policy.PolicyKey))
+    using (LogContext.PushProperty("FranzPolicy", _policyName))
     {
       _logger.LogInformation(
           "⏳ Executing {Request} [{CorrelationId}] with Timeout policy {Policy}",
-          requestName, correlationId, _policy.PolicyKey);
+          requestName, correlationId, _policyName);
 
       var pollyContext = new PollyContext($"Franz-{correlationId}");
 
@@ -73,11 +75,22 @@ public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TReque
         {
           result = await typedPolicy.ExecuteAsync(async (ctx, ct) => await next(), pollyContext, cancellationToken);
         }
+        else if (_policy is IAsyncPolicy untypedPolicy)
+        {
+          // Execute the downstream chain inside the policy boundary.
+          result = default!;
+          await untypedPolicy.ExecuteAsync(
+              async (ctx, ct) =>
+              {
+                result = await next().ConfigureAwait(false);
+              },
+              pollyContext,
+              cancellationToken);
+        }
         else
         {
-          // FIX: Execute the 'next' delegate INSIDE the policy to ensure it's actually timed out.
-          // Previous version called next() twice or outside the policy boundary.
-          result = await _policy.ExecuteAsync(async (ctx, ct) => await next(), pollyContext, cancellationToken);
+          throw new InvalidOperationException(
+              $"Policy '{_policyName}' does not support asynchronous execution.");
         }
 
         stopwatch.Stop();
@@ -85,7 +98,7 @@ public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TReque
 
         _logger.LogInformation(
             "✅ {Request} [{CorrelationId}] completed within timeout in {Elapsed}ms (policy {Policy})",
-            requestName, correlationId, stopwatch.ElapsedMilliseconds, _policy.PolicyKey);
+            requestName, correlationId, stopwatch.ElapsedMilliseconds, _policyName);
 
         NotifyObservers(resilienceContext);
 
@@ -98,7 +111,7 @@ public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TReque
         resilienceContext.TimeoutOccurred = true;
 
         _logger.LogError(ex, "⏱️ {Request} [{CorrelationId}] timed out after {Elapsed}ms (policy {Policy})",
-            requestName, correlationId, stopwatch.ElapsedMilliseconds, _policy.PolicyKey);
+            requestName, correlationId, stopwatch.ElapsedMilliseconds, _policyName);
 
         NotifyObservers(resilienceContext);
         throw;
@@ -109,7 +122,7 @@ public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TReque
         resilienceContext.Duration = stopwatch.Elapsed;
 
         _logger.LogError(ex, "❌ {Request} [{CorrelationId}] failed after {Elapsed}ms (policy {Policy})",
-            requestName, correlationId, stopwatch.ElapsedMilliseconds, _policy.PolicyKey);
+            requestName, correlationId, stopwatch.ElapsedMilliseconds, _policyName);
 
         NotifyObservers(resilienceContext);
         throw;
@@ -119,7 +132,6 @@ public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TReque
 
   private void NotifyObservers(ResilienceContext context)
   {
-    foreach (var obs in _observers)
-      obs.OnPolicyExecuted(context.PolicyName, context);
+    ResilienceObserverDispatcher.Notify(_observers, _logger, context.PolicyName, context);
   }
 }
