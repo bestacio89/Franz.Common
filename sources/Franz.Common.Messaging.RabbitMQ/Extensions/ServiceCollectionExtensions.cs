@@ -79,7 +79,7 @@ public static class ServiceCollectionExtensions
         .Validate(options =>
             string.IsNullOrWhiteSpace(options.BootStrapServers) ||
             (Uri.TryCreate(options.BootStrapServers, UriKind.Absolute, out var uri) &&
-             (uri.Scheme == Uri.UriSchemeAmqp || uri.Scheme == "amqps")),
+             (uri.Scheme == "amqp" || uri.Scheme == "amqps")),
             "Messaging:RabbitMQ:BootStrapServers must be an absolute amqp:// or amqps:// URI.")
         .Validate(options =>
             options.PublisherConfirmTimeoutSeconds > 0,
