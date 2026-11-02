@@ -105,7 +105,6 @@ public sealed class PollyAdvancedCircuitBreakerPipeline<TRequest, TResponse> : I
 
   private void NotifyObservers(ResilienceContext context)
   {
-    foreach (var obs in _observers)
-      obs.OnPolicyExecuted(context.PolicyName, context);
+    ResilienceObserverDispatcher.Notify(_observers, _logger, context.PolicyName, context);
   }
 }
