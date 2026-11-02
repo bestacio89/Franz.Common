@@ -43,8 +43,7 @@ public sealed class PollyRetryPipeline<TRequest, TResponse> : IPipeline<TRequest
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
 
     // BAZOOKA REFACTOR: Bridge to the native Guid v7 identity.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
     var resilienceContext = new Context.ResilienceContext
