@@ -46,8 +46,8 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
       await Container.StartAsync();
       ConnectionString = Container.GetConnectionString();
 
-    var services = new ServiceCollection();
-    services.AddSingleton(Options.Create(new RabbitMQMessagingOptions
+      var services = new ServiceCollection();
+      services.AddSingleton(Options.Create(new RabbitMQMessagingOptions
     {
       BootStrapServers = ConnectionString,
       UserName = "guest",
@@ -55,12 +55,12 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
       PublisherConfirmTimeoutSeconds = 5
     }));
 
-    services.AddSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
-    services.AddSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>();
-    services.AddSingleton<IConnectionProvider, ConnectionProvider>();
-    services.AddSingleton<IChannelPool, ChannelPool>();
-    services.AddScoped<IMessagingInitializer, RabbitMQMessagingInitializer>();
-    services.AddScoped<IMessagingTransaction, RabbitMQMessagingTransaction>();
+      services.AddSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
+      services.AddSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>();
+      services.AddSingleton<IConnectionProvider, ConnectionProvider>();
+      services.AddSingleton<IChannelPool, ChannelPool>();
+      services.AddScoped<IMessagingInitializer, RabbitMQMessagingInitializer>();
+      services.AddScoped<IMessagingTransaction, RabbitMQMessagingTransaction>();
 
       ServiceProvider = services.BuildServiceProvider();
     }
