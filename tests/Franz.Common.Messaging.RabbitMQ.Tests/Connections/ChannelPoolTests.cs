@@ -48,4 +48,58 @@ public sealed class ChannelPoolIntegrationTests
     channel2.Should().BeSameAs(channel1); // real reference reuse
     channel2.IsOpen.Should().BeTrue();
   }
+  [Fact]
+  public async Task GetPublisherConfirmChannelAsync_ShouldConfirmRoutableMandatoryPublish()
+  {
+    var connectionProvider = _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>();
+    await using var pool = new ChannelPool(connectionProvider);
+    await using var channel = await pool.GetPublisherConfirmChannelAsync();
+    var queueName = $"confirm-{Guid.NewGuid():N}";
+
+    await channel.QueueDeclareAsync(
+        queue: queueName,
+        durable: false,
+        exclusive: true,
+        autoDelete: true);
+
+    await channel.BasicPublishAsync(
+        exchange: string.Empty,
+        routingKey: queueName,
+        mandatory: true,
+        basicProperties: new RabbitMQ.Client.BasicProperties(),
+        body: new ReadOnlyMemory<byte>([1, 2, 3]));
+
+    channel.IsOpen.Should().BeTrue();
+  }
+
+  [Fact]
+  public async Task GetPublisherConfirmChannelAsync_ShouldFailForUnroutableMandatoryPublish()
+  {
+    var connectionProvider = _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>();
+    await using var pool = new ChannelPool(connectionProvider);
+    await using var channel = await pool.GetPublisherConfirmChannelAsync();
+
+    var act = async () => await channel.BasicPublishAsync(
+        exchange: string.Empty,
+        routingKey: $"missing-{Guid.NewGuid():N}",
+        mandatory: true,
+        basicProperties: new RabbitMQ.Client.BasicProperties(),
+        body: new ReadOnlyMemory<byte>([1, 2, 3]));
+
+    await act.Should().ThrowAsync<RabbitMQ.Client.Exceptions.PublishException>();
+    channel.IsOpen.Should().BeTrue();
+  }
+
+  [Fact]
+  public async Task GetTransactionalChannelAsync_ShouldCreateChannelWithoutPublisherConfirmMode()
+  {
+    var connectionProvider = _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>();
+    await using var pool = new ChannelPool(connectionProvider);
+    await using var channel = await pool.GetTransactionalChannelAsync();
+
+    channel.IsOpen.Should().BeTrue();
+    await channel.TxSelectAsync();
+    await channel.TxRollbackAsync();
+  }
+
 }
