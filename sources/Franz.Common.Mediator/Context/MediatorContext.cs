@@ -43,10 +43,14 @@ public static class MediatorContext
   /// </summary>
   public static Guid EnsureCorrelationId()
   {
-    if (Current.CorrelationId == Guid.Empty)
+    var context = _current.Value ?? MediatorExecutionContext.Empty;
+
+    if (context.CorrelationId == Guid.Empty)
     {
-      Set(Current.WithCorrelationId(Guid.CreateVersion7()));
+      context = context.WithCorrelationId(Guid.CreateVersion7());
     }
-    return Current.CorrelationId;
+
+    _current.Value = context;
+    return context.CorrelationId;
   }
 }
