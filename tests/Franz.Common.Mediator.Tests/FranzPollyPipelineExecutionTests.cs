@@ -20,14 +20,6 @@ public sealed class FranzPollyPipelineExecutionTests
     return registry;
   }
 
-  private static PolicyRegistry CreateTypedRegistry<TPolicy>(string policyName, TPolicy policy)
-      where TPolicy : class
-  {
-    var registry = new PolicyRegistry();
-    registry.Add(policyName, policy);
-    return registry;
-  }
-
   [Theory]
   [InlineData("retry")]
   [InlineData("circuit-breaker")]
@@ -146,7 +138,8 @@ public sealed class FranzPollyPipelineExecutionTests
   public async Task Retry_policy_counts_result_based_retries()
   {
     const string policyName = "result-retry-policy";
-    var registry = CreateTypedRegistry(
+    var registry = new PolicyRegistry();
+    registry.Add(
         policyName,
         Policy<string>.HandleResult(static result => result == "retry").RetryAsync(1));
     var observer = new RecordingObserver();
@@ -210,7 +203,8 @@ public sealed class FranzPollyPipelineExecutionTests
   public async Task Typed_policy_executes_downstream_handler_exactly_once(string pipeline)
   {
     const string policyName = "typed-test-policy";
-    var registry = CreateTypedRegistry(policyName, Policy.NoOpAsync<string>());
+    var registry = new PolicyRegistry();
+    registry.Add(policyName, Policy.NoOpAsync<string>());
     var handlerInvocations = 0;
     var request = new TestRequest();
     Func<Task<string>> next = () =>
