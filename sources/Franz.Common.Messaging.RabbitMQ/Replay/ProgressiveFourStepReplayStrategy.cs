@@ -1,4 +1,5 @@
-﻿using Franz.Common.Messaging.Configuration;
+#nullable enable
+using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
@@ -8,26 +9,23 @@ using Franz.Common.Messaging;
 
 namespace Franz.Common.Messaging.RabbitMQ.Replay;
 
-public class ProgressiveFourStepReplayStrategy : IReplayStrategy
+public sealed class ProgressiveFourStepReplayStrategy : IReplayStrategy
 {
   public const string ReplayHeader = "x-replay";
-  public const string DelayHeader = "x-delay";
   public const string ExceptionMessageHeader = "x-exception-message";
   public const string ExceptionStackTraceHeader = "x-exception-stacktrace";
-
+  private const int MaxHeaderTextLength = 4_096;
   private readonly IModelProvider _provider;
   private readonly string _queueName;
   private readonly string _replayExchange;
   private readonly string _deadLetterQueue;
 
-  public ProgressiveFourStepReplayStrategy(
-      IModelProvider provider,
-      IAssemblyAccessor accessor,
-      IOptions<MessagingOptions> options)
+  public ProgressiveFourStepReplayStrategy(IModelProvider provider, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
   {
-    _provider = provider;
-
-    var entry = accessor.GetEntryAssembly();
+    _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+    ArgumentNullException.ThrowIfNull(accessor);
+    ArgumentNullException.ThrowIfNull(options);
+    var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
     _queueName = QueueNamer.GetQueueName(entry);
     _replayExchange = ExchangeNamer.GetReplayExchangeName(entry);
     _deadLetterQueue = QueueNamer.GetDeadLetterQueueName(entry);
@@ -35,57 +33,38 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
 
   public async Task ReplayAsync(BasicDeliverEventArgs e, Exception ex)
   {
-    var channel = await _provider.GetChannelAsync();
-
-    var props = new BasicProperties
-    {
-      DeliveryMode = (DeliveryModes)2,
-      Headers = e.BasicProperties.Headers ?? new Dictionary<string, object?>()
-    };
-
-    // Count replay attempts
-    var replayCount = props.Headers.ContainsKey(ReplayHeader)
-        ? Convert.ToInt32(props.Headers[ReplayHeader]) + 1
+    ArgumentNullException.ThrowIfNull(e);
+    ArgumentNullException.ThrowIfNull(ex);
+    var channel = await _provider.GetChannelAsync().ConfigureAwait(false);
+    var headers = e.BasicProperties.Headers is null
+        ? new Dictionary<string, object?>()
+        : new Dictionary<string, object?>(e.BasicProperties.Headers);
+    var replayCount = headers.TryGetValue(ReplayHeader, out var value)
+        ? Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture) + 1
         : 1;
+    headers[ReplayHeader] = replayCount;
+    var properties = new BasicProperties { DeliveryMode = DeliveryModes.Persistent, Headers = headers };
 
-    props.Headers[ReplayHeader] = replayCount;
-
-    // Progressive delays
-    var delay = replayCount switch
+    if (replayCount >= 4)
     {
-      1 => 1_000,    // 1s
-      2 => 10_000,   // 10s
-      3 => 60_000,   // 60s
-      _ => 300_000   // 5 min before sending to DLQ
-    };
-
-    if (replayCount < 4)
-    {
-      // Replay to delayed exchange
-      props.Headers[DelayHeader] = delay;
-
-      await channel.BasicPublishAsync(
-          exchange: _replayExchange,
-          routingKey: _queueName,
-          mandatory: true,
-          basicProperties: props,
-          body: e.Body);
-    }
-    else
-    {
-      // FINAL attempt → send to DLQ
-      props.Headers[ExceptionMessageHeader] = ex.Message;
-      props.Headers[ExceptionStackTraceHeader] = ex.StackTrace ?? string.Empty;
-
-      await channel.BasicPublishAsync(
-          exchange: "",
-          routingKey: _deadLetterQueue,
-          mandatory: true,
-          basicProperties: props,
-          body: e.Body);
+      headers[ExceptionMessageHeader] = Truncate(ex.Message);
+      headers[ExceptionStackTraceHeader] = Truncate(ex.StackTrace ?? string.Empty);
+      await channel.BasicPublishAsync(exchange: string.Empty, routingKey: _deadLetterQueue, mandatory: true,
+          basicProperties: properties, body: e.Body).ConfigureAwait(false);
+      return;
     }
 
-    // ACK the original failed message
-    await channel.BasicAckAsync(e.DeliveryTag, false);
+    await channel.BasicPublishAsync(exchange: _replayExchange, routingKey: GetRetryRoutingKey(_queueName, replayCount),
+        mandatory: true, basicProperties: properties, body: e.Body).ConfigureAwait(false);
   }
+
+  internal static string GetRetryRoutingKey(string queueName, int retryNumber) => $"{queueName}-retry-{retryNumber}";
+  internal static int GetRetryDelayMilliseconds(int retryNumber) => retryNumber switch
+  {
+    1 => 1_000,
+    2 => 10_000,
+    3 => 60_000,
+    _ => throw new ArgumentOutOfRangeException(nameof(retryNumber))
+  };
+  private static string Truncate(string value) => value.Length <= MaxHeaderTextLength ? value : value[..MaxHeaderTextLength];
 }

@@ -11,6 +11,8 @@ public sealed class RabbitMQMessagingOptions : MessagingOptions
   public string? DeadLetterExchangeName { get; set; }
   public string? DeadLetterQueueName { get; set; }
   public string? DefaultRoutingKey { get; set; }
+  /// <summary>Replay strategy: "NoReplay" or "ProgressiveFourStep".</summary>
+  public string ReplayStrategy { get; set; } = "NoReplay";
   // --- Connectivity ---
   public string? BootStrapServers { get; set; }   // URI-based
 

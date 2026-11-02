@@ -82,6 +82,10 @@ public static class ServiceCollectionExtensions
              (uri.Scheme == "amqp" || uri.Scheme == "amqps")),
             "Messaging:RabbitMQ:BootStrapServers must be an absolute amqp:// or amqps:// URI.")
         .Validate(options =>
+            string.Equals(options.ReplayStrategy, "NoReplay", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase),
+            "Messaging:RabbitMQ:ReplayStrategy must be NoReplay or ProgressiveFourStep.")
+        .Validate(options =>
             options.PublisherConfirmTimeoutSeconds > 0,
             "Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds must be greater than zero.")
         .ValidateOnStart();
@@ -139,7 +143,13 @@ public static class ServiceCollectionExtensions
             .AddNoDuplicateScoped<MessageContextAccessor>()
             .AddNoDuplicateScoped<IMessageContextAccessor>(sp => sp.GetRequiredService<MessageContextAccessor>())
             .AddNoDuplicateSingleton<IBasicConsumerFactory, BasicConsumerFactory>()
-            .AddSingleton<IReplayStrategy, NoReplayStrategy>();
+            .AddSingleton<IReplayStrategy>(sp =>
+            {
+              var options = sp.GetRequiredService<IOptions<RabbitMQMessagingOptions>>().Value;
+              return string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase)
+                  ? ActivatorUtilities.CreateInstance<ProgressiveFourStepReplayStrategy>(sp)
+                  : ActivatorUtilities.CreateInstance<NoReplayStrategy>(sp);
+            });
 
     return services;
   }

@@ -66,6 +66,8 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       await InitializeExchangeAsync(channel, _exchangeName, ExchangeType.Headers, true).ConfigureAwait(false);
       await InitializeQueueAsync(channel, _queueName, _exchangeName, _deadLetterExchangeName, _deadLetterQueueName, true).ConfigureAwait(false);
       await InitializeDeadLetterQueueAsync(channel, _deadLetterQueueName, _deadLetterExchangeName).ConfigureAwait(false);
+      if (string.Equals(_options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase))
+        await InitializeReplayTopologyAsync(channel).ConfigureAwait(false);
       await InitializeExchangesForSubscriptionsAsync(channel, cancellationToken).ConfigureAwait(false);
 
       _isInitialized = true;
@@ -134,6 +136,27 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
         deadLetterQueueName,
         deadLetterExchangeName,
         routingKey: deadLetterQueueName).ConfigureAwait(false);
+  }
+
+  private async ValueTask InitializeReplayTopologyAsync(IChannel channel)
+  {
+    var replayExchange = ExchangeNamer.GetReplayExchangeName(_assemblyAccessor.GetEntryAssembly()
+        ?? throw new InvalidOperationException("Entry assembly cannot be null."));
+    await channel.ExchangeDeclareAsync(replayExchange, ExchangeType.Direct, durable: true, autoDelete: false).ConfigureAwait(false);
+    for (var retryNumber = 1; retryNumber <= 3; retryNumber++)
+    {
+      var routingKey = ProgressiveFourStepReplayStrategy.GetRetryRoutingKey(_queueName, retryNumber);
+      var retryQueue = $"{_queueName}-retry-{retryNumber}";
+      var arguments = new Dictionary<string, object?>
+      {
+        ["x-queue-type"] = "quorum",
+        ["x-message-ttl"] = ProgressiveFourStepReplayStrategy.GetRetryDelayMilliseconds(retryNumber),
+        ["x-dead-letter-exchange"] = string.Empty,
+        ["x-dead-letter-routing-key"] = _queueName
+      };
+      await channel.QueueDeclareAsync(retryQueue, durable: true, exclusive: false, autoDelete: false, arguments: arguments).ConfigureAwait(false);
+      await channel.QueueBindAsync(retryQueue, replayExchange, routingKey).ConfigureAwait(false);
+    }
   }
 
   private async ValueTask InitializeExchangesForSubscriptionsAsync(
