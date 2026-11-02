@@ -71,4 +71,55 @@ public sealed class FranzPollyPipelineExecutionTests
     Assert.Equal("completed", result);
     Assert.Equal(1, handlerInvocations);
   }
+  [Fact]
+  public async Task Retry_policy_reinvokes_downstream_only_for_a_failed_attempt()
+  {
+    const string policyName = "retry-policy";
+    var registry = CreateRegistry(
+        policyName,
+        Policy.Handle<InvalidOperationException>().RetryAsync(1));
+    var handlerInvocations = 0;
+    var pipeline = new PollyRetryPipeline<TestRequest, string>(
+        registry,
+        Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
+        NullLogger<TestRequest>.Instance,
+        Array.Empty<IResilienceObserver>());
+
+    var result = await pipeline.Handle(new TestRequest(), () =>
+    {
+      handlerInvocations++;
+      if (handlerInvocations == 1)
+        throw new InvalidOperationException("Transient failure.");
+
+      return Task.FromResult("completed");
+    });
+
+    Assert.Equal("completed", result);
+    Assert.Equal(2, handlerInvocations);
+  }
+
+  [Fact]
+  public async Task Cancelled_policy_does_not_invoke_downstream_handler()
+  {
+    const string policyName = "cancelled-policy";
+    var registry = CreateRegistry(policyName, Policy.NoOpAsync());
+    var pipeline = new PollyRetryPipeline<TestRequest, string>(
+        registry,
+        Options.Create(new PollyRetryPipelineOptions { PolicyName = policyName }),
+        NullLogger<TestRequest>.Instance,
+        Array.Empty<IResilienceObserver>());
+    using var cancellation = new CancellationTokenSource();
+    await cancellation.CancelAsync();
+    var handlerInvocations = 0;
+
+    await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+        pipeline.Handle(new TestRequest(), () =>
+        {
+          handlerInvocations++;
+          return Task.FromResult("unexpected");
+        }, cancellation.Token));
+
+    Assert.Equal(0, handlerInvocations);
+  }
+
 }
