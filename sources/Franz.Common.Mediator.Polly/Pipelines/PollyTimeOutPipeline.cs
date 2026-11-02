@@ -118,7 +118,6 @@ public sealed class PollyTimeoutPipeline<TRequest, TResponse> : IPipeline<TReque
 
   private void NotifyObservers(ResilienceContext context)
   {
-    foreach (var obs in _observers)
-      obs.OnPolicyExecuted(context.PolicyName, context);
+    ResilienceObserverDispatcher.Notify(_observers, _logger, context.PolicyName, context);
   }
 }
