@@ -48,6 +48,7 @@ public sealed class ChannelPoolIntegrationTests
     channel2.Should().BeSameAs(channel1); // real reference reuse
     channel2.IsOpen.Should().BeTrue();
   }
+
   [Fact]
   public async Task GetPublisherConfirmChannelAsync_ShouldConfirmRoutableMandatoryPublish()
   {
@@ -66,7 +67,7 @@ public sealed class ChannelPoolIntegrationTests
         exchange: string.Empty,
         routingKey: queueName,
         mandatory: true,
-        basicProperties: new RabbitMQ.Client.BasicProperties(),
+        basicProperties: new global::RabbitMQ.Client.BasicProperties(),
         body: new ReadOnlyMemory<byte>([1, 2, 3]));
 
     channel.IsOpen.Should().BeTrue();
@@ -83,10 +84,10 @@ public sealed class ChannelPoolIntegrationTests
         exchange: string.Empty,
         routingKey: $"missing-{Guid.NewGuid():N}",
         mandatory: true,
-        basicProperties: new RabbitMQ.Client.BasicProperties(),
+        basicProperties: new global::RabbitMQ.Client.BasicProperties(),
         body: new ReadOnlyMemory<byte>([1, 2, 3]));
 
-    await act.Should().ThrowAsync<RabbitMQ.Client.Exceptions.PublishException>();
+    await act.Should().ThrowAsync<global::RabbitMQ.Client.Exceptions.PublishException>();
     channel.IsOpen.Should().BeTrue();
   }
 
@@ -101,5 +102,4 @@ public sealed class ChannelPoolIntegrationTests
     await channel.TxSelectAsync();
     await channel.TxRollbackAsync();
   }
-
 }
