@@ -1,4 +1,4 @@
-﻿using Franz.Common.Mediator.Context;
+using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.OpenTelemetry.Core;
 using Franz.Common.Mediator.Pipelines.Core;
@@ -16,14 +16,24 @@ public sealed class EventTracingPipeline<TEvent> : IEventPipeline<TEvent>
     where TEvent : IEvent
 {
   private readonly ILogger<EventTracingPipeline<TEvent>> _logger;
+  private readonly ActivitySource _activitySource;
   private readonly IHostEnvironment _env;
 
   public EventTracingPipeline(
       ILogger<EventTracingPipeline<TEvent>> logger,
       IHostEnvironment env)
+      : this(logger, FranzActivityFactory.DefaultSource, env)
   {
-    _logger = logger;
-    _env = env;
+  }
+
+  public EventTracingPipeline(
+      ILogger<EventTracingPipeline<TEvent>> logger,
+      ActivitySource activitySource,
+      IHostEnvironment env)
+  {
+    _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    _activitySource = activitySource ?? throw new ArgumentNullException(nameof(activitySource));
+    _env = env ?? throw new ArgumentNullException(nameof(env));
   }
 
   public async Task HandleAsync(
@@ -31,8 +41,7 @@ public sealed class EventTracingPipeline<TEvent> : IEventPipeline<TEvent>
       Func<Task> next,
       CancellationToken cancellationToken = default)
   {
-    // Parameter removed from StartEventActivity; ambient MediatorContext.Current is read internally.
-    using var activity = FranzActivityFactory.StartEventActivity<TEvent>(_env);
+    using var activity = FranzActivityFactory.StartEventActivity<TEvent>(_activitySource, _env);
 
     try
     {
