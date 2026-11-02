@@ -44,6 +44,10 @@ public class OutboxPublisherServiceTests
     await service.ProcessOutboxOnceAsync(CancellationToken.None);
 
     // Assert
+    _mockStore.Verify(s =>
+        s.GetPendingAsync(_options.BatchSize, It.IsAny<CancellationToken>()),
+        Times.Once);
+
     _mockSender.Verify(s =>
         s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()),
         Times.Once);
@@ -119,6 +123,42 @@ public class OutboxPublisherServiceTests
         s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()),
         Times.Never);
   }
+  [Fact]
+  public async Task ProcessOutboxOnce_WhenDeadLetteringIsDisabled_ShouldKeepExhaustedMessagePending()
+  {
+    var options = Options.Create(new OutboxOptions
+    {
+      Enabled = true,
+      DeadLetterEnabled = false,
+      MaxRetries = 2,
+      BatchSize = 10
+    });
+    var storedMessage = new StoredMessage
+    {
+      Id = Guid.CreateVersion7(),
+      RetryCount = 2
+    };
+
+    _mockStore.Setup(s => s.GetPendingAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<StoredMessage> { storedMessage });
+    _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
+        .ThrowsAsync(new Exception("Permanent Failure"));
+
+    var service = new OutboxPublisherService(
+        _mockStore.Object,
+        _mockSender.Object,
+        options,
+        _mockLogger.Object);
+
+    await service.ProcessOutboxOnceAsync(CancellationToken.None);
+
+    _mockStore.Verify(s => s.UpdateRetryAsync(
+        It.Is<StoredMessage>(message => message.Id == storedMessage.Id && message.RetryCount == 3),
+        It.IsAny<CancellationToken>()), Times.Once);
+    _mockStore.Verify(s => s.MoveToDeadLetterAsync(
+        It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+  }
+
   [Fact]
   public async Task ProcessOutboxOnce_WhenHostCancellationOccursDuringSend_ShouldNotRecordDeliveryFailure()
   {
