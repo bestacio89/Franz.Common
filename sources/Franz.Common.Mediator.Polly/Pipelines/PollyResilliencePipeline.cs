@@ -41,8 +41,7 @@ public sealed class PollyResiliencePipeline<TRequest, TResponse> : IPipeline<TRe
     var requestName = request?.GetType().Name ?? typeof(TRequest).Name;
 
     // Ensure we have a native Guid v7 correlation ID
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
     var context = new ResilienceContext { PolicyName = _profileName };
