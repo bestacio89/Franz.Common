@@ -41,8 +41,10 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
 
   private async Task InitializeAsyncInternal()
   {
-    await Container.StartAsync();
-    ConnectionString = Container.GetConnectionString();
+    try
+    {
+      await Container.StartAsync();
+      ConnectionString = Container.GetConnectionString();
 
     var services = new ServiceCollection();
     services.AddSingleton(Options.Create(new RabbitMQMessagingOptions
@@ -60,17 +62,28 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
     services.AddScoped<IMessagingInitializer, RabbitMQMessagingInitializer>();
     services.AddScoped<IMessagingTransaction, RabbitMQMessagingTransaction>();
 
-    ServiceProvider = services.BuildServiceProvider();
+      ServiceProvider = services.BuildServiceProvider();
+    }
+    catch
+    {
+      await Container.DisposeAsync().ConfigureAwait(false);
+      throw;
+    }
   }
 
   public async Task DisposeAsync()
   {
-    if (ServiceProvider is not null)
-    {
-      await ServiceProvider.DisposeAsync();
-      ServiceProvider = null!;
-    }
+    var serviceProvider = ServiceProvider;
+    ServiceProvider = null!;
 
-    await Container.DisposeAsync().ConfigureAwait(false);
+    try
+    {
+      if (serviceProvider is not null)
+        await serviceProvider.DisposeAsync().ConfigureAwait(false);
+    }
+    finally
+    {
+      await Container.DisposeAsync().ConfigureAwait(false);
+    }
   }
 }
