@@ -238,6 +238,12 @@ public sealed class OutboxMessageListenerTenantScopeTests
         public DateTimeOffset OccurredOn { get; } = DateTimeOffset.UtcNow;
     }
 
+    private sealed class GenericTestEvent<T> : IEvent
+    {
+        public DateTimeOffset OccurredOn { get; } = DateTimeOffset.UtcNow;
+        public T? Value { get; init; }
+    }
+
     private sealed class TrackingTenantMessageContextInitializer : ITenantMessageContextInitializer
     {
         public int BeginCount { get; private set; }
@@ -263,4 +269,9 @@ public sealed class OutboxMessageListenerTenantScopeTests
             }
         }
     }
+}
+
+public sealed class PublicTestEvent : IEvent
+{
+    public DateTimeOffset OccurredOn { get; } = DateTimeOffset.UtcNow;
 }
