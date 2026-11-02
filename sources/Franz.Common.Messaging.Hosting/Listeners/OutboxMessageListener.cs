@@ -9,6 +9,7 @@ using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.MultiTenancy;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Messaging.Storage;
+using Franz.Common.Messaging.Outbox;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
