@@ -1,4 +1,4 @@
-﻿using Franz.Common.Mediator.OpenTelemetry.Core;
+using Franz.Common.Mediator.OpenTelemetry.Core;
 using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.Hosting;
 using System;
@@ -10,11 +10,18 @@ namespace Franz.Common.Mediator.OpenTelemetry;
 
 public class OpenTelemetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
 {
+  private readonly ActivitySource _activitySource;
   private readonly IHostEnvironment _env;
 
   public OpenTelemetryPipeline(IHostEnvironment env)
+      : this(FranzActivityFactory.DefaultSource, env)
   {
-    _env = env;
+  }
+
+  public OpenTelemetryPipeline(ActivitySource activitySource, IHostEnvironment env)
+  {
+    _activitySource = activitySource ?? throw new ArgumentNullException(nameof(activitySource));
+    _env = env ?? throw new ArgumentNullException(nameof(env));
   }
 
   public async Task<TResponse> Handle(
@@ -22,8 +29,7 @@ public class OpenTelemetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TR
       Func<Task<TResponse>> next,
       CancellationToken cancellationToken = default)
   {
-    // Removed second parameter; StartMediatorActivity reads ambient MediatorContext.Current internally
-    using var activity = FranzActivityFactory.StartMediatorActivity<TRequest>(_env);
+    using var activity = FranzActivityFactory.StartMediatorActivity<TRequest>(_activitySource, _env);
 
     try
     {
