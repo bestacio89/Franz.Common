@@ -14,7 +14,13 @@ public class OutboxPublisherServiceTests
   private readonly Mock<IMessageStore> _mockStore = new();
   private readonly Mock<IMessagingSender> _mockSender = new();
   private readonly Mock<ILogger<OutboxPublisherService>> _mockLogger = new();
-  private readonly OutboxOptions _options = new() { PollingInterval = TimeSpan.FromMilliseconds(10), MaxRetries = 2 };
+  private readonly OutboxOptions _options = new()
+  {
+    Enabled = true,
+    DeadLetterEnabled = true,
+    PollingInterval = TimeSpan.FromMilliseconds(10),
+    MaxRetries = 2
+  };
 
   private OutboxPublisherService CreateService() =>
       new(_mockStore.Object, _mockSender.Object, Options.Create(_options), _mockLogger.Object);
