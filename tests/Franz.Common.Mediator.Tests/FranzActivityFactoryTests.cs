@@ -34,13 +34,13 @@ public sealed class FranzActivityFactoryTests
           source,
           environment.Object);
 
-      Assert.NotNull(activity);
-      Assert.Equal(source.Name, activity.Source.Name);
-      Assert.Equal("query", activity.GetTagItem(FranzSemanticConventions.MediatorType));
-      Assert.Equal("Testing", activity.GetTagItem(FranzSemanticConventions.Environment));
+      var startedActivity = Assert.IsType<Activity>(activity);
+      Assert.Equal(source.Name, startedActivity.Source.Name);
+      Assert.Equal("query", startedActivity.GetTagItem(FranzSemanticConventions.MediatorType));
+      Assert.Equal("Testing", startedActivity.GetTagItem(FranzSemanticConventions.Environment));
 
       var correlationId = Assert.IsType<Guid>(
-          activity.GetTagItem(FranzSemanticConventions.CorrelationId));
+          startedActivity.GetTagItem(FranzSemanticConventions.CorrelationId));
       Assert.NotEqual(Guid.Empty, correlationId);
       Assert.Equal(correlationId, MediatorContext.CorrelationId);
     }
@@ -73,11 +73,11 @@ public sealed class FranzActivityFactoryTests
           source,
           environment.Object);
 
-      Assert.NotNull(activity);
-      Assert.Equal(source.Name, activity.Source.Name);
+      var startedActivity = Assert.IsType<Activity>(activity);
+      Assert.Equal(source.Name, startedActivity.Source.Name);
 
       var correlationId = Assert.IsType<Guid>(
-          activity.GetTagItem(FranzSemanticConventions.CorrelationId));
+          startedActivity.GetTagItem(FranzSemanticConventions.CorrelationId));
       Assert.NotEqual(Guid.Empty, correlationId);
     }
     finally
