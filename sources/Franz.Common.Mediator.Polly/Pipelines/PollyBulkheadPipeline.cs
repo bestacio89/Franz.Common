@@ -131,7 +131,6 @@ public sealed class PollyBulkheadPipeline<TRequest, TResponse> : IPipeline<TRequ
 
   private void NotifyObservers(ResilienceContext context)
   {
-    foreach (var obs in _observers)
-      obs.OnPolicyExecuted(context.PolicyName, context);
+    ResilienceObserverDispatcher.Notify(_observers, _logger, context.PolicyName, context);
   }
 }
