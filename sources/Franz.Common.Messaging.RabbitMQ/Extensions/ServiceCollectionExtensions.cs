@@ -88,6 +88,9 @@ public static class ServiceCollectionExtensions
         .Validate(options =>
             options.PublisherConfirmTimeoutSeconds > 0,
             "Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds must be greater than zero.")
+        .Validate(options =>
+            options.MaxConcurrency > 0 && options.MaxConcurrency <= ushort.MaxValue,
+            "Messaging:RabbitMQ:MaxConcurrency must be between 1 and 65535.")
         .ValidateOnStart();
 
     return services;
