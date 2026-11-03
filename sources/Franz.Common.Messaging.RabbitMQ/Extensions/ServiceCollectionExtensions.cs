@@ -83,6 +83,14 @@ public static class ServiceCollectionExtensions
             "Messaging:RabbitMQ:BootStrapServers must be an absolute amqp:// or amqps:// URI.")
         .Validate(options =>
             string.IsNullOrWhiteSpace(options.BootStrapServers) ||
+            (Uri.TryCreate(options.BootStrapServers, UriKind.Absolute, out var bootstrapUri) &&
+             !string.IsNullOrWhiteSpace(bootstrapUri.Host) &&
+             bootstrapUri.UserInfo.Contains(':', StringComparison.Ordinal) &&
+             bootstrapUri.UserInfo.Split(':', 2)[0].Length > 0 &&
+             bootstrapUri.UserInfo.Split(':', 2)[1].Length > 0),
+            "Messaging:RabbitMQ:BootStrapServers must include a host and explicit username/password credentials.")
+        .Validate(options =>
+            string.IsNullOrWhiteSpace(options.BootStrapServers) ||
             options.SslEnabled != true ||
             (Uri.TryCreate(options.BootStrapServers, UriKind.Absolute, out var secureUri) &&
              secureUri.Scheme == "amqps"),
