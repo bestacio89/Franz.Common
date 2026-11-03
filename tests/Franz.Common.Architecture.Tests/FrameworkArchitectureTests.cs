@@ -192,6 +192,27 @@ public sealed class FrameworkArchitectureTests
   }
 
   [Fact]
+  public void DbContextBase_auditing_uses_direct_auditable_contract_dispatch()
+  {
+    var contextPath = Path.Combine(
+      RepositoryRoot.Value,
+      "sources",
+      "Franz.Common.EntityFramework",
+      "DbContextBase.cs");
+    var syntaxTree = CSharpSyntaxTree.ParseText(File.ReadAllText(contextPath));
+    var root = syntaxTree.GetRoot();
+    var auditMethod = root.DescendantNodes()
+      .OfType<MethodDeclarationSyntax>()
+      .Single(method => method.Identifier.ValueText == "ApplyAuditing");
+
+    var auditSource = auditMethod.ToFullString();
+
+    Assert.Contains("Entries<IAuditableEntity>", auditSource, StringComparison.Ordinal);
+    Assert.DoesNotContain("dynamic", auditSource, StringComparison.Ordinal);
+    Assert.DoesNotContain("GetInterfaces", auditSource, StringComparison.Ordinal);
+  }
+
+  [Fact]
   public void Tenant_query_filter_policy_rejects_a_context_without_tenant_scoping()
   {
     const string plantedViolation = """
