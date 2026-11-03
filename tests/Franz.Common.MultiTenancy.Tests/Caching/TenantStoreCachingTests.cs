@@ -1,10 +1,7 @@
-using Franz.Common.Caching.MultiTenancy;
 using Franz.Common.Caching.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options;
 
 namespace Franz.Common.MultiTenancy.Tests.Caching;
 
@@ -111,6 +108,28 @@ public sealed class TenantStoreCachingTests
     }
 
     [Fact]
+    public async Task InvalidateDuringLookup_PreventsStaleResultFromRepopulatingCache()
+    {
+        var store = new MutableTenantStore();
+        var tenant = new TenantInfo(Guid.NewGuid(), "before");
+        store.Set(tenant);
+        store.LookupGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
+        var invalidator = provider.GetRequiredService<ITenantStoreCacheInvalidator>();
+
+        var inFlight = cached.FindByIdAsync(tenant.Id);
+        await store.LookupStarted.Task;
+        store.Set(new TenantInfo(tenant.Id, "after"));
+        invalidator.InvalidateTenant(tenant.Id);
+        store.LookupGate.SetResult();
+
+        Assert.Equal("before", (await inFlight)!.Name);
+        Assert.Equal("after", (await cached.FindByIdAsync(tenant.Id))!.Name);
+        Assert.Equal(2, store.FindByIdCalls);
+    }
+
+    [Fact]
     public async Task CancellationAwareLookup_PropagatesCancellation()
     {
         var store = new MutableTenantStore();
@@ -149,12 +168,13 @@ public sealed class TenantStoreCachingTests
         public async Task<TenantInfo?> FindByIdAsync(Guid id)
         {
             FindByIdCalls++;
+            var result = _tenants.GetValueOrDefault(id);
             if (LookupGate is not null)
             {
                 LookupStarted.TrySetResult();
                 await LookupGate.Task;
             }
-            return _tenants.GetValueOrDefault(id);
+            return result;
         }
 
         public Task<TenantInfo?> FindByHostAsync(string host)
