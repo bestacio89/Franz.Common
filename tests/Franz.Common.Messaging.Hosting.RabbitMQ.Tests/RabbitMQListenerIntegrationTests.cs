@@ -228,14 +228,19 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
     var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
     var channelPool = _fixture.Services.GetRequiredService<IChannelPool>();
     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-    var threeHandlersEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    const int expectedConcurrency = 3;
+    const int messageCount = 6;
+    var concurrencyLimitReached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var allHandlersEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     var releaseHandlers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     var activeHandlers = 0;
+    var handlersEntered = 0;
     var maximumConcurrency = 0;
 
     listener.OnMessageReceivedAsync = async _ =>
     {
       var active = Interlocked.Increment(ref activeHandlers);
+      var entered = Interlocked.Increment(ref handlersEntered);
       int observed;
       do
       {
@@ -245,8 +250,10 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
       }
       while (Interlocked.CompareExchange(ref maximumConcurrency, active, observed) != observed);
 
-      if (active >= 3)
-        threeHandlersEntered.TrySetResult();
+      if (active == expectedConcurrency)
+        concurrencyLimitReached.TrySetResult();
+      if (entered == messageCount)
+        allHandlersEntered.TrySetResult();
 
       try
       {
@@ -267,7 +274,7 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
       var publisher = await channelPool.GetAsync(cts.Token);
       try
       {
-        for (var index = 0; index < 3; index++)
+        for (var index = 0; index < messageCount; index++)
         {
           await publisher.BasicPublishAsync(
               exchange: string.Empty,
@@ -281,8 +288,18 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
         channelPool.Return(publisher);
       }
 
-      await threeHandlersEntered.Task.WaitAsync(cts.Token);
-      maximumConcurrency.Should().Be(3);
+      await concurrencyLimitReached.Task.WaitAsync(cts.Token);
+
+      // Keep the first batch blocked: the listener must not dispatch a fourth
+      // delivery while all configured execution slots are occupied.
+      await Task.Delay(TimeSpan.FromMilliseconds(300), cts.Token);
+      handlersEntered.Should().Be(expectedConcurrency);
+      maximumConcurrency.Should().Be(expectedConcurrency);
+
+      releaseHandlers.TrySetResult();
+      await allHandlersEntered.Task.WaitAsync(cts.Token);
+      maximumConcurrency.Should().Be(expectedConcurrency);
+      handlersEntered.Should().Be(messageCount);
     }
     finally
     {
