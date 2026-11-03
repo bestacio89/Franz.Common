@@ -2,6 +2,7 @@
 using Confluent.Kafka;
 using FluentAssertions;
 using Franz.Common.Mediator;
+using Franz.Common.Mediator.Extensions;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Contexting;
@@ -11,6 +12,8 @@ using Franz.Common.Messaging.Kafka.Modeling;
 using Franz.Common.Messaging.Kafka.Senders;
 using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Messaging.Kafka.Transactions;
+using Franz.Common.Reflection;
+using Franz.Common.Messaging.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -173,6 +176,8 @@ public class KafkaMessagingRegistrationIntegrationTests
   {
     var services = new ServiceCollection();
     services.AddLogging();
+    services.AddSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
+    services.AddDefaultMessageSerializer();
     services.AddFranzMediator(new[] { typeof(KafkaMessagingRegistrationIntegrationTests).Assembly });
     services.AddEventBasedKafkaMessaging(
         _fixture.Configuration,
