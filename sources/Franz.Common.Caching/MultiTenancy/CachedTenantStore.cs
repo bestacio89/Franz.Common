@@ -100,7 +100,7 @@ public sealed class CachedTenantStore : ITenantStore
             static _ => { },
             cancellationToken).ConfigureAwait(false);
 
-        return tenants.Select(Clone).ToArray();
+        return tenants!.Select(Clone).ToArray();
     }
 
     public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken)
@@ -185,7 +185,10 @@ public sealed class CachedTenantStore : ITenantStore
             AbsoluteExpirationRelativeToNow = _absoluteExpiration
         }.RegisterPostEvictionCallback(
             static (evictedKey, _, _, state) =>
-                ((TenantStoreCacheState)state!).KnownCacheKeys.TryRemove((string)evictedKey!, out _),
+            {
+                var cacheState = (TenantStoreCacheState)state!;
+                cacheState.KnownCacheKeys.TryRemove((string)evictedKey!, out _);
+            },
             _state);
 
     private void TrackTenant(TenantInfo tenant)
