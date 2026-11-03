@@ -35,13 +35,13 @@ public sealed class CachedTenantStore : ITenantStore
     }
 
     public Task<TenantInfo?> FindByIdAsync(Guid id)
-        => GetOrLoadAsync(TenantIdKey(id), () => _inner.FindByIdAsync(id), TrackTenant);
+        => GetOrLoadAsync(TenantIdKey(id), () => _inner.FindByIdAsync(id), static _ => { });
 
     public Task<TenantInfo?> FindByHostAsync(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         var normalizedHost = TenantDomain.NormalizeHost(host);
-        return GetOrLoadAsync(HostKey(normalizedHost), () => _inner.FindByHostAsync(normalizedHost), TrackTenant);
+        return GetOrLoadAsync(HostKey(normalizedHost), () => _inner.FindByHostAsync(normalizedHost), tenant => TrackTenantHost(tenant, normalizedHost));
     }
 
     public async Task<IEnumerable<TenantInfo>> GetAllAsync()
@@ -51,8 +51,6 @@ public sealed class CachedTenantStore : ITenantStore
             async () =>
             {
                 var snapshot = (await _inner.GetAllAsync().ConfigureAwait(false)).Select(Clone).ToArray();
-                foreach (var tenant in snapshot)
-                    TrackTenant(tenant);
                 return snapshot;
             },
             static _ => { }).ConfigureAwait(false);
@@ -93,8 +91,6 @@ public sealed class CachedTenantStore : ITenantStore
             async () =>
             {
                 var snapshot = (await _inner.GetAllAsync(cancellationToken).ConfigureAwait(false)).Select(Clone).ToArray();
-                foreach (var tenant in snapshot)
-                    TrackTenant(tenant);
                 return snapshot;
             },
             static _ => { },
@@ -131,9 +127,9 @@ public sealed class CachedTenantStore : ITenantStore
         if (value is null)
             return null;
 
-        onLoaded(value);
         var snapshot = CloneIfTenant(value);
-        StoreIfCurrent(key, snapshot, generation);
+        if (StoreIfCurrent(key, snapshot, generation))
+            onLoaded(value);
         return CloneIfTenant(snapshot);
     }
 
@@ -155,18 +151,19 @@ public sealed class CachedTenantStore : ITenantStore
         return value;
     }
 
-    private void StoreIfCurrent<T>(string key, T value, long generation)
+    private bool StoreIfCurrent<T>(string key, T value, long generation)
     {
         if (_state.GetGeneration(key) != generation)
-            return;
+            return false;
 
         _cache.Set(key, value, CreateEntryOptions());
         _state.TrackCacheKey(key);
         if (_state.GetGeneration(key) == generation)
-            return;
+            return true;
 
         _cache.Remove(key);
         _state.KnownCacheKeys.TryRemove(key, out _);
+        return false;
     }
 
     private MemoryCacheEntryOptions CreateEntryOptions()
@@ -179,18 +176,16 @@ public sealed class CachedTenantStore : ITenantStore
                 var evictionState = (TenantStoreCacheEvictionState)state!;
                 var key = (string)evictedKey!;
                 if (!evictionState.Cache.TryGetValue(key, out _))
+                {
                     evictionState.State.KnownCacheKeys.TryRemove(key, out _);
+                    if (key.StartsWith("franz:tenants:store:host:", StringComparison.Ordinal))
+                        evictionState.State.RemoveHostFromIndexes(key["franz:tenants:store:host:".Length..]);
+                }
             },
             new TenantStoreCacheEvictionState(_state, _cache));
 
-    private sealed record TenantStoreCacheEvictionState(TenantStoreCacheState State, IMemoryCache Cache);\n\n    private void TrackTenant(TenantInfo tenant)
-    {
-        var hosts = _state.TenantHosts.GetOrAdd(
-            tenant.Id,
-            static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal));
-        foreach (var domain in tenant.Domains)
-            hosts.TryAdd(domain.Host, 0);
-    }
+    private sealed record TenantStoreCacheEvictionState(TenantStoreCacheState State, IMemoryCache Cache);\n\n    private void TrackTenantHost(TenantInfo tenant, string host)
+        => _state.TrackTenantHost(tenant.Id, host);
 
     private static T CloneIfTenant<T>(T value)
         => value is TenantInfo tenant ? (T)(object)Clone(tenant) : value;
@@ -230,6 +225,20 @@ public sealed class TenantStoreCacheState
 
     internal ConcurrentDictionary<Guid, ConcurrentDictionary<string, byte>> TenantHosts { get; } = new();
     internal ConcurrentDictionary<string, byte> KnownCacheKeys { get; } = new(StringComparer.Ordinal);
+
+    internal void TrackTenantHost(Guid tenantId, string host)
+    {
+        var hosts = TenantHosts.GetOrAdd(
+            tenantId,
+            static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal));
+        hosts.TryAdd(host, 0);
+    }
+
+    internal void RemoveHostFromIndexes(string host)
+    {
+        foreach (var hosts in TenantHosts.Values)
+            hosts.TryRemove(host, out _);
+    }
 
     internal long GetGeneration(string key) => _generations.GetOrAdd(key, 0);
 
