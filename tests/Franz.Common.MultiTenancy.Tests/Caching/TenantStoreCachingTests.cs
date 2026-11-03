@@ -131,6 +131,48 @@ public sealed class TenantStoreCachingTests
     }
 
     [Fact]
+    public async Task InvalidateHost_RefreshesOnlyTheCanonicalHostLookup()
+    {
+        var store = new MutableTenantStore();
+        var tenant = new TenantInfo(Guid.NewGuid(), "before");
+        tenant.Domains.Add(new TenantDomain("tenant.example.com") { IsVerified = true, TenantId = tenant.Id });
+        store.Set(tenant);
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
+
+        Assert.Equal("before", (await cached.FindByHostAsync("tenant.example.com"))!.Name);
+
+        var updated = new TenantInfo(tenant.Id, "after");
+        updated.Domains.Add(new TenantDomain("tenant.example.com") { IsVerified = true, TenantId = updated.Id });
+        store.Set(updated);
+        provider.GetRequiredService<ITenantStoreCacheInvalidator>().InvalidateHost("TENANT.example.com.");
+
+        Assert.Equal("after", (await cached.FindByHostAsync("tenant.example.com"))!.Name);
+        Assert.Equal(2, store.FindByHostCalls);
+    }
+
+    [Fact]
+    public async Task InvalidateAll_RefreshesIdExistenceAndRegistrySnapshots()
+    {
+        var store = new MutableTenantStore();
+        var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
+        store.Set(tenant);
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
+
+        Assert.NotNull(await cached.FindByIdAsync(tenant.Id));
+        Assert.True(await cached.ExistsAsync(tenant.Id));
+        Assert.Single(await cached.GetAllAsync());
+
+        store.Remove(tenant.Id);
+        provider.GetRequiredService<ITenantStoreCacheInvalidator>().InvalidateAll();
+
+        Assert.Null(await cached.FindByIdAsync(tenant.Id));
+        Assert.False(await cached.ExistsAsync(tenant.Id));
+        Assert.Empty(await cached.GetAllAsync());
+    }
+
+    [Fact]
     public async Task CancellationAwareLookup_PropagatesCancellation()
     {
         var store = new MutableTenantStore();
@@ -164,7 +206,7 @@ public sealed class TenantStoreCachingTests
         public TaskCompletionSource<bool>? LookupGate { get; set; }
         public TaskCompletionSource<bool> LookupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public void Set(TenantInfo tenant) => _tenants[tenant.Id] = tenant;
+        public void Set(TenantInfo tenant) => _tenants[tenant.Id] = tenant;\n\n        public void Remove(Guid tenantId) => _tenants.Remove(tenantId);
 
         public async Task<TenantInfo?> FindByIdAsync(Guid id)
         {
