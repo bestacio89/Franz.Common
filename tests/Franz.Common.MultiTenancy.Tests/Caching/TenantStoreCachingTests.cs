@@ -114,7 +114,7 @@ public sealed class TenantStoreCachingTests
         var store = new MutableTenantStore();
         var tenant = new TenantInfo(Guid.NewGuid(), "before");
         store.Set(tenant);
-        store.LookupGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        store.LookupGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var provider = CreateCachedStore(store);
         var cached = provider.GetRequiredService<ITenantStore>();
         var invalidator = provider.GetRequiredService<ITenantStoreCacheInvalidator>();
@@ -123,7 +123,7 @@ public sealed class TenantStoreCachingTests
         await store.LookupStarted.Task;
         store.Set(new TenantInfo(tenant.Id, "after"));
         invalidator.InvalidateTenant(tenant.Id);
-        store.LookupGate.SetResult();
+        store.LookupGate.SetResult(true);
 
         Assert.Equal("before", (await inFlight)!.Name);
         Assert.Equal("after", (await cached.FindByIdAsync(tenant.Id))!.Name);
