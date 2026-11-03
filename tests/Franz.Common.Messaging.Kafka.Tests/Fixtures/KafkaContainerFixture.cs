@@ -103,6 +103,7 @@ public sealed class KafkaContainerFixture : IAsyncLifetime
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
           [$"{KafkaMessagingOptions.SectionName}:BootstrapServers"] = BootstrapServers,
+          [$"{KafkaMessagingOptions.SectionName}:Security:AllowInsecureTransport"] = "true",
           [$"{KafkaMessagingOptions.SectionName}:TopicName"] = topicName,
           [$"{KafkaMessagingOptions.SectionName}:GroupId"] = "integration-test-group",
           [$"{KafkaMessagingOptions.SectionName}:Consumer:AutoOffsetReset"] = "Earliest",

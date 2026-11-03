@@ -25,6 +25,9 @@ public class KafkaMessagingOptions
 public class KafkaSecurityOptions
 {
   public KafkaSecurityProtocol SecurityProtocol { get; set; } = KafkaSecurityProtocol.Plaintext;
+
+  /// <summary>Explicitly permits unencrypted Kafka transport. Keep disabled outside isolated development and test environments.</summary>
+  public bool AllowInsecureTransport { get; set; }
   public KafkaSaslMechanism? SaslMechanism { get; set; }
   public string? SaslUsername { get; set; }
   public string? SaslPassword { get; set; }

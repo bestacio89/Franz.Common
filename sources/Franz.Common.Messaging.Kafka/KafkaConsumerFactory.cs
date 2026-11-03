@@ -3,6 +3,7 @@ using Confluent.Kafka;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Franz.Common.Messaging.Kafka.Validation;
 
 namespace Franz.Common.Messaging.Kafka;
 
@@ -21,6 +22,10 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
 
   public IConsumer<string, string> Build()
   {
+    var validation = new KafkaMessagingOptionsValidator().Validate(Options.DefaultName, _options);
+    if (validation.Failed)
+      throw new OptionsValidationException(Options.DefaultName, typeof(KafkaMessagingOptions), validation.Failures);
+
     var options = _options.Consumer;
     if (options.EnableAutoCommit || options.EnableAutoOffsetStore)
     {

@@ -20,6 +20,7 @@ using Franz.Common.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Franz.Common.Messaging.Kafka.Validation;
 
 namespace Franz.Common.Messaging.Kafka.Extensions;
 
@@ -138,6 +139,8 @@ public static class ServiceCollectionExtensions
       this IServiceCollection services,
       IConfiguration configuration)
   {
+    services.AddSingleton<IValidateOptions<KafkaMessagingOptions>, KafkaMessagingOptionsValidator>();
+
     services.AddOptions<KafkaMessagingOptions>()
         .BindConfiguration(KafkaMessagingOptions.SectionName)
         .ValidateDataAnnotations()
@@ -192,6 +195,9 @@ public static class ServiceCollectionExtensions
         SaslMechanism = MapSaslMechanism(o.Security.SaslMechanism),
         SaslUsername = o.Security.SaslUsername,
         SaslPassword = o.Security.SaslPassword,
+        SslCaLocation = o.Security.SslCaLocation,
+        SslCertificateLocation = o.Security.SslCertificateLocation,
+        SslKeyLocation = o.Security.SslKeyLocation,
         Acks = MapAcks(o.Producer.Acks),
         EnableIdempotence = o.Producer.EnableIdempotence,
         MessageMaxBytes = o.Producer.MessageMaxBytes,
@@ -248,6 +254,9 @@ public static class ServiceCollectionExtensions
         SaslMechanism = MapSaslMechanism(o.Security.SaslMechanism),
         SaslUsername = o.Security.SaslUsername,
         SaslPassword = o.Security.SaslPassword,
+        SslCaLocation = o.Security.SslCaLocation,
+        SslCertificateLocation = o.Security.SslCertificateLocation,
+        SslKeyLocation = o.Security.SslKeyLocation,
       };
     };
 
