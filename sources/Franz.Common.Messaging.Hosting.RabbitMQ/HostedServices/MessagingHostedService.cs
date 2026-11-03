@@ -21,6 +21,7 @@ public sealed class MessagingHostedService : IHostedService
 
   public Task StartAsync(CancellationToken cancellationToken)
   {
+    TenantMessagingStartupValidation.Validate(_serviceProvider);
     // 🚀 THE FIX: Register the Task-based delegate
     _listener.OnMessageReceivedAsync = HandleMessageAsync;
 
