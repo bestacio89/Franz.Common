@@ -1,0 +1,169 @@
+using Franz.Common.Caching.MultiTenancy;
+using Franz.Common.MultiTenancy;
+using Franz.Common.MultiTenancy.Models;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
+
+namespace Franz.Common.MultiTenancy.Tests.Caching;
+
+public sealed class TenantStoreCachingTests
+{
+    [Fact]
+    public async Task FindByIdAsync_CachesSuccessfulLookupUntilInvalidated()
+    {
+        var store = new MutableTenantStore();
+        var original = new TenantInfo(Guid.NewGuid(), "before");
+        store.Set(original);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var cached = CreateCachedStore(store, cache);
+
+        Assert.Equal("before", (await cached.FindByIdAsync(original.Id))!.Name);
+
+        store.Set(new TenantInfo(original.Id, "after"));
+
+        Assert.Equal("before", (await cached.FindByIdAsync(original.Id))!.Name);
+        cached.InvalidateTenant(original.Id);
+        Assert.Equal("after", (await cached.FindByIdAsync(original.Id))!.Name);
+        Assert.Equal(2, store.FindByIdCalls);
+    }
+
+    [Fact]
+    public async Task InvalidateTenant_RemovesCachedHostAliases()
+    {
+        var store = new MutableTenantStore();
+        var tenant = new TenantInfo(Guid.NewGuid(), "before");
+        tenant.Domains.Add(new TenantDomain("tenant.example.com", isPrimary: true));
+        store.Set(tenant);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var cached = CreateCachedStore(store, cache);
+
+        Assert.Equal("before", (await cached.FindByHostAsync("TENANT.example.com."))!.Name);
+
+        var updated = new TenantInfo(tenant.Id, "after");
+        updated.Domains.Add(new TenantDomain("tenant.example.com", isPrimary: true));
+        store.Set(updated);
+
+        cached.InvalidateTenant(tenant.Id);
+
+        Assert.Equal("after", (await cached.FindByHostAsync("tenant.example.com"))!.Name);
+        Assert.Equal(2, store.FindByHostCalls);
+    }
+
+    [Fact]
+    public async Task FindByIdAsync_ReturnsIndependentTenantSnapshots()
+    {
+        var store = new MutableTenantStore();
+        var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
+        tenant.Properties["tier"] = "standard";
+        store.Set(tenant);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var cached = CreateCachedStore(store, cache);
+
+        var first = (await cached.FindByIdAsync(tenant.Id))!;
+        first.Properties["tier"] = "mutated";
+
+        var second = (await cached.FindByIdAsync(tenant.Id))!;
+
+        Assert.Equal("standard", second.Properties["tier"]);
+        Assert.Equal(1, store.FindByIdCalls);
+    }
+
+    [Fact]
+    public async Task ConcurrentMisses_ShareOneStoreLookup()
+    {
+        var store = new MutableTenantStore();
+        var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
+        store.Set(tenant);
+        store.LookupGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var cached = CreateCachedStore(store, cache);
+
+        var requests = Enumerable.Range(0, 12)
+            .Select(_ => cached.FindByIdAsync(tenant.Id))
+            .ToArray();
+
+        await Task.Delay(25);
+        store.LookupGate.SetResult();
+
+        var results = await Task.WhenAll(requests);
+
+        Assert.All(results, result => Assert.Equal(tenant.Id, result!.Id));
+        Assert.Equal(1, store.FindByIdCalls);
+    }
+
+    [Fact]
+    public async Task ExpiredEntries_AreReloaded()
+    {
+        var store = new MutableTenantStore();
+        var tenant = new TenantInfo(Guid.NewGuid(), "before");
+        store.Set(tenant);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var cached = CreateCachedStore(store, cache, TimeSpan.FromMilliseconds(40));
+
+        Assert.Equal("before", (await cached.FindByIdAsync(tenant.Id))!.Name);
+        store.Set(new TenantInfo(tenant.Id, "after"));
+        await Task.Delay(100);
+
+        Assert.Equal("after", (await cached.FindByIdAsync(tenant.Id))!.Name);
+        Assert.Equal(2, store.FindByIdCalls);
+    }
+
+    [Fact]
+    public async Task CancellationAwareLookup_PropagatesCancellation()
+    {
+        var store = new MutableTenantStore();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var cached = CreateCachedStore(store, cache);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => cached.FindByIdAsync(Guid.NewGuid(), cancellation.Token));
+        Assert.Equal(0, store.FindByIdCalls);
+    }
+
+    private static CachedTenantStore CreateCachedStore(
+        MutableTenantStore store,
+        IMemoryCache cache,
+        TimeSpan? expiration = null)
+        => new(
+            store,
+            cache,
+            Options.Create(new TenantStoreCacheOptions
+            {
+                AbsoluteExpiration = expiration ?? TimeSpan.FromMinutes(1)
+            }));
+
+    private sealed class MutableTenantStore : ITenantStore
+    {
+        private readonly Dictionary<Guid, TenantInfo> _tenants = new();
+
+        public int FindByIdCalls { get; private set; }
+        public int FindByHostCalls { get; private set; }
+        public TaskCompletionSource? LookupGate { get; set; }
+
+        public void Set(TenantInfo tenant) => _tenants[tenant.Id] = tenant;
+
+        public async Task<TenantInfo?> FindByIdAsync(Guid id)
+        {
+            FindByIdCalls++;
+            if (LookupGate is not null)
+                await LookupGate.Task;
+            return _tenants.GetValueOrDefault(id);
+        }
+
+        public Task<TenantInfo?> FindByHostAsync(string host)
+        {
+            FindByHostCalls++;
+            var result = _tenants.Values.SingleOrDefault(tenant =>
+                tenant.Domains.Any(domain => domain.IsVerified && domain.Host == host));
+            return Task.FromResult(result);
+        }
+
+        public Task<IEnumerable<TenantInfo>> GetAllAsync()
+            => Task.FromResult<IEnumerable<TenantInfo>>(_tenants.Values.ToArray());
+
+        public Task<bool> ExistsAsync(Guid id)
+            => Task.FromResult(_tenants.ContainsKey(id));
+    }
+}
