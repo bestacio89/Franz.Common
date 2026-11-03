@@ -115,8 +115,9 @@ public sealed class SharedDatabaseEntityClassificationTests
     private sealed class UnclassifiedDbContext(
         DbContextOptions<UnclassifiedDbContext> options,
         IDispatcher dispatcher,
-        IOptions<DatabaseOptions> databaseOptions)
-        : DbContextBase(options, dispatcher, currentUser: null, tenantContextAccessor: null, databaseOptions: databaseOptions)
+        IOptions<DatabaseOptions> databaseOptions,
+        IOptions<MultiTenancyOptions> multiTenancyOptions)
+        : DbContextBase(options, dispatcher, currentUser: null, tenantContextAccessor: null, databaseOptions: databaseOptions, multiTenancyOptions: multiTenancyOptions)
     {
         public DbSet<UnclassifiedEntity> Entities => Set<UnclassifiedEntity>();
     }
@@ -124,8 +125,9 @@ public sealed class SharedDatabaseEntityClassificationTests
     private sealed class AmbiguousDbContext(
         DbContextOptions<AmbiguousDbContext> options,
         IDispatcher dispatcher,
-        IOptions<DatabaseOptions> databaseOptions)
-        : DbContextBase(options, dispatcher, currentUser: null, tenantContextAccessor: null, databaseOptions: databaseOptions)
+        IOptions<DatabaseOptions> databaseOptions,
+        IOptions<MultiTenancyOptions> multiTenancyOptions)
+        : DbContextBase(options, dispatcher, currentUser: null, tenantContextAccessor: null, databaseOptions: databaseOptions, multiTenancyOptions: multiTenancyOptions)
     {
         public DbSet<AmbiguousEntity> Entities => Set<AmbiguousEntity>();
     }
