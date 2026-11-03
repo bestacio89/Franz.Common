@@ -25,6 +25,12 @@ public sealed class KafkaMessagingHostedService : BackgroundService
     _logger = logger;
   }
 
+  public override Task StartAsync(CancellationToken cancellationToken)
+  {
+    TenantMessagingStartupValidation.Validate(_serviceProvider);
+    return base.StartAsync(cancellationToken);
+  }
+
   protected override async Task ExecuteAsync(CancellationToken stoppingToken)
   {
     _listener.OnMessageReceivedAsync = HandleMessageInternalAsync;
