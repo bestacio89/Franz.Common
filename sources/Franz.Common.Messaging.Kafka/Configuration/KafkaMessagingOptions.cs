@@ -81,6 +81,9 @@ public class KafkaProducerOptions
 
   public KafkaCompressionType CompressionType { get; set; } = KafkaCompressionType.Snappy;
   public bool EnableIdempotence { get; set; } = true;
+
+  /// <summary>Optional prefix for unique transaction producer identities. A unique suffix is generated per transaction.</summary>
+  public string? TransactionalIdPrefix { get; set; }
   public KafkaMessageKeyStrategy MessageKeyStrategy { get; set; } = KafkaMessageKeyStrategy.MessageId;
 
   [Range(0, 1000)]

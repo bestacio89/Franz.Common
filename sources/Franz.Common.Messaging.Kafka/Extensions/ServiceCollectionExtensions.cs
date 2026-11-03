@@ -116,7 +116,9 @@ public static class ServiceCollectionExtensions
         .AddMessagingFactories()
         .AddOnlyHighLifetimeModelProvider(ServiceLifetime.Scoped)
         .AddNoDuplicateSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>()
-        .AddNoDuplicateSingleton<IConnectionProvider, ConnectionProvider>();
+        .AddNoDuplicateSingleton<IConnectionProvider, ConnectionProvider>()
+        .AddNoDuplicateSingleton<IKafkaTransactionProducerFactory, KafkaTransactionProducerFactory>()
+        .AddNoDuplicateScoped<KafkaTransactionContext>();
   }
 
   // =========================================================

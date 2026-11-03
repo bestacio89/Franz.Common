@@ -1,6 +1,7 @@
 #nullable enable
 using Confluent.Kafka;
 using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Kafka.Transactions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Reflection;
@@ -18,6 +19,7 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
   private readonly IAssemblyAccessor _assemblyAccessor;
   private readonly ILogger<KafkaSender> _logger;
   private readonly KafkaMessageKeyStrategy _keyStrategy;
+  private readonly KafkaTransactionContext? _transactionContext;
   private int _disposed;
 
   /// <summary>
@@ -46,7 +48,26 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
           assemblyAccessor,
           options?.Value?.Producer?.MessageKeyStrategy
               ?? throw new ArgumentNullException(nameof(options)),
-          logger)
+          logger,
+          null)
+  {
+  }
+
+  public KafkaSender(
+      IProducer<string, byte[]> producer,
+      IMessageSerializer serializer,
+      IAssemblyAccessor assemblyAccessor,
+      IOptions<KafkaMessagingOptions> options,
+      ILogger<KafkaSender> logger,
+      KafkaTransactionContext transactionContext)
+      : this(
+          producer,
+          serializer,
+          assemblyAccessor,
+          options?.Value?.Producer?.MessageKeyStrategy
+              ?? throw new ArgumentNullException(nameof(options)),
+          logger,
+          transactionContext ?? throw new ArgumentNullException(nameof(transactionContext)))
   {
   }
 
@@ -55,13 +76,15 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
       IMessageSerializer serializer,
       IAssemblyAccessor assemblyAccessor,
       KafkaMessageKeyStrategy keyStrategy,
-      ILogger<KafkaSender> logger)
+      ILogger<KafkaSender> logger,
+      KafkaTransactionContext? transactionContext = null)
   {
     _producer = producer ?? throw new ArgumentNullException(nameof(producer));
     _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
     _assemblyAccessor = assemblyAccessor ?? throw new ArgumentNullException(nameof(assemblyAccessor));
     _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     _keyStrategy = keyStrategy;
+    _transactionContext = transactionContext;
   }
 
   public async ValueTask SendAsync(Message message, CancellationToken ct = default)
@@ -82,7 +105,8 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
       };
 
       var topic = TopicNamer.GetTopicName(_assemblyAccessor.GetEntryAssembly());
-      var result = await _producer.ProduceAsync(topic, kafkaMessage, ct).ConfigureAwait(false);
+      var producer = _transactionContext?.Producer ?? _producer;
+      var result = await producer.ProduceAsync(topic, kafkaMessage, ct).ConfigureAwait(false);
 
       _logger.LogDebug(
           "[Kafka] Delivered {MessageId} to {Topic} [Partition: {Partition}, Offset: {Offset}]",
