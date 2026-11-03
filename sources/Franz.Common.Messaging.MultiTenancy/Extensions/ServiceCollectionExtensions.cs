@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         Action<TenantMessagingOptions>? configure)
     {
+        services.Configure<MultiTenancyOptions>(options => options.Enabled = true);
         services.Configure(configure ?? (_ => { }));
         services
             .AddNoDuplicateScoped<ITenantExecutionContextAccessor, ScopedTenantExecutionContextAccessor>()
