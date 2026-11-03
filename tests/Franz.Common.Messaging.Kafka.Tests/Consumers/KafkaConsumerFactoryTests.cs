@@ -34,7 +34,7 @@ public class KafkaConsumerFactoryTests
           MaxPollIntervalMs = 300000,
           FetchMaxBytes = 52428800
         },
-        Security = new KafkaSecurityOptions()
+        Security = new KafkaSecurityOptions { AllowInsecureTransport = true }
       };
 
   [Fact]
