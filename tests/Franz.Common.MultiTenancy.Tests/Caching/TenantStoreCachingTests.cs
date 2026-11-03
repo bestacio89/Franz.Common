@@ -1,4 +1,5 @@
 using Franz.Common.Caching.Extensions;
+using Franz.Common.Caching.MultiTenancy;
 using Microsoft.Extensions.DependencyInjection;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
