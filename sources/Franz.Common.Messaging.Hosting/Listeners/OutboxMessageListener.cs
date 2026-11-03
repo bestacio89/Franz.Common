@@ -139,7 +139,8 @@ public sealed class OutboxMessageListener : IListener
       }
       else
       {
-        _logger.LogWarning("Outbox message {MessageId} is neither an ICommand nor an IEvent.", message.Id);
+        throw new InvalidOperationException(
+            $"Outbox message '{message.Id}' resolved to unsupported type '{domainObject.GetType().FullName}'.");
       }
 
       await inbox.MarkProcessedAsync(message.Id, cancellationToken).ConfigureAwait(false);
