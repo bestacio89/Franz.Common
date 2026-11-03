@@ -3,6 +3,10 @@ using FluentAssertions;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Franz.Common.Messaging.RabbitMQ;
+using Franz.Common.Reflection;
+using RabbitMQ.Client.Exceptions;
 using Xunit;
 
 namespace Franz.Common.Messaging.RabbitMQ.Tests.Connections;
@@ -89,6 +93,22 @@ public sealed class ChannelPoolIntegrationTests
 
     await act.Should().ThrowAsync<global::RabbitMQ.Client.Exceptions.PublishException>();
     channel.IsOpen.Should().BeTrue();
+  }
+
+  [Fact]
+  public async Task GetPublisherConfirmChannelAsync_ShouldFailWhenBrokerIsUnavailable()
+  {
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      BootStrapServers = "amqp://guest:guest@127.0.0.1:1/"
+    });
+    await using var connectionProvider = new ConnectionProvider(
+        new ConnectionFactoryProvider(options, new AssemblyAccessorWrapper()));
+    await using var pool = new ChannelPool(connectionProvider);
+
+    var act = async () => await pool.GetPublisherConfirmChannelAsync();
+
+    await act.Should().ThrowAsync<BrokerUnreachableException>();
   }
 
   [Fact]
