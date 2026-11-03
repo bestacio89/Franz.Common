@@ -134,6 +134,90 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
   }
 
   [Fact]
+  [Trait("Category", "FaultTolerance")]
+  public async Task Listener_ShouldRouteRetryExhaustionToDeadLetterQueue()
+  {
+    var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
+    var channelPool = _fixture.Services.GetRequiredService<IChannelPool>();
+    var assemblyAccessor = _fixture.Services.GetRequiredService<IAssemblyAccessor>();
+    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+    var body = $"retry-exhausted-{Guid.NewGuid():N}";
+    var handlerFailed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    listener.OnMessageReceivedAsync = args =>
+    {
+      if (string.Equals(args.Message.Body, body, StringComparison.Ordinal))
+      {
+        handlerFailed.TrySetResult();
+        throw new InvalidOperationException("Retry budget already exhausted.");
+      }
+
+      return Task.CompletedTask;
+    };
+
+    try
+    {
+      await listener.Listen(cts.Token);
+      await listener.WaitUntilReadyAsync().WaitAsync(cts.Token);
+
+      var assembly = assemblyAccessor.GetEntryAssembly()
+          ?? throw new InvalidOperationException("Entry assembly cannot be null.");
+      var queueName = QueueNamer.GetQueueName(assembly);
+      var deadLetterQueue = QueueNamer.GetDeadLetterQueueName(assembly);
+      var publisher = await channelPool.GetAsync(cts.Token);
+      try
+      {
+        var properties = new BasicProperties
+        {
+          Headers = new Dictionary<string, object?> { ["x-replay"] = 3 }
+        };
+        await publisher.BasicPublishAsync(
+            exchange: string.Empty,
+            routingKey: queueName,
+            mandatory: true,
+            basicProperties: properties,
+            body: Encoding.UTF8.GetBytes(body),
+            cancellationToken: cts.Token);
+      }
+      finally
+      {
+        channelPool.Return(publisher);
+      }
+
+      await handlerFailed.Task.WaitAsync(cts.Token);
+
+      var deadLetterChannel = await channelPool.GetAsync(cts.Token);
+      try
+      {
+        BasicGetResult? deadLetter = null;
+        for (var attempt = 0; attempt < 50 && deadLetter is null; attempt++)
+        {
+          var candidate = await deadLetterChannel.BasicGetAsync(
+              deadLetterQueue, autoAck: true, cancellationToken: cts.Token);
+          if (candidate is not null &&
+              string.Equals(Encoding.UTF8.GetString(candidate.Body.Span), body, StringComparison.Ordinal))
+            deadLetter = candidate;
+          else
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token);
+        }
+
+        deadLetter.Should().NotBeNull("the exhausted delivery must be confirmed in the DLQ");
+      }
+      finally
+      {
+        channelPool.Return(deadLetterChannel);
+      }
+
+      listener.Completion.IsCompleted.Should().BeFalse(
+          "routing a failed delivery to the DLQ must not close the consumer channel");
+    }
+    finally
+    {
+      listener.OnMessageReceivedAsync = null;
+    }
+  }
+
+  [Fact]
   [Trait("Category", "Concurrency")]
   public async Task Listener_ShouldProcessUpToConfiguredConcurrencyInParallel()
   {
