@@ -222,7 +222,9 @@ public sealed class TenantStoreCachingTests
         public TaskCompletionSource<bool>? LookupGate { get; set; }
         public TaskCompletionSource<bool> LookupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public void Set(TenantInfo tenant) => _tenants[tenant.Id] = tenant;\n\n        public void Remove(Guid tenantId) => _tenants.Remove(tenantId);
+        public void Set(TenantInfo tenant) => _tenants[tenant.Id] = tenant;
+
+        public void Remove(Guid tenantId) => _tenants.Remove(tenantId);
 
         public async Task<TenantInfo?> FindByIdAsync(Guid id)
         {
@@ -236,7 +238,14 @@ public sealed class TenantStoreCachingTests
             return result;
         }
 
-        public Task<TenantInfo?> FindByIdAsync(Guid id, CancellationToken cancellationToken)\n        {\n            LastCancellationToken = cancellationToken;\n            cancellationToken.ThrowIfCancellationRequested();\n            return FindByIdAsync(id);\n        }\n\n        public Task<TenantInfo?> FindByHostAsync(string host)
+        public Task<TenantInfo?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            LastCancellationToken = cancellationToken;
+            cancellationToken.ThrowIfCancellationRequested();
+            return FindByIdAsync(id);
+        }
+
+        public Task<TenantInfo?> FindByHostAsync(string host)
         {
             FindByHostCalls++;
             var result = _tenants.Values.SingleOrDefault(tenant =>
