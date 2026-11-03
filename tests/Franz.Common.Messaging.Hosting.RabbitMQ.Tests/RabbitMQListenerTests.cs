@@ -31,7 +31,7 @@ public sealed class RabbitMQListenerTests : IClassFixture<RabbitMQHostingFixture
   }
 
   [Fact]
-  public async Task StopListenAsync_ShouldReleaseChannelToPool_AndAllowRestart()
+  public async Task StopListenAsync_ShouldDisposeConsumerChannel_AndAllowRestart()
   {
     var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
     using var firstCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));

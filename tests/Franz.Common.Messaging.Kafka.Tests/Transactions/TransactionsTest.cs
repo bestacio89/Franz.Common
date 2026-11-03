@@ -3,6 +3,7 @@ using Confluent.Kafka;
 using FluentAssertions;
 using Franz.Common.Messaging.Kafka.Transactions;
 using Moq;
+using Moq;
 using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Transactions;
@@ -60,6 +61,47 @@ public class MessagingTransactionTests
     await _sut.RollbackAsync();
 
     _producerMock.Verify(x => x.AbortTransaction(), Times.Never);
+  }
+
+
+  [Fact]
+  public async Task CompleteAsync_ShouldDisposeIsolatedProducerAndClearTransactionContext()
+  {
+    var producer = new Mock<IProducer<string, byte[]>>();
+    var factory = new Mock<IKafkaTransactionProducerFactory>();
+    factory.Setup(x => x.Create()).Returns(producer.Object);
+    var context = new KafkaTransactionContext();
+    var sut = new MessagingTransaction(factory.Object, context);
+
+    await sut.BeginAsync();
+    await sut.CompleteAsync();
+
+    factory.Verify(x => x.Create(), Times.Once);
+    producer.Verify(x => x.BeginTransaction(), Times.Once);
+    producer.Verify(x => x.CommitTransaction(), Times.Once);
+    producer.Verify(x => x.Dispose(), Times.Once);
+
+    // A second transaction in the same scope must acquire a fresh producer.
+    factory.Setup(x => x.Create()).Returns(new Mock<IProducer<string, byte[]>>().Object);
+    await sut.BeginAsync();
+    await sut.RollbackAsync();
+    factory.Verify(x => x.Create(), Times.Exactly(2));
+  }
+
+  [Fact]
+  public async Task BeginAsync_ShouldRejectConcurrentTransactionInSameContext()
+  {
+    var producer = new Mock<IProducer<string, byte[]>>();
+    var factory = new Mock<IKafkaTransactionProducerFactory>();
+    factory.Setup(x => x.Create()).Returns(producer.Object);
+    var sut = new MessagingTransaction(factory.Object, new KafkaTransactionContext());
+
+    await sut.BeginAsync();
+    Func<Task> act = async () => await sut.BeginAsync();
+
+    await act.Should().ThrowAsync<InvalidOperationException>()
+      .WithMessage("*already active*");
+    await sut.RollbackAsync();
   }
 
   [Fact]

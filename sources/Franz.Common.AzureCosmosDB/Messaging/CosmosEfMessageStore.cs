@@ -30,8 +30,22 @@ public class CosmosEfMessageStore : IMessageStore
     // indexing scenarios, helping with FIFO-ish processing.
     return await _dbContext.OutboxMessages
         .AsNoTracking()
-        .Where(m => m.SentOn == null && !m.IsDeadLetter)
+        .Where(m => m.SentOn == null && !m.IsDeadLetter && (m.NextAttemptAt == null || m.NextAttemptAt <= DateTime.UtcNow))
         .OrderBy(m => m.Id) // Explicitly sort by the sequential Guid
+        .ToListAsync(cancellationToken);
+  }
+
+  public async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(
+      int batchSize,
+      CancellationToken cancellationToken = default)
+  {
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
+
+    return await _dbContext.OutboxMessages
+        .AsNoTracking()
+        .Where(m => m.SentOn == null && !m.IsDeadLetter && (m.NextAttemptAt == null || m.NextAttemptAt <= DateTime.UtcNow))
+        .OrderBy(m => m.Id)
+        .Take(batchSize)
         .ToListAsync(cancellationToken);
   }
 
@@ -60,6 +74,7 @@ public class CosmosEfMessageStore : IMessageStore
     existing.RetryCount = message.RetryCount;
     existing.LastError = message.LastError;
     existing.LastTriedOn = message.LastTriedOn;
+    existing.NextAttemptAt = message.NextAttemptAt;
 
     await _dbContext.SaveChangesAsync(cancellationToken);
   }

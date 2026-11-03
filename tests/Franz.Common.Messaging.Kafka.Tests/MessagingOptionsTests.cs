@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using FluentAssertions;
 using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Kafka.Validation;
 using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Configuration
@@ -115,6 +116,109 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
 
       isValid.Should().BeFalse();
       results.Should().ContainSingle(r => r.MemberNames.Contains(nameof(KafkaProducerOptions.MessageMaxBytes)));
+    }
+
+    [Fact]
+    public void KafkaSecurityOptions_ShouldReject_PlaintextWithoutExplicitOptIn()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group"
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message => message.Contains("AllowInsecureTransport"));
+    }
+
+    [Theory]
+    [InlineData(KafkaSecurityProtocol.SaslPlaintext)]
+    [InlineData(KafkaSecurityProtocol.SaslSsl)]
+    public void KafkaSecurityOptions_ShouldRequire_SaslMechanism(KafkaSecurityProtocol protocol)
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions
+        {
+          SecurityProtocol = protocol,
+          SaslUsername = "user",
+          SaslPassword = "secret"
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message => message.Contains("SaslMechanism"));
+    }
+
+    [Fact]
+    public void KafkaSecurityOptions_ShouldRequireCredentials_ForPlainMechanism()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions
+        {
+          SecurityProtocol = KafkaSecurityProtocol.SaslSsl,
+          SaslMechanism = KafkaSaslMechanism.Plain
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message => message.Contains("SaslUsername"));
+      result.Failures.Should().Contain(message => message.Contains("SaslPassword"));
+    }
+
+    [Fact]
+    public void KafkaSecurityOptions_ShouldAccept_ValidSaslSslConfiguration()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions
+        {
+          SecurityProtocol = KafkaSecurityProtocol.SaslSsl,
+          SaslMechanism = KafkaSaslMechanism.ScramSha512,
+          SaslUsername = "user",
+          SaslPassword = "secret"
+        }
+      };
+
+      new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options).Failed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void KafkaSecurityOptions_ShouldReject_SslClientCertificateWithoutKey()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions
+        {
+          SecurityProtocol = KafkaSecurityProtocol.Ssl,
+          SslCertificateLocation = "/cert/client.pem"
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message => message.Contains("SslKeyLocation"));
     }
 
     [Fact]

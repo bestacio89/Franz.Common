@@ -68,7 +68,48 @@ public static class ServiceCollectionExtensions
     if (!section.Exists())
       throw new TechnicalException("RabbitMQ messaging configuration missing");
 
-    services.AddOptions<RabbitMQMessagingOptions>().Bind(section);
+    services.AddOptions<RabbitMQMessagingOptions>()
+        .Bind(section)
+        .Validate(options =>
+            !string.IsNullOrWhiteSpace(options.BootStrapServers) ||
+            (!string.IsNullOrWhiteSpace(options.HostName) &&
+             !string.IsNullOrWhiteSpace(options.UserName) &&
+             !string.IsNullOrWhiteSpace(options.Password)),
+            "Configure Messaging:RabbitMQ:BootStrapServers with an amqp(s) URI, or configure HostName, UserName, and Password explicitly.")
+        .Validate(options =>
+            string.IsNullOrWhiteSpace(options.BootStrapServers) ||
+            (Uri.TryCreate(options.BootStrapServers, UriKind.Absolute, out var uri) &&
+             (uri.Scheme == "amqp" || uri.Scheme == "amqps")),
+            "Messaging:RabbitMQ:BootStrapServers must be an absolute amqp:// or amqps:// URI.")
+        .Validate(options =>
+            string.IsNullOrWhiteSpace(options.BootStrapServers) ||
+            (Uri.TryCreate(options.BootStrapServers, UriKind.Absolute, out var bootstrapUri) &&
+             !string.IsNullOrWhiteSpace(bootstrapUri.Host) &&
+             bootstrapUri.UserInfo.Contains(":", StringComparison.Ordinal) &&
+             bootstrapUri.UserInfo.Split(':', 2)[0].Length > 0 &&
+             bootstrapUri.UserInfo.Split(':', 2)[1].Length > 0),
+            "Messaging:RabbitMQ:BootStrapServers must include a host and explicit username/password credentials.")
+        .Validate(options =>
+            string.IsNullOrWhiteSpace(options.BootStrapServers) ||
+            options.SslEnabled != true ||
+            (Uri.TryCreate(options.BootStrapServers, UriKind.Absolute, out var secureUri) &&
+             secureUri.Scheme == "amqps"),
+            "RabbitMQ TLS is enabled but Messaging:RabbitMQ:BootStrapServers does not use amqps://.")
+        .Validate(options =>
+            options.RequestedHeartbeatSeconds is null or > 0,
+            "Messaging:RabbitMQ:RequestedHeartbeatSeconds must be greater than zero when configured.")
+        .Validate(options =>
+            string.Equals(options.ReplayStrategy, "NoReplay", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase),
+            "Messaging:RabbitMQ:ReplayStrategy must be NoReplay or ProgressiveFourStep.")
+        .Validate(options =>
+            options.PublisherConfirmTimeoutSeconds > 0,
+            "Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds must be greater than zero.")
+        .Validate(options =>
+            options.MaxConcurrency > 0 && options.MaxConcurrency <= ushort.MaxValue,
+            "Messaging:RabbitMQ:MaxConcurrency must be between 1 and 65535.")
+        .ValidateOnStart();
+
     return services;
   }
 
@@ -85,6 +126,8 @@ public static class ServiceCollectionExtensions
         .AddNoDuplicateSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>()
         .AddNoDuplicateSingleton<IConnectionProvider, ConnectionProvider>()
         .AddNoDuplicateSingleton<IChannelPool, ChannelPool>()
+        .AddNoDuplicateSingleton<IConfirmChannelPool>(sp =>
+            (IConfirmChannelPool)sp.GetRequiredService<IChannelPool>())
         .AddMessagingFactories()
         .AddNoDuplicateScoped<IMessagingInitializer, RabbitMQMessagingInitializer>()
         .AddNoDuplicateScoped<IMessagingTransaction, RabbitMQMessagingTransaction>();
@@ -122,7 +165,17 @@ public static class ServiceCollectionExtensions
             .AddNoDuplicateScoped<MessageContextAccessor>()
             .AddNoDuplicateScoped<IMessageContextAccessor>(sp => sp.GetRequiredService<MessageContextAccessor>())
             .AddNoDuplicateSingleton<IBasicConsumerFactory, BasicConsumerFactory>()
-            .AddSingleton<IReplayStrategy, NoReplayStrategy>();
+            .AddSingleton<IReplayStrategy>(sp =>
+            {
+              var options = sp.GetRequiredService<IOptions<RabbitMQMessagingOptions>>().Value;
+              var confirmChannelPool = sp.GetRequiredService<IConfirmChannelPool>();
+              var accessor = sp.GetRequiredService<IAssemblyAccessor>();
+              var rabbitOptions = sp.GetRequiredService<IOptions<RabbitMQMessagingOptions>>();
+
+              return string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase)
+                  ? new ProgressiveFourStepReplayStrategy(confirmChannelPool, accessor, rabbitOptions)
+                  : new NoReplayStrategy(confirmChannelPool, accessor, rabbitOptions);
+            });
 
     return services;
   }

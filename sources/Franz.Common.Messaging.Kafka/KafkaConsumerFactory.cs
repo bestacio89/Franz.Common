@@ -3,6 +3,7 @@ using Confluent.Kafka;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Franz.Common.Messaging.Kafka.Validation;
 
 namespace Franz.Common.Messaging.Kafka;
 
@@ -21,7 +22,18 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
 
   public IConsumer<string, string> Build()
   {
+    var validation = new KafkaMessagingOptionsValidator().Validate(Options.DefaultName, _options);
+    if (validation.Failed)
+      throw new OptionsValidationException(Options.DefaultName, typeof(KafkaMessagingOptions), validation.Failures);
+
     var options = _options.Consumer;
+    if (options.EnableAutoCommit || options.EnableAutoOffsetStore)
+    {
+      throw new InvalidOperationException(
+          "Franz Kafka consumers commit offsets only after successful handler completion. " +
+          "EnableAutoCommit and EnableAutoOffsetStore must both be false.");
+    }
+
     var config = new ConsumerConfig
     {
       BootstrapServers = _options.BootstrapServers,
@@ -54,6 +66,26 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
     };
 
     return new ConsumerBuilder<string, string>(config)
+        .SetPartitionsRevokedHandler((_, partitions) =>
+        {
+          if (partitions.Count == 0)
+            return;
+
+          _logger.LogInformation(
+              "Kafka partitions revoked for group {GroupId}: {Partitions}.",
+              config.GroupId,
+              string.Join(", ", partitions.Select(partition => $"{partition.Topic}[{partition.Partition.Value}]@{partition.Offset.Value}")));
+        })
+        .SetPartitionsLostHandler((_, partitions) =>
+        {
+          if (partitions.Count == 0)
+            return;
+
+          _logger.LogWarning(
+              "Kafka partitions lost for group {GroupId}: {Partitions}. Offsets may be redelivered; handlers must be idempotent.",
+              config.GroupId,
+              string.Join(", ", partitions.Select(partition => $"{partition.Topic}[{partition.Partition.Value}]@{partition.Offset.Value}")));
+        })
         .SetErrorHandler((_, error) =>
         {
           if (error.IsFatal)

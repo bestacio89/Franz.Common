@@ -255,3 +255,12 @@ See the `LICENSE` file for details.
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## Kafka consumer delivery and rebalance contract
+
+- **Handlers must be bounded.** Keep each message handler's total processing time, including retries and retry backoff, comfortably below `KafkaConsumerOptions.MaxPollIntervalMs`. The consumer is polled synchronously by the listener; an unbounded handler can exceed the group coordinator's poll deadline and lose partition ownership.
+- **Handlers must be idempotent.** A successful handler can be followed by a rebalance before its offset commit is accepted. The listener logs known rebalance-related commit rejections and continues; the record can be delivered again to the new partition owner. Make side effects idempotent or persist an inbox/deduplication key in the same transaction as the business update.
+- **Offsets are committed after processing.** Auto commit and auto offset storage are rejected by the consumer factory. A handler failure does not advance the original message's offset. Dead-letter publication must succeed before the original offset is committed.
+- **Rebalance observability.** Partition revocation and partition loss are logged separately. A lost partition is no longer owned by this consumer, so do not assume that an in-flight handler's eventual completion can be committed by the former owner.
+- **No exactly-once claim for external effects.** Kafka offset commits do not atomically include external database writes. Use an outbox/inbox or a Kafka transaction with the relevant consumer offsets when the workflow requires atomic Kafka-to-Kafka processing.

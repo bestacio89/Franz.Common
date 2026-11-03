@@ -31,4 +31,10 @@ public class OutboxOptions
   /// Default = false.
   /// </summary>
   public int BatchSize { get; set; } = 10;
+
+  /// <summary>Initial delay before retrying a failed message.</summary>
+  public TimeSpan InitialRetryDelay { get; set; } = TimeSpan.FromSeconds(5);
+
+  /// <summary>Upper bound for exponential retry delay.</summary>
+  public TimeSpan MaxRetryDelay { get; set; } = TimeSpan.FromMinutes(5);
 }

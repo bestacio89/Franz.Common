@@ -60,6 +60,8 @@ public class MessageStorageTests
     {
       Id = Guid.CreateVersion7(),
       Body = "payload",
+      MessageType = "Franz.Tests.TestEvent, Franz.Tests",
+      CorrelationId = Guid.CreateVersion7(),
       Headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
             {
                 { "X-Roles", ["Admin", "User"] }
@@ -70,6 +72,9 @@ public class MessageStorageTests
     var message = stored.ToMessage();
 
     // Assert
+    message.MessageType.Should().Be(stored.MessageType);
+    message.CorrelationId.Should().Be(stored.CorrelationId);
+
     // FIX: headers.TryGetValue now outputs string[] instead of StringValues
     message.Headers.TryGetValue("X-Roles", out var values).Should().BeTrue();
     values!.Length.Should().Be(2);

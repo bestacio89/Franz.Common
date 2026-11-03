@@ -2,8 +2,6 @@
 using Franz.Common.Mediator.Extensions;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.RabbitMQ;
-using Franz.Common.Messaging.RabbitMQ.Connections;
-using Franz.Common.Reflection;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.MongoDB.Extensions;
@@ -21,6 +19,7 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
   private readonly MongoContainerFixture _mongo;
 
   public IHost? Host { get; private set; }
+  private bool _hostStarted;
 
   public IServiceProvider Services =>
       Host?.Services ?? throw new InvalidOperationException("Host not started. Call InitializeAsync first.");
@@ -32,6 +31,19 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
   }
 
   public async Task InitializeAsync()
+  {
+    try
+    {
+      await InitializeCoreAsync();
+    }
+    catch
+    {
+      await DisposeAsync();
+      throw;
+    }
+  }
+
+  private async Task InitializeCoreAsync()
   {
     // 1️⃣ Start containers in parallel
     // Senior Note: Parallel startup minimizes cold-start latency for the integration suite.
@@ -55,57 +67,38 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
         await initializer.InitializeAsync();
       }
 
-      // TestHost is the process entry assembly under xUnit. Provision the exact
-      // queue derived by RabbitMQListener explicitly, so the test exercises the
-      // listener lifecycle rather than depending on entry-assembly discovery.
-      await DeclareListenerTopologyAsync(scope.ServiceProvider);
     }
 
     await Host.StartAsync();
+    _hostStarted = true;
   }
 
   public async Task DisposeAsync()
   {
-    // 3️⃣ Graceful shutdown of the Host before killing infrastructure
-    if (Host != null)
-    {
-      await Host.StopAsync();
-      Host.Dispose();
-    }
-
-    await Task.WhenAll(
-        _rabbit.DisposeAsync(),
-        _mongo.DisposeAsync());
-  }
-
-  private static async Task DeclareListenerTopologyAsync(IServiceProvider services)
-  {
-    var assembly = services.GetRequiredService<IAssemblyAccessor>().GetEntryAssembly()
-        ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-    var queue = QueueNamer.GetQueueName(assembly);
-    var exchange = ExchangeNamer.GetEventExchangeName(assembly);
-    var deadLetterQueue = QueueNamer.GetDeadLetterQueueName(assembly);
-    var deadLetterExchange = ExchangeNamer.GetDeadLetterExchangeName(assembly);
-    var channel = await services.GetRequiredService<IChannelPool>().GetAsync();
+    // Stop and asynchronously dispose the host before disposing its dependencies.
+    // Nested finally blocks ensure every container is disposed even when one
+    // shutdown operation fails.
+    var host = Host;
+    Host = null;
 
     try
     {
-      await channel.ExchangeDeclareAsync(exchange, ExchangeType.Headers, durable: true, autoDelete: false);
-      await channel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Direct, durable: true, autoDelete: false);
-      await channel.QueueDeclareAsync(queue, durable: true, exclusive: false, autoDelete: false,
-          arguments: new Dictionary<string, object?>
-          {
-            ["x-queue-type"] = "quorum",
-            ["x-dead-letter-exchange"] = deadLetterExchange,
-            ["x-dead-letter-routing-key"] = deadLetterQueue
-          });
-      await channel.QueueDeclareAsync(deadLetterQueue, durable: true, exclusive: false, autoDelete: false,
-          arguments: new Dictionary<string, object?> { ["x-queue-type"] = "quorum" });
-      await channel.QueueBindAsync(deadLetterQueue, deadLetterExchange, deadLetterQueue);
+      if (host is not null && _hostStarted)
+        await host.StopAsync().ConfigureAwait(false);
     }
     finally
     {
-      services.GetRequiredService<IChannelPool>().Return(channel);
+      try
+      {
+        host?.Dispose();
+      }
+      finally
+      {
+        _hostStarted = false;
+        await Task.WhenAll(
+            _rabbit.DisposeAsync(),
+            _mongo.DisposeAsync()).ConfigureAwait(false);
+      }
     }
   }
 
@@ -119,6 +112,12 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
     {
       configDict[key] = value;
     }
+
+    // Exercise the opt-in bounded consumer mode in hosting integration tests.
+    // Production defaults remain sequential (MaxConcurrency = 1).
+    configDict["Messaging:RabbitMQ:MaxConcurrency"] = "3";
+    configDict["Messaging:RabbitMQ:ReplayStrategy"] = "ProgressiveFourStep";
+    configDict["Messaging:RabbitMQ:DeadLetterQueueName"] = $"{_rabbit.QueueName}-dead-letter";
 
     // Merge Mongo configuration
     foreach (var (key, value) in _mongo.GetConfiguration())

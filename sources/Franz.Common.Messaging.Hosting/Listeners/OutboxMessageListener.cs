@@ -9,8 +9,10 @@ using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.MultiTenancy;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Messaging.Storage;
+using Franz.Common.Messaging.Outbox;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Messaging.Hosting.Listeners;
 
@@ -18,13 +20,34 @@ public sealed class OutboxMessageListener : IListener
 {
   private readonly IServiceScopeFactory _scopeFactory;
   private readonly ILogger<OutboxMessageListener> _logger;
+  private readonly int _batchSize;
 
+  /// <summary>
+  /// Creates a listener with the default polling batch size for binary compatibility.
+  /// </summary>
   public OutboxMessageListener(
       IServiceScopeFactory scopeFactory,
       ILogger<OutboxMessageListener> logger)
+      : this(scopeFactory, logger, Options.Create(new OutboxOptions()))
   {
+  }
+
+  /// <summary>
+  /// Creates a listener using the configured outbox polling batch size.
+  /// </summary>
+  public OutboxMessageListener(
+      IServiceScopeFactory scopeFactory,
+      ILogger<OutboxMessageListener> logger,
+      IOptions<OutboxOptions> options)
+  {
+    ArgumentNullException.ThrowIfNull(scopeFactory);
+    ArgumentNullException.ThrowIfNull(logger);
+    ArgumentNullException.ThrowIfNull(options);
+
     _scopeFactory = scopeFactory;
     _logger = logger;
+    _batchSize = options.Value.BatchSize;
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_batchSize);
   }
 
   public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
@@ -42,7 +65,7 @@ public sealed class OutboxMessageListener : IListener
         await using (var pollingScope = _scopeFactory.CreateAsyncScope())
         {
           var messageStore = pollingScope.ServiceProvider.GetRequiredService<IMessageStore>();
-          pending = await messageStore.GetPendingAsync(stoppingToken).ConfigureAwait(false);
+          pending = await messageStore.GetPendingAsync(_batchSize, stoppingToken).ConfigureAwait(false);
         }
 
         foreach (var stored in pending)
@@ -94,7 +117,9 @@ public sealed class OutboxMessageListener : IListener
 
       // A nested hosted handler may clear the ambient AsyncLocal; restore it for this dispatch scope.
       messageContextAccessor?.Set(new MessageContext(message));
-      var domainObject = TryDeserializeDomainObject(message, serializer);
+      var domainObject = TryDeserializeDomainObject(message, serializer)
+          ?? throw new InvalidOperationException(
+              $"Outbox message '{message.Id}' could not be resolved to a command or event.");
 
       using var logScope = _logger.BeginScope(new Dictionary<string, object?>
       {
@@ -114,7 +139,8 @@ public sealed class OutboxMessageListener : IListener
       }
       else
       {
-        _logger.LogWarning("Outbox message {MessageId} is neither an ICommand nor an IEvent.", message.Id);
+        throw new InvalidOperationException(
+            $"Outbox message '{message.Id}' resolved to unsupported type '{domainObject.GetType().FullName}'.");
       }
 
       await inbox.MarkProcessedAsync(message.Id, cancellationToken).ConfigureAwait(false);
@@ -159,17 +185,95 @@ public sealed class OutboxMessageListener : IListener
 
   private static Type? ResolveType(string typeName)
   {
-    var type = Type.GetType(typeName);
+    ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
+
+    // Prefer the CLR resolver. It understands assembly-qualified names,
+    // nested types, and generic type expressions.
+    var type = Type.GetType(
+        typeName,
+        throwOnError: false,
+        ignoreCase: false);
+
     if (type is not null)
       return type;
 
+    // Assembly.GetType expects the type's full name, not its
+    // assembly-qualified name. Find the top-level separator while
+    // preserving commas inside generic type argument expressions.
+    var separatorIndex = FindAssemblySeparator(typeName);
+    var fullTypeName = separatorIndex < 0
+        ? typeName.Trim()
+        : typeName[..separatorIndex].Trim();
+
+    if (fullTypeName.Length == 0)
+      return null;
+
+    if (separatorIndex >= 0)
+    {
+      var assemblyIdentity = typeName[(separatorIndex + 1)..].Trim();
+      var assemblyName = assemblyIdentity.Split(',', 2)[0].Trim();
+
+      if (assemblyName.Length > 0)
+      {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+          if (!string.Equals(
+                  assembly.GetName().Name,
+                  assemblyName,
+                  StringComparison.OrdinalIgnoreCase))
+            continue;
+
+          type = assembly.GetType(
+              fullTypeName,
+              throwOnError: false,
+              ignoreCase: false);
+
+          if (type is not null)
+            return type;
+        }
+      }
+    }
+
+    // Last resort: resolve an unqualified type name against loaded assemblies.
     foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
     {
-      type = assembly.GetType(typeName);
+      type = assembly.GetType(
+          fullTypeName,
+          throwOnError: false,
+          ignoreCase: false);
+
       if (type is not null)
         return type;
     }
 
     return null;
+  }
+
+  private static int FindAssemblySeparator(string typeName)
+  {
+    var genericDepth = 0;
+
+    for (var index = 0; index < typeName.Length; index++)
+    {
+      switch (typeName[index])
+      {
+        case '[':
+          genericDepth++;
+          break;
+
+        case ']':
+          genericDepth--;
+
+          if (genericDepth < 0)
+            return -1;
+
+          break;
+
+        case ',' when genericDepth == 0:
+          return index;
+      }
+    }
+
+    return -1;
   }
 }

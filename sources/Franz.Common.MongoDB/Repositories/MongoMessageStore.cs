@@ -30,10 +30,8 @@ public class MongoMessageStore : IMessageStore
             new CreateIndexModel<StoredMessage>(
                 Builders<StoredMessage>.IndexKeys.Ascending(m => m.SentOn)),
 
-            // GUID V7 Index: Naturally handles chronological ordering 
-            // and provides high-performance unique lookups.
             new CreateIndexModel<StoredMessage>(
-                Builders<StoredMessage>.IndexKeys.Ascending(m => m.Id)),
+                Builders<StoredMessage>.IndexKeys.Ascending(m => m.NextAttemptAt)),
 
             // For retry cycle handling and DLQ triage
             new CreateIndexModel<StoredMessage>(
@@ -45,15 +43,31 @@ public class MongoMessageStore : IMessageStore
         };
 
     _collection.Indexes.CreateMany(indexModels);
+
+    // MongoDB creates a unique index for the document _id automatically.
+    // StoredMessage.Id is mapped to _id by the driver's Id convention, so
+    // creating another index on Id is both redundant and rejected by MongoDB.
   }
 
   public async Task SaveAsync(Message message, CancellationToken cancellationToken = default)
       => await _collection.InsertOneAsync(message.ToStored(), cancellationToken: cancellationToken);
 
   public async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(CancellationToken cancellationToken = default)
-      => await _collection.Find(m => m.SentOn == null && !m.IsDeadLetter)
+      => await _collection.Find(m => m.SentOn == null && !m.IsDeadLetter && (m.NextAttemptAt == null || m.NextAttemptAt <= DateTime.UtcNow))
                           .SortBy(m => m.Id) // Leverage Guid v7 sequentiality for FIFO
                           .ToListAsync(cancellationToken);
+
+  public async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(
+      int batchSize,
+      CancellationToken cancellationToken = default)
+  {
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
+
+    return await _collection.Find(m => m.SentOn == null && !m.IsDeadLetter && (m.NextAttemptAt == null || m.NextAttemptAt <= DateTime.UtcNow))
+        .SortBy(m => m.Id)
+        .Limit(batchSize)
+        .ToListAsync(cancellationToken);
+  }
 
   // 🛠️ FIX: Changed parameter type from string to Guid to match IMessageStore
   public async Task MarkAsSentAsync(Guid id, CancellationToken cancellationToken = default)
@@ -69,7 +83,8 @@ public class MongoMessageStore : IMessageStore
     var update = Builders<StoredMessage>.Update
         .Set(x => x.RetryCount, message.RetryCount)
         .Set(x => x.LastError, message.LastError)
-        .Set(x => x.LastTriedOn, message.LastTriedOn);
+        .Set(x => x.LastTriedOn, message.LastTriedOn)
+        .Set(x => x.NextAttemptAt, message.NextAttemptAt);
 
     await _collection.UpdateOneAsync(
         x => x.Id == message.Id, // message.Id is now a Guid
@@ -79,10 +94,16 @@ public class MongoMessageStore : IMessageStore
 
   public async Task MoveToDeadLetterAsync(StoredMessage message, CancellationToken cancellationToken = default)
   {
-    // Tag as DLQ before moving
+    // Upsert by stable message ID so a retry after a crash between the DLQ write
+    // and outbox deletion cannot create duplicate dead-letter records.
     message.IsDeadLetter = true;
 
-    await _deadLetterCollection.InsertOneAsync(message, cancellationToken: cancellationToken);
+    await _deadLetterCollection.ReplaceOneAsync(
+        m => m.Id == message.Id,
+        message,
+        new ReplaceOptions { IsUpsert = true },
+        cancellationToken);
+
     await _collection.DeleteOneAsync(m => m.Id == message.Id, cancellationToken);
   }
 }

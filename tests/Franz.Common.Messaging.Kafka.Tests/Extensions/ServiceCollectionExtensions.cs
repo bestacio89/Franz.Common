@@ -2,6 +2,7 @@
 using Confluent.Kafka;
 using FluentAssertions;
 using Franz.Common.Mediator;
+using Franz.Common.Mediator.Extensions;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Contexting;
@@ -11,6 +12,7 @@ using Franz.Common.Messaging.Kafka.Modeling;
 using Franz.Common.Messaging.Kafka.Senders;
 using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Messaging.Kafka.Transactions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -166,6 +168,42 @@ public class KafkaMessagingRegistrationIntegrationTests
         because: "event mode must register a sender keyed by event type name");
     consumer.Should().NotBeNull(
         because: "event mode must register a consumer keyed by event type name");
+  }
+
+  [Fact]
+  public async Task EventMode_ExplicitEventTypes_ShouldRegisterOnlyDeclaredEvents()
+  {
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddSingleton<IConfiguration>(_fixture.Configuration);
+    services.AddFranzMediator(new[] { typeof(KafkaMessagingRegistrationIntegrationTests).Assembly });
+    services.AddEventBasedKafkaMessaging(
+        _fixture.Configuration,
+        typeof(TestIntegrationEvent));
+
+    await using var provider = services.BuildServiceProvider();
+    await using var scope = provider.CreateAsyncScope();
+
+    scope.ServiceProvider
+        .GetKeyedService<IMessagingPublisher>(nameof(TestIntegrationEvent))
+        .Should().NotBeNull();
+
+    scope.ServiceProvider
+        .GetKeyedService<IMessagingPublisher>(nameof(AnotherIntegrationEvent))
+        .Should().BeNull();
+  }
+
+  [Fact]
+  public void EventMode_ExplicitEventTypes_ShouldRejectNonIntegrationEvents()
+  {
+    var services = new ServiceCollection();
+
+    var act = () => services.AddEventBasedKafkaMessaging(
+        _fixture.Configuration,
+        typeof(string));
+
+    act.Should().Throw<ArgumentException>()
+        .WithMessage("*IIntegrationEvent*");
   }
 
   [Fact]

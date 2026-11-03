@@ -3,21 +3,41 @@ using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.RabbitMQ.Transactions;
+using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using System.Text;
 
 namespace Franz.Common.Messaging.RabbitMQ;
 
-public sealed class RabbitMQMessagingSender(
-    Connections.IChannelPool channelPool,
-    IMessageHandler handler,
-    IMessagingTransaction? transaction = null)
-    : IMessagingSender, IAsyncDisposable, IDisposable
+public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable, IDisposable
 {
-  public void Dispose()
+  private readonly Connections.IChannelPool _channelPool;
+  private readonly IMessageHandler _handler;
+  private readonly IMessagingTransaction? _transaction;
+  private readonly IOptions<RabbitMQMessagingOptions>? _options;
+
+  // Preserve the original public constructor for source and binary compatibility.
+  public RabbitMQMessagingSender(
+      Connections.IChannelPool channelPool,
+      IMessageHandler handler,
+      IMessagingTransaction? transaction = null)
+      : this(channelPool, handler, transaction, null)
   {
-    GC.SuppressFinalize(this);
   }
+
+  public RabbitMQMessagingSender(
+      Connections.IChannelPool channelPool,
+      IMessageHandler handler,
+      IMessagingTransaction? transaction,
+      IOptions<RabbitMQMessagingOptions>? options)
+  {
+    _channelPool = channelPool ?? throw new ArgumentNullException(nameof(channelPool));
+    _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+    _transaction = transaction;
+    _options = options;
+  }
+
+  public void Dispose() => GC.SuppressFinalize(this);
 
   public ValueTask DisposeAsync()
   {
@@ -30,17 +50,28 @@ public sealed class RabbitMQMessagingSender(
     ArgumentNullException.ThrowIfNull(message);
     ArgumentNullException.ThrowIfNull(message.Body);
 
-    await handler.ProcessAsync(message, cancellationToken).ConfigureAwait(false);
+    await _handler.ProcessAsync(message, cancellationToken).ConfigureAwait(false);
     var queue = QueueNamer.GetQueueName(message.Kind);
-    var channel = await channelPool.GetAsync(cancellationToken).ConfigureAwait(false);
+
+    var advancedPool = _channelPool as Connections.IConfirmChannelPool;
+    var dedicatedChannel = advancedPool is not null;
+    var channel = _transaction is RabbitMQMessagingTransaction && advancedPool is not null
+        ? await advancedPool.GetTransactionalChannelAsync(cancellationToken).ConfigureAwait(false)
+        : advancedPool is not null
+            ? await advancedPool.GetPublisherConfirmChannelAsync(cancellationToken).ConfigureAwait(false)
+            : await _channelPool.GetAsync(cancellationToken).ConfigureAwait(false);
+
+    using var confirmationTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+    confirmationTimeout.CancelAfter(TimeSpan.FromSeconds(_options?.Value.PublisherConfirmTimeoutSeconds ?? 5));
+    var publishCompleted = false;
 
     try
     {
-      if (transaction is RabbitMQMessagingTransaction rabbitTransaction)
+      if (_transaction is RabbitMQMessagingTransaction rabbitTransaction)
         rabbitTransaction.Attach(channel);
 
-      if (transaction is not null)
-        await transaction.BeginAsync(cancellationToken).ConfigureAwait(false);
+      if (_transaction is not null)
+        await _transaction.BeginAsync(cancellationToken).ConfigureAwait(false);
 
       var body = Encoding.UTF8.GetBytes(message.Body);
       var properties = message.Headers.ToBasicProperties();
@@ -55,18 +86,20 @@ public sealed class RabbitMQMessagingSender(
           mandatory: true,
           basicProperties: basicProperties,
           body: body,
-          cancellationToken: cancellationToken).ConfigureAwait(false);
+          cancellationToken: dedicatedChannel ? confirmationTimeout.Token : cancellationToken).ConfigureAwait(false);
 
-      if (transaction is not null)
-        await transaction.CompleteAsync(cancellationToken).ConfigureAwait(false);
+      if (_transaction is not null)
+        await _transaction.CompleteAsync(cancellationToken).ConfigureAwait(false);
+
+      publishCompleted = true;
     }
     catch (Exception sendException)
     {
-      if (transaction is not null)
+      if (_transaction is not null)
       {
         try
         {
-          await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+          await _transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception rollbackException)
         {
@@ -81,14 +114,21 @@ public sealed class RabbitMQMessagingSender(
     }
     finally
     {
-      if (transaction is RabbitMQMessagingTransaction)
-        await DisposeTransactionalChannelAsync(channel).ConfigureAwait(false);
+      if (_transaction is RabbitMQMessagingTransaction)
+        await DisposeChannelAsync(channel).ConfigureAwait(false);
+      else if (advancedPool is not null)
+      {
+        if (publishCompleted)
+          advancedPool.ReturnPublisherConfirmChannel(channel);
+        else
+          await DisposeChannelAsync(channel).ConfigureAwait(false);
+      }
       else
-        channelPool.Return(channel);
+        _channelPool.Return(channel);
     }
   }
 
-  private static async ValueTask DisposeTransactionalChannelAsync(IChannel channel)
+  private static async ValueTask DisposeChannelAsync(IChannel channel)
   {
     try
     {
@@ -97,7 +137,7 @@ public sealed class RabbitMQMessagingSender(
     }
     catch
     {
-      // A channel in transaction mode must never return to the shared pool.
+      // A confirmed or transactional channel must never return to the shared pool.
     }
 
     try

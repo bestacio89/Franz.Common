@@ -36,6 +36,9 @@ public class StoredMessage
 
   public DateTime? LastTriedOn { get; set; }
 
+  /// <summary>Earliest UTC time at which this message may be retried.</summary>
+  public DateTime? NextAttemptAt { get; set; }
+
   public bool IsDeadLetter { get; set; } = false;
 
   // =====================================================
@@ -43,23 +46,5 @@ public class StoredMessage
   // =====================================================
 
   public Message ToMessage()
-  {
-    var message = new Message(Body)
-    {
-      Id = Id,
-      CorrelationId = CorrelationId,
-      MessageType = MessageType,
-      Properties = new Dictionary<string, object>(Properties)
-    };
-
-    foreach (var header in Headers)
-    {
-      message.Headers[header.Key] =
-        header.Value is null || header.Value.Length == 0
-          ? Array.Empty<string>()
-          : header.Value.Where(v => v is not null).ToArray();
-    }
-
-    return message;
-  }
+      => Storage.MessageMappingExtensions.ToMessage(this);
 }

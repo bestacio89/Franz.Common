@@ -41,11 +41,13 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
 
   private async Task InitializeAsyncInternal()
   {
-    await Container.StartAsync();
-    ConnectionString = Container.GetConnectionString();
+    try
+    {
+      await Container.StartAsync();
+      ConnectionString = Container.GetConnectionString();
 
-    var services = new ServiceCollection();
-    services.AddSingleton(Options.Create(new RabbitMQMessagingOptions
+      var services = new ServiceCollection();
+      services.AddSingleton(Options.Create(new RabbitMQMessagingOptions
     {
       BootStrapServers = ConnectionString,
       UserName = "guest",
@@ -53,24 +55,35 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
       PublisherConfirmTimeoutSeconds = 5
     }));
 
-    services.AddSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
-    services.AddSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>();
-    services.AddSingleton<IConnectionProvider, ConnectionProvider>();
-    services.AddSingleton<IChannelPool, ChannelPool>();
-    services.AddScoped<IMessagingInitializer, RabbitMQMessagingInitializer>();
-    services.AddScoped<IMessagingTransaction, RabbitMQMessagingTransaction>();
+      services.AddSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
+      services.AddSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>();
+      services.AddSingleton<IConnectionProvider, ConnectionProvider>();
+      services.AddSingleton<IChannelPool, ChannelPool>();
+      services.AddScoped<IMessagingInitializer, RabbitMQMessagingInitializer>();
+      services.AddScoped<IMessagingTransaction, RabbitMQMessagingTransaction>();
 
-    ServiceProvider = services.BuildServiceProvider();
+      ServiceProvider = services.BuildServiceProvider();
+    }
+    catch
+    {
+      await Container.DisposeAsync().ConfigureAwait(false);
+      throw;
+    }
   }
 
   public async Task DisposeAsync()
   {
-    if (ServiceProvider is not null)
-    {
-      await ServiceProvider.DisposeAsync();
-      ServiceProvider = null!;
-    }
+    var serviceProvider = ServiceProvider;
+    ServiceProvider = null!;
 
-    await Container.DisposeAsync().ConfigureAwait(false);
+    try
+    {
+      if (serviceProvider is not null)
+        await serviceProvider.DisposeAsync().ConfigureAwait(false);
+    }
+    finally
+    {
+      await Container.DisposeAsync().ConfigureAwait(false);
+    }
   }
 }

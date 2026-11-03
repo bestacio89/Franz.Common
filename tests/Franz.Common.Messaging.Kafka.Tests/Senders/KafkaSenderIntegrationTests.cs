@@ -3,12 +3,14 @@ using Confluent.Kafka;
 using FluentAssertions;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Kafka.Senders;
+using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.Text;
 using Xunit;
@@ -72,7 +74,7 @@ public sealed class KafkaSenderTests : IClassFixture<KafkaContainerFixture>, IAs
 
       result.Should().NotBeNull();
 
-      result!.Message.Key.Should().Be(correlationId.ToString());
+      result!.Message.Key.Should().Be(messageId.ToString());
 
       var payload = Encoding.UTF8.GetString(result.Message.Value);
       payload.Should().Contain("Integration-Test-Data");
@@ -138,6 +140,7 @@ public sealed class KafkaSenderTests : IClassFixture<KafkaContainerFixture>, IAs
       mockProducer.Object,
       _scope.ServiceProvider.GetRequiredService<IMessageSerializer>(),
       _scope.ServiceProvider.GetRequiredService<IAssemblyAccessor>(),
+      _scope.ServiceProvider.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
       _scope.ServiceProvider.GetRequiredService<ILogger<KafkaSender>>()
     );
 

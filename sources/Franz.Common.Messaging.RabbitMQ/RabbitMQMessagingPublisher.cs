@@ -50,7 +50,17 @@ public sealed class RabbitMQMessagingPublisher(
 
   private async ValueTask PublishInternalAsync(Message message, string exchange, CancellationToken ct)
   {
-    var channel = await _channelPool.GetAsync(ct).ConfigureAwait(false);
+    var advancedPool = _channelPool as IConfirmChannelPool;
+    var dedicatedChannel = advancedPool is not null;
+    var channel = _transaction is RabbitMQMessagingTransaction && advancedPool is not null
+        ? await advancedPool.GetTransactionalChannelAsync(ct).ConfigureAwait(false)
+        : advancedPool is not null
+            ? await advancedPool.GetPublisherConfirmChannelAsync(ct).ConfigureAwait(false)
+            : await _channelPool.GetAsync(ct).ConfigureAwait(false);
+
+    using var confirmationTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+    confirmationTimeout.CancelAfter(TimeSpan.FromSeconds(_options.PublisherConfirmTimeoutSeconds));
+    var publishCompleted = false;
 
     try
     {
@@ -69,10 +79,12 @@ public sealed class RabbitMQMessagingPublisher(
           mandatory: true,
           basicProperties: properties,
           body: body,
-          cancellationToken: ct).ConfigureAwait(false);
+          cancellationToken: dedicatedChannel ? confirmationTimeout.Token : ct).ConfigureAwait(false);
 
       if (_transaction is not null)
         await _transaction.CompleteAsync(ct).ConfigureAwait(false);
+
+      publishCompleted = true;
     }
     catch (Exception publishException)
     {
@@ -97,6 +109,13 @@ public sealed class RabbitMQMessagingPublisher(
     {
       if (_transaction is RabbitMQMessagingTransaction)
         await DisposeTransactionalChannelAsync(channel).ConfigureAwait(false);
+      else if (advancedPool is not null)
+      {
+        if (publishCompleted)
+          advancedPool.ReturnPublisherConfirmChannel(channel);
+        else
+          await DisposeTransactionalChannelAsync(channel).ConfigureAwait(false);
+      }
       else
         _channelPool.Return(channel);
     }

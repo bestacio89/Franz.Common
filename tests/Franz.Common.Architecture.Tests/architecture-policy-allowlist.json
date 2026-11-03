@@ -25,12 +25,6 @@
   },
   {
     "rule": "ACTIVATOR",
-    "path": "sources/Franz.Common.Messaging.Kafka/Extensions/ServiceCollectionExtensions.cs",
-    "reason": "Existing runtime factory or adapter construction. Replacing these sites requires preserving generic registration, serialization and provider behavior; retain only as an explicit shrinking exception.",
-    "ruleId": "SRC-002"
-  },
-  {
-    "rule": "ACTIVATOR",
     "path": "sources/Franz.Common.Messaging.Sagas/Core/SagaOrchestrator.cs",
     "reason": "Existing runtime factory or adapter construction. Replacing these sites requires preserving generic registration, serialization and provider behavior; retain only as an explicit shrinking exception.",
     "ruleId": "SRC-002"

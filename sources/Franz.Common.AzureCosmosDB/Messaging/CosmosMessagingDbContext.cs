@@ -42,6 +42,7 @@ public class CosmosMessagingDbContext : DbContextBase
       entity.Property(m => m.RetryCount).ToJsonProperty("retryCount");
       entity.Property(m => m.LastError).ToJsonProperty("lastError");
       entity.Property(m => m.LastTriedOn).ToJsonProperty("lastTriedOn");
+      entity.Property(m => m.NextAttemptAt).ToJsonProperty("nextAttemptAt");
       entity.Property(m => m.IsDeadLetter).ToJsonProperty("isDeadLetter");
     });
 

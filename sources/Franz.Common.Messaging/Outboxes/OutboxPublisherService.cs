@@ -30,6 +30,12 @@ public sealed class OutboxPublisherService : BackgroundService
   // =====================================================
   protected override async Task ExecuteAsync(CancellationToken stoppingToken)
   {
+    if (!_options.Enabled)
+    {
+      _logger.LogInformation("Outbox publisher is disabled by configuration.");
+      return;
+    }
+
     _logger.LogInformation(
         "🚀 OutboxPublisherService started. Interval: {Interval}ms, MaxRetries: {MaxRetries}",
         _options.PollingInterval.TotalMilliseconds,
@@ -41,12 +47,23 @@ public sealed class OutboxPublisherService : BackgroundService
       {
         await ProcessOutboxOnceAsync(stoppingToken);
       }
+      catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+      {
+        break;
+      }
       catch (Exception ex)
       {
         _logger.LogError(ex, "🔥 Outbox loop iteration failed unexpectedly");
       }
 
-      await Task.Delay(_options.PollingInterval, stoppingToken);
+      try
+      {
+        await Task.Delay(_options.PollingInterval, stoppingToken);
+      }
+      catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+      {
+        break;
+      }
     }
 
     _logger.LogInformation("🛑 OutboxPublisherService stopped");
@@ -57,7 +74,7 @@ public sealed class OutboxPublisherService : BackgroundService
   // =====================================================
   public async Task ProcessOutboxOnceAsync(CancellationToken ct)
   {
-    var pending = await _messageStore.GetPendingAsync(ct);
+    var pending = await _messageStore.GetPendingAsync(_options.BatchSize, ct);
 
     if (pending.Count == 0)
     {
@@ -95,33 +112,71 @@ public sealed class OutboxPublisherService : BackgroundService
 
       _logger.LogInformation("✅ Successfully sent message {MessageId}", stored.Id);
     }
+    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+    {
+      // Host/request cancellation is control flow, not a delivery failure.
+      // Leave the message pending so a later run can safely resume delivery.
+      throw;
+    }
     catch (Exception ex)
     {
-      stored.RetryCount++;
       stored.LastError = ex.Message;
       stored.LastTriedOn = DateTime.UtcNow;
 
       if (stored.RetryCount >= _options.MaxRetries)
       {
-        await _messageStore.MoveToDeadLetterAsync(stored, ct);
+        if (_options.DeadLetterEnabled)
+        {
+          await _messageStore.MoveToDeadLetterAsync(stored, ct);
 
-        _logger.LogError(
-            ex,
-            "💀 Message {MessageId} moved to DLQ after {Retries} retries.",
-            stored.Id,
-            stored.RetryCount);
+          _logger.LogError(
+              ex,
+              "Message {MessageId} moved to dead-letter storage after {Retries} retries.",
+              stored.Id,
+              stored.RetryCount);
+        }
+        else
+        {
+          stored.NextAttemptAt = CalculateNextAttempt(Math.Max(1, stored.RetryCount), stored.LastTriedOn.Value);
+          await _messageStore.UpdateRetryAsync(stored, ct);
+
+          _logger.LogError(
+              ex,
+              "Message {MessageId} exhausted {MaxRetries} retries, but dead-lettering is disabled; it remains pending.",
+              stored.Id,
+              _options.MaxRetries);
+        }
       }
       else
       {
+        stored.RetryCount++;
+        stored.NextAttemptAt = CalculateNextAttempt(stored.RetryCount, stored.LastTriedOn.Value);
         await _messageStore.UpdateRetryAsync(stored, ct);
 
         _logger.LogWarning(
             ex,
-            "⚠️ Message {MessageId} failed (Attempt {RetryCount}/{MaxCount}). Will retry.",
+            "Message {MessageId} failed; retry {RetryCount}/{MaxRetries} has been scheduled.",
             stored.Id,
             stored.RetryCount,
             _options.MaxRetries);
       }
     }
+  }
+
+  private DateTime CalculateNextAttempt(int retryCount, DateTime failedAtUtc)
+  {
+    if (_options.InitialRetryDelay <= TimeSpan.Zero)
+      throw new InvalidOperationException("InitialRetryDelay must be greater than zero.");
+
+    if (_options.MaxRetryDelay < _options.InitialRetryDelay)
+      throw new InvalidOperationException("MaxRetryDelay must be greater than or equal to InitialRetryDelay.");
+
+    var exponent = Math.Clamp(retryCount - 1, 0, 30);
+    var multiplier = Math.Pow(2, exponent);
+    var delayTicks = Math.Min(
+        _options.InitialRetryDelay.Ticks * multiplier,
+        _options.MaxRetryDelay.Ticks);
+
+    return failedAtUtc.AddTicks((long)delayTicks);
   }
 }

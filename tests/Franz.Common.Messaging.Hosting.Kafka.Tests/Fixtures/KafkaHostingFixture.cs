@@ -33,6 +33,7 @@ public sealed class KafkaHostingFixture : IAsyncLifetime
   private readonly MongoDbContainer _mongo;
 
   public IHost? Host { get; private set; }
+  private bool _hostStarted;
   public string BootstrapServers => _kafka.GetBootstrapAddress();
   public string MongoConnectionString => _mongo.GetConnectionString();
   public string MongoDatabaseName { get; } = $"franz-tests-{Guid.CreateVersion7():N}";
@@ -45,20 +46,44 @@ public sealed class KafkaHostingFixture : IAsyncLifetime
 
   public async Task InitializeAsync()
   {
-    await Task.WhenAll(_kafka.StartAsync(), _mongo.StartAsync());
-    Host = BuildHost();
-    await Host.StartAsync();
+    try
+    {
+      await Task.WhenAll(_kafka.StartAsync(), _mongo.StartAsync());
+      Host = BuildHost();
+      await Host.StartAsync();
+      _hostStarted = true;
+    }
+    catch
+    {
+      await DisposeAsync();
+      throw;
+    }
   }
 
   public async Task DisposeAsync()
   {
-    if (Host != null)
-    {
-      await Host.StopAsync();
-      Host.Dispose();
-    }
+    var host = Host;
+    Host = null;
 
-    await Task.WhenAll(_kafka.DisposeAsync().AsTask(), _mongo.DisposeAsync().AsTask());
+    try
+    {
+      if (host is not null && _hostStarted)
+        await host.StopAsync().ConfigureAwait(false);
+    }
+    finally
+    {
+      try
+      {
+        host?.Dispose();
+      }
+      finally
+      {
+        _hostStarted = false;
+        await Task.WhenAll(
+            _kafka.DisposeAsync().AsTask(),
+            _mongo.DisposeAsync().AsTask()).ConfigureAwait(false);
+      }
+    }
   }
 
   public IServiceProvider Services =>
@@ -72,6 +97,7 @@ public sealed class KafkaHostingFixture : IAsyncLifetime
       {
         ["Messaging:Kafka:BootstrapServers"] = BootstrapServers,
         ["Messaging:Kafka:GroupId"] = groupId,
+        ["Messaging:Kafka:Security:AllowInsecureTransport"] = "true",
         ["Messaging:Kafka:Failure:DeadLetterTopic"] = "hero-test-dlt",
         ["Messaging:Kafka:Failure:MaxRetryAttempts"] = "1",
         ["Messaging:Kafka:Failure:RetryBackoffMs"] = "0",

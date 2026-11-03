@@ -29,6 +29,7 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
           {
             GroupId = $"test-group-{Guid.NewGuid():N}",
             BootstrapServers = _fixture.BootstrapServers,
+            Security = new KafkaSecurityOptions { AllowInsecureTransport = true },
             Consumer = new KafkaConsumerOptions
             {
               

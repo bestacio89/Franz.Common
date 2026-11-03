@@ -11,6 +11,14 @@ public sealed class RabbitMQMessagingOptions : MessagingOptions
   public string? DeadLetterExchangeName { get; set; }
   public string? DeadLetterQueueName { get; set; }
   public string? DefaultRoutingKey { get; set; }
+  /// <summary>Replay strategy: "NoReplay" or "ProgressiveFourStep".</summary>
+  public string ReplayStrategy { get; set; } = "NoReplay";
+
+  /// <summary>
+  /// Maximum number of deliveries processed concurrently by each RabbitMQ listener.
+  /// Set to 1 to preserve sequential processing.
+  /// </summary>
+  public int MaxConcurrency { get; set; } = 1;
   // --- Connectivity ---
   public string? BootStrapServers { get; set; }   // URI-based
 

@@ -44,9 +44,28 @@ public sealed class MassTransitKafkaConsumerTenantScopeTests
             cancellation.Token);
 
         Assert.True(handlerExecuted);
+        consumer.Received(1).Commit(
+            Arg.Is<ConsumeResult<string, string>>(delivery => delivery.Topic == "tenant-events"));
         Assert.Equal(1, initializer.BeginCount);
         Assert.Equal(1, initializer.DisposeCount);
         Assert.Equal(tenantId.ToString(), initializer.LastMessage!.Headers[HeaderConstants.TenantId].Single());
+    }
+
+    [Fact]
+    public async Task SubscribeAsync_DoesNotCommitOffsetWhenHandlerFails()
+    {
+        var consumer = Substitute.For<IConsumer<string, string>>();
+        var delivery = CreateDelivery(Guid.NewGuid());
+        consumer.Consume(Arg.Any<CancellationToken>()).Returns(delivery);
+
+        var sut = new KafkaConsumer(consumer);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.SubscribeAsync<Payload>(
+                "tenant-events",
+                _ => throw new InvalidOperationException("Handler failed.")));
+
+        consumer.DidNotReceive().Commit(Arg.Any<ConsumeResult<string, string>>());
     }
 
     [Fact]

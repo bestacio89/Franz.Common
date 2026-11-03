@@ -25,6 +25,9 @@ public class KafkaMessagingOptions
 public class KafkaSecurityOptions
 {
   public KafkaSecurityProtocol SecurityProtocol { get; set; } = KafkaSecurityProtocol.Plaintext;
+
+  /// <summary>Explicitly permits unencrypted Kafka transport. Keep disabled outside isolated development and test environments.</summary>
+  public bool AllowInsecureTransport { get; set; }
   public KafkaSaslMechanism? SaslMechanism { get; set; }
   public string? SaslUsername { get; set; }
   public string? SaslPassword { get; set; }
@@ -82,6 +85,10 @@ public class KafkaProducerOptions
   public KafkaCompressionType CompressionType { get; set; } = KafkaCompressionType.Snappy;
   public bool EnableIdempotence { get; set; } = true;
 
+  /// <summary>Optional prefix for unique transaction producer identities. A unique suffix is generated per transaction.</summary>
+  public string? TransactionalIdPrefix { get; set; }
+  public KafkaMessageKeyStrategy MessageKeyStrategy { get; set; } = KafkaMessageKeyStrategy.MessageId;
+
   [Range(0, 1000)]
   public int MessageSendMaxRetries { get; set; } = 3;
 
@@ -91,6 +98,13 @@ public class KafkaProducerOptions
   [Range(1, 900000)]
   public int DeliveryTimeoutMs { get; set; } = 120000;
   public string? DefaultKey { get; set; }
+}
+
+public enum KafkaMessageKeyStrategy
+{
+  MessageId,
+  CorrelationId,
+  AggregateId
 }
 
 public enum KafkaAcks { None, Leader, All }

@@ -58,9 +58,9 @@ public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
     else
     {
       var sslEnabled = options.SslEnabled == true;
-      factory.HostName = Require(options.HostName, "localhost");
-      factory.UserName = Require(options.UserName, "guest");
-      factory.Password = Require(options.Password, "guest");
+      factory.HostName = Require(options.HostName, nameof(options.HostName));
+      factory.UserName = Require(options.UserName, nameof(options.UserName));
+      factory.Password = Require(options.Password, nameof(options.Password));
       factory.VirtualHost = Require(options.VirtualHost, "/");
       factory.Port = options.Port ?? (sslEnabled ? 5671 : AmqpTcpEndpoint.UseDefaultPort);
 
@@ -86,8 +86,14 @@ public sealed class ConnectionFactoryProvider : IConnectionFactoryProvider
     return factory;
   }
 
-  private static string Require(string? value, string fallback)
-      => string.IsNullOrWhiteSpace(value) ? fallback : value;
+  private static string Require(string? value, string optionName)
+  {
+    if (string.IsNullOrWhiteSpace(value))
+      throw new InvalidOperationException(
+          $"RabbitMQ option '{optionName}' is required when BootStrapServers is not configured.");
+
+    return value;
+  }
 
   private string? GetClientProvidedName()
   {

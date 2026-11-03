@@ -1,4 +1,6 @@
-﻿using Franz.Common.Messaging.Configuration;
+#nullable enable
+using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
@@ -14,78 +16,139 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
   public const string DelayHeader = "x-delay";
   public const string ExceptionMessageHeader = "x-exception-message";
   public const string ExceptionStackTraceHeader = "x-exception-stacktrace";
-
-  private readonly IModelProvider _provider;
+  private const int MaxHeaderTextLength = 4_096;
+  private readonly IModelProvider? _legacyProvider;
+  private readonly IConfirmChannelPool? _confirmChannelPool;
+  private readonly int _publisherConfirmTimeoutSeconds;
   private readonly string _queueName;
   private readonly string _replayExchange;
   private readonly string _deadLetterQueue;
 
-  public ProgressiveFourStepReplayStrategy(
-      IModelProvider provider,
-      IAssemblyAccessor accessor,
-      IOptions<MessagingOptions> options)
+  // Compatibility constructor for existing consumers. Framework DI uses the confirmed-channel overload.
+  public ProgressiveFourStepReplayStrategy(IModelProvider provider, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
   {
-    _provider = provider;
+    _legacyProvider = provider ?? throw new ArgumentNullException(nameof(provider));
+    (_queueName, _replayExchange, _deadLetterQueue) = ResolveTopology(accessor, options);
+    _publisherConfirmTimeoutSeconds = options.Value.PublisherConfirmTimeoutSeconds;
+  }
 
-    var entry = accessor.GetEntryAssembly();
-    _queueName = QueueNamer.GetQueueName(entry);
+  public ProgressiveFourStepReplayStrategy(IConfirmChannelPool confirmChannelPool, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
+  {
+    _confirmChannelPool = confirmChannelPool ?? throw new ArgumentNullException(nameof(confirmChannelPool));
+    (_queueName, _replayExchange, _deadLetterQueue) = ResolveTopology(accessor, options);
+    _publisherConfirmTimeoutSeconds = options.Value.PublisherConfirmTimeoutSeconds;
+  }
+
+
+  public ProgressiveFourStepReplayStrategy(
+      IConfirmChannelPool confirmChannelPool,
+      IAssemblyAccessor accessor,
+      IOptions<RabbitMQMessagingOptions> options)
+  {
+    _confirmChannelPool = confirmChannelPool ?? throw new ArgumentNullException(nameof(confirmChannelPool));
+    ArgumentNullException.ThrowIfNull(accessor);
+    ArgumentNullException.ThrowIfNull(options);
+    var settings = options.Value;
+    var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
+    _queueName = settings.QueueName ?? QueueNamer.GetQueueName(entry);
     _replayExchange = ExchangeNamer.GetReplayExchangeName(entry);
-    _deadLetterQueue = QueueNamer.GetDeadLetterQueueName(entry);
+    _deadLetterQueue = settings.DeadLetterQueueName ?? QueueNamer.GetDeadLetterQueueName(entry);
+    _publisherConfirmTimeoutSeconds = settings.PublisherConfirmTimeoutSeconds;
+  }
+
+  private static (string Queue, string ReplayExchange, string DeadLetterQueue) ResolveTopology(
+      IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
+  {
+    ArgumentNullException.ThrowIfNull(accessor);
+    ArgumentNullException.ThrowIfNull(options);
+    var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
+    return (QueueNamer.GetQueueName(entry), ExchangeNamer.GetReplayExchangeName(entry),
+        QueueNamer.GetDeadLetterQueueName(entry));
   }
 
   public async Task ReplayAsync(BasicDeliverEventArgs e, Exception ex)
   {
-    var channel = await _provider.GetChannelAsync();
+    ArgumentNullException.ThrowIfNull(e);
+    ArgumentNullException.ThrowIfNull(ex);
 
-    var props = new BasicProperties
-    {
-      DeliveryMode = (DeliveryModes)2,
-      Headers = e.BasicProperties.Headers ?? new Dictionary<string, object?>()
-    };
-
-    // Count replay attempts
-    var replayCount = props.Headers.ContainsKey(ReplayHeader)
-        ? Convert.ToInt32(props.Headers[ReplayHeader]) + 1
+    var headers = e.BasicProperties.Headers is null
+        ? new Dictionary<string, object?>()
+        : new Dictionary<string, object?>(e.BasicProperties.Headers);
+    var replayCount = headers.TryGetValue(ReplayHeader, out var value)
+        ? Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture) + 1
         : 1;
+    headers[ReplayHeader] = replayCount;
+    var properties = new BasicProperties { DeliveryMode = DeliveryModes.Persistent, Headers = headers };
 
-    props.Headers[ReplayHeader] = replayCount;
-
-    // Progressive delays
-    var delay = replayCount switch
+    string exchange;
+    string routingKey;
+    if (replayCount >= 4)
     {
-      1 => 1_000,    // 1s
-      2 => 10_000,   // 10s
-      3 => 60_000,   // 60s
-      _ => 300_000   // 5 min before sending to DLQ
-    };
-
-    if (replayCount < 4)
-    {
-      // Replay to delayed exchange
-      props.Headers[DelayHeader] = delay;
-
-      await channel.BasicPublishAsync(
-          exchange: _replayExchange,
-          routingKey: _queueName,
-          mandatory: true,
-          basicProperties: props,
-          body: e.Body);
+      headers[ExceptionMessageHeader] = Truncate(ex.Message);
+      headers[ExceptionStackTraceHeader] = Truncate(ex.StackTrace ?? string.Empty);
+      exchange = string.Empty;
+      routingKey = _deadLetterQueue;
     }
     else
     {
-      // FINAL attempt → send to DLQ
-      props.Headers[ExceptionMessageHeader] = ex.Message;
-      props.Headers[ExceptionStackTraceHeader] = ex.StackTrace ?? string.Empty;
-
-      await channel.BasicPublishAsync(
-          exchange: "",
-          routingKey: _deadLetterQueue,
-          mandatory: true,
-          basicProperties: props,
-          body: e.Body);
+      exchange = _replayExchange;
+      routingKey = GetRetryRoutingKey(_queueName, replayCount);
     }
 
-    // ACK the original failed message
-    await channel.BasicAckAsync(e.DeliveryTag, false);
+    IChannel channel;
+    var confirmed = _confirmChannelPool is not null;
+    channel = confirmed
+        ? await _confirmChannelPool!.GetPublisherConfirmChannelAsync().ConfigureAwait(false)
+        : await _legacyProvider!.GetChannelAsync().ConfigureAwait(false);
+
+    var published = false;
+    using var confirmationTimeout = new CancellationTokenSource(
+        TimeSpan.FromSeconds(_publisherConfirmTimeoutSeconds));
+    try
+    {
+      // On a confirm-enabled channel RabbitMQ.Client completes this operation only after
+      // publisher confirmation and raises PublishException for mandatory unroutable messages.
+      await channel.BasicPublishAsync(exchange, routingKey, mandatory: true,
+          basicProperties: properties, body: e.Body,
+          cancellationToken: confirmed ? confirmationTimeout.Token : CancellationToken.None).ConfigureAwait(false);
+      published = true;
+    }
+    finally
+    {
+      if (confirmed)
+      {
+        if (published)
+          _confirmChannelPool!.ReturnPublisherConfirmChannel(channel);
+        else
+          await DisposeChannelAsync(channel).ConfigureAwait(false);
+      }
+    }
+  }
+
+  internal static string GetRetryRoutingKey(string queueName, int retryNumber) => $"{queueName}-retry-{retryNumber}";
+  internal static int GetRetryDelayMilliseconds(int retryNumber) => retryNumber switch
+  {
+    1 => 1_000,
+    2 => 10_000,
+    3 => 60_000,
+    _ => throw new ArgumentOutOfRangeException(nameof(retryNumber))
+  };
+
+  private static string Truncate(string value) => value.Length <= MaxHeaderTextLength ? value : value[..MaxHeaderTextLength];
+
+  private static async ValueTask DisposeChannelAsync(IChannel channel)
+  {
+    try
+    {
+      if (channel.IsOpen)
+        await channel.CloseAsync().ConfigureAwait(false);
+    }
+    catch { /* Preserve the publication failure. */ }
+
+    try
+    {
+      await channel.DisposeAsync().ConfigureAwait(false);
+    }
+    catch { /* Preserve the publication failure. */ }
   }
 }
