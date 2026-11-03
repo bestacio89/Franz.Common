@@ -78,21 +78,18 @@ public abstract class DbContextBase : DbContext
     {
         var userId = _currentUser?.UserId ?? "system";
 
-        foreach (var entry in ChangeTracker.Entries())
+        foreach (var entry in ChangeTracker.Entries<IAuditableEntity>())
         {
-            if (entry.Entity is not IEntity<object> && !ImplementsIEntity(entry.Entity.GetType()))
-                continue;
-
             switch (entry.State)
             {
                 case EntityState.Added:
-                    ((dynamic)entry.Entity).MarkCreated(userId);
+                    entry.Entity.MarkCreated(userId);
                     break;
                 case EntityState.Modified:
-                    ((dynamic)entry.Entity).MarkUpdated(userId);
+                    entry.Entity.MarkUpdated(userId);
                     break;
                 case EntityState.Deleted:
-                    ((dynamic)entry.Entity).MarkDeleted(userId);
+                    entry.Entity.MarkDeleted(userId);
                     entry.State = EntityState.Modified;
                     break;
             }
