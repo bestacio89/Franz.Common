@@ -74,18 +74,34 @@ public sealed class CosmosFixture : IAsyncLifetime
 
     var provider = services.BuildServiceProvider();
 
-    // Ensure schema exists BEFORE test runs
-    using (var scope = provider.CreateScope())
+    try
     {
+      // Ensure schema exists BEFORE test runs.
+      await using var scope = provider.CreateAsyncScope();
       var db = scope.ServiceProvider.GetRequiredService<TestCosmosDbContext>();
       await db.Database.EnsureCreatedAsync();
+
       var cosmosClient = scope.ServiceProvider.GetRequiredService<CosmosClient>();
       await cosmosClient.GetDatabase(databaseName).CreateContainerIfNotExistsAsync(
         new ContainerProperties("TenantDocuments", "/tenantId"),
         throughput: 400);
-    }
 
-    return new IsolatedCosmosContext(provider);
+      return new IsolatedCosmosContext(provider);
+    }
+    catch
+    {
+      // Do not leak CosmosClient sockets if database/container initialization fails.
+      if (provider is IAsyncDisposable asyncDisposable)
+      {
+        await asyncDisposable.DisposeAsync();
+      }
+      else
+      {
+        (provider as IDisposable)?.Dispose();
+      }
+
+      throw;
+    }
   }
 
   public async Task DisposeAsync()
