@@ -1,4 +1,6 @@
 using Franz.Common.Caching.MultiTenancy;
+using Franz.Common.Caching.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Microsoft.Extensions.Caching.Memory;
@@ -14,15 +16,15 @@ public sealed class TenantStoreCachingTests
         var store = new MutableTenantStore();
         var original = new TenantInfo(Guid.NewGuid(), "before");
         store.Set(original);
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var cached = CreateCachedStore(store, cache);
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
 
         Assert.Equal("before", (await cached.FindByIdAsync(original.Id))!.Name);
 
         store.Set(new TenantInfo(original.Id, "after"));
 
         Assert.Equal("before", (await cached.FindByIdAsync(original.Id))!.Name);
-        cached.InvalidateTenant(original.Id);
+        provider.GetRequiredService<ITenantStoreCacheInvalidator>().InvalidateTenant(original.Id);
         Assert.Equal("after", (await cached.FindByIdAsync(original.Id))!.Name);
         Assert.Equal(2, store.FindByIdCalls);
     }
@@ -34,8 +36,8 @@ public sealed class TenantStoreCachingTests
         var tenant = new TenantInfo(Guid.NewGuid(), "before");
         tenant.Domains.Add(new TenantDomain("tenant.example.com", isPrimary: true) { IsVerified = true, TenantId = tenant.Id });
         store.Set(tenant);
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var cached = CreateCachedStore(store, cache);
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
 
         Assert.Equal("before", (await cached.FindByHostAsync("TENANT.example.com."))!.Name);
 
@@ -43,7 +45,7 @@ public sealed class TenantStoreCachingTests
         updated.Domains.Add(new TenantDomain("tenant.example.com", isPrimary: true) { IsVerified = true, TenantId = updated.Id });
         store.Set(updated);
 
-        cached.InvalidateTenant(tenant.Id);
+        provider.GetRequiredService<ITenantStoreCacheInvalidator>().InvalidateTenant(tenant.Id);
 
         Assert.Equal("after", (await cached.FindByHostAsync("tenant.example.com"))!.Name);
         Assert.Equal(2, store.FindByHostCalls);
@@ -56,8 +58,8 @@ public sealed class TenantStoreCachingTests
         var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
         tenant.Properties["tier"] = "standard";
         store.Set(tenant);
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var cached = CreateCachedStore(store, cache);
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
 
         var first = (await cached.FindByIdAsync(tenant.Id))!;
         first.Properties["tier"] = "mutated";
@@ -75,8 +77,8 @@ public sealed class TenantStoreCachingTests
         var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
         store.Set(tenant);
         store.LookupGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var cached = CreateCachedStore(store, cache);
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
 
         var requests = Enumerable.Range(0, 12)
             .Select(_ => cached.FindByIdAsync(tenant.Id))
@@ -97,8 +99,8 @@ public sealed class TenantStoreCachingTests
         var store = new MutableTenantStore();
         var tenant = new TenantInfo(Guid.NewGuid(), "before");
         store.Set(tenant);
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var cached = CreateCachedStore(store, cache, TimeSpan.FromMilliseconds(40));
+        using var provider = CreateCachedStore(store, TimeSpan.FromMilliseconds(40));
+        var cached = provider.GetRequiredService<ITenantStore>();
 
         Assert.Equal("before", (await cached.FindByIdAsync(tenant.Id))!.Name);
         store.Set(new TenantInfo(tenant.Id, "after"));
@@ -112,8 +114,8 @@ public sealed class TenantStoreCachingTests
     public async Task CancellationAwareLookup_PropagatesCancellation()
     {
         var store = new MutableTenantStore();
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var cached = CreateCachedStore(store, cache);
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
@@ -122,17 +124,16 @@ public sealed class TenantStoreCachingTests
         Assert.Equal(0, store.FindByIdCalls);
     }
 
-    private static CachedTenantStore CreateCachedStore(
+    private static ServiceProvider CreateCachedStore(
         MutableTenantStore store,
-        IMemoryCache cache,
         TimeSpan? expiration = null)
-        => new(
-            store,
-            cache,
-            Options.Create(new TenantStoreCacheOptions
-            {
-                AbsoluteExpiration = expiration ?? TimeSpan.FromMinutes(1)
-            }));
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ITenantStore>(store);
+        services.AddTenantStoreCaching(options =>
+            options.AbsoluteExpiration = expiration ?? TimeSpan.FromMinutes(1));
+        return services.BuildServiceProvider();
+    }
 
     private sealed class MutableTenantStore : ITenantStore
     {
