@@ -11,8 +11,12 @@ namespace Franz.Common.Messaging.MultiTenancy.Extensions;
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddMessagingMultitenancyContext(
+        this IServiceCollection services)
+        => AddMessagingMultitenancyContext(services, configure: null);
+
+    public static IServiceCollection AddMessagingMultitenancyContext(
         this IServiceCollection services,
-        Action<TenantMessagingOptions>? configure = null)
+        Action<TenantMessagingOptions>? configure)
     {
         services.Configure(configure ?? (_ => { }));
         services
