@@ -106,6 +106,8 @@ public static class ServiceCollectionExtensions
         .AddNoDuplicateSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>()
         .AddNoDuplicateSingleton<IConnectionProvider, ConnectionProvider>()
         .AddNoDuplicateSingleton<IChannelPool, ChannelPool>()
+        .AddNoDuplicateSingleton<IConfirmChannelPool>(sp =>
+            (IConfirmChannelPool)sp.GetRequiredService<IChannelPool>())
         .AddMessagingFactories()
         .AddNoDuplicateScoped<IMessagingInitializer, RabbitMQMessagingInitializer>()
         .AddNoDuplicateScoped<IMessagingTransaction, RabbitMQMessagingTransaction>();
@@ -146,13 +148,13 @@ public static class ServiceCollectionExtensions
             .AddSingleton<IReplayStrategy>(sp =>
             {
               var options = sp.GetRequiredService<IOptions<RabbitMQMessagingOptions>>().Value;
-              var provider = sp.GetRequiredService<IModelProvider>();
+              var confirmChannelPool = sp.GetRequiredService<IConfirmChannelPool>();
               var accessor = sp.GetRequiredService<IAssemblyAccessor>();
               var messagingOptions = sp.GetRequiredService<IOptions<MessagingOptions>>();
 
               return string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase)
-                  ? new ProgressiveFourStepReplayStrategy(provider, accessor, messagingOptions)
-                  : new NoReplayStrategy(provider, accessor, messagingOptions);
+                  ? new ProgressiveFourStepReplayStrategy(confirmChannelPool, accessor, messagingOptions)
+                  : new NoReplayStrategy(confirmChannelPool, accessor, messagingOptions);
             });
 
     return services;
