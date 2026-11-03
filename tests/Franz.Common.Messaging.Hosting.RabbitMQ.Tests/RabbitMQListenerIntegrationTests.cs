@@ -77,6 +77,63 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
   }
 
   [Fact]
+  [Trait("Category", "FaultTolerance")]
+  public async Task Listener_ShouldConfirmRetryPublicationBeforeAcknowledgingOriginalDelivery()
+  {
+    var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
+    var channelPool = _fixture.Services.GetRequiredService<IChannelPool>();
+    var assemblyAccessor = _fixture.Services.GetRequiredService<IAssemblyAccessor>();
+    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+    var body = $"retry-confirm-{Guid.NewGuid():N}";
+    var retryProcessed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var attempts = 0;
+
+    listener.OnMessageReceivedAsync = args =>
+    {
+      if (!string.Equals(args.Message.Body, body, StringComparison.Ordinal))
+        return Task.CompletedTask;
+
+      if (Interlocked.Increment(ref attempts) == 1)
+        throw new InvalidOperationException("Force one retry.");
+
+      retryProcessed.TrySetResult();
+      return Task.CompletedTask;
+    };
+
+    try
+    {
+      await listener.Listen(cts.Token);
+      await listener.WaitUntilReadyAsync().WaitAsync(cts.Token);
+
+      var queueName = QueueNamer.GetQueueName(
+          assemblyAccessor.GetEntryAssembly()
+          ?? throw new InvalidOperationException("Entry assembly cannot be null."));
+      var publisher = await channelPool.GetAsync(cts.Token);
+      try
+      {
+        await publisher.BasicPublishAsync(
+            exchange: string.Empty,
+            routingKey: queueName,
+            body: Encoding.UTF8.GetBytes(body),
+            cancellationToken: cts.Token);
+      }
+      finally
+      {
+        channelPool.Return(publisher);
+      }
+
+      await retryProcessed.Task.WaitAsync(cts.Token);
+      attempts.Should().Be(2);
+      listener.Completion.IsCompleted.Should().BeFalse(
+          "a failed handler followed by a confirmed retry must not close the consumer channel");
+    }
+    finally
+    {
+      listener.OnMessageReceivedAsync = null;
+    }
+  }
+
+  [Fact]
   [Trait("Category", "Concurrency")]
   public async Task Listener_ShouldProcessUpToConfiguredConcurrencyInParallel()
   {
