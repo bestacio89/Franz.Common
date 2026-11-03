@@ -122,31 +122,19 @@ public sealed class CachedTenantStore : ITenantStore
         if (_cache.TryGetValue(key, out T? cached))
             return cached is null ? null : CloneIfTenant(cached);
 
-        var gate = _state.PopulationGates.GetOrAdd(key, static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            if (_cache.TryGetValue(key, out cached))
-                return cached is null ? null : CloneIfTenant(cached);
+        await using var gate = await _state.AcquirePopulationGateAsync(key, cancellationToken).ConfigureAwait(false);
+        if (_cache.TryGetValue(key, out cached))
+            return cached is null ? null : CloneIfTenant(cached);
 
-            var generation = _state.GetGeneration(key);
-            var value = await factory().ConfigureAwait(false);
-            if (value is null)
-                return null;
+        var generation = _state.GetGeneration(key);
+        var value = await factory().ConfigureAwait(false);
+        if (value is null)
+            return null;
 
-            onLoaded(value);
-            var snapshot = CloneIfTenant(value);
-            if (_state.GetGeneration(key) == generation)
-            {
-                _cache.Set(key, snapshot, CreateEntryOptions(key));
-                _state.TrackCacheKey(key);
-            }
-            return CloneIfTenant(snapshot);
-        }
-        finally
-        {
-            gate.Release();
-        }
+        onLoaded(value);
+        var snapshot = CloneIfTenant(value);
+        StoreIfCurrent(key, snapshot, generation);
+        return CloneIfTenant(snapshot);
     }
 
     private async Task<T> GetOrLoadValueAsync<T>(
@@ -157,29 +145,31 @@ public sealed class CachedTenantStore : ITenantStore
         if (_cache.TryGetValue(key, out T? cached))
             return cached!;
 
-        var gate = _state.PopulationGates.GetOrAdd(key, static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            if (_cache.TryGetValue(key, out cached))
-                return cached!;
+        await using var gate = await _state.AcquirePopulationGateAsync(key, cancellationToken).ConfigureAwait(false);
+        if (_cache.TryGetValue(key, out cached))
+            return cached!;
 
-            var generation = _state.GetGeneration(key);
-            var value = await factory().ConfigureAwait(false);
-            if (_state.GetGeneration(key) == generation)
-            {
-                _cache.Set(key, value, CreateEntryOptions(key));
-                _state.TrackCacheKey(key);
-            }
-            return value;
-        }
-        finally
-        {
-            gate.Release();
-        }
+        var generation = _state.GetGeneration(key);
+        var value = await factory().ConfigureAwait(false);
+        StoreIfCurrent(key, value, generation);
+        return value;
     }
 
-    private MemoryCacheEntryOptions CreateEntryOptions(string key)
+    private void StoreIfCurrent<T>(string key, T value, long generation)
+    {
+        if (_state.GetGeneration(key) != generation)
+            return;
+
+        _state.TrackCacheKey(key);
+        _cache.Set(key, value, CreateEntryOptions());
+        if (_state.GetGeneration(key) == generation)
+            return;
+
+        _cache.Remove(key);
+        _state.KnownCacheKeys.TryRemove(key, out _);
+    }
+
+    private MemoryCacheEntryOptions CreateEntryOptions()
         => new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = _absoluteExpiration
@@ -233,17 +223,99 @@ public sealed class CachedTenantStore : ITenantStore
 /// <summary>Shared cache bookkeeping so invalidation remains correct for any ITenantStore lifetime.</summary>
 public sealed class TenantStoreCacheState
 {
-    internal ConcurrentDictionary<string, SemaphoreSlim> PopulationGates { get; } = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, PopulationGate> _populationGates = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _generations = new(StringComparer.Ordinal);
+
     internal ConcurrentDictionary<Guid, ConcurrentDictionary<string, byte>> TenantHosts { get; } = new();
     internal ConcurrentDictionary<string, byte> KnownCacheKeys { get; } = new(StringComparer.Ordinal);
-    private ConcurrentDictionary<string, long> Generations { get; } = new(StringComparer.Ordinal);
 
-    internal long GetGeneration(string key) => Generations.GetOrAdd(key, 0);
+    internal long GetGeneration(string key) => _generations.GetOrAdd(key, 0);
+
     internal void TrackCacheKey(string key) => KnownCacheKeys.TryAdd(key, 0);
+
+    internal string[] GetActiveKeys() => _populationGates.Keys.ToArray();
+
     internal void InvalidateKey(string key)
     {
-        Generations.AddOrUpdate(key, 1, static (_, generation) => checked(generation + 1));
+        if (_populationGates.ContainsKey(key))
+            _generations.AddOrUpdate(key, 1, static (_, generation) => checked(generation + 1));
+
         KnownCacheKeys.TryRemove(key, out _);
+    }
+
+    internal async Task<IAsyncDisposable> AcquirePopulationGateAsync(
+        string key,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var entry = _populationGates.GetOrAdd(key, static _ => new PopulationGate());
+            lock (entry.Sync)
+            {
+                if (entry.Removed ||
+                    !_populationGates.TryGetValue(key, out var current) ||
+                    !ReferenceEquals(current, entry))
+                    continue;
+
+                entry.ReferenceCount++;
+            }
+
+            try
+            {
+                await entry.Semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                return new PopulationGateLease(this, key, entry);
+            }
+            catch
+            {
+                ReleaseReference(key, entry);
+                throw;
+            }
+        }
+    }
+
+    private void Release(string key, PopulationGate entry)
+    {
+        entry.Semaphore.Release();
+        ReleaseReference(key, entry);
+    }
+
+    private void ReleaseReference(string key, PopulationGate entry)
+    {
+        lock (entry.Sync)
+        {
+            entry.ReferenceCount--;
+            if (entry.ReferenceCount != 0)
+                return;
+
+            entry.Removed = true;
+            _generations.TryRemove(key, out _);
+            if (_populationGates.TryGetValue(key, out var current) && ReferenceEquals(current, entry))
+                _populationGates.TryRemove(key, out _);
+            entry.Semaphore.Dispose();
+        }
+    }
+
+    private sealed class PopulationGate
+    {
+        public object Sync { get; } = new();
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+        public int ReferenceCount { get; set; }
+        public bool Removed { get; set; }
+    }
+
+    private sealed class PopulationGateLease(
+        TenantStoreCacheState owner,
+        string key,
+        PopulationGate entry) : IAsyncDisposable
+    {
+        private int _disposed;
+
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                owner.Release(key, entry);
+            return ValueTask.CompletedTask;
+        }
     }
 }
 
@@ -277,7 +349,7 @@ public sealed class TenantStoreCacheInvalidator(
 
     public void InvalidateAll()
     {
-        foreach (var key in state.PopulationGates.Keys.Concat(state.KnownCacheKeys.Keys).Distinct(StringComparer.Ordinal))
+        foreach (var key in state.GetActiveKeys().Concat(state.KnownCacheKeys.Keys).Distinct(StringComparer.Ordinal))
             Remove(key);
         state.TenantHosts.Clear();
     }
