@@ -81,6 +81,7 @@ public class KafkaProducerOptions
 
   public KafkaCompressionType CompressionType { get; set; } = KafkaCompressionType.Snappy;
   public bool EnableIdempotence { get; set; } = true;
+  public KafkaMessageKeyStrategy MessageKeyStrategy { get; set; } = KafkaMessageKeyStrategy.MessageId;
 
   [Range(0, 1000)]
   public int MessageSendMaxRetries { get; set; } = 3;
@@ -91,6 +92,13 @@ public class KafkaProducerOptions
   [Range(1, 900000)]
   public int DeliveryTimeoutMs { get; set; } = 120000;
   public string? DefaultKey { get; set; }
+}
+
+public enum KafkaMessageKeyStrategy
+{
+  MessageId,
+  CorrelationId,
+  AggregateId
 }
 
 public enum KafkaAcks { None, Leader, All }

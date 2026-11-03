@@ -1,9 +1,11 @@
-﻿#nullable enable
+#nullable enable
 using Confluent.Kafka;
+using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Text;
 using System.Threading;
 
@@ -13,9 +15,14 @@ public sealed class KafkaSender(
     IProducer<string, byte[]> producer,
     IMessageSerializer serializer,
     IAssemblyAccessor assemblyAccessor,
+    IOptions<KafkaMessagingOptions> options,
     ILogger<KafkaSender> logger)
     : IMessagingSender, IAsyncDisposable, IDisposable
 {
+  private readonly KafkaMessageKeyStrategy _keyStrategy =
+      options?.Value?.Producer?.MessageKeyStrategy
+      ?? throw new ArgumentNullException(nameof(options));
+
   private int _disposed;
 
   public async ValueTask SendAsync(Message message, CancellationToken ct = default)
@@ -27,66 +34,51 @@ public sealed class KafkaSender(
 
     try
     {
-      // =========================
-      // NORMALIZE TRANSPORT VALUES
-      // =========================
-      var correlationKey =
-        message.CorrelationId?.ToString()
-        ?? message.Id.ToString();
-
-      var payload = Serialize(message);
-
+      var key = ResolveMessageKey(message, _keyStrategy);
       var kafkaMessage = new Message<string, byte[]>
       {
-        Key = correlationKey,
-        Value = payload,
+        Key = key,
+        Value = Serialize(message),
         Headers = BuildHeaders(message)
       };
 
       var topic = TopicNamer.GetTopicName(assemblyAccessor.GetEntryAssembly());
-
-      var result = await producer
-          .ProduceAsync(topic, kafkaMessage, ct)
-          .ConfigureAwait(false);
+      var result = await producer.ProduceAsync(topic, kafkaMessage, ct).ConfigureAwait(false);
 
       logger.LogDebug(
           "[Kafka] Delivered {MessageId} to {Topic} [Partition: {Partition}, Offset: {Offset}]",
-          message.Id,
-          result.Topic,
-          result.Partition.Value,
-          result.Offset.Value);
+          message.Id, result.Topic, result.Partition.Value, result.Offset.Value);
     }
     catch (ProduceException<string, byte[]> ex)
     {
-      logger.LogError(ex,
-          "[Kafka] Produce failure {MessageId} | Reason: {Reason}",
-          message.Id,
-          ex.Error.Reason);
-
+      logger.LogError(ex, "[Kafka] Produce failure {MessageId} | Reason: {Reason}",
+          message.Id, ex.Error.Reason);
       throw;
     }
     catch (Exception ex)
     {
-      logger.LogError(ex,
-          "[Kafka] Unexpected error producing {MessageId}",
-          message.Id);
-
+      logger.LogError(ex, "[Kafka] Unexpected error producing {MessageId}", message.Id);
       throw;
     }
   }
 
-  // =========================
-  // HOT PATH HELPERS
-  // =========================
+  private static string ResolveMessageKey(Message message, KafkaMessageKeyStrategy strategy)
+      => strategy switch
+      {
+        KafkaMessageKeyStrategy.MessageId => message.Id.ToString(),
+        KafkaMessageKeyStrategy.CorrelationId => message.CorrelationId?.ToString()
+            ?? throw new InvalidOperationException(
+                $"Kafka message {message.Id} has no CorrelationId, but the CorrelationId key strategy is configured."),
+        KafkaMessageKeyStrategy.AggregateId => message.AggregateId?.ToString()
+            ?? throw new InvalidOperationException(
+                $"Kafka message {message.Id} has no AggregateId, but the AggregateId key strategy is configured."),
+        _ => throw new InvalidOperationException($"Unsupported Kafka message key strategy: {strategy}.")
+      };
 
   private byte[] Serialize(Message message)
   {
-    var str = serializer.Serialize(message.Body);
-
-    if (string.IsNullOrEmpty(str))
-      return Array.Empty<byte>();
-
-    return Encoding.UTF8.GetBytes(str);
+    var value = serializer.Serialize(message.Body);
+    return string.IsNullOrEmpty(value) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(value);
   }
 
   private static Confluent.Kafka.Headers BuildHeaders(Message message)
@@ -104,21 +96,13 @@ public sealed class KafkaSender(
       foreach (var value in values)
       {
         if (!string.IsNullOrWhiteSpace(value))
-        {
           headers.Add(key, Encoding.UTF8.GetBytes(value));
-        }
       }
     }
 
     return headers;
   }
 
-  // =========================
-  // LIFECYCLE
-  // =========================
-
-  // The producer is owned by dependency injection and registered as a singleton.
-  // A scoped sender must never flush or dispose that shared infrastructure.
   public ValueTask DisposeAsync()
   {
     Dispose();

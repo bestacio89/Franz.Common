@@ -16,7 +16,6 @@ public class Message : INotification, IEvent
   {
     Id = Guid.CreateVersion7();
     _correlationId = Id;
-
     SyncProjection();
   }
 
@@ -33,10 +32,6 @@ public class Message : INotification, IEvent
     HydrateFromHeaders(headers);
   }
 
-  // ---------------------------
-  // CORE IDENTITY
-  // ---------------------------
-
   public Guid Id { get; set; }
 
   public DateTimeOffset OccurredOn { get; set; } = DateTimeOffset.UtcNow;
@@ -45,19 +40,11 @@ public class Message : INotification, IEvent
 
   public MessageKind Kind { get; set; } = MessageKind.Command;
 
-  // ---------------------------
-  // METADATA
-  // ---------------------------
-
   public virtual IDictionary<string, string[]> Headers { get; set; }
       = new MessageHeaders();
 
   public virtual IDictionary<string, object> Properties { get; set; }
       = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-
-  // ---------------------------
-  // CORRELATION (nullable, canonical source)
-  // ---------------------------
 
   [JsonIgnore]
   public virtual Guid? CorrelationId
@@ -76,19 +63,18 @@ public class Message : INotification, IEvent
     }
   }
 
-  // ---------------------------
-  // MESSAGE TYPE
-  // ---------------------------
+  /// <summary>
+  /// Identifies the aggregate whose ordering boundary applies to this message.
+  /// Messages for the same aggregate must use the same Kafka topic and partition key
+  /// to preserve their relative order.
+  /// </summary>
+  public virtual Guid? AggregateId { get; set; }
 
   public virtual string? MessageType
   {
     get => GetProperty<string>(nameof(MessageType));
     set => SetProperty(nameof(MessageType), value);
   }
-
-  // ---------------------------
-  // PUBLIC API
-  // ---------------------------
 
   public T? GetProperty<T>(string key)
       => Properties.TryGetValue(key, out var value) && value is T cast
@@ -98,20 +84,12 @@ public class Message : INotification, IEvent
   public void SetProperty<T>(string key, T value)
       => Properties[key] = value!;
 
-  // ---------------------------
-  // INTERNAL PROJECTION
-  // ---------------------------
-
   private void SyncProjection()
   {
     if (_correlationId.HasValue)
-    {
       Headers[CorrelationHeader] = new[] { _correlationId.Value.ToString() };
-    }
     else
-    {
       Headers.Remove(CorrelationHeader);
-    }
   }
 
   private void HydrateFromHeaders(IDictionary<string, string[]> headers)
