@@ -207,9 +207,9 @@ public sealed class FrameworkArchitectureTests
 
     var auditSource = auditMethod.ToFullString();
 
-    Assert.Contains("Entries<IAuditableEntity>", auditSource, StringComparison.Ordinal);
-    Assert.DoesNotContain("dynamic", auditSource, StringComparison.Ordinal);
-    Assert.DoesNotContain("GetInterfaces", auditSource, StringComparison.Ordinal);
+    Assert.Contains("Entries<IAuditableEntity>", auditSource);
+    Assert.DoesNotContain("dynamic", auditSource);
+    Assert.DoesNotContain("GetInterfaces", auditSource);
   }
 
   [Fact]
