@@ -20,9 +20,22 @@ public abstract class DbContextBase : DbContext
         DbContextOptions options,
         IDispatcher dispatcher,
         ICurrentUserService? currentUser = null,
-        ITenantExecutionContextAccessor? tenantContextAccessor = null,
-        IOptions<DatabaseOptions>? databaseOptions = null
-    ) : base(options)
+        ITenantExecutionContextAccessor? tenantContextAccessor = null)
+        : this(options, dispatcher, currentUser, tenantContextAccessor, databaseOptions: null)
+    {
+    }
+
+    /// <summary>
+    /// Creates a context with database isolation settings available for model validation.
+    /// Derived contexts must explicitly forward the options when shared-database classification
+    /// validation is required.
+    /// </summary>
+    protected DbContextBase(
+        DbContextOptions options,
+        IDispatcher dispatcher,
+        ICurrentUserService? currentUser,
+        ITenantExecutionContextAccessor? tenantContextAccessor,
+        IOptions<DatabaseOptions>? databaseOptions) : base(options)
     {
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _currentUser = currentUser;
