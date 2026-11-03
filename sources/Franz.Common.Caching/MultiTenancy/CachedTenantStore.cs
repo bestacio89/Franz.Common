@@ -129,17 +129,18 @@ public sealed class CachedTenantStore : ITenantStore
             if (_cache.TryGetValue(key, out cached))
                 return cached is null ? null : CloneIfTenant(cached);
 
+            var generation = _state.GetGeneration(key);
             var value = await factory().ConfigureAwait(false);
             if (value is null)
                 return null;
 
             onLoaded(value);
             var snapshot = CloneIfTenant(value);
-            _cache.Set(key, snapshot, new MemoryCacheEntryOptions
+            if (_state.GetGeneration(key) == generation)
             {
-                AbsoluteExpirationRelativeToNow = _absoluteExpiration
-            });
-            _state.TrackCacheKey(key);
+                _cache.Set(key, snapshot, CreateEntryOptions(key));
+                _state.TrackCacheKey(key);
+            }
             return CloneIfTenant(snapshot);
         }
         finally
@@ -163,12 +164,13 @@ public sealed class CachedTenantStore : ITenantStore
             if (_cache.TryGetValue(key, out cached))
                 return cached!;
 
+            var generation = _state.GetGeneration(key);
             var value = await factory().ConfigureAwait(false);
-            _cache.Set(key, value, new MemoryCacheEntryOptions
+            if (_state.GetGeneration(key) == generation)
             {
-                AbsoluteExpirationRelativeToNow = _absoluteExpiration
-            });
-            _state.TrackCacheKey(key);
+                _cache.Set(key, value, CreateEntryOptions(key));
+                _state.TrackCacheKey(key);
+            }
             return value;
         }
         finally
@@ -176,6 +178,15 @@ public sealed class CachedTenantStore : ITenantStore
             gate.Release();
         }
     }
+
+    private MemoryCacheEntryOptions CreateEntryOptions(string key)
+        => new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = _absoluteExpiration
+        }.RegisterPostEvictionCallback(
+            static (evictedKey, _, _, state) =>
+                ((TenantStoreCacheState)state!).KnownCacheKeys.TryRemove((string)evictedKey!, out _),
+            _state);
 
     private void TrackTenant(TenantInfo tenant)
     {
@@ -222,8 +233,15 @@ public sealed class TenantStoreCacheState
     internal ConcurrentDictionary<string, SemaphoreSlim> PopulationGates { get; } = new(StringComparer.Ordinal);
     internal ConcurrentDictionary<Guid, ConcurrentDictionary<string, byte>> TenantHosts { get; } = new();
     internal ConcurrentDictionary<string, byte> KnownCacheKeys { get; } = new(StringComparer.Ordinal);
+    private ConcurrentDictionary<string, long> Generations { get; } = new(StringComparer.Ordinal);
 
+    internal long GetGeneration(string key) => Generations.GetOrAdd(key, 0);
     internal void TrackCacheKey(string key) => KnownCacheKeys.TryAdd(key, 0);
+    internal void InvalidateKey(string key)
+    {
+        Generations.AddOrUpdate(key, 1, static (_, generation) => checked(generation + 1));
+        KnownCacheKeys.TryRemove(key, out _);
+    }
 }
 
 /// <summary>Invalidates tenant-store entries across all decorated store instances in this process.</summary>
@@ -256,14 +274,14 @@ internal sealed class TenantStoreCacheInvalidator(
 
     public void InvalidateAll()
     {
-        foreach (var key in state.KnownCacheKeys.Keys)
+        foreach (var key in state.PopulationGates.Keys.Concat(state.KnownCacheKeys.Keys).Distinct(StringComparer.Ordinal))
             Remove(key);
         state.TenantHosts.Clear();
     }
 
     private void Remove(string key)
     {
+        state.InvalidateKey(key);
         cache.Remove(key);
-        state.KnownCacheKeys.TryRemove(key, out _);
     }
 }
