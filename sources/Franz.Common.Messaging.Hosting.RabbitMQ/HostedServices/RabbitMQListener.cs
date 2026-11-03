@@ -36,9 +36,7 @@ public sealed class RabbitMQListener(
   {
   }
 
-  private readonly string _queueName = QueueNamer.GetQueueName(
-      assemblyAccessor.GetEntryAssembly()
-      ?? throw new InvalidOperationException("Entry assembly cannot be null."));
+  private readonly string _queueName = ResolveQueueName(assemblyAccessor, options);
   private readonly object _lock = new();
   private readonly int _maxConcurrency = options?.Value.MaxConcurrency ?? 1;
   private readonly SemaphoreSlim _acknowledgementLock = new(1, 1);
@@ -338,6 +336,20 @@ public sealed class RabbitMQListener(
   {
     await StopListenAsync().ConfigureAwait(false);
     GC.SuppressFinalize(this);
+  }
+
+  private static string ResolveQueueName(
+      IAssemblyAccessor assemblyAccessor,
+      IOptions<Franz.Common.Messaging.RabbitMQ.RabbitMQMessagingOptions>? options)
+  {
+    ArgumentNullException.ThrowIfNull(assemblyAccessor);
+    var configuredQueueName = options?.Value.QueueName;
+    if (!string.IsNullOrWhiteSpace(configuredQueueName))
+      return configuredQueueName;
+
+    var assembly = assemblyAccessor.GetEntryAssembly()
+        ?? throw new InvalidOperationException("Entry assembly cannot be null.");
+    return QueueNamer.GetQueueName(assembly);
   }
 
   private static TaskCompletionSource NewReadySource()
