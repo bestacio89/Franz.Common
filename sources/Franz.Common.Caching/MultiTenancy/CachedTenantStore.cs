@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Microsoft.Extensions.Caching.Memory;
@@ -215,7 +216,8 @@ internal sealed class CachedTenantStore : ITenantStore
 }
 
 /// <summary>Shared cache bookkeeping so invalidation remains correct for any ITenantStore lifetime.</summary>
-internal sealed class TenantStoreCacheState
+[EditorBrowsable(EditorBrowsableState.Never)]
+public sealed class TenantStoreCacheState
 {
     public TenantStoreCacheState() { }
 
