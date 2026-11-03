@@ -19,8 +19,10 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
   private const int MaxHeaderTextLength = 4_096;
   private readonly IModelProvider? _legacyProvider;
   private readonly IConfirmChannelPool? _confirmChannelPool;
+  private readonly int _publisherConfirmTimeoutSeconds;
   private readonly string _queueName;
   private readonly string _replayExchange;
+  private readonly int _publisherConfirmTimeoutSeconds;
   private readonly string _deadLetterQueue;
 
   // Compatibility constructor for existing consumers. Framework DI uses the confirmed-channel overload.
@@ -28,6 +30,7 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
   {
     _legacyProvider = provider ?? throw new ArgumentNullException(nameof(provider));
     (_queueName, _replayExchange, _deadLetterQueue) = ResolveTopology(accessor, options);
+    _publisherConfirmTimeoutSeconds = options.Value.PublisherConfirmTimeoutSeconds;
   }
 
   public ProgressiveFourStepReplayStrategy(IConfirmChannelPool confirmChannelPool, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
@@ -82,12 +85,15 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
         : await _legacyProvider!.GetChannelAsync().ConfigureAwait(false);
 
     var published = false;
+    using var confirmationTimeout = new CancellationTokenSource(
+        TimeSpan.FromSeconds(_publisherConfirmTimeoutSeconds));
     try
     {
       // On a confirm-enabled channel RabbitMQ.Client completes this operation only after
       // publisher confirmation and raises PublishException for mandatory unroutable messages.
       await channel.BasicPublishAsync(exchange, routingKey, mandatory: true,
-          basicProperties: properties, body: e.Body).ConfigureAwait(false);
+          basicProperties: properties, body: e.Body,
+          cancellationToken: confirmed ? confirmationTimeout.Token : CancellationToken.None).ConfigureAwait(false);
       published = true;
     }
     finally
