@@ -32,7 +32,7 @@ public sealed class TenantStoreCachingTests
     {
         var store = new MutableTenantStore();
         var tenant = new TenantInfo(Guid.NewGuid(), "before");
-        tenant.Domains.Add(new TenantDomain("tenant.example.com", isPrimary: true));
+        tenant.Domains.Add(new TenantDomain("tenant.example.com", isPrimary: true) { IsVerified = true, TenantId = tenant.Id });
         store.Set(tenant);
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var cached = CreateCachedStore(store, cache);
@@ -40,7 +40,7 @@ public sealed class TenantStoreCachingTests
         Assert.Equal("before", (await cached.FindByHostAsync("TENANT.example.com."))!.Name);
 
         var updated = new TenantInfo(tenant.Id, "after");
-        updated.Domains.Add(new TenantDomain("tenant.example.com", isPrimary: true));
+        updated.Domains.Add(new TenantDomain("tenant.example.com", isPrimary: true) { IsVerified = true, TenantId = updated.Id });
         store.Set(updated);
 
         cached.InvalidateTenant(tenant.Id);
@@ -82,7 +82,7 @@ public sealed class TenantStoreCachingTests
             .Select(_ => cached.FindByIdAsync(tenant.Id))
             .ToArray();
 
-        await Task.Delay(25);
+        await store.LookupStarted.Task;
         store.LookupGate.SetResult();
 
         var results = await Task.WhenAll(requests);
@@ -141,6 +141,7 @@ public sealed class TenantStoreCachingTests
         public int FindByIdCalls { get; private set; }
         public int FindByHostCalls { get; private set; }
         public TaskCompletionSource? LookupGate { get; set; }
+        public TaskCompletionSource LookupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void Set(TenantInfo tenant) => _tenants[tenant.Id] = tenant;
 
@@ -148,7 +149,10 @@ public sealed class TenantStoreCachingTests
         {
             FindByIdCalls++;
             if (LookupGate is not null)
+            {
+                LookupStarted.TrySetResult();
                 await LookupGate.Task;
+            }
             return _tenants.GetValueOrDefault(id);
         }
 
