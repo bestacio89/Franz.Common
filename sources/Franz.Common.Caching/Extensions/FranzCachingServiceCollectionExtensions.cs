@@ -7,6 +7,8 @@ using Franz.Common.Caching.Pipelines;
 using Franz.Common.Caching.Providers;
 using Franz.Common.Caching.Settings;
 using Franz.Common.Mediator.Pipelines.Core;
+using Franz.Common.MultiTenancy;
+using Franz.Common.Caching.MultiTenancy;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -241,6 +243,6 @@ public static class FranzCachingServiceCollectionExtensions
     return services;
   }
 
-  private sealed class TenantStoreCacheRegistration;
+  private sealed class TenantStoreCacheRegistration { }
 
 }
