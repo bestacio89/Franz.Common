@@ -61,6 +61,26 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
     };
 
     return new ConsumerBuilder<string, string>(config)
+        .SetPartitionsRevokedHandler((_, partitions) =>
+        {
+          if (partitions.Count == 0)
+            return;
+
+          _logger.LogInformation(
+              "Kafka partitions revoked for group {GroupId}: {Partitions}.",
+              config.GroupId,
+              string.Join(", ", partitions.Select(partition => $"{partition.Topic}[{partition.Partition.Value}]@{partition.Offset.Value}")));
+        })
+        .SetPartitionsLostHandler((_, partitions) =>
+        {
+          if (partitions.Count == 0)
+            return;
+
+          _logger.LogWarning(
+              "Kafka partitions lost for group {GroupId}: {Partitions}. Offsets may be redelivered; handlers must be idempotent.",
+              config.GroupId,
+              string.Join(", ", partitions.Select(partition => $"{partition.Topic}[{partition.Partition.Value}]@{partition.Offset.Value}")));
+        })
         .SetErrorHandler((_, error) =>
         {
           if (error.IsFatal)

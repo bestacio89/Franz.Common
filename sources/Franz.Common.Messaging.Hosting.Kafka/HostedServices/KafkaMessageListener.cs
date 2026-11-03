@@ -87,7 +87,7 @@ public sealed class KafkaMessageListener : IListener
         {
           _logger.LogDebug("Ignoring Kafka tombstone on {Topic}[{Partition}] offset {Offset}.",
               result.Topic, result.Partition.Value, result.Offset.Value);
-          _consumer.Commit(result);
+          CommitAfterProcessing(result);
           continue;
         }
 
@@ -153,6 +153,30 @@ public sealed class KafkaMessageListener : IListener
       _logger.LogInformation("Kafka listener stopped.");
     }
   }
+
+  private void CommitAfterProcessing(ConsumeResult<string, string> result)
+  {
+    try
+    {
+      _consumer.Commit(result);
+    }
+    catch (KafkaException ex) when (IsRebalanceCommitFailure(ex))
+    {
+      // The handler has completed, but ownership may have changed before the
+      // offset commit reached the coordinator. Let the new owner redeliver;
+      // do not terminate the listener for this expected rebalance race.
+      _logger.LogWarning(ex,
+          "Kafka offset commit was rejected during rebalance for {Topic}[{Partition}] offset {Offset}. The message may be redelivered.",
+          result.Topic, result.Partition.Value, result.Offset.Value);
+    }
+  }
+
+  private static bool IsRebalanceCommitFailure(KafkaException exception)
+      => exception.Error.Code.ToString() is
+          "Local_State" or
+          "IllegalGeneration" or
+          "UnknownMemberId" or
+          "RebalanceInProgress";
 
   private async Task DeadLetterAndCommitAsync(
       ConsumeResult<string, string> result,
