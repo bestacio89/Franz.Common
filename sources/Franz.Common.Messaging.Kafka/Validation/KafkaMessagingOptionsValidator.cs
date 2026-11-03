@@ -19,7 +19,7 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
     if (!Enum.IsDefined(security.SecurityProtocol))
       failures.Add("SecurityProtocol must be a defined KafkaSecurityProtocol value.");
 
-    if (!Enum.IsDefined(security.SaslMechanism) && security.SaslMechanism.HasValue)
+    if (security.SaslMechanism.HasValue && !Enum.IsDefined(security.SaslMechanism.Value))
       failures.Add("SaslMechanism must be a defined KafkaSaslMechanism value.");
 
     var usesSasl = security.SecurityProtocol is KafkaSecurityProtocol.SaslPlaintext or KafkaSecurityProtocol.SaslSsl;
