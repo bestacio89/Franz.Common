@@ -7,6 +7,7 @@ using Franz.Common.Messaging.RabbitMQ.Hosting;
 using Franz.Common.Messaging.RabbitMQ.Replay;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
@@ -20,12 +21,15 @@ public sealed class RabbitMQListener(
     IChannelPool channelPool,
     IAssemblyAccessor assemblyAccessor,
     ILogger<RabbitMQListener> logger,
-    IReplayStrategy? replayStrategy = null) : IListener, IAsyncDisposable
+    IReplayStrategy? replayStrategy = null,
+    IOptions<Franz.Common.Messaging.RabbitMQ.RabbitMQMessagingOptions>? options = null) : IListener, IAsyncDisposable
 {
   private readonly string _queueName = QueueNamer.GetQueueName(
       assemblyAccessor.GetEntryAssembly()
       ?? throw new InvalidOperationException("Entry assembly cannot be null."));
   private readonly object _lock = new();
+  private readonly int _maxConcurrency = options?.Value.MaxConcurrency ?? 1;
+  private readonly SemaphoreSlim _acknowledgementLock = new(1, 1);
   private CancellationTokenSource? _cts;
   private Task? _listenTask;
   private IChannel? _channel;
@@ -78,12 +82,16 @@ public sealed class RabbitMQListener(
   {
     try
     {
+      if (_maxConcurrency is < 1 or > ushort.MaxValue)
+        throw new InvalidOperationException("RabbitMQ MaxConcurrency must be between 1 and 65535.");
+
       var channel = await channelPool.GetAsync(ct).ConfigureAwait(false);
       _channel = channel;
 
-      await using var consumer = new RabbitMqConsumer(channel, _queueName);
+      await using var consumer = new RabbitMqConsumer(channel, _queueName, (ushort)_maxConcurrency);
       var enumerator = consumer.ConsumeAsync(ct).GetAsyncEnumerator(ct);
       Task<bool>? pendingMoveNext = null;
+      var inFlight = new List<Task>(_maxConcurrency);
       try
       {
         // The first MoveNextAsync starts the iterator. The consumer's explicit
@@ -94,11 +102,21 @@ public sealed class RabbitMQListener(
 
         while (await pendingMoveNext.ConfigureAwait(false))
         {
-          await ReceiveMessageAsync(channel, enumerator.Current, ct).ConfigureAwait(false);
+          inFlight.Add(ReceiveMessageAsync(channel, enumerator.Current, ct));
+
+          if (inFlight.Count >= _maxConcurrency)
+          {
+            var completed = await Task.WhenAny(inFlight).ConfigureAwait(false);
+            inFlight.Remove(completed);
+            await completed.ConfigureAwait(false);
+          }
+
           pendingMoveNext = enumerator.MoveNextAsync().AsTask();
         }
 
         pendingMoveNext = null;
+        await Task.WhenAll(inFlight).ConfigureAwait(false);
+        inFlight.Clear();
       }
       finally
       {
@@ -119,6 +137,21 @@ public sealed class RabbitMQListener(
         }
 
         await enumerator.DisposeAsync().ConfigureAwait(false);
+
+        // Do not return or close the consumer channel while delivery handlers may
+        // still acknowledge or reject deliveries on it.
+        if (inFlight.Count > 0)
+        {
+          try
+          {
+            await Task.WhenAll(inFlight).ConfigureAwait(false);
+          }
+          catch when (ct.IsCancellationRequested)
+          {
+            // Cancellation remains the listener's control flow; the channel is
+            // closed only after all in-flight callbacks have stopped using it.
+          }
+        }
       }
     }
     catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -174,8 +207,7 @@ public sealed class RabbitMQListener(
 
       if (replayStrategy is null)
       {
-        await channel.BasicNackAsync(delivery.DeliveryTag, multiple: false, requeue: false,
-            cancellationToken: ct).ConfigureAwait(false);
+        await RejectDeliveryAsync(channel, delivery.DeliveryTag, ct).ConfigureAwait(false);
         return;
       }
 
@@ -191,16 +223,37 @@ public sealed class RabbitMQListener(
             "Replay strategy failed for delivery {DeliveryTag} on queue {Queue}",
             delivery.DeliveryTag, _queueName);
 
-        await channel.BasicNackAsync(delivery.DeliveryTag, multiple: false, requeue: false,
-            cancellationToken: ct).ConfigureAwait(false);
+        await RejectDeliveryAsync(channel, delivery.DeliveryTag, ct).ConfigureAwait(false);
         return;
       }
     }
 
     // Keep acknowledgement outside the handler/replay catch. A broker/channel
     // acknowledgement failure must not be misclassified as a business failure.
-    await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken: ct)
-        .ConfigureAwait(false);
+    await _acknowledgementLock.WaitAsync(ct).ConfigureAwait(false);
+    try
+    {
+      await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken: ct)
+          .ConfigureAwait(false);
+    }
+    finally
+    {
+      _acknowledgementLock.Release();
+    }
+  }
+
+  private async Task RejectDeliveryAsync(IChannel channel, ulong deliveryTag, CancellationToken ct)
+  {
+    await _acknowledgementLock.WaitAsync(ct).ConfigureAwait(false);
+    try
+    {
+      await channel.BasicNackAsync(deliveryTag, multiple: false, requeue: false,
+          cancellationToken: ct).ConfigureAwait(false);
+    }
+    finally
+    {
+      _acknowledgementLock.Release();
+    }
   }
 
   public async Task StopListenAsync(CancellationToken cancellationToken = default)
