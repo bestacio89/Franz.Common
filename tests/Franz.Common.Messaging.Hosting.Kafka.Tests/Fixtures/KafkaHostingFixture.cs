@@ -97,6 +97,7 @@ public sealed class KafkaHostingFixture : IAsyncLifetime
       {
         ["Messaging:Kafka:BootstrapServers"] = BootstrapServers,
         ["Messaging:Kafka:GroupId"] = groupId,
+        ["Messaging:Kafka:Security:AllowInsecureTransport"] = "true",
         ["Messaging:Kafka:Failure:DeadLetterTopic"] = "hero-test-dlt",
         ["Messaging:Kafka:Failure:MaxRetryAttempts"] = "1",
         ["Messaging:Kafka:Failure:RetryBackoffMs"] = "0",
