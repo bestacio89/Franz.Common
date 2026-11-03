@@ -1,8 +1,10 @@
 using Franz.Common.Business.Domain;
 using Franz.Common.EntityFramework.Auditing;
+using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Linq.Expressions;
 
 namespace Franz.Common.EntityFramework;
@@ -12,17 +14,20 @@ public abstract class DbContextBase : DbContext
     private readonly IDispatcher _dispatcher;
     private readonly ICurrentUserService? _currentUser;
     private readonly ITenantExecutionContextAccessor? _tenantContextAccessor;
+    private readonly DatabaseOptions? _databaseOptions;
 
     protected DbContextBase(
         DbContextOptions options,
         IDispatcher dispatcher,
         ICurrentUserService? currentUser = null,
-        ITenantExecutionContextAccessor? tenantContextAccessor = null
+        ITenantExecutionContextAccessor? tenantContextAccessor = null,
+        IOptions<DatabaseOptions>? databaseOptions = null
     ) : base(options)
     {
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _currentUser = currentUser;
         _tenantContextAccessor = tenantContextAccessor;
+        _databaseOptions = databaseOptions?.Value;
     }
 
     /// <summary>Current tenant for parameterized filters. An empty value deliberately matches no tenant data.</summary>
@@ -116,9 +121,44 @@ public abstract class DbContextBase : DbContext
     private static bool ImplementsIEntity(Type type)
         => type.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntity<>));
 
+    private void ValidateSharedDatabaseEntityClassification(IReadOnlyModel model)
+    {
+        if (_databaseOptions?.IsolationMode != DatabaseIsolationMode.SharedDatabase)
+            return;
+
+        var violations = model.GetEntityTypes()
+            .Select(entityType => entityType.ClrType)
+            .Where(ImplementsIEntity)
+            .Select(type => new
+            {
+                Type = type,
+                IsTenantOwned = typeof(ITenantEntity).IsAssignableFrom(type),
+                IsGlobal = typeof(IGlobalEntity).IsAssignableFrom(type)
+            })
+            .Where(entity => entity.IsTenantOwned == entity.IsGlobal)
+            .Select(entity =>
+            {
+                var reason = entity.IsTenantOwned
+                    ? "implements both ITenantEntity and IGlobalEntity"
+                    : "implements neither ITenantEntity nor IGlobalEntity";
+                return $"{entity.Type.FullName}: {reason}";
+            })
+            .OrderBy(message => message, StringComparer.Ordinal)
+            .ToArray();
+
+        if (violations.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "SharedDatabase entity classification failed. Every IEntity<TKey> must implement exactly one " +
+                "of ITenantEntity or IGlobalEntity. Correct the following model types:\n - " +
+                string.Join("\n - ", violations));
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        ValidateSharedDatabaseEntityClassification(modelBuilder.Model);
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
