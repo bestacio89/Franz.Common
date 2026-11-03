@@ -131,6 +131,31 @@ public sealed class TenantStoreCachingTests
     }
 
     [Fact]
+    public async Task InvalidateTenant_DiscardsInFlightHostnameLookup()
+    {
+        var store = new MutableTenantStore();
+        var tenant = new TenantInfo(Guid.NewGuid(), "before");
+        tenant.Domains.Add(new TenantDomain("tenant.example.com") { IsVerified = true, TenantId = tenant.Id });
+        store.Set(tenant);
+        store.HostLookupGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
+        var invalidator = provider.GetRequiredService<ITenantStoreCacheInvalidator>();
+
+        var inFlight = cached.FindByHostAsync("tenant.example.com");
+        await store.HostLookupStarted.Task;
+        var updated = new TenantInfo(tenant.Id, "after");
+        updated.Domains.Add(new TenantDomain("tenant.example.com") { IsVerified = true, TenantId = updated.Id });
+        store.Set(updated);
+        invalidator.InvalidateTenant(tenant.Id);
+        store.HostLookupGate.SetResult(true);
+
+        Assert.Equal("before", (await inFlight)!.Name);
+        Assert.Equal("after", (await cached.FindByHostAsync("tenant.example.com"))!.Name);
+        Assert.Equal(2, store.FindByHostCalls);
+    }
+
+    [Fact]
     public async Task InvalidateHost_RefreshesOnlyTheCanonicalHostLookup()
     {
         var store = new MutableTenantStore();
@@ -220,7 +245,9 @@ public sealed class TenantStoreCachingTests
         public int FindByHostCalls { get; private set; }
         public CancellationToken? LastCancellationToken { get; private set; }
         public TaskCompletionSource<bool>? LookupGate { get; set; }
+        public TaskCompletionSource<bool>? HostLookupGate { get; set; }
         public TaskCompletionSource<bool> LookupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> HostLookupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void Set(TenantInfo tenant) => _tenants[tenant.Id] = tenant;
 
@@ -245,12 +272,17 @@ public sealed class TenantStoreCachingTests
             return FindByIdAsync(id);
         }
 
-        public Task<TenantInfo?> FindByHostAsync(string host)
+        public async Task<TenantInfo?> FindByHostAsync(string host)
         {
             FindByHostCalls++;
             var result = _tenants.Values.SingleOrDefault(tenant =>
                 tenant.Domains.Any(domain => domain.IsVerified && domain.Host == host));
-            return Task.FromResult(result);
+            if (HostLookupGate is not null)
+            {
+                HostLookupStarted.TrySetResult(true);
+                await HostLookupGate.Task;
+            }
+            return result;
         }
 
         public Task<IEnumerable<TenantInfo>> GetAllAsync()
