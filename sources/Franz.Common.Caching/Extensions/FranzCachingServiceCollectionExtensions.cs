@@ -213,4 +213,34 @@ public static class FranzCachingServiceCollectionExtensions
     return services;
   }
 
+  /// <summary>
+  /// Decorates the registered tenant store with bounded process-local caching.
+  /// The application must invalidate the cache after every successful tenant registry write.
+  /// </summary>
+  public static IServiceCollection AddTenantStoreCaching(
+      this IServiceCollection services,
+      Action<TenantStoreCacheOptions>? configure = null)
+  {
+    ArgumentNullException.ThrowIfNull(services);
+
+    if (services.Any(descriptor => descriptor.ServiceType == typeof(TenantStoreCacheRegistration)))
+      return services;
+
+    services.AddMemoryCache();
+    services.AddOptions<TenantStoreCacheOptions>()
+        .Configure(configure ?? (_ => { }))
+        .Validate(
+            options => options.AbsoluteExpiration > TimeSpan.Zero,
+            "Tenant-store cache expiration must be greater than zero.")
+        .ValidateOnStart();
+
+    services.Decorate<ITenantStore, CachedTenantStore>();
+    services.TryAddTransient<ITenantStoreCacheInvalidator>(provider =>
+        (ITenantStoreCacheInvalidator)provider.GetRequiredService<ITenantStore>());
+    services.AddSingleton<TenantStoreCacheRegistration>();
+    return services;
+  }
+
+  private sealed class TenantStoreCacheRegistration;
+
 }
