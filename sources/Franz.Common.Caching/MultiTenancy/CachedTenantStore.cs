@@ -217,6 +217,8 @@ internal sealed class CachedTenantStore : ITenantStore
 /// <summary>Shared cache bookkeeping so invalidation remains correct for any ITenantStore lifetime.</summary>
 internal sealed class TenantStoreCacheState
 {
+    public TenantStoreCacheState() { }
+
     private readonly ConcurrentDictionary<string, PopulationGate> _populationGates = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, long> _generations = new(StringComparer.Ordinal);
 
@@ -330,6 +332,7 @@ internal sealed class TenantStoreCacheInvalidator : ITenantStoreCacheInvalidator
         _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         _state = state ?? throw new ArgumentNullException(nameof(state));
     }
+
     public void InvalidateTenant(Guid tenantId)
     {
         Remove(CachedTenantStore.TenantIdKey(tenantId));
@@ -350,12 +353,11 @@ internal sealed class TenantStoreCacheInvalidator : ITenantStoreCacheInvalidator
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         var normalizedHost = TenantDomain.NormalizeHost(host);
         Remove(CachedTenantStore.HostKey(normalizedHost));
-
     }
 
     public void InvalidateAll()
     {
-        foreach (var key in state.GetKnownOrActiveKeys())
+        foreach (var key in _state.GetKnownOrActiveKeys())
             Remove(key);
     }
 
