@@ -74,7 +74,7 @@ public sealed class TenantStoreCachingTests
         var store = new MutableTenantStore();
         var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
         store.Set(tenant);
-        store.LookupGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        store.LookupGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var provider = CreateCachedStore(store);
         var cached = provider.GetRequiredService<ITenantStore>();
 
@@ -83,7 +83,7 @@ public sealed class TenantStoreCachingTests
             .ToArray();
 
         await store.LookupStarted.Task;
-        store.LookupGate.SetResult();
+        store.LookupGate.SetResult(true);
 
         var results = await Task.WhenAll(requests);
 
@@ -161,8 +161,8 @@ public sealed class TenantStoreCachingTests
 
         public int FindByIdCalls { get; private set; }
         public int FindByHostCalls { get; private set; }
-        public TaskCompletionSource? LookupGate { get; set; }
-        public TaskCompletionSource LookupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool>? LookupGate { get; set; }
+        public TaskCompletionSource<bool> LookupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void Set(TenantInfo tenant) => _tenants[tenant.Id] = tenant;
 
@@ -172,7 +172,7 @@ public sealed class TenantStoreCachingTests
             var result = _tenants.GetValueOrDefault(id);
             if (LookupGate is not null)
             {
-                LookupStarted.TrySetResult();
+                LookupStarted.TrySetResult(true);
                 await LookupGate.Task;
             }
             return result;
