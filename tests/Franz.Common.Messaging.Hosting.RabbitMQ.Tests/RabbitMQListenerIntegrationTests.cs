@@ -2,11 +2,13 @@
 using System.Text;
 using Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices;
 using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fixtures;
+using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging;
 using Franz.Common.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using Xunit;
 
@@ -16,6 +18,14 @@ namespace Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Integration;
 public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : IClassFixture<RabbitMQHostingFixture>
 {
   private readonly RabbitMQHostingFixture _fixture = fixture;
+
+  private string ListenerQueueName =>
+      _fixture.Services.GetRequiredService<IOptions<RabbitMQMessagingOptions>>().Value.QueueName
+      ?? throw new InvalidOperationException("RabbitMQ QueueName must be configured for integration tests.");
+
+  private string DeadLetterQueueName =>
+      _fixture.Services.GetRequiredService<IOptions<RabbitMQMessagingOptions>>().Value.DeadLetterQueueName
+      ?? throw new InvalidOperationException("RabbitMQ DeadLetterQueueName must be configured for integration tests.");
 
   [Fact]
   [Trait("Category", "Connectivity")]
@@ -54,8 +64,7 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
       var pubChannel = await channelPool.GetAsync(cts.Token);
       try
       {
-        var queueName = QueueNamer.GetQueueName(
-            _fixture.Services.GetRequiredService<Franz.Common.Reflection.IAssemblyAccessor>().GetEntryAssembly());
+        var queueName = ListenerQueueName;
         await pubChannel.BasicPublishAsync(
             exchange: string.Empty,
             routingKey: queueName,
@@ -82,7 +91,6 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
   {
     var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
     var channelPool = _fixture.Services.GetRequiredService<IChannelPool>();
-    var assemblyAccessor = _fixture.Services.GetRequiredService<IAssemblyAccessor>();
     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
     var body = $"retry-confirm-{Guid.NewGuid():N}";
     var retryProcessed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -105,9 +113,7 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
       await listener.Listen(cts.Token);
       await listener.WaitUntilReadyAsync().WaitAsync(cts.Token);
 
-      var queueName = QueueNamer.GetQueueName(
-          assemblyAccessor.GetEntryAssembly()
-          ?? throw new InvalidOperationException("Entry assembly cannot be null."));
+      var queueName = ListenerQueueName;
       var publisher = await channelPool.GetAsync(cts.Token);
       try
       {
@@ -140,7 +146,6 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
   {
     var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
     var channelPool = _fixture.Services.GetRequiredService<IChannelPool>();
-    var assemblyAccessor = _fixture.Services.GetRequiredService<IAssemblyAccessor>();
     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
     var body = $"retry-exhausted-{Guid.NewGuid():N}";
     var handlerFailed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -161,10 +166,8 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
       await listener.Listen(cts.Token);
       await listener.WaitUntilReadyAsync().WaitAsync(cts.Token);
 
-      var assembly = assemblyAccessor.GetEntryAssembly()
-          ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-      var queueName = QueueNamer.GetQueueName(assembly);
-      var deadLetterQueue = QueueNamer.GetDeadLetterQueueName(assembly);
+      var queueName = ListenerQueueName;
+      var deadLetterQueue = DeadLetterQueueName;
       var publisher = await channelPool.GetAsync(cts.Token);
       try
       {
@@ -224,7 +227,6 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
   {
     var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
     var channelPool = _fixture.Services.GetRequiredService<IChannelPool>();
-    var assemblyAccessor = _fixture.Services.GetRequiredService<IAssemblyAccessor>();
     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
     var threeHandlersEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     var releaseHandlers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -261,9 +263,7 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
       await listener.Listen(cts.Token);
       await listener.WaitUntilReadyAsync().WaitAsync(cts.Token);
 
-      var queueName = QueueNamer.GetQueueName(
-          assemblyAccessor.GetEntryAssembly()
-          ?? throw new InvalidOperationException("Entry assembly cannot be null."));
+      var queueName = ListenerQueueName;
       var publisher = await channelPool.GetAsync(cts.Token);
       try
       {
