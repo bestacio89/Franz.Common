@@ -245,7 +245,7 @@ public sealed class TenantStoreCacheState
 }
 
 /// <summary>Invalidates tenant-store entries across all decorated store instances in this process.</summary>
-internal sealed class TenantStoreCacheInvalidator(
+public sealed class TenantStoreCacheInvalidator(
     IMemoryCache cache,
     TenantStoreCacheState state) : ITenantStoreCacheInvalidator
 {
