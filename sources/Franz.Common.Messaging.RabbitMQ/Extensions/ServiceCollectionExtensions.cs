@@ -82,6 +82,15 @@ public static class ServiceCollectionExtensions
              (uri.Scheme == "amqp" || uri.Scheme == "amqps")),
             "Messaging:RabbitMQ:BootStrapServers must be an absolute amqp:// or amqps:// URI.")
         .Validate(options =>
+            string.IsNullOrWhiteSpace(options.BootStrapServers) ||
+            options.SslEnabled != true ||
+            (Uri.TryCreate(options.BootStrapServers, UriKind.Absolute, out var secureUri) &&
+             secureUri.Scheme == "amqps"),
+            "RabbitMQ TLS is enabled but Messaging:RabbitMQ:BootStrapServers does not use amqps://.")
+        .Validate(options =>
+            options.RequestedHeartbeatSeconds is null or > 0,
+            "Messaging:RabbitMQ:RequestedHeartbeatSeconds must be greater than zero when configured.")
+        .Validate(options =>
             string.Equals(options.ReplayStrategy, "NoReplay", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase),
             "Messaging:RabbitMQ:ReplayStrategy must be NoReplay or ProgressiveFourStep.")
