@@ -153,6 +153,7 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
     // Exercise the opt-in bounded consumer mode in hosting integration tests.
     // Production defaults remain sequential (MaxConcurrency = 1).
     configDict["Messaging:RabbitMQ:MaxConcurrency"] = "3";
+    configDict["Messaging:RabbitMQ:ReplayStrategy"] = "ProgressiveFourStep";
 
     // Merge Mongo configuration
     foreach (var (key, value) in _mongo.GetConfiguration())
