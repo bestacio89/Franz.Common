@@ -61,3 +61,30 @@ A passing routing test is not evidence of full persistence isolation. A provider
 The 2.3.4 implementation establishes a fresh DI scope for each supported message delivery and clears tenant execution state when the delivery pipeline exits, including exceptional and cancellation exits. Outbox dispatch resolves its persistence and dispatch services within a per-message scope. The MassTransit Kafka scoped-handler overload is the preferred path when handler dependencies are tenant-sensitive; the legacy captured-handler overload fails closed when tenant-aware processing is enabled.
 
 These guarantees are transport- and registration-path-specific. They do not make untrusted metadata an authorization source, and they do not replace tenant membership or producer authorization. Applications must test their configured adapters and verify that no tenant-sensitive dependency or ambient state escapes the delivery scope.
+
+
+## Tenant registry caching
+
+Tenant registry caching is opt-in through the caching integration package. Register the application-owned `ITenantStore` first, then decorate it:
+
+```csharp
+services.AddSingleton<ITenantStore, SqlTenantStore>();
+services.AddTenantStoreCaching(options =>
+{
+    options.AbsoluteExpiration = TimeSpan.FromMinutes(2);
+});
+```
+
+The decorator uses process-local `IMemoryCache` entries with absolute expiration. Successful lookups are cached; missing tenants are not negatively cached. Cache population is single-flight per key, and returned tenant metadata is copied so callers cannot mutate cached snapshots through the returned object.
+
+After every successful tenant-registry write, invalidate the affected metadata:
+
+```csharp
+var invalidator = serviceProvider.GetRequiredService<ITenantStoreCacheInvalidator>();
+invalidator.InvalidateTenant(tenantId);
+```
+
+Use `InvalidateHost(host)` when only a hostname mapping changes and `InvalidateAll()` after bulk imports or registry-wide changes. `InvalidateTenant` removes the tenant lookup, existence result, full-registry snapshot, and host aliases observed for that tenant. Invalidation also prevents an in-flight lookup from repopulating an entry after the invalidation boundary.
+
+This cache is process-local, not a distributed coherence protocol. In multi-instance deployments, publish invalidation to every application instance after a registry write, or rely on the configured absolute TTL as the maximum stale-read window. Do not treat TTL as a replacement for explicit invalidation after administrative writes. The default TTL is one minute; configure it according to tenant metadata change frequency and acceptable staleness.
+
