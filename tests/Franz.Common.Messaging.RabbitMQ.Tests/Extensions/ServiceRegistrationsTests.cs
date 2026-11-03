@@ -9,6 +9,7 @@ using Franz.Common.Messaging.RabbitMQ.Transactions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure;
@@ -99,6 +100,69 @@ public sealed class ServiceRegistrationTests
 
     var options = provider.GetRequiredService<IOptions<RabbitMQMessagingOptions>>().Value;
     options.BootStrapServers.Should().Be(_fixture.ConnectionString);
+  }
+
+  [Fact]
+  public async Task AddRabbitMQMessaging_ShouldValidateMissingConnectionSettingsAtHostStartup()
+  {
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+          ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = "5"
+        })
+        .Build();
+
+    using var host = new HostBuilder()
+        .ConfigureServices(services => services.AddRabbitMQMessaging(configuration))
+        .Build();
+
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>()
+        .WithMessage("*BootStrapServers*");
+  }
+
+  [Fact]
+  public async Task AddRabbitMQMessaging_ShouldRejectUriWithoutExplicitCredentialsAtHostStartup()
+  {
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+          ["Messaging:RabbitMQ:BootStrapServers"] = "amqp://localhost:5672/",
+          ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = "5"
+        })
+        .Build();
+
+    using var host = new HostBuilder()
+        .ConfigureServices(services => services.AddRabbitMQMessaging(configuration))
+        .Build();
+
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>()
+        .WithMessage("*explicit username/password credentials*");
+  }
+
+  [Fact]
+  public async Task AddRabbitMQMessaging_ShouldRejectTlsWithNonTlsUriAtHostStartup()
+  {
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+          ["Messaging:RabbitMQ:BootStrapServers"] = "amqp://guest:guest@localhost:5672/",
+          ["Messaging:RabbitMQ:SslEnabled"] = "true",
+          ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = "5"
+        })
+        .Build();
+
+    using var host = new HostBuilder()
+        .ConfigureServices(services => services.AddRabbitMQMessaging(configuration))
+        .Build();
+
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>()
+        .WithMessage("*does not use amqps://*");
   }
 
   [Fact]
