@@ -267,14 +267,17 @@ public sealed class ServiceRegistrationTests
     new RabbitMQMessagingOptions().MaxConcurrency.Should().Be(1);
   }
 
-  [Fact]
-  public async Task AddRabbitMQMessaging_ShouldRejectInvalidConcurrencyAtHostStartup()
+  [Theory]
+  [InlineData("0")]
+  [InlineData("-1")]
+  [InlineData("65536")]
+  public async Task AddRabbitMQMessaging_ShouldRejectOutOfRangeConcurrencyAtHostStartup(string concurrency)
   {
     var configuration = new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
           ["Messaging:RabbitMQ:BootStrapServers"] = _fixture.ConnectionString,
-          ["Messaging:RabbitMQ:MaxConcurrency"] = "0"
+          ["Messaging:RabbitMQ:MaxConcurrency"] = concurrency
         })
         .Build();
 
