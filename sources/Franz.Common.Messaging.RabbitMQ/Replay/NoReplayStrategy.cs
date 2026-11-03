@@ -32,6 +32,7 @@ public class NoReplayStrategy : IReplayStrategy
   {
     _confirmChannelPool = confirmChannelPool ?? throw new ArgumentNullException(nameof(confirmChannelPool));
     _deadLetterQueue = ResolveDeadLetterQueue(accessor, options);
+    _publisherConfirmTimeoutSeconds = options.Value.PublisherConfirmTimeoutSeconds;
   }
 
 
