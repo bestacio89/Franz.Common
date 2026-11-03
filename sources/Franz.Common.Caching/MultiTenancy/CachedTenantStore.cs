@@ -160,8 +160,8 @@ public sealed class CachedTenantStore : ITenantStore
         if (_state.GetGeneration(key) != generation)
             return;
 
-        _state.TrackCacheKey(key);
         _cache.Set(key, value, CreateEntryOptions());
+        _state.TrackCacheKey(key);
         if (_state.GetGeneration(key) == generation)
             return;
 
@@ -176,12 +176,14 @@ public sealed class CachedTenantStore : ITenantStore
         }.RegisterPostEvictionCallback(
             static (evictedKey, _, _, state) =>
             {
-                var cacheState = (TenantStoreCacheState)state!;
-                cacheState.KnownCacheKeys.TryRemove((string)evictedKey!, out _);
+                var evictionState = (TenantStoreCacheEvictionState)state!;
+                var key = (string)evictedKey!;
+                if (!evictionState.Cache.TryGetValue(key, out _))
+                    evictionState.State.KnownCacheKeys.TryRemove(key, out _);
             },
-            _state);
+            new TenantStoreCacheEvictionState(_state, _cache));
 
-    private void TrackTenant(TenantInfo tenant)
+    private sealed record TenantStoreCacheEvictionState(TenantStoreCacheState State, IMemoryCache Cache);\n\n    private void TrackTenant(TenantInfo tenant)
     {
         var hosts = _state.TenantHosts.GetOrAdd(
             tenant.Id,
