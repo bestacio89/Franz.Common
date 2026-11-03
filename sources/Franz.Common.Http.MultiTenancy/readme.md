@@ -248,3 +248,28 @@ Tenant resolution now carries `HttpContext.RequestAborted` through the resolutio
 After resolution and authorization, the middleware establishes one immutable `TenantExecutionContext`. The HTTP tenant/domain accessors reject attempts to replace tenant or domain identity while that validated context is active. The context is cleared in a `finally` block, including when downstream middleware throws or is cancelled.
 
 The authenticated `IdentityContextAccessor` reads user claims only from an authenticated principal. Tenant and domain values come from the validated execution context. Use `IHeaderContextAccessor` to inspect raw headers; never treat caller-supplied identity headers as proof of identity or membership.
+
+
+## HTTP tenant boundary configuration
+
+Tenant resolution exclusions are explicit path prefixes and are matched on segment boundaries, case-insensitively. Excluded endpoints bypass tenant resolution and tenant execution-context creation; secure those endpoints independently. The root path cannot be excluded.
+
+```csharp
+services.AddFranzMultiTenancy(options =>
+{
+    options.RequireTenant = true;
+    options.ExcludedPaths.Add("/health");
+    options.ExcludedPaths.Add("/metrics");
+});
+```
+
+At host startup, the HTTP integration validates that at least one `ITenantResolver` is registered when tenant resolution is required. Authenticated requests remain fail-closed by default: an `ITenantRequestAuthorizer` must be registered. Applications can opt in to the built-in GUID-claim authorizer:
+
+```csharp
+services.AddTenantClaimsAuthorizer(options =>
+{
+    options.TenantIdClaimType = "tenant_id";
+});
+```
+
+The claims authorizer accepts only an authenticated principal containing a claim whose value parses to the exact resolved tenant GUID. It is a simple membership policy; applications with richer membership, role, subscription, or delegated-access rules should register their own `ITenantRequestAuthorizer`. Setting `RequireAuthenticatedAuthorization = false` disables this boundary check and should be an explicit, security-reviewed application decision.
