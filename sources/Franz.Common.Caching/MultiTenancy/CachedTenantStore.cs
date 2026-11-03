@@ -41,7 +41,7 @@ public sealed class CachedTenantStore : ITenantStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         var normalizedHost = TenantDomain.NormalizeHost(host);
-        return GetOrLoadAsync(HostKey(normalizedHost), () => _inner.FindByHostAsync(normalizedHost), tenant => TrackTenantHost(tenant, normalizedHost));
+        return GetOrLoadAsync(HostKey(normalizedHost), () => _inner.FindByHostAsync(normalizedHost), static _ => { });
     }
 
     public async Task<IEnumerable<TenantInfo>> GetAllAsync()
@@ -79,7 +79,7 @@ public sealed class CachedTenantStore : ITenantStore
         return await GetOrLoadAsync(
             HostKey(normalizedHost),
             () => _inner.FindByHostAsync(normalizedHost, cancellationToken),
-            tenant => TrackTenantHost(tenant, normalizedHost),
+            static _ => { },
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -178,16 +178,11 @@ public sealed class CachedTenantStore : ITenantStore
                 if (!evictionState.Cache.TryGetValue(key, out _))
                 {
                     evictionState.State.KnownCacheKeys.TryRemove(key, out _);
-                    if (key.StartsWith("franz:tenants:store:host:", StringComparison.Ordinal))
-                        evictionState.State.RemoveHostFromIndexes(key["franz:tenants:store:host:".Length..]);
                 }
             },
             new TenantStoreCacheEvictionState(_state, _cache));
 
     private sealed record TenantStoreCacheEvictionState(TenantStoreCacheState State, IMemoryCache Cache);
-
-    private void TrackTenantHost(TenantInfo tenant, string host)
-        => _state.TrackTenantHost(tenant.Id, host);
 
     private static T CloneIfTenant<T>(T value)
         => value is TenantInfo tenant ? (T)(object)Clone(tenant) : value;
@@ -225,22 +220,10 @@ public sealed class TenantStoreCacheState
     private readonly ConcurrentDictionary<string, PopulationGate> _populationGates = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, long> _generations = new(StringComparer.Ordinal);
 
-    internal ConcurrentDictionary<Guid, ConcurrentDictionary<string, byte>> TenantHosts { get; } = new();
     internal ConcurrentDictionary<string, byte> KnownCacheKeys { get; } = new(StringComparer.Ordinal);
 
-    internal void TrackTenantHost(Guid tenantId, string host)
-    {
-        var hosts = TenantHosts.GetOrAdd(
-            tenantId,
-            static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal));
-        hosts.TryAdd(host, 0);
-    }
-
-    internal void RemoveHostFromIndexes(string host)
-    {
-        foreach (var hosts in TenantHosts.Values)
-            hosts.TryRemove(host, out _);
-    }
+    internal string[] GetKnownOrActiveKeys()
+        => _populationGates.Keys.Concat(KnownCacheKeys.Keys).Distinct(StringComparer.Ordinal).ToArray();
 
     internal long GetGeneration(string key) => _generations.GetOrAdd(key, 0);
 
@@ -349,10 +332,12 @@ public sealed class TenantStoreCacheInvalidator(
         Remove(CachedTenantStore.ExistsKey(tenantId));
         Remove(CachedTenantStore.AllTenantsCacheKey);
 
-        if (state.TenantHosts.TryRemove(tenantId, out var hosts))
+        // A tenant update can change any hostname mapping. Invalidate every host lookup,
+        // including in-flight lookups whose tenant identity is not known yet.
+        foreach (var key in state.GetKnownOrActiveKeys())
         {
-            foreach (var host in hosts.Keys)
-                Remove(CachedTenantStore.HostKey(host));
+            if (key.StartsWith("franz:tenants:store:host:", StringComparison.Ordinal))
+                Remove(key);
         }
     }
 
@@ -362,15 +347,12 @@ public sealed class TenantStoreCacheInvalidator(
         var normalizedHost = TenantDomain.NormalizeHost(host);
         Remove(CachedTenantStore.HostKey(normalizedHost));
 
-        foreach (var tenantHosts in state.TenantHosts.Values)
-            tenantHosts.TryRemove(normalizedHost, out _);
     }
 
     public void InvalidateAll()
     {
-        foreach (var key in state.GetActiveKeys().Concat(state.KnownCacheKeys.Keys).Distinct(StringComparer.Ordinal))
+        foreach (var key in state.GetKnownOrActiveKeys())
             Remove(key);
-        state.TenantHosts.Clear();
     }
 
     private void Remove(string key)
