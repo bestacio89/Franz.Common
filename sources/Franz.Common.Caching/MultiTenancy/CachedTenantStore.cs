@@ -89,7 +89,7 @@ public sealed class CachedTenantStore : ITenantStore
     {
         cancellationToken.ThrowIfCancellationRequested();
         var tenants = await GetOrLoadAsync(
-            AllTenantsKey,
+            AllTenantsCacheKey,
             async () =>
             {
                 var snapshot = (await _inner.GetAllAsync(cancellationToken).ConfigureAwait(false)).Select(Clone).ToArray();
@@ -107,7 +107,7 @@ public sealed class CachedTenantStore : ITenantStore
     {
         cancellationToken.ThrowIfCancellationRequested();
         return GetOrLoadValueAsync(
-            $"franz:tenants:store:exists:{id:D}",
+            ExistsKey(id),
             () => _inner.ExistsAsync(id),
             cancellationToken);
     }
@@ -156,7 +156,7 @@ public sealed class CachedTenantStore : ITenantStore
         if (_cache.TryGetValue(key, out T? cached))
             return cached!;
 
-        var gate = _populationGates.GetOrAdd(key, static _ => new SemaphoreSlim(1, 1));
+        var gate = _state.PopulationGates.GetOrAdd(key, static _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -213,16 +213,17 @@ public sealed class CachedTenantStore : ITenantStore
 
     internal static string TenantIdKey(Guid id) => $"franz:tenants:store:id:{id:D}";
     internal static string HostKey(string host) => $"franz:tenants:store:host:{host}";
+    internal static string ExistsKey(Guid id) => $"franz:tenants:store:exists:{id:D}";
 }
 
 /// <summary>Shared cache bookkeeping so invalidation remains correct for any ITenantStore lifetime.</summary>
-internal sealed class TenantStoreCacheState
+public sealed class TenantStoreCacheState
 {
-    public ConcurrentDictionary<string, SemaphoreSlim> PopulationGates { get; } = new(StringComparer.Ordinal);
-    public ConcurrentDictionary<Guid, ConcurrentDictionary<string, byte>> TenantHosts { get; } = new();
-    public ConcurrentDictionary<string, byte> KnownCacheKeys { get; } = new(StringComparer.Ordinal);
+    internal ConcurrentDictionary<string, SemaphoreSlim> PopulationGates { get; } = new(StringComparer.Ordinal);
+    internal ConcurrentDictionary<Guid, ConcurrentDictionary<string, byte>> TenantHosts { get; } = new();
+    internal ConcurrentDictionary<string, byte> KnownCacheKeys { get; } = new(StringComparer.Ordinal);
 
-    public void TrackCacheKey(string key) => KnownCacheKeys.TryAdd(key, 0);
+    internal void TrackCacheKey(string key) => KnownCacheKeys.TryAdd(key, 0);
 }
 
 /// <summary>Invalidates tenant-store entries across all decorated store instances in this process.</summary>
