@@ -17,6 +17,7 @@ public class NoReplayStrategy : IReplayStrategy
   private const int MaxHeaderTextLength = 4_096;
   private readonly IModelProvider? _legacyProvider;
   private readonly IConfirmChannelPool? _confirmChannelPool;
+  private readonly int _publisherConfirmTimeoutSeconds;
   private readonly string _deadLetterQueue;
 
   // Compatibility constructor for existing consumers. Framework DI uses the confirmed-channel overload.
@@ -24,6 +25,7 @@ public class NoReplayStrategy : IReplayStrategy
   {
     _legacyProvider = provider ?? throw new ArgumentNullException(nameof(provider));
     _deadLetterQueue = ResolveDeadLetterQueue(accessor, options);
+    _publisherConfirmTimeoutSeconds = options.Value.PublisherConfirmTimeoutSeconds;
   }
 
   public NoReplayStrategy(IConfirmChannelPool confirmChannelPool, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
@@ -63,10 +65,13 @@ public class NoReplayStrategy : IReplayStrategy
         : await _legacyProvider!.GetChannelAsync().ConfigureAwait(false);
 
     var published = false;
+    using var confirmationTimeout = new CancellationTokenSource(
+        TimeSpan.FromSeconds(_publisherConfirmTimeoutSeconds));
     try
     {
       await channel.BasicPublishAsync(exchange: string.Empty, routingKey: _deadLetterQueue,
-          mandatory: true, basicProperties: properties, body: e.Body).ConfigureAwait(false);
+          mandatory: true, basicProperties: properties, body: e.Body,
+          cancellationToken: confirmed ? confirmationTimeout.Token : CancellationToken.None).ConfigureAwait(false);
       published = true;
     }
     finally
