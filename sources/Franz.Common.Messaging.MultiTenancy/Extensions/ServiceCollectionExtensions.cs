@@ -3,13 +3,17 @@ using Franz.Common.MultiTenancy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Franz.Common.Messaging;
+using Franz.Common.Messaging.MultiTenancy.Configuration;
 
 namespace Franz.Common.Messaging.MultiTenancy.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddMessagingMultitenancyContext(this IServiceCollection services)
+    public static IServiceCollection AddMessagingMultitenancyContext(
+        this IServiceCollection services,
+        Action<TenantMessagingOptions>? configure = null)
     {
+        services.Configure(configure ?? (_ => { }));
         services
             .AddNoDuplicateScoped<ITenantExecutionContextAccessor, ScopedTenantExecutionContextAccessor>()
             .AddNoDuplicateScoped<ITenantContextAccessor, TenantContextAccessor>()
