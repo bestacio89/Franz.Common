@@ -15,7 +15,7 @@ using System.Text;
 namespace Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices;
 
 /// <summary>
-/// Owns the lifecycle of a RabbitMQ consumer and dispatches deliveries sequentially.
+/// Owns the lifecycle of a RabbitMQ consumer and dispatches deliveries with bounded concurrency.
 /// </summary>
 public sealed class RabbitMQListener(
     IChannelPool channelPool,
@@ -128,11 +128,11 @@ public sealed class RabbitMQListener(
           {
             await pendingMoveNext.ConfigureAwait(false);
           }
-          catch (OperationCanceledException) when (ct.IsCancellationRequested)
+          catch
           {
-          }
-          catch (global::RabbitMQ.Client.Exceptions.OperationInterruptedException) when (ct.IsCancellationRequested)
-          {
+            // The iterator may already have faulted while the delivery task was
+            // being observed. Cleanup must still dispose the iterator and drain
+            // every callback before the channel is returned.
           }
         }
 
@@ -146,10 +146,10 @@ public sealed class RabbitMQListener(
           {
             await Task.WhenAll(inFlight).ConfigureAwait(false);
           }
-          catch when (ct.IsCancellationRequested)
+          catch
           {
-            // Cancellation remains the listener's control flow; the channel is
-            // closed only after all in-flight callbacks have stopped using it.
+            // Preserve the original processing/transport exception while ensuring
+            // all callbacks have stopped using the channel before it is returned.
           }
         }
       }
