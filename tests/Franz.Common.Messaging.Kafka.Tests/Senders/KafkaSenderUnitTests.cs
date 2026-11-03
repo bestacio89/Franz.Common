@@ -24,6 +24,7 @@ public sealed class KafkaSenderUnitTests
   {
     var mockAssembly = new Mock<IAssembly>();
     mockAssembly.Setup(a => a.Name).Returns("Company.Test.Api");
+    mockAssembly.Setup(a => a.Assembly).Returns(typeof(KafkaSender).Assembly);
 
     var mockAccessor = new Mock<IAssemblyAccessor>();
     mockAccessor.Setup(a => a.GetEntryAssembly()).Returns(mockAssembly.Object);
