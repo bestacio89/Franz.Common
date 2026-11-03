@@ -404,6 +404,9 @@ public sealed class FrameworkArchitectureTests
       var syntaxTree = CSharpSyntaxTree.ParseText(File.ReadAllText(file), path: relativePath);
       var root = syntaxTree.GetRoot();
 
+      foreach (var rule in TenantIsolationPolicyAnalyzer.Analyze(File.ReadAllText(file), relativePath))
+        findings.Add(new PolicyFinding(rule, relativePath));
+
       var usesDynamicTypes = root
         .DescendantNodes()
         .OfType<IdentifierNameSyntax>()
