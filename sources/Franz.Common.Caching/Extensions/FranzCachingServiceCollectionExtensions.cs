@@ -236,9 +236,9 @@ public static class FranzCachingServiceCollectionExtensions
             "Tenant-store cache expiration must be greater than zero.")
         .ValidateOnStart();
 
+    services.TryAddSingleton<TenantStoreCacheState>();
+    services.TryAddSingleton<ITenantStoreCacheInvalidator, TenantStoreCacheInvalidator>();
     services.Decorate<ITenantStore, CachedTenantStore>();
-    services.TryAddTransient<ITenantStoreCacheInvalidator>(provider =>
-        (ITenantStoreCacheInvalidator)provider.GetRequiredService<ITenantStore>());
     services.AddSingleton<TenantStoreCacheRegistration>();
     return services;
   }
