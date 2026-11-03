@@ -104,7 +104,7 @@ public sealed class CachedTenantStore : ITenantStore
         cancellationToken.ThrowIfCancellationRequested();
         return GetOrLoadValueAsync(
             ExistsKey(id),
-            () => _inner.ExistsAsync(id),
+            () => _inner.ExistsAsync(id, cancellationToken),
             cancellationToken);
     }
 
