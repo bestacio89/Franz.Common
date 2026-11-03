@@ -216,7 +216,7 @@ public static class FranzCachingServiceCollectionExtensions
   }
 
   /// <summary>
-  /// Decorates the registered tenant store with bounded process-local caching.
+  /// Decorates the registered tenant store with time-bounded process-local caching.
   /// The application must invalidate the cache after every successful tenant registry write.
   /// </summary>
   public static IServiceCollection AddTenantStoreCaching(
