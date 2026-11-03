@@ -459,30 +459,48 @@ The relational provider qualification covers tenant-scoped EF Core reads and wri
 Do not treat EF Core global query filters as a complete database security boundary. Raw SQL, stored procedures, direct connections, provider-native bulk APIs, and deliberate filter bypasses need explicit tenant enforcement and tests. Cosmos DB and MongoDB are not included in this relational qualification. See the [relational provider contract](../../Docs/relational-provider-contract.md) and [tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md).
 
 
-## Shared-database entity classification
+## Explicit multi-tenancy activation and shared-database classification
 
-When using `DatabaseIsolationMode.SharedDatabase`, every persisted `IEntity<TKey>` must declare exactly one ownership classification:
+Multi-tenancy is an application-level architectural choice. It is independent of `Database:IsolationMode`. Non-multi-tenant applications (for example, a game backend operated by one owner inside one environment) do not need tenant identifiers, tenant/global entity markers, or tenant execution contexts.
 
-- Tenant-owned entities implement `ITenantEntity` and expose their mapped `Guid TenantId`.
-- Cross-tenant entities implement `IGlobalEntity` only when the data is intentionally shared by every tenant.
+The default is disabled:
 
-Entities implementing neither marker, or implementing both, cause EF model initialization to fail with a diagnostic listing the offending CLR types. The gate is scoped to `SharedDatabase`; `TenantDatabase` and `DomainDatabase` retain their separate routing semantics.
+```json
+{
+  "MultiTenancy": {
+    "Enabled": false
+  },
+  "Database": {
+    "IsolationMode": "SharedDatabase",
+    "DatabaseName": "game"
+  }
+}
+```
 
-The database options must be forwarded by the concrete DbContext so the base context can enforce the configured mode:
+Registering the HTTP multi-tenancy or messaging multi-tenancy integration enables `MultiTenancyOptions.Enabled`. A host can also configure `MultiTenancyOptions` explicitly. A concrete `DbContext` that uses the classification gate must forward both `IOptions<DatabaseOptions>` and `IOptions<MultiTenancyOptions>`:
 
 ```csharp
 public sealed class ApplicationDbContext(
     DbContextOptions<ApplicationDbContext> options,
     IDispatcher dispatcher,
     ITenantExecutionContextAccessor tenantContext,
-    IOptions<DatabaseOptions> databaseOptions)
+    IOptions<DatabaseOptions> databaseOptions,
+    IOptions<MultiTenancyOptions> multiTenancyOptions)
     : DbContextBase(
         options,
         dispatcher,
         tenantContextAccessor: tenantContext,
-        databaseOptions: databaseOptions)
+        databaseOptions: databaseOptions,
+        multiTenancyOptions: multiTenancyOptions)
 {
 }
 ```
 
-This is an explicit constructor-composition requirement; the base class cannot receive optional dependencies that the concrete DbContext constructor does not forward. Existing derived contexts that do not forward `IOptions<DatabaseOptions>` do not activate the classification gate and must be updated before relying on this protection.
+When multi-tenancy is enabled with `DatabaseIsolationMode.SharedDatabase`, every persisted `IEntity<TKey>` must declare exactly one ownership classification:
+
+- Tenant-owned entities implement `ITenantEntity` and expose their mapped `Guid TenantId`.
+- Cross-tenant entities implement `IGlobalEntity` only when the data is intentionally shared by every tenant.
+
+Entities implementing neither marker, or implementing both, cause EF model initialization to fail with a diagnostic listing the offending CLR types. When multi-tenancy is disabled, this classification gate is not applied, even when the database isolation mode is `SharedDatabase`. `TenantDatabase` and `DomainDatabase` retain their database-routing semantics; the shared-database classification gate does not apply to those modes.
+
+The concrete DbContext must forward the options because optional base-constructor dependencies are not injected automatically. Existing non-multi-tenant DbContexts can continue using the original constructor overload and do not need tenant-specific changes.
