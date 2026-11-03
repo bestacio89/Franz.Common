@@ -35,7 +35,8 @@ public sealed class KafkaHostingExtensionsTests
       .AddInMemoryCollection(new Dictionary<string, string?>
       {
         ["Messaging:Kafka:BootstrapServers"] = _kafka.BootstrapServers,
-        ["Messaging:Kafka:GroupId"] = $"franz-test-group-{Guid.NewGuid():N}"
+        ["Messaging:Kafka:GroupId"] = $"franz-test-group-{Guid.NewGuid():N}",
+        ["Messaging:Kafka:Security:AllowInsecureTransport"] = "true"
       })
       .Build();
   }
