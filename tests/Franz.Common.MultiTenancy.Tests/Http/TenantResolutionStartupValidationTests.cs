@@ -12,7 +12,7 @@ public sealed class TenantResolutionStartupValidationTests
     public async Task HostStartup_RejectsMissingTenantResolver()
     {
         using var host = new HostBuilder()
-            .ConfigureServices(services => services.AddFranzMultiTenancy())
+            .ConfigureServices((_, services) => services.AddFranzMultiTenancy())
             .Build();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -25,7 +25,7 @@ public sealed class TenantResolutionStartupValidationTests
     public async Task HostStartup_RejectsMissingAuthenticatedRequestAuthorizer()
     {
         using var host = new HostBuilder()
-            .ConfigureServices(services =>
+            .ConfigureServices((_, services) =>
             {
                 services.AddFranzMultiTenancy();
                 services.AddSingleton<ITenantResolver, StartupTestTenantResolver>();
