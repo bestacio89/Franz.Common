@@ -60,19 +60,69 @@ public static class ServiceCollectionExtensions
   public static IServiceCollection AddEventBasedKafkaMessaging(
       this IServiceCollection services,
       IConfiguration configuration)
+      => AddEventBasedKafkaMessagingCore(
+          services,
+          configuration,
+          DiscoverHandledEventTypes());
+
+  /// <summary>
+  /// Registers event-based Kafka messaging for an explicit set of integration event types.
+  /// Prefer this overload when the application owns a known event contract set; it avoids
+  /// assembly-wide handler discovery during service registration.
+  /// </summary>
+  public static IServiceCollection AddEventBasedKafkaMessaging(
+      this IServiceCollection services,
+      IConfiguration configuration,
+      params Type[] eventTypes)
   {
+    ArgumentNullException.ThrowIfNull(eventTypes);
+
+    if (eventTypes.Any(static type =>
+        type is null ||
+        !type.IsClass ||
+        type.IsAbstract ||
+        !typeof(IIntegrationEvent).IsAssignableFrom(type)))
+    {
+      throw new ArgumentException(
+          "Every event type must be a concrete class implementing IIntegrationEvent.",
+          nameof(eventTypes));
+    }
+
+    var duplicateName = eventTypes
+        .GroupBy(static type => type.Name, StringComparer.Ordinal)
+        .FirstOrDefault(static group => group.Count() > 1);
+
+    if (duplicateName is not null)
+    {
+      throw new ArgumentException(
+          $"Event types must have unique simple names because event names are used as DI keys. Duplicate: '{duplicateName.Key}'.",
+          nameof(eventTypes));
+    }
+
+    return AddEventBasedKafkaMessagingCore(
+        services,
+        configuration,
+        eventTypes.Distinct());
+  }
+
+  private static IServiceCollection AddEventBasedKafkaMessagingCore(
+      IServiceCollection services,
+      IConfiguration configuration,
+      IEnumerable<Type> eventTypes)
+  {
+    ArgumentNullException.ThrowIfNull(services);
+    ArgumentNullException.ThrowIfNull(configuration);
+    ArgumentNullException.ThrowIfNull(eventTypes);
+
     services
         .AddKafkaMessagingOptions(configuration)
         .AddKafkaCore(configuration, serviceKey: null, perEvent: true);
-
-    var eventTypes = DiscoverHandledEventTypes();
 
     foreach (var eventType in eventTypes)
     {
       var serviceKey = eventType.Name;
 
       services
-          // sharedInitializer: true — initializer is unkeyed, shared across all events
           .AddKafkaProducerLayer(serviceKey, sharedInitializer: true)
           .AddKafkaMessagingConsumer(serviceKey);
     }
@@ -209,8 +259,11 @@ public static class ServiceCollectionExtensions
       services.AddKeyedScoped<IMessagingInitializer>(serviceKey, (sp, key) =>
       {
         var admin = sp.GetRequiredKeyedService<IAdminClient>(key);
-        return ActivatorUtilities.CreateInstance<KafkaMessagingInitializer>(
-            sp, admin, perEvent);
+        return new KafkaMessagingInitializer(
+            admin,
+            sp.GetRequiredService<IAssemblyAccessor>(),
+            sp.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
+            perEvent);
       });
     }
     else
@@ -220,9 +273,10 @@ public static class ServiceCollectionExtensions
 
       // Unkeyed — shared across all event mode registrations
       services.AddNoDuplicateScoped<IMessagingInitializer>(sp =>
-          ActivatorUtilities.CreateInstance<KafkaMessagingInitializer>(
-              sp,
+          new KafkaMessagingInitializer(
               sp.GetRequiredService<IAdminClient>(),
+              sp.GetRequiredService<IAssemblyAccessor>(),
+              sp.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
               perEvent));
     }
 

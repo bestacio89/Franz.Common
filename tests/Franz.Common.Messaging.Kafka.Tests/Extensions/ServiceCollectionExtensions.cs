@@ -169,6 +169,41 @@ public class KafkaMessagingRegistrationIntegrationTests
   }
 
   [Fact]
+  public async Task EventMode_ExplicitEventTypes_ShouldRegisterOnlyDeclaredEvents()
+  {
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddFranzMediator(new[] { typeof(KafkaMessagingRegistrationIntegrationTests).Assembly });
+    services.AddEventBasedKafkaMessaging(
+        _fixture.Configuration,
+        typeof(TestIntegrationEvent));
+
+    await using var provider = services.BuildServiceProvider();
+    await using var scope = provider.CreateAsyncScope();
+
+    scope.ServiceProvider
+        .GetKeyedService<IMessagingPublisher>(nameof(TestIntegrationEvent))
+        .Should().NotBeNull();
+
+    scope.ServiceProvider
+        .GetKeyedService<IMessagingPublisher>(nameof(AnotherIntegrationEvent))
+        .Should().BeNull();
+  }
+
+  [Fact]
+  public void EventMode_ExplicitEventTypes_ShouldRejectNonIntegrationEvents()
+  {
+    var services = new ServiceCollection();
+
+    var act = () => services.AddEventBasedKafkaMessaging(
+        _fixture.Configuration,
+        typeof(string));
+
+    act.Should().Throw<ArgumentException>()
+        .WithMessage("*IIntegrationEvent*");
+  }
+
+  [Fact]
   public async Task EventMode_TwoEvents_Should_ProduceIsolatedKeyedRegistrations()
   {
     var sp = _fixture.BuildEventBasedServiceProvider();
