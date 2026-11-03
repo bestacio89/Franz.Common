@@ -80,6 +80,7 @@ public sealed class RabbitMQListener(
 
   private async Task RunAsync(CancellationToken ct, TaskCompletionSource readyTcs)
   {
+    var closeChannelOnExit = false;
     try
     {
       if (_maxConcurrency is < 1 or > ushort.MaxValue)
@@ -156,16 +157,19 @@ public sealed class RabbitMQListener(
     }
     catch (OperationCanceledException) when (ct.IsCancellationRequested)
     {
+      closeChannelOnExit = true;
       readyTcs.TrySetCanceled(ct);
       logger.LogInformation("RabbitMQ listener cancellation requested for {Queue}", _queueName);
     }
     catch (global::RabbitMQ.Client.Exceptions.OperationInterruptedException ex) when (ct.IsCancellationRequested)
     {
+      closeChannelOnExit = true;
       readyTcs.TrySetCanceled(ct);
       logger.LogDebug(ex, "RabbitMQ consumer stopped during cancellation for {Queue}", _queueName);
     }
     catch (Exception ex)
     {
+      closeChannelOnExit = true;
       readyTcs.TrySetException(ex);
       logger.LogCritical(ex, "Fatal error in RabbitMQ listener for {Queue}", _queueName);
       throw;
@@ -174,7 +178,12 @@ public sealed class RabbitMQListener(
     {
       var channel = Interlocked.Exchange(ref _channel, null);
       if (channel is not null)
-        channelPool.Return(channel);
+      {
+        if (closeChannelOnExit || ct.IsCancellationRequested)
+          await DisposeChannelAsync(channel).ConfigureAwait(false);
+        else
+          channelPool.Return(channel);
+      }
     }
   }
 
@@ -239,6 +248,28 @@ public sealed class RabbitMQListener(
     finally
     {
       _acknowledgementLock.Release();
+    }
+  }
+
+  private static async ValueTask DisposeChannelAsync(IChannel channel)
+  {
+    try
+    {
+      if (channel.IsOpen)
+        await channel.CloseAsync().ConfigureAwait(false);
+    }
+    catch
+    {
+      // Closing a consumer channel is required to release any unacknowledged deliveries.
+    }
+
+    try
+    {
+      await channel.DisposeAsync().ConfigureAwait(false);
+    }
+    catch
+    {
+      // Preserve the listener's processing or shutdown outcome.
     }
   }
 
