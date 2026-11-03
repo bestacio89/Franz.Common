@@ -113,7 +113,7 @@ public sealed class ServiceRegistrationTests
         .Build();
 
     using var host = new HostBuilder()
-        .ConfigureServices(services => services.AddRabbitMQMessaging(configuration))
+        .ConfigureServices((_, services) => services.AddRabbitMQMessaging(configuration))
         .Build();
 
     var act = () => host.StartAsync();
@@ -134,7 +134,7 @@ public sealed class ServiceRegistrationTests
         .Build();
 
     using var host = new HostBuilder()
-        .ConfigureServices(services => services.AddRabbitMQMessaging(configuration))
+        .ConfigureServices((_, services) => services.AddRabbitMQMessaging(configuration))
         .Build();
 
     var act = () => host.StartAsync();
@@ -156,7 +156,7 @@ public sealed class ServiceRegistrationTests
         .Build();
 
     using var host = new HostBuilder()
-        .ConfigureServices(services => services.AddRabbitMQMessaging(configuration))
+        .ConfigureServices((_, services) => services.AddRabbitMQMessaging(configuration))
         .Build();
 
     var act = () => host.StartAsync();
@@ -183,7 +183,7 @@ public sealed class ServiceRegistrationTests
         .Build();
 
     using var host = new HostBuilder()
-        .ConfigureServices(services => services.AddRabbitMQMessaging(configuration))
+        .ConfigureServices((_, services) => services.AddRabbitMQMessaging(configuration))
         .Build();
 
     var act = () => host.StartAsync();
