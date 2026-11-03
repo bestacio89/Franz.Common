@@ -13,6 +13,7 @@ public static class MultiTenancyServiceCollectionExtensions
         this IServiceCollection services,
         Action<TenantResolutionOptions>? configure = null)
     {
+        services.Configure<MultiTenancyOptions>(options => options.Enabled = true);
         services.AddHttpContextAccessor();
         services.Configure(configure ?? (_ => { }));
         services.TryAddScoped<ITenantContextAccessor, TenantContextAccessor>();
