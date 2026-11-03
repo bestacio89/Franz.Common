@@ -166,6 +166,33 @@ public sealed class ServiceRegistrationTests
   }
 
   [Fact]
+  public void RabbitMQMessagingOptions_ShouldDefaultToSequentialConsumption()
+  {
+    new RabbitMQMessagingOptions().MaxConcurrency.Should().Be(1);
+  }
+
+  [Fact]
+  public async Task AddRabbitMQMessaging_ShouldRejectInvalidConcurrencyAtHostStartup()
+  {
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+          ["Messaging:RabbitMQ:BootStrapServers"] = _fixture.ConnectionString,
+          ["Messaging:RabbitMQ:MaxConcurrency"] = "0"
+        })
+        .Build();
+
+    using var host = new HostBuilder()
+        .ConfigureServices(services => services.AddRabbitMQMessaging(configuration))
+        .Build();
+
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>()
+        .WithMessage("*MaxConcurrency*");
+  }
+
+  [Fact]
   public void AddRabbitMQMessaging_ShouldBeIdempotent()
   {
     _services.AddRabbitMQMessaging(_configuration);
