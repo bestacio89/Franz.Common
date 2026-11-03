@@ -1,9 +1,10 @@
 using Franz.Common.DependencyInjection.Extensions;
+using Franz.Common.Messaging;
+using Franz.Common.Messaging.MultiTenancy.Accessors;
+using Franz.Common.Messaging.MultiTenancy.Configuration;
 using Franz.Common.MultiTenancy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Franz.Common.Messaging;
-using Franz.Common.Messaging.MultiTenancy.Configuration;
 
 namespace Franz.Common.Messaging.MultiTenancy.Extensions;
 
