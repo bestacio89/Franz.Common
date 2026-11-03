@@ -173,6 +173,21 @@ public sealed class TenantStoreCachingTests
     }
 
     [Fact]
+    public async Task CancellationAwareLookup_ForwardsTokenToUnderlyingStore()
+    {
+        var store = new MutableTenantStore();
+        var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
+        store.Set(tenant);
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
+        using var cancellation = new CancellationTokenSource();
+
+        Assert.NotNull(await cached.FindByIdAsync(tenant.Id, cancellation.Token));
+
+        Assert.Equal(cancellation.Token, store.LastCancellationToken);
+    }
+
+    [Fact]
     public async Task CancellationAwareLookup_PropagatesCancellation()
     {
         var store = new MutableTenantStore();
@@ -203,6 +218,7 @@ public sealed class TenantStoreCachingTests
 
         public int FindByIdCalls { get; private set; }
         public int FindByHostCalls { get; private set; }
+        public CancellationToken? LastCancellationToken { get; private set; }
         public TaskCompletionSource<bool>? LookupGate { get; set; }
         public TaskCompletionSource<bool> LookupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -220,7 +236,7 @@ public sealed class TenantStoreCachingTests
             return result;
         }
 
-        public Task<TenantInfo?> FindByHostAsync(string host)
+        public Task<TenantInfo?> FindByIdAsync(Guid id, CancellationToken cancellationToken)\n        {\n            LastCancellationToken = cancellationToken;\n            cancellationToken.ThrowIfCancellationRequested();\n            return FindByIdAsync(id);\n        }\n\n        public Task<TenantInfo?> FindByHostAsync(string host)
         {
             FindByHostCalls++;
             var result = _tenants.Values.SingleOrDefault(tenant =>
