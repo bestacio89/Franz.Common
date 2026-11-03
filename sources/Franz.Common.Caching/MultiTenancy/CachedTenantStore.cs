@@ -250,8 +250,14 @@ public sealed class TenantStoreCacheState
 
     internal void InvalidateKey(string key)
     {
-        if (_populationGates.ContainsKey(key))
-            _generations.AddOrUpdate(key, 1, static (_, generation) => checked(generation + 1));
+        if (_populationGates.TryGetValue(key, out var entry))
+        {
+            lock (entry.Sync)
+            {
+                if (!entry.Removed)
+                    _generations.AddOrUpdate(key, 1, static (_, generation) => checked(generation + 1));
+            }
+        }
 
         KnownCacheKeys.TryRemove(key, out _);
     }
