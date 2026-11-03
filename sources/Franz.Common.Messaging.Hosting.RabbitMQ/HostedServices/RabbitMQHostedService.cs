@@ -17,23 +17,38 @@ public sealed class RabbitMQHostedService : BackgroundService
   private readonly RabbitMQListener _listener;
   private readonly IQueueProvisioner? _provisioner;
   private readonly IModelProvider _modelProvider;
-  private readonly IAssemblyAccessor _assemblyAccessor;
   private readonly ILogger<RabbitMQHostedService> _logger;
   private readonly string _queueName;
 
+  /// <summary>
+  /// Creates the hosted service using the assembly-derived queue name.
+  /// </summary>
   public RabbitMQHostedService(
       RabbitMQListener listener,
       IModelProvider modelProvider,
       IAssemblyAccessor assemblyAccessor,
       ILogger<RabbitMQHostedService> logger,
-      IQueueProvisioner? provisioner = null,
-      IOptions<RabbitMQMessagingOptions>? options = null)
+      IQueueProvisioner? provisioner = null)
+      : this(listener, modelProvider, assemblyAccessor, logger, provisioner, options: null)
+  {
+  }
+
+  /// <summary>
+  /// Creates the hosted service using the configured queue name when available.
+  /// </summary>
+  public RabbitMQHostedService(
+      RabbitMQListener listener,
+      IModelProvider modelProvider,
+      IAssemblyAccessor assemblyAccessor,
+      ILogger<RabbitMQHostedService> logger,
+      IQueueProvisioner? provisioner,
+      IOptions<RabbitMQMessagingOptions>? options)
   {
     _listener = listener;
     _modelProvider = modelProvider;
-    _assemblyAccessor = assemblyAccessor;
     _logger = logger;
     _provisioner = provisioner;
+
     var configuredQueueName = options?.Value.QueueName;
     _queueName = !string.IsNullOrWhiteSpace(configuredQueueName)
         ? configuredQueueName
