@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Confluent.Kafka;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Mediator;
@@ -262,14 +262,20 @@ public static class ServiceCollectionExtensions
               sp.GetRequiredKeyedService<IMessagingSender>(key)
           ));
 
-      services.AddKeyedScoped<IMessagingTransaction, MessagingTransaction>(serviceKey);
+      services.AddKeyedScoped<IMessagingTransaction>(serviceKey, (sp, _) =>
+          new MessagingTransaction(
+              sp.GetRequiredService<IKafkaTransactionProducerFactory>(),
+              sp.GetRequiredService<KafkaTransactionContext>()));
       services.AddKeyedScoped<IMessageHandler, MessageBuilderDelegatingHandler>(serviceKey);
     }
     else
     {
       services.AddNoDuplicateScoped<IMessagingSender, KafkaSender>();
       services.AddNoDuplicateScoped<IMessagingPublisher, MessagingPublisher>();
-      services.AddNoDuplicateScoped<IMessagingTransaction, MessagingTransaction>();
+      services.AddNoDuplicateScoped<IMessagingTransaction>(sp =>
+          new MessagingTransaction(
+              sp.GetRequiredService<IKafkaTransactionProducerFactory>(),
+              sp.GetRequiredService<KafkaTransactionContext>()));
       services.AddNoDuplicateScoped<IMessageHandler, MessageBuilderDelegatingHandler>();
     }
 
