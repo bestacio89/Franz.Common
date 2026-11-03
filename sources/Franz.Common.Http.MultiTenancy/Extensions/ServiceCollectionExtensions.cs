@@ -1,4 +1,3 @@
-using Franz.Common.Http.MultiTenancy.Accessors;
 using Franz.Common.Http.MultiTenancy.Configuration;
 using Franz.Common.Http.MultiTenancy.Middleware;
 using Franz.Common.MultiTenancy;
@@ -17,7 +16,7 @@ public static class MultiTenancyServiceCollectionExtensions
         services.Configure(configure ?? (_ => { }));
         services.TryAddScoped<ITenantContextAccessor, TenantContextAccessor>();
         services.TryAddScoped<IDomainContextAccessor, DomainContextAccessor>();
-        services.TryAddScoped<ITenantExecutionContextAccessor, TenantExecutionContextAccessor>();
+        services.TryAddScoped<ITenantExecutionContextAccessor, ScopedTenantExecutionContextAccessor>();
         services.TryAddScoped<ITenantResolutionPipeline, DefaultTenantResolutionPipeline>();
         services.TryAddScoped<IDomainResolutionPipeline, DefaultDomainResolutionPipeline>();
         services.TryAddScoped<TenantResolutionMiddleware>();
