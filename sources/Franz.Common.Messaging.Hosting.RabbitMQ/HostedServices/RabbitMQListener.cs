@@ -24,6 +24,18 @@ public sealed class RabbitMQListener(
     IReplayStrategy? replayStrategy = null,
     IOptions<Franz.Common.Messaging.RabbitMQ.RabbitMQMessagingOptions>? options = null) : IListener, IAsyncDisposable
 {
+  /// <summary>
+  /// Preserves the public constructor contract from earlier package versions.
+  /// </summary>
+  public RabbitMQListener(
+      IChannelPool channelPool,
+      IAssemblyAccessor assemblyAccessor,
+      ILogger<RabbitMQListener> logger,
+      IReplayStrategy? replayStrategy)
+      : this(channelPool, assemblyAccessor, logger, replayStrategy, options: null)
+  {
+  }
+
   private readonly string _queueName = QueueNamer.GetQueueName(
       assemblyAccessor.GetEntryAssembly()
       ?? throw new InvalidOperationException("Entry assembly cannot be null."));
