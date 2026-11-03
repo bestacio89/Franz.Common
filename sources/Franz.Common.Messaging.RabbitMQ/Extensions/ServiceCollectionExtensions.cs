@@ -170,11 +170,11 @@ public static class ServiceCollectionExtensions
               var options = sp.GetRequiredService<IOptions<RabbitMQMessagingOptions>>().Value;
               var confirmChannelPool = sp.GetRequiredService<IConfirmChannelPool>();
               var accessor = sp.GetRequiredService<IAssemblyAccessor>();
-              var messagingOptions = sp.GetRequiredService<IOptions<MessagingOptions>>();
+              var rabbitOptions = sp.GetRequiredService<IOptions<RabbitMQMessagingOptions>>();
 
               return string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase)
-                  ? new ProgressiveFourStepReplayStrategy(confirmChannelPool, accessor, messagingOptions)
-                  : new NoReplayStrategy(confirmChannelPool, accessor, messagingOptions);
+                  ? new ProgressiveFourStepReplayStrategy(confirmChannelPool, accessor, rabbitOptions)
+                  : new NoReplayStrategy(confirmChannelPool, accessor, rabbitOptions);
             });
 
     return services;
