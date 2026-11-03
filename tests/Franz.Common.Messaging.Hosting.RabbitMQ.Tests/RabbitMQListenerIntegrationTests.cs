@@ -130,6 +130,7 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
     finally
     {
       listener.OnMessageReceivedAsync = null;
+      await listener.StopListenAsync();
     }
   }
 
