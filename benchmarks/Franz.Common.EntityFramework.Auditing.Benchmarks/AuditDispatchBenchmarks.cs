@@ -11,7 +11,7 @@ namespace Franz.Common.EntityFramework.Auditing.Benchmarks;
 [MemoryDiagnoser]
 public class AuditDispatchBenchmarks
 {
-    private BenchmarkEntity[] _entities = [];
+    private object[] _entities = [];
 
     [Params(1, 100, 1_000)]
     public int EntityCount { get; set; }
@@ -20,7 +20,7 @@ public class AuditDispatchBenchmarks
     public void Setup()
     {
         _entities = Enumerable.Range(0, EntityCount)
-            .Select(index => new BenchmarkEntity(GuidFromInt(index + 1)))
+            .Select(index => (object)new BenchmarkEntity(GuidFromInt(index + 1)))
             .ToArray();
     }
 
