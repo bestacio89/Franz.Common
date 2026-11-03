@@ -1,3 +1,4 @@
+using Franz.Common.Http.MultiTenancy.Accessors;
 using Franz.Common.Http.MultiTenancy.Configuration;
 using Franz.Common.Http.MultiTenancy.Middleware;
 using Franz.Common.MultiTenancy;
