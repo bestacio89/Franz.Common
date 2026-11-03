@@ -46,5 +46,11 @@
     "rule": "TEST_HELPER_IN_RUNTIME",
     "severity": "Error",
     "description": "Test-only helpers must not leak into runtime packages."
+  },
+  {
+    "id": "SEC-003",
+    "rule": "TENANT_QUERY_FILTER_MISSING",
+    "severity": "Error",
+    "description": "DbContextBase must apply a global tenant query filter to ITenantEntity types, scoped to the validated current tenant."
   }
 ]
