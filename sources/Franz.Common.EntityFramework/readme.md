@@ -457,3 +457,32 @@ All EF provider adapters use the shared `DatabaseTargetResolver`; adapters const
 The relational provider qualification covers tenant-scoped EF Core reads and writes, fail-closed behavior when tenant execution context is absent, tenant ownership immutability, cross-tenant mutation rejection, query-filter behavior for supported set-based operations, and the repository `ExecuteBulkUpdateAsync` contract. The named relational engines in the qualification are PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23.
 
 Do not treat EF Core global query filters as a complete database security boundary. Raw SQL, stored procedures, direct connections, provider-native bulk APIs, and deliberate filter bypasses need explicit tenant enforcement and tests. Cosmos DB and MongoDB are not included in this relational qualification. See the [relational provider contract](../../Docs/relational-provider-contract.md) and [tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md).
+
+
+## Shared-database entity classification
+
+When using `DatabaseIsolationMode.SharedDatabase`, every persisted `IEntity<TKey>` must declare exactly one ownership classification:
+
+- Tenant-owned entities implement `ITenantEntity` and expose their mapped `Guid TenantId`.
+- Cross-tenant entities implement `IGlobalEntity` only when the data is intentionally shared by every tenant.
+
+Entities implementing neither marker, or implementing both, cause EF model initialization to fail with a diagnostic listing the offending CLR types. The gate is scoped to `SharedDatabase`; `TenantDatabase` and `DomainDatabase` retain their separate routing semantics.
+
+The database options must be forwarded by the concrete DbContext so the base context can enforce the configured mode:
+
+```csharp
+public sealed class ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    IDispatcher dispatcher,
+    ITenantExecutionContextAccessor tenantContext,
+    IOptions<DatabaseOptions> databaseOptions)
+    : DbContextBase(
+        options,
+        dispatcher,
+        tenantContextAccessor: tenantContext,
+        databaseOptions: databaseOptions)
+{
+}
+```
+
+This is an explicit constructor-composition requirement; the base class cannot receive optional dependencies that the concrete DbContext constructor does not forward. Existing derived contexts that do not forward `IOptions<DatabaseOptions>` do not activate the classification gate and must be updated before relying on this protection.
