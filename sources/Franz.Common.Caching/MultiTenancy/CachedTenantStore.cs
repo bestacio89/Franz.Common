@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace Franz.Common.Caching.MultiTenancy;
 
 /// <summary>
-/// Adds bounded, process-local caching to an existing tenant store. Registry writes remain
+/// Adds time-bounded, process-local caching to an existing tenant store. Registry writes remain
 /// owned by the underlying store; callers must use the invalidator after successful writes.
 /// </summary>
 public sealed class CachedTenantStore : ITenantStore
@@ -57,7 +57,7 @@ public sealed class CachedTenantStore : ITenantStore
             },
             static _ => { }).ConfigureAwait(false);
 
-        return tenants.Select(Clone).ToArray();
+        return tenants!.Select(Clone).ToArray();
     }
 
     public Task<bool> ExistsAsync(Guid id)
