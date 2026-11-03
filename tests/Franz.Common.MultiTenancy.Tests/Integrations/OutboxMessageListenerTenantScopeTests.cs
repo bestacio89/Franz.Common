@@ -187,6 +187,54 @@ public sealed class OutboxMessageListenerTenantScopeTests
     }
 
     [Fact]
+    public async Task Listen_WhenDeserializedPayloadIsNotACommandOrEvent_DoesNotMarkItProcessedOrSent()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var stored = new StoredMessage
+        {
+            Body = "{}",
+            MessageType = typeof(string).AssemblyQualifiedName
+        };
+
+        var messageStore = Substitute.For<IMessageStore>();
+        messageStore.GetPendingAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>([stored]));
+
+        var inboxStore = Substitute.For<IInboxStore>();
+        inboxStore.HasProcessedAsync(stored.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(false));
+
+        var serializer = Substitute.For<IMessageSerializer>();
+        serializer.Deserialize("{}", typeof(string)).Returns("not a command or event");
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IMessageStore>(messageStore);
+        services.AddSingleton<IInboxStore>(inboxStore);
+        services.AddSingleton<IDispatcher>(Substitute.For<IDispatcher>());
+        services.AddSingleton<IMessageSerializer>(serializer);
+
+        using var provider = services.BuildServiceProvider();
+        var listener = new OutboxMessageListener(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            provider.GetRequiredService<ILogger<OutboxMessageListener>>());
+
+        listener.OnMessageReceivedAsync = _ =>
+        {
+            cancellation.Cancel();
+            return Task.CompletedTask;
+        };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => listener.Listen(cancellation.Token));
+
+        await inboxStore.DidNotReceive().MarkProcessedAsync(
+            Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await messageStore.DidNotReceive().MarkAsSentAsync(
+            Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Listen_WhenMessageTypeIsUnknown_DoesNotInvokeSerializerOrMarkMessageProcessed()
     {
         using var cancellation = new CancellationTokenSource();
