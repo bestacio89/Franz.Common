@@ -117,6 +117,7 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
     // Production defaults remain sequential (MaxConcurrency = 1).
     configDict["Messaging:RabbitMQ:MaxConcurrency"] = "3";
     configDict["Messaging:RabbitMQ:ReplayStrategy"] = "ProgressiveFourStep";
+    configDict["Messaging:RabbitMQ:DeadLetterQueueName"] = $"{_rabbit.QueueName}-dead-letter";
 
     // Merge Mongo configuration
     foreach (var (key, value) in _mongo.GetConfiguration())
