@@ -4,6 +4,7 @@ using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Options;
 using System.Linq.Expressions;
 
@@ -15,32 +16,47 @@ public abstract class DbContextBase : DbContext
     private readonly ICurrentUserService? _currentUser;
     private readonly ITenantExecutionContextAccessor? _tenantContextAccessor;
     private readonly DatabaseOptions? _databaseOptions;
+    private readonly bool _multiTenancyEnabled;
 
     protected DbContextBase(
         DbContextOptions options,
         IDispatcher dispatcher,
         ICurrentUserService? currentUser = null,
         ITenantExecutionContextAccessor? tenantContextAccessor = null)
-        : this(options, dispatcher, currentUser, tenantContextAccessor, databaseOptions: null)
+        : this(options, dispatcher, currentUser, tenantContextAccessor, databaseOptions: null, multiTenancyOptions: null)
     {
     }
 
     /// <summary>
-    /// Creates a context with database isolation settings available for model validation.
-    /// Derived contexts must explicitly forward the options when shared-database classification
-    /// validation is required.
+    /// Creates a context with database and multi-tenancy settings available for model validation.
+    /// Multi-tenant applications must explicitly forward both option objects from their composition root.
     /// </summary>
     protected DbContextBase(
         DbContextOptions options,
         IDispatcher dispatcher,
         ICurrentUserService? currentUser,
         ITenantExecutionContextAccessor? tenantContextAccessor,
-        IOptions<DatabaseOptions>? databaseOptions) : base(options)
+        IOptions<DatabaseOptions>? databaseOptions)
+        : this(options, dispatcher, currentUser, tenantContextAccessor, databaseOptions, multiTenancyOptions: null)
+    {
+    }
+
+    /// <summary>
+    /// Creates a context with explicit multi-tenancy activation and database isolation settings.
+    /// </summary>
+    protected DbContextBase(
+        DbContextOptions options,
+        IDispatcher dispatcher,
+        ICurrentUserService? currentUser,
+        ITenantExecutionContextAccessor? tenantContextAccessor,
+        IOptions<DatabaseOptions>? databaseOptions,
+        IOptions<MultiTenancyOptions>? multiTenancyOptions) : base(options)
     {
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _currentUser = currentUser;
         _tenantContextAccessor = tenantContextAccessor;
         _databaseOptions = databaseOptions?.Value;
+        _multiTenancyEnabled = multiTenancyOptions?.Value.Enabled ?? false;
     }
 
     /// <summary>Current tenant for parameterized filters. An empty value deliberately matches no tenant data.</summary>
@@ -136,7 +152,7 @@ public abstract class DbContextBase : DbContext
 
     private void ValidateSharedDatabaseEntityClassification(IReadOnlyModel model)
     {
-        if (_databaseOptions?.IsolationMode != DatabaseIsolationMode.SharedDatabase)
+        if (!_multiTenancyEnabled || _databaseOptions?.IsolationMode != DatabaseIsolationMode.SharedDatabase)
             return;
 
         var violations = model.GetEntityTypes()
