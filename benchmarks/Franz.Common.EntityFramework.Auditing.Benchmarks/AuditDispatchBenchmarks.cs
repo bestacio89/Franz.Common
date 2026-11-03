@@ -60,5 +60,7 @@ public class AuditDispatchBenchmarks
         return new Guid(bytes);
     }
 
-    private sealed class BenchmarkEntity(Guid id) : Entity<Guid>(id);
+    private sealed class BenchmarkEntity(Guid id) : Entity<Guid>(id)
+    {
+    }
 }
