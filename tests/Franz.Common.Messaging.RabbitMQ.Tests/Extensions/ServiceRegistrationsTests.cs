@@ -244,7 +244,7 @@ public sealed class ServiceRegistrationTests
     });
     var provider = new ConnectionFactoryProvider(options, new Franz.Common.Reflection.AssemblyAccessorWrapper());
 
-    var factory = (RabbitMQ.Client.ConnectionFactory)provider.Current;
+    var factory = (global::RabbitMQ.Client.ConnectionFactory)provider.Current;
 
     factory.Ssl.Enabled.Should().BeTrue();
     factory.Ssl.AcceptablePolicyErrors.Should().Be(System.Net.Security.SslPolicyErrors.None);
