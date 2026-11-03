@@ -17,17 +17,28 @@ public sealed class TenantResolutionMiddleware(
 {
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
+        var configuration = options.Value;
+        if (configuration.ExcludedPaths.Any(path =>
+                context.Request.Path.StartsWithSegments(
+                    new PathString(path),
+                    StringComparison.OrdinalIgnoreCase)))
+        {
+            await next(context).ConfigureAwait(false);
+            return;
+        }
+
         var cancellationToken = context.RequestAborted;
         var result = await pipeline.ResolveAsync(context, cancellationToken).ConfigureAwait(false);
         var tenant = result?.Tenant;
 
         if (tenant is null || !result!.Succeeded)
         {
-            if (options.Value.RequireTenant)
+            if (configuration.RequireTenant)
             {
                 context.Response.StatusCode = StatusCodes.Status404NotFound;
                 return;
             }
+
             await next(context).ConfigureAwait(false);
             return;
         }
@@ -46,7 +57,8 @@ public sealed class TenantResolutionMiddleware(
             return;
         }
 
-        if (context.User.Identity?.IsAuthenticated == true)
+        if (configuration.RequireAuthenticatedAuthorization &&
+            context.User.Identity?.IsAuthenticated == true)
         {
             var authorizer = serviceProvider.GetService<ITenantRequestAuthorizer>();
             if (authorizer is null ||
