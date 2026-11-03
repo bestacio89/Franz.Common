@@ -18,7 +18,8 @@ public sealed class SharedDatabaseEntityClassificationTests
         using var context = new ClassifiedDbContext(
             CreateOptions<ClassifiedDbContext>(),
             new Mock<IDispatcher>().Object,
-            Options.Create(new DatabaseOptions { DatabaseName = "shared", IsolationMode = DatabaseIsolationMode.SharedDatabase }));
+            Options.Create(new DatabaseOptions { DatabaseName = "shared", IsolationMode = DatabaseIsolationMode.SharedDatabase }),
+            Options.Create(new MultiTenancyOptions { Enabled = true }));
 
         Assert.Contains(context.Model.GetEntityTypes(), entity => entity.ClrType == typeof(TenantOwnedEntity));
         Assert.Contains(context.Model.GetEntityTypes(), entity => entity.ClrType == typeof(GlobalEntity));
@@ -30,7 +31,8 @@ public sealed class SharedDatabaseEntityClassificationTests
         using var context = new UnclassifiedDbContext(
             CreateOptions<UnclassifiedDbContext>(),
             new Mock<IDispatcher>().Object,
-            Options.Create(new DatabaseOptions { DatabaseName = "shared", IsolationMode = DatabaseIsolationMode.SharedDatabase }));
+            Options.Create(new DatabaseOptions { DatabaseName = "shared", IsolationMode = DatabaseIsolationMode.SharedDatabase }),
+            Options.Create(new MultiTenancyOptions { Enabled = true }));
 
         var exception = Assert.Throws<InvalidOperationException>(() => _ = context.Model);
 
@@ -45,7 +47,8 @@ public sealed class SharedDatabaseEntityClassificationTests
         using var context = new AmbiguousDbContext(
             CreateOptions<AmbiguousDbContext>(),
             new Mock<IDispatcher>().Object,
-            Options.Create(new DatabaseOptions { DatabaseName = "shared", IsolationMode = DatabaseIsolationMode.SharedDatabase }));
+            Options.Create(new DatabaseOptions { DatabaseName = "shared", IsolationMode = DatabaseIsolationMode.SharedDatabase }),
+            Options.Create(new MultiTenancyOptions { Enabled = true }));
 
         var exception = Assert.Throws<InvalidOperationException>(() => _ = context.Model);
 
@@ -54,12 +57,25 @@ public sealed class SharedDatabaseEntityClassificationTests
     }
 
     [Fact]
+    public void NonMultiTenantApplication_SharedDatabaseAllowsUnclassifiedDomainEntities()
+    {
+        using var context = new UnclassifiedDbContext(
+            CreateOptions<UnclassifiedDbContext>(),
+            new Mock<IDispatcher>().Object,
+            Options.Create(new DatabaseOptions { DatabaseName = "game", IsolationMode = DatabaseIsolationMode.SharedDatabase }),
+            Options.Create(new MultiTenancyOptions { Enabled = false }));
+
+        Assert.Contains(context.Model.GetEntityTypes(), entity => entity.ClrType == typeof(UnclassifiedEntity));
+    }
+
+    [Fact]
     public void TenantDatabase_DoesNotApplySharedDatabaseClassificationGate()
     {
         using var context = new UnclassifiedDbContext(
             CreateOptions<UnclassifiedDbContext>(),
             new Mock<IDispatcher>().Object,
-            Options.Create(new DatabaseOptions { DatabaseName = "tenant_{dbName}", IsolationMode = DatabaseIsolationMode.TenantDatabase }));
+            Options.Create(new DatabaseOptions { DatabaseName = "tenant_{dbName}", IsolationMode = DatabaseIsolationMode.TenantDatabase }),
+            Options.Create(new MultiTenancyOptions { Enabled = true }));
 
         Assert.Contains(context.Model.GetEntityTypes(), entity => entity.ClrType == typeof(UnclassifiedEntity));
     }
@@ -88,8 +104,9 @@ public sealed class SharedDatabaseEntityClassificationTests
     private sealed class ClassifiedDbContext(
         DbContextOptions<ClassifiedDbContext> options,
         IDispatcher dispatcher,
-        IOptions<DatabaseOptions> databaseOptions)
-        : DbContextBase(options, dispatcher, currentUser: null, tenantContextAccessor: null, databaseOptions: databaseOptions)
+        IOptions<DatabaseOptions> databaseOptions,
+        IOptions<MultiTenancyOptions> multiTenancyOptions)
+        : DbContextBase(options, dispatcher, currentUser: null, tenantContextAccessor: null, databaseOptions: databaseOptions, multiTenancyOptions: multiTenancyOptions)
     {
         public DbSet<TenantOwnedEntity> TenantEntities => Set<TenantOwnedEntity>();
         public DbSet<GlobalEntity> GlobalEntities => Set<GlobalEntity>();
