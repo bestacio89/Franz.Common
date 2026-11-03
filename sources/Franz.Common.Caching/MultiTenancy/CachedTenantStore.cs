@@ -67,7 +67,7 @@ public sealed class CachedTenantStore : ITenantStore
         return await GetOrLoadAsync(
             TenantIdKey(id),
             () => _inner.FindByIdAsync(id, cancellationToken),
-            TrackTenant,
+            static _ => { },
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -79,7 +79,7 @@ public sealed class CachedTenantStore : ITenantStore
         return await GetOrLoadAsync(
             HostKey(normalizedHost),
             () => _inner.FindByHostAsync(normalizedHost, cancellationToken),
-            TrackTenant,
+            tenant => TrackTenantHost(tenant, normalizedHost),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -184,7 +184,9 @@ public sealed class CachedTenantStore : ITenantStore
             },
             new TenantStoreCacheEvictionState(_state, _cache));
 
-    private sealed record TenantStoreCacheEvictionState(TenantStoreCacheState State, IMemoryCache Cache);\n\n    private void TrackTenantHost(TenantInfo tenant, string host)
+    private sealed record TenantStoreCacheEvictionState(TenantStoreCacheState State, IMemoryCache Cache);
+
+    private void TrackTenantHost(TenantInfo tenant, string host)
         => _state.TrackTenantHost(tenant.Id, host);
 
     private static T CloneIfTenant<T>(T value)
