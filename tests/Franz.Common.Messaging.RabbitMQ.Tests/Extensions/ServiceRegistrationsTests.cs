@@ -165,6 +165,102 @@ public sealed class ServiceRegistrationTests
         .WithMessage("*does not use amqps://*");
   }
 
+  [Theory]
+  [InlineData("HostName")]
+  [InlineData("UserName")]
+  [InlineData("Password")]
+  public async Task AddRabbitMQMessaging_ShouldRejectIncompleteExplicitConnectionSettingsAtHostStartup(string missingSetting)
+  {
+    var settings = new Dictionary<string, string?>
+    {
+      ["Messaging:RabbitMQ:HostName"] = "rabbit.example.test",
+      ["Messaging:RabbitMQ:UserName"] = "service-user",
+      ["Messaging:RabbitMQ:Password"] = "service-password",
+      ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = "5"
+    };
+    settings.Remove($"Messaging:RabbitMQ:{missingSetting}");
+
+    using var host = CreateHost(settings);
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>()
+        .WithMessage("*BootStrapServers*");
+  }
+
+  [Theory]
+  [InlineData("http://user:password@localhost:5672/")]
+  [InlineData("amqp://user@localhost:5672/")]
+  [InlineData("amqp://:password@localhost:5672/")]
+  public async Task AddRabbitMQMessaging_ShouldRejectInvalidBootstrapUriAtHostStartup(string bootstrapUri)
+  {
+    using var host = CreateHost(new Dictionary<string, string?>
+    {
+      ["Messaging:RabbitMQ:BootStrapServers"] = bootstrapUri,
+      ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = "5"
+    });
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>();
+  }
+
+  [Theory]
+  [InlineData("0")]
+  [InlineData("-1")]
+  public async Task AddRabbitMQMessaging_ShouldRejectNonPositivePublisherConfirmTimeoutAtHostStartup(string timeout)
+  {
+    using var host = CreateHost(new Dictionary<string, string?>
+    {
+      ["Messaging:RabbitMQ:BootStrapServers"] = "amqp://service:secret@localhost:5672/",
+      ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = timeout
+    });
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>()
+        .WithMessage("*PublisherConfirmTimeoutSeconds*");
+  }
+
+  [Fact]
+  public async Task AddRabbitMQMessaging_ShouldRejectNonPositiveHeartbeatAtHostStartup()
+  {
+    using var host = CreateHost(new Dictionary<string, string?>
+    {
+      ["Messaging:RabbitMQ:BootStrapServers"] = "amqp://service:secret@localhost:5672/",
+      ["Messaging:RabbitMQ:RequestedHeartbeatSeconds"] = "0",
+      ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = "5"
+    });
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>()
+        .WithMessage("*RequestedHeartbeatSeconds*");
+  }
+
+  [Fact]
+  public void ConnectionFactoryProvider_ShouldEnableStrictTlsForAmqpsBootstrapUri()
+  {
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      BootStrapServers = "amqps://service:secret@rabbit.example.test:5671/",
+      PublisherConfirmTimeoutSeconds = 5
+    });
+    var provider = new ConnectionFactoryProvider(options, new Franz.Common.Reflection.AssemblyAccessorWrapper());
+
+    var factory = (RabbitMQ.Client.ConnectionFactory)provider.Current;
+
+    factory.Ssl.Enabled.Should().BeTrue();
+    factory.Ssl.AcceptablePolicyErrors.Should().Be(System.Net.Security.SslPolicyErrors.None);
+  }
+
+  private static IHost CreateHost(Dictionary<string, string?> settings)
+  {
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(settings)
+        .Build();
+
+    return new HostBuilder()
+        .ConfigureServices((_, services) => services.AddRabbitMQMessaging(configuration))
+        .Build();
+  }
+
   [Fact]
   public void RabbitMQMessagingOptions_ShouldDefaultToSequentialConsumption()
   {
