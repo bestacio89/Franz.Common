@@ -1,9 +1,11 @@
 using Franz.Common.Messaging.Hosting.RabbitMQ.Abstractions;
 using Franz.Common.Messaging.RabbitMQ.Hosting;
+using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices;
 
@@ -17,19 +19,27 @@ public sealed class RabbitMQHostedService : BackgroundService
   private readonly IModelProvider _modelProvider;
   private readonly IAssemblyAccessor _assemblyAccessor;
   private readonly ILogger<RabbitMQHostedService> _logger;
+  private readonly string _queueName;
 
   public RabbitMQHostedService(
       RabbitMQListener listener,
       IModelProvider modelProvider,
       IAssemblyAccessor assemblyAccessor,
       ILogger<RabbitMQHostedService> logger,
-      IQueueProvisioner? provisioner = null)
+      IQueueProvisioner? provisioner = null,
+      IOptions<RabbitMQMessagingOptions>? options = null)
   {
     _listener = listener;
     _modelProvider = modelProvider;
     _assemblyAccessor = assemblyAccessor;
     _logger = logger;
     _provisioner = provisioner;
+    var configuredQueueName = options?.Value.QueueName;
+    _queueName = !string.IsNullOrWhiteSpace(configuredQueueName)
+        ? configuredQueueName
+        : QueueNamer.GetQueueName(
+            assemblyAccessor.GetEntryAssembly()
+            ?? throw new InvalidOperationException("Entry assembly cannot be null."));
   }
 
   protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -38,12 +48,8 @@ public sealed class RabbitMQHostedService : BackgroundService
 
     if (_provisioner is not null)
     {
-      var assembly = _assemblyAccessor.GetEntryAssembly()
-          ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-      var queueName = QueueNamer.GetQueueName(assembly);
-
-      _logger.LogInformation("Ensuring RabbitMQ queue {Queue}", queueName);
-      await _provisioner.EnsureQueueExistsAsync(_modelProvider, queueName, stoppingToken)
+      _logger.LogInformation("Ensuring RabbitMQ queue {Queue}", _queueName);
+      await _provisioner.EnsureQueueExistsAsync(_modelProvider, _queueName, stoppingToken)
           .ConfigureAwait(false);
     }
 
