@@ -11,19 +11,58 @@ using System.Threading;
 
 namespace Franz.Common.Messaging.Kafka.Senders;
 
-public sealed class KafkaSender(
-    IProducer<string, byte[]> producer,
-    IMessageSerializer serializer,
-    IAssemblyAccessor assemblyAccessor,
-    IOptions<KafkaMessagingOptions> options,
-    ILogger<KafkaSender> logger)
-    : IMessagingSender, IAsyncDisposable, IDisposable
+public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposable
 {
-  private readonly KafkaMessageKeyStrategy _keyStrategy =
-      options?.Value?.Producer?.MessageKeyStrategy
-      ?? throw new ArgumentNullException(nameof(options));
-
+  private readonly IProducer<string, byte[]> _producer;
+  private readonly IMessageSerializer _serializer;
+  private readonly IAssemblyAccessor _assemblyAccessor;
+  private readonly ILogger<KafkaSender> _logger;
+  private readonly KafkaMessageKeyStrategy _keyStrategy;
   private int _disposed;
+
+  /// <summary>
+  /// Creates a sender using the default MessageId partition-key strategy.
+  /// Retained for binary and source compatibility with earlier package versions.
+  /// </summary>
+  public KafkaSender(
+      IProducer<string, byte[]> producer,
+      IMessageSerializer serializer,
+      IAssemblyAccessor assemblyAccessor,
+      ILogger<KafkaSender> logger)
+      : this(producer, serializer, assemblyAccessor,
+          KafkaMessageKeyStrategy.MessageId, logger)
+  {
+  }
+
+  public KafkaSender(
+      IProducer<string, byte[]> producer,
+      IMessageSerializer serializer,
+      IAssemblyAccessor assemblyAccessor,
+      IOptions<KafkaMessagingOptions> options,
+      ILogger<KafkaSender> logger)
+      : this(
+          producer,
+          serializer,
+          assemblyAccessor,
+          options?.Value?.Producer?.MessageKeyStrategy
+              ?? throw new ArgumentNullException(nameof(options)),
+          logger)
+  {
+  }
+
+  private KafkaSender(
+      IProducer<string, byte[]> producer,
+      IMessageSerializer serializer,
+      IAssemblyAccessor assemblyAccessor,
+      KafkaMessageKeyStrategy keyStrategy,
+      ILogger<KafkaSender> logger)
+  {
+    _producer = producer ?? throw new ArgumentNullException(nameof(producer));
+    _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+    _assemblyAccessor = assemblyAccessor ?? throw new ArgumentNullException(nameof(assemblyAccessor));
+    _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    _keyStrategy = keyStrategy;
+  }
 
   public async ValueTask SendAsync(Message message, CancellationToken ct = default)
   {
@@ -42,22 +81,22 @@ public sealed class KafkaSender(
         Headers = BuildHeaders(message)
       };
 
-      var topic = TopicNamer.GetTopicName(assemblyAccessor.GetEntryAssembly());
-      var result = await producer.ProduceAsync(topic, kafkaMessage, ct).ConfigureAwait(false);
+      var topic = TopicNamer.GetTopicName(_assemblyAccessor.GetEntryAssembly());
+      var result = await _producer.ProduceAsync(topic, kafkaMessage, ct).ConfigureAwait(false);
 
-      logger.LogDebug(
+      _logger.LogDebug(
           "[Kafka] Delivered {MessageId} to {Topic} [Partition: {Partition}, Offset: {Offset}]",
           message.Id, result.Topic, result.Partition.Value, result.Offset.Value);
     }
     catch (ProduceException<string, byte[]> ex)
     {
-      logger.LogError(ex, "[Kafka] Produce failure {MessageId} | Reason: {Reason}",
+      _logger.LogError(ex, "[Kafka] Produce failure {MessageId} | Reason: {Reason}",
           message.Id, ex.Error.Reason);
       throw;
     }
     catch (Exception ex)
     {
-      logger.LogError(ex, "[Kafka] Unexpected error producing {MessageId}", message.Id);
+      _logger.LogError(ex, "[Kafka] Unexpected error producing {MessageId}", message.Id);
       throw;
     }
   }
@@ -77,7 +116,7 @@ public sealed class KafkaSender(
 
   private byte[] Serialize(Message message)
   {
-    var value = serializer.Serialize(message.Body);
+    var value = _serializer.Serialize(message.Body);
     return string.IsNullOrEmpty(value) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(value);
   }
 
