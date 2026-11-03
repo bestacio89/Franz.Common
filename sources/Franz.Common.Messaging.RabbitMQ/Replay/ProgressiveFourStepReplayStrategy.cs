@@ -39,6 +39,23 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
     (_queueName, _replayExchange, _deadLetterQueue) = ResolveTopology(accessor, options);
   }
 
+
+  public ProgressiveFourStepReplayStrategy(
+      IConfirmChannelPool confirmChannelPool,
+      IAssemblyAccessor accessor,
+      IOptions<RabbitMQMessagingOptions> options)
+  {
+    _confirmChannelPool = confirmChannelPool ?? throw new ArgumentNullException(nameof(confirmChannelPool));
+    ArgumentNullException.ThrowIfNull(accessor);
+    ArgumentNullException.ThrowIfNull(options);
+    var settings = options.Value;
+    var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
+    _queueName = settings.QueueName ?? QueueNamer.GetQueueName(entry);
+    _replayExchange = ExchangeNamer.GetReplayExchangeName(entry);
+    _deadLetterQueue = settings.DeadLetterQueueName ?? QueueNamer.GetDeadLetterQueueName(entry);
+    _publisherConfirmTimeoutSeconds = settings.PublisherConfirmTimeoutSeconds;
+  }
+
   private static (string Queue, string ReplayExchange, string DeadLetterQueue) ResolveTopology(
       IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
   {
