@@ -1,5 +1,6 @@
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Messages;
+using Franz.Common.Messaging;
 using Franz.Common.Messaging.Hosting.Listeners;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
