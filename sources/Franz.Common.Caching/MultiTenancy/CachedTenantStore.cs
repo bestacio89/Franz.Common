@@ -10,7 +10,7 @@ namespace Franz.Common.Caching.MultiTenancy;
 /// Adds time-bounded, process-local caching to an existing tenant store. Registry writes remain
 /// owned by the underlying store; callers must use the invalidator after successful writes.
 /// </summary>
-public sealed class CachedTenantStore : ITenantStore
+internal sealed class CachedTenantStore : ITenantStore
 {
     internal const string AllTenantsCacheKey = "franz:tenants:store:all";
     private readonly ITenantStore _inner;
@@ -215,7 +215,7 @@ public sealed class CachedTenantStore : ITenantStore
 }
 
 /// <summary>Shared cache bookkeeping so invalidation remains correct for any ITenantStore lifetime.</summary>
-public sealed class TenantStoreCacheState
+internal sealed class TenantStoreCacheState
 {
     private readonly ConcurrentDictionary<string, PopulationGate> _populationGates = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, long> _generations = new(StringComparer.Ordinal);
@@ -320,10 +320,16 @@ public sealed class TenantStoreCacheState
 }
 
 /// <summary>Invalidates tenant-store entries across all decorated store instances in this process.</summary>
-public sealed class TenantStoreCacheInvalidator(
-    IMemoryCache cache,
-    TenantStoreCacheState state) : ITenantStoreCacheInvalidator
+internal sealed class TenantStoreCacheInvalidator : ITenantStoreCacheInvalidator
 {
+    private readonly IMemoryCache _cache;
+    private readonly TenantStoreCacheState _state;
+
+    public TenantStoreCacheInvalidator(IMemoryCache cache, TenantStoreCacheState state)
+    {
+        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        _state = state ?? throw new ArgumentNullException(nameof(state));
+    }
     public void InvalidateTenant(Guid tenantId)
     {
         Remove(CachedTenantStore.TenantIdKey(tenantId));
@@ -332,7 +338,7 @@ public sealed class TenantStoreCacheInvalidator(
 
         // A tenant update can change any hostname mapping. Invalidate every host lookup,
         // including in-flight lookups whose tenant identity is not known yet.
-        foreach (var key in state.GetKnownOrActiveKeys())
+        foreach (var key in _state.GetKnownOrActiveKeys())
         {
             if (key.StartsWith("franz:tenants:store:host:", StringComparison.Ordinal))
                 Remove(key);
@@ -355,7 +361,7 @@ public sealed class TenantStoreCacheInvalidator(
 
     private void Remove(string key)
     {
-        state.InvalidateKey(key);
-        cache.Remove(key);
+        _state.InvalidateKey(key);
+        _cache.Remove(key);
     }
 }
