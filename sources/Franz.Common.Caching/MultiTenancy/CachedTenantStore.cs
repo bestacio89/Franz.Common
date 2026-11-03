@@ -47,7 +47,13 @@ public sealed class CachedTenantStore : ITenantStore, ITenantStoreCacheInvalidat
     {
         var tenants = await GetOrLoadAsync(
             AllTenantsKey,
-            async () => (await _inner.GetAllAsync().ConfigureAwait(false)).Select(Clone).ToArray(),
+            async () =>
+            {
+                var snapshot = (await _inner.GetAllAsync().ConfigureAwait(false)).Select(Clone).ToArray();
+                foreach (var tenant in snapshot)
+                    TrackTenant(tenant);
+                return snapshot;
+            },
             static _ => { }).ConfigureAwait(false);
 
         return tenants.Select(Clone).ToArray();
@@ -83,7 +89,13 @@ public sealed class CachedTenantStore : ITenantStore, ITenantStoreCacheInvalidat
         cancellationToken.ThrowIfCancellationRequested();
         var tenants = await GetOrLoadAsync(
             AllTenantsKey,
-            async () => (await _inner.GetAllAsync(cancellationToken).ConfigureAwait(false)).Select(Clone).ToArray(),
+            async () =>
+            {
+                var snapshot = (await _inner.GetAllAsync(cancellationToken).ConfigureAwait(false)).Select(Clone).ToArray();
+                foreach (var tenant in snapshot)
+                    TrackTenant(tenant);
+                return snapshot;
+            },
             static _ => { },
             cancellationToken).ConfigureAwait(false);
 
