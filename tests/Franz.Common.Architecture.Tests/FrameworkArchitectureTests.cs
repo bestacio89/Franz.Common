@@ -192,6 +192,74 @@ public sealed class FrameworkArchitectureTests
   }
 
   [Fact]
+  public void Tenant_query_filter_policy_rejects_a_context_without_tenant_scoping()
+  {
+    const string plantedViolation = """
+      public sealed class DbContextBase
+      {
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+          var isTenantEntity = typeof(ITenantEntity).IsAssignableFrom(typeof(Order));
+          modelBuilder.Entity<Order>().HasQueryFilter(order => !order.IsDeleted);
+        }
+      }
+      """;
+
+    var findings = TenantIsolationPolicyAnalyzer.Analyze(plantedViolation, "planted/DbContextBase.cs");
+
+    Assert.Contains("TENANT_QUERY_FILTER_MISSING", findings);
+  }
+
+  [Fact]
+  public void Tenant_isolation_policy_rejects_query_filter_bypass_and_raw_sql()
+  {
+    const string plantedViolation = """
+      public sealed class OrderRepository
+      {
+        public IQueryable<Order> GetAll(DbContext context)
+          => context.Set<Order>().IgnoreQueryFilters();
+
+        public Task<int> DeleteAsync(DbContext context, string sql)
+          => context.Database.ExecuteSqlRawAsync(sql);
+      }
+      """;
+
+    var findings = TenantIsolationPolicyAnalyzer.Analyze(plantedViolation, "planted/OrderRepository.cs");
+
+    Assert.Contains("QUERY_FILTER_BYPASS", findings);
+    Assert.Contains("RAW_SQL", findings);
+  }
+
+  [Fact]
+  public void Tenant_query_filter_policy_accepts_explicit_tenant_scoping()
+  {
+    const string compliantContext = """
+      public sealed class DbContextBase
+      {
+        public Guid CurrentTenantId => Guid.Empty;
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+          foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+          {
+            var clrType = entityType.ClrType;
+            var isTenantEntity = typeof(ITenantEntity).IsAssignableFrom(clrType);
+            if (!isTenantEntity)
+              continue;
+
+            modelBuilder.Entity(clrType).HasQueryFilter(
+              entity => EF.Property<Guid>(entity, nameof(ITenantEntity.TenantId)) == CurrentTenantId);
+          }
+        }
+      }
+      """;
+
+    var findings = TenantIsolationPolicyAnalyzer.Analyze(compliantContext, "planted/DbContextBase.cs");
+
+    Assert.DoesNotContain("TENANT_QUERY_FILTER_MISSING", findings);
+  }
+
+  [Fact]
   public void Runtime_source_policy_violations_must_be_explicitly_allowlisted()
   {
     var findings = FindRuntimeSourcePolicyViolations();
