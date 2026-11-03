@@ -139,7 +139,9 @@ jobs:
         run: dotnet test tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=architecture-tests.trx"
 
       - name: Test solution
-        run: dotnet test Franz.Common.slnx --configuration Release --no-build --blame-hang-timeout 10m --logger "trx;LogFileName=dependency-validation.trx"
+        # Integration-test projects share heavyweight container resources (notably Cosmos DB).
+        # Run solution test projects sequentially to prevent cross-project emulator contention.
+        run: dotnet test Franz.Common.slnx --configuration Release --no-build --maxcpucount:1 --blame-hang-timeout 10m --logger "trx;LogFileName=dependency-validation.trx"
 
       - name: Capture container diagnostics
         if: failure()
