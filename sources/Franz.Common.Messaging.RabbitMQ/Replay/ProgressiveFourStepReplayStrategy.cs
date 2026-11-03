@@ -22,7 +22,6 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
   private readonly int _publisherConfirmTimeoutSeconds;
   private readonly string _queueName;
   private readonly string _replayExchange;
-  private readonly int _publisherConfirmTimeoutSeconds;
   private readonly string _deadLetterQueue;
 
   // Compatibility constructor for existing consumers. Framework DI uses the confirmed-channel overload.
@@ -37,6 +36,7 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
   {
     _confirmChannelPool = confirmChannelPool ?? throw new ArgumentNullException(nameof(confirmChannelPool));
     (_queueName, _replayExchange, _deadLetterQueue) = ResolveTopology(accessor, options);
+    _publisherConfirmTimeoutSeconds = options.Value.PublisherConfirmTimeoutSeconds;
   }
 
 
