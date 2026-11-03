@@ -229,8 +229,6 @@ public sealed class TenantStoreCacheState
 
     internal void TrackCacheKey(string key) => KnownCacheKeys.TryAdd(key, 0);
 
-    internal string[] GetActiveKeys() => _populationGates.Keys.ToArray();
-
     internal void InvalidateKey(string key)
     {
         if (_populationGates.TryGetValue(key, out var entry))
