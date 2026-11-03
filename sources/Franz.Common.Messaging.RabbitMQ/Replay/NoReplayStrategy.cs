@@ -34,6 +34,21 @@ public class NoReplayStrategy : IReplayStrategy
     _deadLetterQueue = ResolveDeadLetterQueue(accessor, options);
   }
 
+
+  public NoReplayStrategy(
+      IConfirmChannelPool confirmChannelPool,
+      IAssemblyAccessor accessor,
+      IOptions<RabbitMQMessagingOptions> options)
+  {
+    _confirmChannelPool = confirmChannelPool ?? throw new ArgumentNullException(nameof(confirmChannelPool));
+    ArgumentNullException.ThrowIfNull(accessor);
+    ArgumentNullException.ThrowIfNull(options);
+    var settings = options.Value;
+    var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
+    _deadLetterQueue = settings.DeadLetterQueueName ?? QueueNamer.GetDeadLetterQueueName(entry);
+    _publisherConfirmTimeoutSeconds = settings.PublisherConfirmTimeoutSeconds;
+  }
+
   private static string ResolveDeadLetterQueue(IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
   {
     ArgumentNullException.ThrowIfNull(accessor);
