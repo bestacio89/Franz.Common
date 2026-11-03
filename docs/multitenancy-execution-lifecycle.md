@@ -84,7 +84,7 @@ var invalidator = serviceProvider.GetRequiredService<ITenantStoreCacheInvalidato
 invalidator.InvalidateTenant(tenantId);
 ```
 
-Use `InvalidateHost(host)` when only a hostname mapping changes and `InvalidateAll()` after bulk imports or registry-wide changes. `InvalidateTenant` removes the tenant lookup, existence result, full-registry snapshot, and host aliases observed for that tenant. Invalidation also prevents an in-flight lookup from repopulating an entry after the invalidation boundary.
+Use `InvalidateTenant(tenantId)` for any tenant metadata update, including changes to its domains; it removes the tenant lookup, existence result, full-registry snapshot, and host aliases observed for that tenant. When a hostname is reassigned, invalidate both affected tenant IDs. Use `InvalidateHost(host)` only when the host lookup entry itself must be purged without changing either tenant record. Use `InvalidateAll()` after bulk imports or registry-wide changes. Invalidation also prevents an in-flight lookup from repopulating an entry after the invalidation boundary.
 
 This cache is process-local, not a distributed coherence protocol. In multi-instance deployments, publish invalidation to every application instance after a registry write, or rely on the configured absolute TTL as the maximum stale-read window. Do not treat TTL as a replacement for explicit invalidation after administrative writes. The default TTL is one minute; configure it according to tenant metadata change frequency and acceptable staleness.
 
