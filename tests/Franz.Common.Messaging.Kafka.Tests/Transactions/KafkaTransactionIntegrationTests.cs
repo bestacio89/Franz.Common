@@ -40,7 +40,6 @@ public sealed class KafkaTransactionIntegrationTests : IClassFixture<KafkaContai
     var context = new KafkaTransactionContext();
 
     using var consumer = CreateReadCommittedConsumer(topic);
-    _ = consumer.Consume(TimeSpan.FromSeconds(1));
 
     await using var transaction = CreateTransaction(options, context);
     await using var sender = CreateSender(serializer, accessor, options, context);
@@ -110,13 +109,16 @@ public sealed class KafkaTransactionIntegrationTests : IClassFixture<KafkaContai
     {
       BootstrapServers = _fixture.BootstrapServers,
       GroupId = $"read-committed-{Guid.CreateVersion7():N}",
-      AutoOffsetReset = AutoOffsetReset.Latest,
+      AutoOffsetReset = AutoOffsetReset.Earliest,
       EnableAutoCommit = false,
       IsolationLevel = IsolationLevel.ReadCommitted
     };
 
     var consumer = new ConsumerBuilder<string, byte[]>(config).Build();
-    consumer.Subscribe(topic);
+    // Explicit partition assignment avoids a group-join/offset-reset race in this
+    // transaction-isolation test. The test filters the unique message key, so it
+    // remains isolated from records produced by other integration tests.
+    consumer.Assign(new TopicPartition(topic, new Partition(0)));
     return consumer;
   }
 
