@@ -59,6 +59,33 @@ public sealed class FrameworkArchitectureTests
   }
 
   [Fact]
+  public void Shared_messaging_public_api_must_not_expose_broker_specific_vocabulary()
+  {
+    var messagingAssembly = typeof(Franz.Common.Messaging.Configuration.MessagingOptions).Assembly;
+    var brokerTerms = new[] { "Topic", "Partition", "Exchange", "Queue", "Offset" };
+    var publicApiNames = messagingAssembly.GetExportedTypes()
+      .Where(type => type.Namespace?.StartsWith("Franz.Common.Messaging", StringComparison.Ordinal) == true)
+      .SelectMany(type =>
+        new[] { type.FullName ?? type.Name }.Concat(
+          type.GetMembers(
+              System.Reflection.BindingFlags.Public |
+              System.Reflection.BindingFlags.Instance |
+              System.Reflection.BindingFlags.Static |
+              System.Reflection.BindingFlags.DeclaredOnly)
+            .Select(member => $"{type.FullName}.{member.Name}")));
+
+    var violations = publicApiNames
+      .Where(name => brokerTerms.Any(term => name.Contains(term, StringComparison.OrdinalIgnoreCase)))
+      .OrderBy(name => name, StringComparer.Ordinal)
+      .ToArray();
+
+    Assert.True(
+      violations.Length == 0,
+      "The shared messaging assembly must expose logical messaging concepts only. Broker-specific API names found:" +
+      Environment.NewLine + string.Join(Environment.NewLine, violations));
+  }
+
+  [Fact]
   public void Core_packages_must_not_reference_infrastructure_adapter_projects_or_packages()
   {
     var corePackages = new HashSet<string>(StringComparer.Ordinal)
