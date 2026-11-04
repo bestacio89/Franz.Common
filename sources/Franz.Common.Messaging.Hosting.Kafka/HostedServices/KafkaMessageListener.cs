@@ -144,7 +144,7 @@ public sealed class KafkaMessageListener : IListener
         }
 
         // Commit only after the complete processing pipeline succeeds.
-        _consumer.Commit(result);
+        CommitAfterProcessing(result);
       }
     }
     finally
@@ -233,7 +233,6 @@ public sealed class KafkaMessageListener : IListener
           result.Topic, result.Partition.Value, result.Offset.Value, deadLetterTopic);
 
       // Acknowledge the original only after the broker confirms DLT publication.
-      _consumer.Commit(result);
     }
     catch (Exception deadLetterFailure)
     {
@@ -241,6 +240,11 @@ public sealed class KafkaMessageListener : IListener
           $"Failed to publish Kafka message at {result.Topic}[{result.Partition.Value}] offset {result.Offset.Value} to dead-letter topic '{deadLetterTopic}'. The original offset was not committed.",
           new AggregateException(failure, deadLetterFailure));
     }
+
+    // DLT publication is confirmed before acknowledging the source record. A
+    // rebalance may still reject the offset commit; that is safe because the
+    // destination already contains the failed message and a replay is possible.
+    CommitAfterProcessing(result);
   }
 
   public Task StopListenAsync(CancellationToken cancellationToken = default)
