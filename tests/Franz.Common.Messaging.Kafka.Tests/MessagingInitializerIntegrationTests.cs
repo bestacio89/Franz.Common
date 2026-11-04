@@ -105,7 +105,12 @@ public sealed class KafkaMessagingInitializerIntegrationTests
       BootstrapServers = _fixture.BootstrapServers,
       TopicName = "configured-topic",
       Failure = { DeadLetterTopic = "configured-topic-dlt" },
-      Topic = new KafkaTopicOptions { NumPartitions = 3, ReplicationFactor = 1 }
+      Topic = new KafkaTopicOptions
+      {
+        NumPartitions = 3,
+        ReplicationFactor = 1,
+        Configurations = new Dictionary<string, string> { ["cleanup.policy"] = "compact" }
+      }
     };
 
     var sut = CreateSut(options: options);
@@ -113,10 +118,17 @@ public sealed class KafkaMessagingInitializerIntegrationTests
 
     using var admin = BuildAdminClient();
     var metadata = admin.GetMetadata(TimeSpan.FromSeconds(10));
-    var topic = metadata.Topics.Should().ContainSingle(item => item.Topic == "configured-topic").Subject;
+    var topic = metadata.Topics.Should().ContainSingle(item => item.Topic == "configured-topic").Which;
 
     topic.Partitions.Should().HaveCount(3);
     topic.Partitions.Should().OnlyContain(partition => partition.Replicas.Count == 1);
+
+    var config = await admin.DescribeConfigsAsync(new[]
+    {
+      new ConfigResource { Name = "configured-topic", Type = ResourceType.Topic }
+    });
+    config.Should().ContainSingle();
+    config[0].Entries["cleanup.policy"].Value.Should().Be("compact");
   }
 
   [Fact]
