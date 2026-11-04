@@ -305,6 +305,9 @@ public sealed class ServiceRegistrationTests
   [Fact]
   public async Task AddRabbitMQMessaging_ShouldRejectOrderedConsumptionWithConcurrentHandlers()
   {
+    RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.OrderedConsumption)
+        .Should().BeTrue("the default single-consumer configuration preserves queue order");
+
     using var host = CreateHost(new Dictionary<string, string?>
     {
       ["Messaging:RabbitMQ:BootStrapServers"] = _fixture.ConnectionString,
