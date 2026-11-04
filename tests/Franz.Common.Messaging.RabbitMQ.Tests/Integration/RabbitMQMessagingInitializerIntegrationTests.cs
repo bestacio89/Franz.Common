@@ -258,6 +258,11 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       [ProgressiveFourStepReplayStrategy.ReplayHeader] = 4
     };
 
+    RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.Retry).Should().BeTrue();
+    RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.DeadLetter).Should().BeTrue();
+    RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.DeliveryAttemptLimit).Should().BeTrue();
+    RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.PublisherAcknowledgements).Should().BeTrue();
+
     await strategy.ReplayAsync(retryFive, new InvalidOperationException("retry failure"));
 
     var verificationChannel = await channelPool.GetAsync();
