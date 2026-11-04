@@ -5,4 +5,5 @@ internal sealed record HandlerInfo(
     string ImplementationType,
     string HandlerKind,
     string RequestType,
-    string? ResponseType);
+    string? ResponseType,
+    bool IsIntegrationEvent);

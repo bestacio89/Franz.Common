@@ -40,8 +40,11 @@ internal static class HandlerDiscovery
       if (!TargetInterfaces.Contains(originalDefinition))
         continue;
 
-      var requestType = interfaceSymbol.TypeArguments[0]
+      var requestTypeSymbol = interfaceSymbol.TypeArguments[0];
+      var requestType = requestTypeSymbol
           .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+      var isIntegrationEvent = requestTypeSymbol.AllInterfaces.Any(static implementedInterface =>
+          implementedInterface.ToDisplayString() == "Franz.Common.Business.Events.IIntegrationEvent");
       var responseType = interfaceSymbol.TypeArguments.Length > 1
           ? interfaceSymbol.TypeArguments[1].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
           : null;
@@ -60,7 +63,7 @@ internal static class HandlerDiscovery
       };
 
       discovered ??= new List<HandlerInfo>();
-      discovered.Add(new HandlerInfo(serviceType, implementationType, kind, requestType, responseType));
+      discovered.Add(new HandlerInfo(serviceType, implementationType, kind, requestType, responseType, isIntegrationEvent));
     }
 
     return discovered;

@@ -71,7 +71,6 @@ public sealed class MessagingTransaction : IMessagingTransaction
     await _gate.WaitAsync(ct).ConfigureAwait(false);
     try
     {
-      ThrowIfDisposed();
       if (!_isActive)
         return;
 
@@ -119,35 +118,14 @@ public sealed class MessagingTransaction : IMessagingTransaction
 
   public async ValueTask DisposeAsync()
   {
-    await _gate.WaitAsync().ConfigureAwait(false);
-    try
-    {
-      if (_disposed)
-        return;
+    if (_disposed)
+      return;
 
-      if (_isActive)
-      {
-        var producer = _producer!;
-        try
-        {
-          producer.AbortTransaction();
-        }
-        finally
-        {
-          _isActive = false;
-          ReleaseProducer(producer);
-        }
-      }
+    if (_isActive)
+      await RollbackAsync().ConfigureAwait(false);
 
-      _disposed = true;
-    }
-    finally
-    {
-      // Keep the semaphore undisposed: callers already waiting at the time of
-      // disposal must be released and observe ObjectDisposedException instead
-      // of racing SemaphoreSlim.Dispose().
-      _gate.Release();
-    }
+    _disposed = true;
+    _gate.Dispose();
   }
 
   private void ReleaseProducer(IProducer<string, byte[]> producer)

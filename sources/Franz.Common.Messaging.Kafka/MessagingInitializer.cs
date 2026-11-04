@@ -97,49 +97,30 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
 
   private IReadOnlyCollection<string> DiscoverIntegrationEventTopics()
   {
-    var entryAssembly = _assemblyAccessor.GetEntryAssembly();
-    var companyPrefix = GetCompanyPrefix(entryAssembly);
-
-    var integrationEventTypes = AppDomain.CurrentDomain
-        .GetAssemblies()
-        .Where(a => !a.IsDynamic &&
-                    !string.IsNullOrWhiteSpace(a.FullName) &&
-                    a.FullName!.StartsWith(companyPrefix, StringComparison.OrdinalIgnoreCase))
-        .SelectMany(a =>
-        {
-          try { return a.ExportedTypes; }
-          catch { return Array.Empty<Type>(); }
-        })
-        .SelectMany(t => t.GetInterfaces())
-        .Where(i => i.IsGenericType &&
-                    i.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
-        .SelectMany(i => i.GenericTypeArguments)
-        .Where(t => typeof(IIntegrationEvent).IsAssignableFrom(t))
+    var eventTypes = Franz.Common.Messaging.Manifest.MessagingManifestRegistry.GetAll()
+        .SelectMany(static manifest => manifest.Destinations)
         .Distinct()
-        .ToList();
+        .ToArray();
 
     var topics = new HashSet<string>(StringComparer.Ordinal);
-
-    foreach (var evtType in integrationEventTypes)
+    foreach (var eventType in eventTypes)
     {
       var topic = _perEvent
-          ? TopicNamer.GetTopicName(evtType)
-          : TopicNamer.GetTopicName(new AssemblyWrapper(evtType.Assembly));
+          ? TopicNamer.GetTopicName(eventType)
+          : TopicNamer.GetTopicName(new AssemblyWrapper(eventType.Assembly));
 
-      var dlt = _perEvent
-          ? TopicNamer.GetDeadLetterTopicName(evtType)
-          : TopicNamer.GetDeadLetterTopicName(new AssemblyWrapper(evtType.Assembly));
+      var deadLetterTopic = _perEvent
+          ? TopicNamer.GetDeadLetterTopicName(eventType)
+          : TopicNamer.GetDeadLetterTopicName(new AssemblyWrapper(eventType.Assembly));
 
-      if (!string.IsNullOrWhiteSpace(topic)) topics.Add(topic);
-      if (!string.IsNullOrWhiteSpace(dlt)) topics.Add(dlt);
+      if (!string.IsNullOrWhiteSpace(topic))
+        topics.Add(topic);
+      if (!string.IsNullOrWhiteSpace(deadLetterTopic))
+        topics.Add(deadLetterTopic);
     }
 
-    return topics.ToList();
+    return topics.ToArray();
   }
-
-  // =========================================================
-  // INFRASTRUCTURE
-  // =========================================================
 
   private async ValueTask EnsureTopicAsync(string name, CancellationToken cancellationToken)
   {

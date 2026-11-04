@@ -26,18 +26,38 @@ public sealed class MediatorRegistrationGenerator : IIncrementalGenerator
             .Where(static handlers => handlers is not null)
             .SelectMany(static (handlers, _) => handlers!);
 
+        var integrationEvents = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                predicate: IntegrationEventDiscovery.IsCandidate,
+                transform: IntegrationEventDiscovery.Analyze)
+            .Where(static eventType => eventType is not null)
+            .Select(static (eventType, _) => eventType!);
+
         var dispatchCalls = context.SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: DispatchCallDiscovery.IsCandidate,
                 transform: DispatchCallDiscovery.Analyze)
             .Where(static call => call is not null);
 
+        var messagingManifestAvailable = context.CompilationProvider
+            .Select(static (compilation, _) =>
+                compilation.GetTypeByMetadataName("Franz.Common.Messaging.Manifest.MessagingManifestRegistry") is not null);
+
+        var generatorInputs = handlerDeclarations.Collect()
+            .Combine(dispatchCalls.Collect())
+            .Combine(integrationEvents.Collect())
+            .Combine(messagingManifestAvailable);
+
         context.RegisterSourceOutput(
-            handlerDeclarations.Collect().Combine(dispatchCalls.Collect()),
+            generatorInputs,
             static (productionContext, input) =>
             {
-                var handlers = input.Left;
-                foreach (var call in input.Right)
+                var handlers = input.Left.Left.Left;
+                var dispatchCalls = input.Left.Left.Right;
+                var integrationEventTypes = input.Left.Right;
+                var hasMessagingManifest = input.Right;
+
+                foreach (var call in dispatchCalls)
                 {
                     if (call is null)
                         continue;
@@ -59,6 +79,12 @@ public sealed class MediatorRegistrationGenerator : IIncrementalGenerator
 
                 var source = RegistrationSourceEmitter.Generate(handlers);
                 productionContext.AddSource("GeneratedMediatorRegistration.g.cs", source);
+
+                if (hasMessagingManifest)
+                {
+                    var manifestSource = MessagingManifestSourceEmitter.Generate(integrationEventTypes, handlers);
+                    productionContext.AddSource("GeneratedMessagingManifest.g.cs", manifestSource);
+                }
             });
     }
 }
