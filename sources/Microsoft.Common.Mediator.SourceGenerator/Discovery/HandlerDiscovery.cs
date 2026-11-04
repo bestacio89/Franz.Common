@@ -43,8 +43,9 @@ internal static class HandlerDiscovery
       var requestTypeSymbol = interfaceSymbol.TypeArguments[0];
       var requestType = requestTypeSymbol
           .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-      var isIntegrationEvent = requestTypeSymbol.AllInterfaces.Any(static implementedInterface =>
-          implementedInterface.ToDisplayString() == "Franz.Common.Business.Events.IIntegrationEvent");
+      var isIntegrationEvent = requestTypeSymbol is INamedTypeSymbol namedRequestType &&
+          namedRequestType.AllInterfaces.Any(static implementedInterface =>
+              implementedInterface.ToDisplayString() == "Franz.Common.Business.Events.IIntegrationEvent");
       var responseType = interfaceSymbol.TypeArguments.Length > 1
           ? interfaceSymbol.TypeArguments[1].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
           : null;

@@ -1,6 +1,8 @@
 using FluentAssertions;
 using Franz.Common.Messaging.Manifest;
 using Xunit;
+using System.Reflection;
+using System.Reflection.Emit;
 
 namespace Franz.Common.Messaging.Tests.Manifest;
 
@@ -22,7 +24,9 @@ public sealed class MessagingManifestTests
   [Fact]
   public void MessagingManifestRegistry_ShouldReturnEmptyManifestForUnregisteredAssembly()
   {
-    var manifest = MessagingManifestRegistry.Get(typeof(MessagingManifestTests).Assembly);
+    var assembly = AssemblyBuilder.DefineDynamicAssembly(
+        new AssemblyName($"Unregistered-{Guid.NewGuid():N}"), AssemblyBuilderAccess.Run);
+    var manifest = MessagingManifestRegistry.Get(assembly);
 
     manifest.Destinations.Should().NotBeNull().And.BeEmpty();
     manifest.Subscriptions.Should().NotBeNull().And.BeEmpty();
@@ -31,7 +35,8 @@ public sealed class MessagingManifestTests
   [Fact]
   public void MessagingManifestRegistry_ShouldRegisterManifestByAssembly()
   {
-    var assembly = typeof(MessagingManifestTests).Assembly;
+    var assembly = AssemblyBuilder.DefineDynamicAssembly(
+        new AssemblyName($"Registered-{Guid.NewGuid():N}"), AssemblyBuilderAccess.Run);
     var manifest = new MessagingManifest(
         destinations: new[] { typeof(string) },
         subscriptions: new[] { typeof(Guid) });

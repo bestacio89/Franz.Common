@@ -105,6 +105,30 @@ public class MessagingTransactionTests
   }
 
   [Fact]
+  public async Task BeginAsync_ShouldRejectCallsAfterDisposal()
+  {
+    await _sut.DisposeAsync();
+    Func<Task> act = async () => await _sut.BeginAsync();
+    await act.Should().ThrowAsync<ObjectDisposedException>();
+  }
+
+  [Fact]
+  public async Task CompleteAsync_ShouldRejectCallsAfterDisposal()
+  {
+    await _sut.DisposeAsync();
+    Func<Task> act = async () => await _sut.CompleteAsync();
+    await act.Should().ThrowAsync<ObjectDisposedException>();
+  }
+
+  [Fact]
+  public async Task RollbackAsync_ShouldRejectCallsAfterDisposal()
+  {
+    await _sut.DisposeAsync();
+    Func<Task> act = async () => await _sut.RollbackAsync();
+    await act.Should().ThrowAsync<ObjectDisposedException>();
+  }
+
+  [Fact]
   public async Task DisposeAsync_ShouldAbortOnlyIfTransactionActive()
   {
     await _sut.BeginAsync();
