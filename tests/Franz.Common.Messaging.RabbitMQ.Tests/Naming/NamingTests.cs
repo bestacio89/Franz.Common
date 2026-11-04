@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Reflection;
 using System.Reflection;
 using Xunit;
@@ -35,6 +36,36 @@ public class NamingTests
 
         RabbitMQExchangeNamer.GetEventExchangeName(assembly)
             .Should().Be("franz-common-event");
+    }
+
+    [Theory]
+    [InlineData(MessageKind.Command, "franz-commands-in")]
+    [InlineData(MessageKind.Query, "franz-queries-in")]
+    [InlineData(MessageKind.Fault, "franz-faults-in")]
+    [InlineData(MessageKind.IntegrationEvent, "franz-events-in")]
+    public void GetQueueName_ShouldMapMessageKindsToRabbitMqDestinations(
+        MessageKind kind,
+        string expectedQueue)
+    {
+        RabbitMQQueueNamer.GetQueueName(kind).Should().Be(expectedQueue);
+    }
+
+    [Fact]
+    public void GetDeadLetterExchangeName_ShouldAppendDlq()
+    {
+        var assembly = new AssemblyWrapper(Assembly.GetExecutingAssembly());
+
+        RabbitMQExchangeNamer.GetDeadLetterExchangeName(assembly)
+            .Should().Be("franz-common-dlq");
+    }
+
+    [Fact]
+    public void GetReplayExchangeName_ShouldAppendReplay()
+    {
+        var assembly = new AssemblyWrapper(Assembly.GetExecutingAssembly());
+
+        RabbitMQExchangeNamer.GetReplayExchangeName(assembly)
+            .Should().Be("franz-common-replay");
     }
 
     [Fact]
