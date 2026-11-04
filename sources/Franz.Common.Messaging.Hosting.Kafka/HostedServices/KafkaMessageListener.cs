@@ -202,11 +202,11 @@ public sealed class KafkaMessageListener : IListener
   }
 
   private static bool IsRebalanceCommitFailure(KafkaException exception)
-      => exception.Error.Code.ToString() is
-          "Local_State" or
-          "IllegalGeneration" or
-          "UnknownMemberId" or
-          "RebalanceInProgress";
+      => exception.Error.Code is
+          ErrorCode.Local_State or
+          ErrorCode.IllegalGeneration or
+          ErrorCode.UnknownMemberId or
+          ErrorCode.RebalanceInProgress;
 
   private async Task DeadLetterAndCommitAsync(
       ConsumeResult<string, string> result,
