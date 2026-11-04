@@ -5,6 +5,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Franz.Common.Messaging.Kafka;
+using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using System;
