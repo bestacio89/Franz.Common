@@ -101,7 +101,6 @@ public sealed class KafkaHostingFixture : IAsyncLifetime
         ["Messaging:Kafka:Failure:DeadLetterTopic"] = "hero-test-dlt",
         ["Messaging:Kafka:Failure:MaxRetryAttempts"] = "1",
         ["Messaging:Kafka:Failure:RetryBackoffMs"] = "0",
-        ["Messaging:Kafka:Failure:HandlerTimeoutMs"] = "100",
         ["Mongo:ConnectionString"] = MongoConnectionString,
         ["Mongo:Database"] = MongoDatabaseName
       })
