@@ -3,14 +3,12 @@ using Franz.Common.Reflection;
 using System.Reflection;
 using Franz.Common.Messaging.Messages;
 
-namespace Franz.Common.Messaging;
+namespace Franz.Common.Messaging.RabbitMQ;
 
 public static class QueueNamer
 {
   private const string QueueSuffixName = "-in";
   private const string DeadLetterQueueSuffixName = "-in-dlq";
-
-  // --- Original Assembly-Based Logic (For Listeners/Initializers) ---
 
   public static string GetQueueName(Assembly assembly) => GetQueueName(new AssemblyWrapper(assembly));
 
@@ -28,11 +26,8 @@ public static class QueueNamer
     return string.Concat(serviceName, DeadLetterQueueSuffixName);
   }
 
-  // --- New Enum-Based Logic (For Senders/Direct Routing) ---
-
   /// <summary>
   /// Routes to generic infrastructure queues based on MessageKind.
-  /// Senior Note: Used by Senders when the specific destination assembly isn't known.
   /// </summary>
   public static string GetQueueName(MessageKind kind)
   {
@@ -47,7 +42,6 @@ public static class QueueNamer
 
   private static string GetServiceName(IAssembly assembly)
   {
-    // Extracting parts (e.g., "Franz.Common" -> "franz-common")
-    return assembly.ExtractParts(2, "-").ToLower();
+    return assembly.ExtractParts(2, "-").ToLowerInvariant();
   }
 }

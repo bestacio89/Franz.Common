@@ -67,7 +67,7 @@ configuration, producers, consumers, serialization, and transactions.
 - `MessagingTransaction` for Kafka-backed transactional workflows
 
 ### Utilities
-- `ExchangeNamer` and `TopicNamer` for consistent topic naming
+- `TopicNamer` for Kafka topic naming
 - Messaging helpers shared across Franz transports
 
 ### Dependency Injection

@@ -1,5 +1,6 @@
 #nullable enable
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Reflection;
