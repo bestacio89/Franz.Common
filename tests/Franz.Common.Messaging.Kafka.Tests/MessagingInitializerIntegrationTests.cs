@@ -134,7 +134,15 @@ public sealed class KafkaMessagingInitializerIntegrationTests
   [Fact]
   public async Task InitializeAsync_ShouldRespectCancellationBeforeProvisioning()
   {
-    var sut = CreateSut();
+    var topicName = $"cancellation-{Guid.NewGuid():N}";
+    var deadLetterTopicName = $"{topicName}-dlt";
+    var sut = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      Failure = { DeadLetterTopic = deadLetterTopicName }
+    });
     using var cancellation = new CancellationTokenSource();
     cancellation.Cancel();
 
@@ -143,7 +151,7 @@ public sealed class KafkaMessagingInitializerIntegrationTests
     await action.Should().ThrowAsync<OperationCanceledException>();
     using var admin = BuildAdminClient();
     admin.GetMetadata(TimeSpan.FromSeconds(10)).Topics
-        .Should().NotContain(topic => topic.Topic == "main-topic");
+        .Should().NotContain(topic => topic.Topic == topicName);
   }
 
   // =========================================================
