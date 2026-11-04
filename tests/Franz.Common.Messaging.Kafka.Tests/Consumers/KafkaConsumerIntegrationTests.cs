@@ -33,7 +33,9 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
             Security = new KafkaSecurityOptions { AllowInsecureTransport = true },
             Consumer = new KafkaConsumerOptions
             {
-              EnableAutoCommit = false
+              EnableAutoCommit = false,
+              SessionTimeoutMs = 6_000,
+              MaxPollIntervalMs = 30_000
             }
           }),
           NullLogger<KafkaConsumerFactory>.Instance);
