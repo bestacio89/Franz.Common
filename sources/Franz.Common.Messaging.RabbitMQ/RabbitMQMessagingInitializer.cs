@@ -69,6 +69,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       else
       {
         await InitializeExchangeAsync(channel, _exchangeName, ExchangeType.Headers, true, cancellationToken).ConfigureAwait(false);
+        await InitializeDestinationExchangesAsync(channel, cancellationToken).ConfigureAwait(false);
         await InitializeQueueAsync(channel, _queueName, _exchangeName, _deadLetterExchangeName, _deadLetterQueueName, _options.QueueDurable, cancellationToken).ConfigureAwait(false);
         await InitializeDeadLetterQueueAsync(channel, _deadLetterQueueName, _deadLetterExchangeName, cancellationToken).ConfigureAwait(false);
         if (string.Equals(_options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase))
@@ -87,6 +88,8 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
   private async ValueTask VerifyTopologyAsync(IChannel channel, CancellationToken cancellationToken)
   {
     await channel.ExchangeDeclarePassiveAsync(_exchangeName, cancellationToken).ConfigureAwait(false);
+    foreach (var destinationExchange in GetDestinationExchangeNames())
+      await channel.ExchangeDeclarePassiveAsync(destinationExchange, cancellationToken).ConfigureAwait(false);
     await channel.QueueDeclarePassiveAsync(_queueName, cancellationToken).ConfigureAwait(false);
     await channel.ExchangeDeclarePassiveAsync(_deadLetterExchangeName, cancellationToken).ConfigureAwait(false);
     await channel.QueueDeclarePassiveAsync(_deadLetterQueueName, cancellationToken).ConfigureAwait(false);
@@ -213,6 +216,29 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       await channel.QueueDeclareAsync(retryQueue, durable: _options.QueueDurable, exclusive: false, autoDelete: false, arguments: arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
       await channel.QueueBindAsync(retryQueue, replayExchange, routingKey, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
+  }
+
+  private IReadOnlyCollection<string> GetDestinationExchangeNames()
+  {
+    if (!string.IsNullOrWhiteSpace(_options.ExchangeName))
+      return Array.Empty<string>();
+
+    return Franz.Common.Messaging.Manifest.MessagingManifestRegistry.GetAll()
+        .SelectMany(static manifest => manifest.Destinations)
+        .Select(static eventType => RabbitMQExchangeNamer.GetEventExchangeName(eventType.Assembly))
+        .Where(exchange => !string.Equals(exchange, _exchangeName, StringComparison.Ordinal))
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(static exchange => exchange, StringComparer.Ordinal)
+        .ToArray();
+  }
+
+  private async ValueTask InitializeDestinationExchangesAsync(
+      IChannel channel,
+      CancellationToken cancellationToken)
+  {
+    foreach (var exchangeName in GetDestinationExchangeNames())
+      await InitializeExchangeAsync(channel, exchangeName, ExchangeType.Headers, true, cancellationToken)
+          .ConfigureAwait(false);
   }
 
   private async ValueTask InitializeExchangesForSubscriptionsAsync(
