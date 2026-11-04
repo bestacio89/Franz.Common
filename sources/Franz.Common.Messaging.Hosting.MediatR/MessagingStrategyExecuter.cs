@@ -32,14 +32,17 @@ public class MessagingStrategyExecuter : IMessagingStrategyExecuter
     return Task.FromResult(result);
   }
 
-  public async Task ExecuteAsync(Message message)
+  public Task ExecuteAsync(Message message) => ExecuteAsync(message, CancellationToken.None);
+
+  public async Task ExecuteAsync(Message message, CancellationToken cancellationToken)
   {
-    messageActionExecutingContext = new MessageActionExecutingContext(message);
+    cancellationToken.ThrowIfCancellationRequested();
+    messageActionExecutingContext = new MessageActionExecutingContext(message, cancellationToken);
     messageActionExecutedContext = new MessageActionExecutedContext(message);
 
     action = async () =>
     {
-      await Process(message);
+      await Process(message, cancellationToken);
     };
 
     await Next().Invoke();
@@ -68,22 +71,23 @@ public class MessagingStrategyExecuter : IMessagingStrategyExecuter
     });
   }
 
-  private async Task Process(Message message)
+  private async Task Process(Message message, CancellationToken cancellationToken)
   {
     var classMessage = GetParameter(message);
 
     switch (classMessage)
     {
       case IIntegrationEvent integrationEvent:
-        await dispatcher.PublishNotificationAsync(integrationEvent);
+        await dispatcher.PublishNotificationAsync(integrationEvent, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         break;
 
       case ICommand command:
-        await dispatcher.SendAsync(command);
+        await dispatcher.SendAsync(command, cancellationToken);
         break;
 
       case IQuery<object> query:
-        await dispatcher.SendAsync(query);
+        await dispatcher.SendAsync(query, cancellationToken);
         break;
 
       default:
