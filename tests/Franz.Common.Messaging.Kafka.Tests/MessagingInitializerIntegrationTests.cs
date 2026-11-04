@@ -121,7 +121,7 @@ public sealed class KafkaMessagingInitializerIntegrationTests
     var topic = metadata.Topics.Should().ContainSingle(item => item.Topic == "configured-topic").Which;
 
     topic.Partitions.Should().HaveCount(3);
-    topic.Partitions.Should().OnlyContain(partition => partition.Replicas.Count == 1);
+    topic.Partitions.Should().OnlyContain(partition => partition.Replicas.Count() == 1);
 
     var config = await admin.DescribeConfigsAsync(new[]
     {
