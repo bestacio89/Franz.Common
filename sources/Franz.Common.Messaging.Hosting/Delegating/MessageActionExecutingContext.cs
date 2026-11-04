@@ -4,12 +4,10 @@ namespace Franz.Common.Messaging.Hosting.Delegating;
 
 public class MessageActionExecutingContext
 {
-    public MessageActionExecutingContext(Message message, CancellationToken cancellationToken = default)
+    public MessageActionExecutingContext(Message message)
     {
-        Message = message ?? throw new ArgumentNullException(nameof(message));
-        CancellationToken = cancellationToken;
+        Message = message;
     }
 
     public Message Message { get; }
-    public CancellationToken CancellationToken { get; }
 }
