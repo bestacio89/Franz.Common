@@ -1,7 +1,4 @@
 #nullable enable
-using Franz.Common.Business.Events;
-using Franz.Common.Mediator;
-using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
@@ -10,10 +7,8 @@ using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -32,8 +27,6 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
   private readonly string _queueName;
   private readonly string _deadLetterQueueName;
   private readonly string _deadLetterExchangeName;
-
-  private static readonly ConcurrentDictionary<Assembly, Type[]> CachedIntegrationEvents = new();
 
   public RabbitMQMessagingInitializer(
       IModelProvider modelProvider,
@@ -177,12 +170,12 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
 
     await channel.QueueDeclareAsync(
         deadLetterQueueName,
-        durable: true,
+        durable: _options.QueueDurable,
         exclusive: false,
         autoDelete: false,
         arguments: new Dictionary<string, object?>
         {
-          ["x-queue-type"] = "quorum"
+          ["x-queue-type"] = GetQueueTypeName()
         }).ConfigureAwait(false);
 
     await channel.QueueBindAsync(
@@ -207,7 +200,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
         ["x-dead-letter-exchange"] = string.Empty,
         ["x-dead-letter-routing-key"] = _queueName
       };
-      await channel.QueueDeclareAsync(retryQueue, durable: true, exclusive: false, autoDelete: false, arguments: arguments).ConfigureAwait(false);
+      await channel.QueueDeclareAsync(retryQueue, durable: _options.QueueDurable, exclusive: false, autoDelete: false, arguments: arguments).ConfigureAwait(false);
       await channel.QueueBindAsync(retryQueue, replayExchange, routingKey).ConfigureAwait(false);
     }
   }
@@ -216,27 +209,10 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       IChannel channel,
       CancellationToken cancellationToken)
   {
-    var entryAssembly = _assemblyAccessor.GetEntryAssembly()
-        ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-
-    var companyName = entryAssembly.Name?.Split('.').FirstOrDefault() ?? string.Empty;
-
-    var integrationEvents = CachedIntegrationEvents.GetOrAdd(entryAssembly.Assembly, _ =>
-        AppDomain.CurrentDomain
-            .GetAssemblies()
-            .Where(a => !a.IsDynamic &&
-                        a.FullName?.StartsWith(companyName, StringComparison.OrdinalIgnoreCase) == true)
-            .SelectMany(a => a.ExportedTypes)
-            .Where(t => t.GetInterfaces().Any(ifc =>
-                ifc.IsGenericType &&
-                ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>)))
-            .SelectMany(t => t.GetInterfaces())
-            .Where(ifc => ifc.IsGenericType &&
-                          ifc.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
-            .Select(ifc => ifc.GetGenericArguments()[0])
-            .Where(t => typeof(IIntegrationEvent).IsAssignableFrom(t))
-            .Distinct()
-            .ToArray());
+    var integrationEvents = Franz.Common.Messaging.Manifest.MessagingManifestRegistry.GetAll()
+        .SelectMany(static manifest => manifest.Subscriptions)
+        .Distinct()
+        .ToArray();
 
     foreach (var eventType in integrationEvents)
     {

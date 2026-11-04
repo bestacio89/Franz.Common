@@ -1,5 +1,6 @@
 #nullable enable
 using System.ComponentModel.DataAnnotations;
+using Franz.Common.Messaging.Configuration;
 
 namespace Franz.Common.Messaging.Kafka.Configuration;
 
