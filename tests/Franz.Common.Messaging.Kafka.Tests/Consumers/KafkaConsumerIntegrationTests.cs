@@ -202,6 +202,51 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
   }
 
   [Fact]
+  public async Task ConsumerGroup_ShouldDistributePartitionsAcrossMembers()
+  {
+    var groupId = $"partition-group-{Guid.NewGuid():N}";
+    var topic = $"partition-topic-{Guid.NewGuid():N}";
+
+    using var admin = new AdminClientBuilder(new AdminClientConfig
+    {
+      BootstrapServers = _fixture.BootstrapServers
+    }).Build();
+
+    await admin.CreateTopicsAsync(new[]
+    {
+      new TopicSpecification
+      {
+        Name = topic,
+        NumPartitions = 2,
+        ReplicationFactor = 1
+      }
+    });
+
+    var factory = BuildFactory(groupId);
+    using var firstMember = factory.Build();
+    using var secondMember = factory.Build();
+    firstMember.Subscribe(topic);
+    secondMember.Subscribe(topic);
+
+    var deadline = DateTime.UtcNow.AddSeconds(30);
+    while (DateTime.UtcNow < deadline &&
+           (firstMember.Assignment.Count != 1 || secondMember.Assignment.Count != 1))
+    {
+      _ = firstMember.Consume(TimeSpan.FromMilliseconds(100));
+      _ = secondMember.Consume(TimeSpan.FromMilliseconds(100));
+    }
+
+    firstMember.Assignment.Should().ContainSingle();
+    secondMember.Assignment.Should().ContainSingle();
+    firstMember.Assignment.Single().Topic.Should().Be(topic);
+    secondMember.Assignment.Single().Topic.Should().Be(topic);
+    firstMember.Assignment.Single().Should().NotBe(secondMember.Assignment.Single());
+
+    KafkaMessagingCapabilities.Descriptor.Supports(MessagingCapability.PartitionedConsumption)
+        .Should().BeTrue();
+  }
+
+  [Fact]
   public async Task Consumer_ShouldReceiveMessagePublishedToTopic()
   {
     var factory = BuildFactory();
