@@ -47,7 +47,7 @@ public class NoReplayStrategy : IReplayStrategy
     ArgumentNullException.ThrowIfNull(options);
     var settings = options.Value;
     var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-    _deadLetterQueue = settings.DeadLetterQueueName ?? QueueNamer.GetDeadLetterQueueName(entry);
+    _deadLetterQueue = settings.DeadLetterQueueName ?? RabbitMQQueueNamer.GetDeadLetterQueueName(entry);
     _publisherConfirmTimeoutSeconds = settings.PublisherConfirmTimeoutSeconds;
   }
 
@@ -56,7 +56,7 @@ public class NoReplayStrategy : IReplayStrategy
     ArgumentNullException.ThrowIfNull(accessor);
     ArgumentNullException.ThrowIfNull(options);
     var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-    return QueueNamer.GetDeadLetterQueueName(entry);
+    return RabbitMQQueueNamer.GetDeadLetterQueueName(entry);
   }
 
   public async Task ReplayAsync(BasicDeliverEventArgs e, Exception ex)

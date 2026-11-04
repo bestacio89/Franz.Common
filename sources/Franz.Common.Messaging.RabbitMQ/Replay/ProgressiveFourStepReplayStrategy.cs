@@ -51,9 +51,9 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
     ArgumentNullException.ThrowIfNull(options);
     var settings = options.Value;
     var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-    _queueName = settings.QueueName ?? QueueNamer.GetQueueName(entry);
-    _replayExchange = ExchangeNamer.GetReplayExchangeName(entry);
-    _deadLetterQueue = settings.DeadLetterQueueName ?? QueueNamer.GetDeadLetterQueueName(entry);
+    _queueName = settings.QueueName ?? RabbitMQQueueNamer.GetQueueName(entry);
+    _replayExchange = RabbitMQExchangeNamer.GetReplayExchangeName(entry);
+    _deadLetterQueue = settings.DeadLetterQueueName ?? RabbitMQQueueNamer.GetDeadLetterQueueName(entry);
     _publisherConfirmTimeoutSeconds = settings.PublisherConfirmTimeoutSeconds;
   }
 
@@ -63,8 +63,8 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
     ArgumentNullException.ThrowIfNull(accessor);
     ArgumentNullException.ThrowIfNull(options);
     var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-    return (QueueNamer.GetQueueName(entry), ExchangeNamer.GetReplayExchangeName(entry),
-        QueueNamer.GetDeadLetterQueueName(entry));
+    return (RabbitMQQueueNamer.GetQueueName(entry), RabbitMQExchangeNamer.GetReplayExchangeName(entry),
+        RabbitMQQueueNamer.GetDeadLetterQueueName(entry));
   }
 
   public async Task ReplayAsync(BasicDeliverEventArgs e, Exception ex)

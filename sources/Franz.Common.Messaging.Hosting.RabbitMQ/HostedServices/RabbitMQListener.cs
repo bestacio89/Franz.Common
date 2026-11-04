@@ -350,7 +350,7 @@ public sealed class RabbitMQListener(
 
     var assembly = assemblyAccessor.GetEntryAssembly()
         ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-    return QueueNamer.GetQueueName(assembly);
+    return RabbitMQQueueNamer.GetQueueName(assembly);
   }
 
   private static TaskCompletionSource NewReadySource()
