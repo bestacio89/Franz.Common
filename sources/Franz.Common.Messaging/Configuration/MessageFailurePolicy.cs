@@ -9,7 +9,8 @@ public sealed record MessageFailurePolicy
   public MessageFailurePolicy(
       int maxRetryAttempts = 3,
       TimeSpan? retryBackoff = null,
-      bool deadLetterOnExhaustion = true)
+      bool deadLetterOnExhaustion = true,
+      TimeSpan? handlerTimeout = null)
   {
     if (maxRetryAttempts < 0)
       throw new ArgumentOutOfRangeException(nameof(maxRetryAttempts), "Retry attempts cannot be negative.");
@@ -18,9 +19,13 @@ public sealed record MessageFailurePolicy
     if (effectiveBackoff < TimeSpan.Zero)
       throw new ArgumentOutOfRangeException(nameof(retryBackoff), "Retry backoff cannot be negative.");
 
+    if (handlerTimeout is { } timeout && timeout <= TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(nameof(handlerTimeout), "Handler timeout must be greater than zero when configured.");
+
     MaxRetryAttempts = maxRetryAttempts;
     RetryBackoff = effectiveBackoff;
     DeadLetterOnExhaustion = deadLetterOnExhaustion;
+    HandlerTimeout = handlerTimeout;
   }
 
   /// <summary>Number of retries after the initial delivery.</summary>
@@ -31,6 +36,9 @@ public sealed record MessageFailurePolicy
 
   /// <summary>Whether exhausted messages should be sent to a dead-letter destination.</summary>
   public bool DeadLetterOnExhaustion { get; }
+
+  /// <summary>Optional cooperative processing timeout propagated to handlers.</summary>
+  public TimeSpan? HandlerTimeout { get; }
 
   public static MessageFailurePolicy Default { get; } = new();
 }

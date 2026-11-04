@@ -23,6 +23,8 @@ public class KafkaMessagingOptions
   public KafkaObservabilityOptions Observability { get; set; } = new();
   public KafkaTopicOptions Topic { get; set; } = new();
   public ProvisioningMode ProvisioningMode { get; set; } = ProvisioningMode.Create;
+  public MessageFailurePolicy? FailurePolicy { get; set; }
+  public MessageOrderingStrategy? OrderingStrategy { get; set; }
 }
 
 public class KafkaSecurityOptions
@@ -125,6 +127,10 @@ public class KafkaFailureOptions
   public int RetryBackoffMs { get; set; } = 500;
 
   public bool UseOriginalMessageKey { get; set; } = true;
+
+  /// <summary>Optional cooperative handler timeout in milliseconds; zero disables it.</summary>
+  [Range(0, 900000)]
+  public int HandlerTimeoutMs { get; set; }
 }
 
 public class KafkaObservabilityOptions

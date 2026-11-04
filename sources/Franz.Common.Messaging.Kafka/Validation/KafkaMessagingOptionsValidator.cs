@@ -90,27 +90,36 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
     if (options.Consumer.MaxPollIntervalMs <= 0)
       failures.Add("Consumer:MaxPollIntervalMs must be greater than zero.");
 
-    if (options.Failure.MaxRetryAttempts < 0)
+    if (!Enum.IsDefined(options.ProvisioningMode))
+      failures.Add("ProvisioningMode must be a defined value.");
+    if (options.OrderingStrategy.HasValue && !Enum.IsDefined(options.OrderingStrategy.Value))
+      failures.Add("OrderingStrategy must be a defined MessageOrderingStrategy value.");
+
+    var maxRetryAttempts = options.FailurePolicy?.MaxRetryAttempts ?? options.Failure.MaxRetryAttempts;
+    var retryBackoffMilliseconds = options.FailurePolicy?.RetryBackoff.TotalMilliseconds
+        ?? options.Failure.RetryBackoffMs;
+    var handlerTimeoutMilliseconds = options.FailurePolicy?.HandlerTimeout?.TotalMilliseconds
+        ?? options.Failure.HandlerTimeoutMs;
+
+    if (maxRetryAttempts < 0)
       failures.Add("Failure:MaxRetryAttempts cannot be negative.");
-
-    if (options.Failure.RetryBackoffMs < 0)
+    if (retryBackoffMilliseconds < 0)
       failures.Add("Failure:RetryBackoffMs cannot be negative.");
+    if (handlerTimeoutMilliseconds < 0)
+      failures.Add("Failure:HandlerTimeoutMs cannot be negative.");
 
-    // The listener performs MaxRetryAttempts delays between attempts. That delay budget
-    // must fit strictly inside MaxPollIntervalMs so the consumer can continue polling
-    // and retain partition ownership while retrying a failed handler.
+    // A single synchronous Consume/handler loop must finish its configured retry
+    // and cooperative timeout budget before Kafka revokes the consumer's partitions.
     if (options.Consumer.MaxPollIntervalMs > 0 &&
-        options.Failure.MaxRetryAttempts >= 0 &&
-        options.Failure.RetryBackoffMs >= 0)
+        maxRetryAttempts >= 0 &&
+        retryBackoffMilliseconds >= 0 &&
+        handlerTimeoutMilliseconds >= 0)
     {
-      var retryBudgetMilliseconds =
-          (long)options.Failure.MaxRetryAttempts * options.Failure.RetryBackoffMs;
+      var retryBudgetMilliseconds = maxRetryAttempts * retryBackoffMilliseconds
+          + (maxRetryAttempts + 1) * handlerTimeoutMilliseconds;
 
       if (retryBudgetMilliseconds >= options.Consumer.MaxPollIntervalMs)
-      {
-        failures.Add(
-            $"Kafka retry backoff budget ({retryBudgetMilliseconds} ms) must be less than Consumer:MaxPollIntervalMs ({options.Consumer.MaxPollIntervalMs} ms).");
-      }
+        failures.Add($"Kafka handler and retry budget ({retryBudgetMilliseconds} ms) must be less than Consumer:MaxPollIntervalMs ({options.Consumer.MaxPollIntervalMs} ms).");
     }
 
     return failures.Count == 0

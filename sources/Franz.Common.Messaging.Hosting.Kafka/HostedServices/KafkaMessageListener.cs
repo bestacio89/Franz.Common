@@ -41,7 +41,26 @@ public sealed class KafkaMessageListener : IListener
       : this(consumer, topics, serializer, logger)
   {
     _deadLetterProducer = deadLetterProducer;
-    _failureOptions = options.Value.Failure ?? new KafkaFailureOptions();
+    _failureOptions = ResolveFailureOptions(options.Value);
+  }
+
+  private static KafkaFailureOptions ResolveFailureOptions(KafkaMessagingOptions options)
+  {
+    var legacy = options.Failure ?? new KafkaFailureOptions();
+    if (options.FailurePolicy is not { } policy)
+      return legacy;
+
+    return new KafkaFailureOptions
+    {
+      EnableDeadLetter = policy.DeadLetterOnExhaustion,
+      DeadLetterTopic = legacy.DeadLetterTopic,
+      MaxRetryAttempts = policy.MaxRetryAttempts,
+      RetryBackoffMs = checked((int)Math.Ceiling(policy.RetryBackoff.TotalMilliseconds)),
+      HandlerTimeoutMs = policy.HandlerTimeout is { } timeout
+          ? checked((int)Math.Ceiling(timeout.TotalMilliseconds))
+          : legacy.HandlerTimeoutMs,
+      UseOriginalMessageKey = legacy.UseOriginalMessageKey
+    };
   }
 
   public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
@@ -113,7 +132,18 @@ public sealed class KafkaMessageListener : IListener
           stoppingToken.ThrowIfCancellationRequested();
           try
           {
-            await OnMessageReceivedAsync(new MessageEventArgs(transport));
+            using var handlerTimeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            if (_failureOptions.HandlerTimeoutMs > 0)
+              handlerTimeout.CancelAfter(_failureOptions.HandlerTimeoutMs);
+
+            try
+            {
+              await OnMessageReceivedAsync(new MessageEventArgs(transport, handlerTimeout.Token));
+            }
+            catch (OperationCanceledException ex) when (handlerTimeout.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+            {
+              throw new TimeoutException($"Kafka message handler exceeded its configured timeout of {_failureOptions.HandlerTimeoutMs} ms.", ex);
+            }
             succeeded = true;
             break;
           }
@@ -144,7 +174,7 @@ public sealed class KafkaMessageListener : IListener
         }
 
         // Commit only after the complete processing pipeline succeeds.
-        _consumer.Commit(result);
+        CommitAfterProcessing(result);
       }
     }
     finally
@@ -228,12 +258,6 @@ public sealed class KafkaMessageListener : IListener
           },
           cancellationToken);
 
-      _logger.LogError(failure,
-          "Kafka message at {Topic}[{Partition}] offset {Offset} was published to dead-letter topic {DeadLetterTopic}.",
-          result.Topic, result.Partition.Value, result.Offset.Value, deadLetterTopic);
-
-      // Acknowledge the original only after the broker confirms DLT publication.
-      _consumer.Commit(result);
     }
     catch (Exception deadLetterFailure)
     {
@@ -241,6 +265,11 @@ public sealed class KafkaMessageListener : IListener
           $"Failed to publish Kafka message at {result.Topic}[{result.Partition.Value}] offset {result.Offset.Value} to dead-letter topic '{deadLetterTopic}'. The original offset was not committed.",
           new AggregateException(failure, deadLetterFailure));
     }
+
+    _logger.LogError(failure,
+        "Kafka message at {Topic}[{Partition}] offset {Offset} was published to dead-letter topic {DeadLetterTopic}.",
+        result.Topic, result.Partition.Value, result.Offset.Value, deadLetterTopic);
+    CommitAfterProcessing(result);
   }
 
   public Task StopListenAsync(CancellationToken cancellationToken = default)
