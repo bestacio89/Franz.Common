@@ -28,6 +28,8 @@ public sealed class KafkaTransactionIntegrationTests : IClassFixture<KafkaContai
   [Fact]
   public async Task CompleteAsync_ShouldExposeCommittedMessagesToReadCommittedConsumers()
   {
+    KafkaMessagingCapabilities.Descriptor.Supports(MessagingCapability.TransactionalPublishing)
+        .Should().BeTrue("the adapter must exercise its declared transactional publishing capability");
     using var provider = (ServiceProvider)_fixture.BuildServiceProvider();
     using var scope = provider.CreateScope();
     var options = scope.ServiceProvider.GetRequiredService<IOptions<KafkaMessagingOptions>>().Value;
