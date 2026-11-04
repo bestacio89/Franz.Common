@@ -332,14 +332,17 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
     committed.Should().NotBeNull();
     System.Text.Encoding.UTF8.GetString(committed!.Body.Span).Should().Be("committed");
 
-    await transaction.BeginAsync();
-    await publishingChannel.BasicPublishAsync(
+    await using var rollbackChannel = await connection.CreateChannelAsync();
+    var rollbackTransaction = new RabbitMQMessagingTransaction();
+    rollbackTransaction.Attach(rollbackChannel);
+    await rollbackTransaction.BeginAsync();
+    await rollbackChannel.BasicPublishAsync(
         exchange: string.Empty,
         routingKey: queueName,
         mandatory: false,
         basicProperties: new BasicProperties(),
         body: new ReadOnlyMemory<byte>(System.Text.Encoding.UTF8.GetBytes("rolled-back")));
-    await transaction.RollbackAsync();
+    await rollbackTransaction.RollbackAsync();
 
     var rolledBack = await consumingChannel.BasicGetAsync(queueName, autoAck: true);
     rolledBack.Should().BeNull("a rolled-back publication must not become visible to consumers");
