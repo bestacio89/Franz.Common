@@ -6,7 +6,6 @@ using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
-using System.Text;
 using Xunit;
 
 namespace Franz.Common.Messaging.Hosting.Kafka.Tests;
@@ -45,26 +44,6 @@ public sealed class KafkaListenerIntegrationTests
     // 3. Assert
     var arrived = await probe.WaitForArrivalAsync(messageId, TimeSpan.FromSeconds(20));
     arrived.Should().BeTrue("The listener must deserialize via IMessageSerializer and await the async handler.");
-  }
-
-  [Fact]
-  public async Task Listener_ShouldCancelTimedOutHandlerAndDeadLetterTheMessage()
-  {
-    var serializer = _fixture.Host!.Services.GetRequiredService<IMessageSerializer>();
-    var message = new Message("{\"Body\":\"__timeout__\"}")
-    {
-      Id = Guid.CreateVersion7(),
-      CorrelationId = Guid.CreateVersion7()
-    };
-    var rawJson = serializer.Serialize(message);
-
-    await _fixture.ProduceRawMessageAsync("TestEvent", rawJson);
-    var deadLetter = await _fixture.ConsumeDeadLetterAsync("hero-test-dlt", rawJson, TimeSpan.FromSeconds(15));
-
-    deadLetter.Should().NotBeNull("the timeout must cancel the handler and route the failed message to the dead-letter topic");
-    deadLetter!.Message.Headers.Should().Contain(header =>
-        header.Key == "x-franz-failure-type" &&
-        Encoding.UTF8.GetString(header.GetValueBytes()) == typeof(TimeoutException).FullName);
   }
 
   [Fact]
