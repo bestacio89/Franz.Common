@@ -28,7 +28,7 @@ public sealed class KafkaTransactionIntegrationTests : IClassFixture<KafkaContai
   [Fact]
   public async Task CompleteAsync_ShouldExposeCommittedMessagesToReadCommittedConsumers()
   {
-    using var provider = _fixture.BuildServiceProvider();
+    using var provider = (ServiceProvider)_fixture.BuildServiceProvider();
     using var scope = provider.CreateScope();
     var options = scope.ServiceProvider.GetRequiredService<IOptions<KafkaMessagingOptions>>().Value;
     options.Producer.TransactionalIdPrefix = $"franz-commit-{Guid.CreateVersion7():N}";
@@ -38,18 +38,16 @@ public sealed class KafkaTransactionIntegrationTests : IClassFixture<KafkaContai
     var topic = TopicNamer.GetTopicName(accessor.GetEntryAssembly());
     var messageId = Guid.CreateVersion7();
     var context = new KafkaTransactionContext();
-    var transaction = CreateTransaction(options, context);
 
     using var consumer = CreateReadCommittedConsumer(topic);
     _ = consumer.Consume(TimeSpan.FromSeconds(1));
 
-    await using (transaction)
-    await using (var sender = CreateSender(serializer, accessor, options, context))
-    {
-      await transaction.BeginAsync();
-      await sender.SendAsync(new Message($"committed-{messageId:N}") { Id = messageId });
-      await transaction.CompleteAsync();
-    }
+    await using var transaction = CreateTransaction(options, context);
+    await using var sender = CreateSender(serializer, accessor, options, context);
+
+    await transaction.BeginAsync();
+    await sender.SendAsync(new Message($"committed-{messageId:N}") { Id = messageId });
+    await transaction.CompleteAsync();
 
     var received = ConsumeUntilMessageId(consumer, messageId, TimeSpan.FromSeconds(10));
     received.Should().NotBeNull("a committed transactional record must be visible to read-committed consumers");
@@ -58,7 +56,7 @@ public sealed class KafkaTransactionIntegrationTests : IClassFixture<KafkaContai
   [Fact]
   public async Task RollbackAsync_ShouldHideAbortedMessagesFromReadCommittedConsumers()
   {
-    using var provider = _fixture.BuildServiceProvider();
+    using var provider = (ServiceProvider)_fixture.BuildServiceProvider();
     using var scope = provider.CreateScope();
     var options = scope.ServiceProvider.GetRequiredService<IOptions<KafkaMessagingOptions>>().Value;
     options.Producer.TransactionalIdPrefix = $"franz-abort-{Guid.CreateVersion7():N}";
@@ -68,18 +66,16 @@ public sealed class KafkaTransactionIntegrationTests : IClassFixture<KafkaContai
     var topic = TopicNamer.GetTopicName(accessor.GetEntryAssembly());
     var messageId = Guid.CreateVersion7();
     var context = new KafkaTransactionContext();
-    var transaction = CreateTransaction(options, context);
 
     using var consumer = CreateReadCommittedConsumer(topic);
     _ = consumer.Consume(TimeSpan.FromSeconds(1));
 
-    await using (transaction)
-    await using (var sender = CreateSender(serializer, accessor, options, context))
-    {
-      await transaction.BeginAsync();
-      await sender.SendAsync(new Message($"aborted-{messageId:N}") { Id = messageId });
-      await transaction.RollbackAsync();
-    }
+    await using var transaction = CreateTransaction(options, context);
+    await using var sender = CreateSender(serializer, accessor, options, context);
+
+    await transaction.BeginAsync();
+    await sender.SendAsync(new Message($"aborted-{messageId:N}") { Id = messageId });
+    await transaction.RollbackAsync();
 
     var received = ConsumeUntilMessageId(consumer, messageId, TimeSpan.FromSeconds(3));
     received.Should().BeNull("an aborted transactional record must not be visible to read-committed consumers");
