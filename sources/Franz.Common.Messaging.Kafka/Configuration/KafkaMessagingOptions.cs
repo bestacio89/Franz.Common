@@ -102,6 +102,11 @@ public class KafkaProducerOptions
 
   [Range(1, 900000)]
   public int DeliveryTimeoutMs { get; set; } = 120000;
+
+  /// <summary>Maximum duration of a Kafka transaction, in milliseconds. Must be at least the producer delivery timeout.</summary>
+  [Range(1, 900000)]
+  public int TransactionTimeoutMs { get; set; } = 120000;
+
   public string? DefaultKey { get; set; }
 }
 

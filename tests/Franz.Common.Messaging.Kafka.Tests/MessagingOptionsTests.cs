@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -53,6 +53,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       options.Producer.MessageSendMaxRetries.Should().Be(3);
       options.Producer.RetryBackoffMs.Should().Be(100);
       options.Producer.DeliveryTimeoutMs.Should().Be(120000);
+      options.Producer.TransactionTimeoutMs.Should().Be(120000);
 
       // Failure defaults
       options.Failure.EnableDeadLetter.Should().BeTrue();
@@ -99,6 +100,50 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       isValid.Should().BeFalse();
       results.Should().ContainSingle(r => r.MemberNames.Contains(nameof(KafkaConsumerOptions.SessionTimeoutMs)));
       results.Should().ContainSingle(r => r.MemberNames.Contains(nameof(KafkaConsumerOptions.MaxPollIntervalMs)));
+    }
+
+
+    [Fact]
+    public void KafkaProducerOptions_ShouldRejectDeliveryTimeoutGreaterThanTransactionTimeout()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Producer = new KafkaProducerOptions
+        {
+          DeliveryTimeoutMs = 120001,
+          TransactionTimeoutMs = 120000
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message =>
+          message.Contains("DeliveryTimeoutMs", StringComparison.Ordinal) &&
+          message.Contains("TransactionTimeoutMs", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void KafkaProducerOptions_ShouldAcceptDeliveryTimeoutEqualToTransactionTimeout()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Producer = new KafkaProducerOptions
+        {
+          DeliveryTimeoutMs = 120000,
+          TransactionTimeoutMs = 120000
+        }
+      };
+
+      new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options).Failed.Should().BeFalse();
     }
 
     [Fact]

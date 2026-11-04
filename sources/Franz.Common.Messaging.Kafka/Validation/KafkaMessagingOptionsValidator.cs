@@ -64,6 +64,9 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
     if (options.Consumer is null)
       failures.Add("Consumer options must be configured.");
 
+    if (options.Producer is null)
+      failures.Add("Producer options must be configured.");
+
     if (options.Failure is null)
       failures.Add("Failure options must be configured.");
 
@@ -84,8 +87,15 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
         failures.Add("Topic:Configurations must contain non-empty keys and non-null values.");
     }
 
-    if (options.Consumer is null || options.Failure is null)
+    if (options.Consumer is null || options.Failure is null || options.Producer is null)
       return ValidateOptionsResult.Fail(failures);
+
+    if (options.Producer.DeliveryTimeoutMs <= 0 || options.Producer.DeliveryTimeoutMs > 900000)
+      failures.Add("Producer:DeliveryTimeoutMs must be between 1 and 900000 milliseconds.");
+    if (options.Producer.TransactionTimeoutMs <= 0 || options.Producer.TransactionTimeoutMs > 900000)
+      failures.Add("Producer:TransactionTimeoutMs must be between 1 and 900000 milliseconds.");
+    else if (options.Producer.DeliveryTimeoutMs > options.Producer.TransactionTimeoutMs)
+      failures.Add("Producer:DeliveryTimeoutMs must be less than or equal to Producer:TransactionTimeoutMs for transactional producers.");
 
     if (options.Consumer.MaxPollIntervalMs <= 0)
       failures.Add("Consumer:MaxPollIntervalMs must be greater than zero.");
