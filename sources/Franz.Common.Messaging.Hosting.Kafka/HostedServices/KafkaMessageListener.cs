@@ -111,9 +111,11 @@ public sealed class KafkaMessageListener : IListener
         for (var attempt = 0; attempt <= _failureOptions.MaxRetryAttempts; attempt++)
         {
           stoppingToken.ThrowIfCancellationRequested();
+          using var attemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+          attemptCancellation.CancelAfter(_failureOptions.HandlerTimeoutMs);
           try
           {
-            await OnMessageReceivedAsync(new MessageEventArgs(transport));
+            await OnMessageReceivedAsync(new MessageEventArgs(transport, attemptCancellation.Token));
             succeeded = true;
             break;
           }
@@ -121,11 +123,11 @@ public sealed class KafkaMessageListener : IListener
           {
             throw;
           }
-          catch (Exception ex)
+          catch (OperationCanceledException ex) when (attemptCancellation.IsCancellationRequested)
           {
-            processingFailure = ex;
-            _logger.LogWarning(ex,
-                "Kafka handler failed for message {MessageId} at {Topic}[{Partition}] offset {Offset}; attempt {Attempt} of {TotalAttempts}.",
+            processingFailure = new TimeoutException($"Kafka handler attempt exceeded the configured timeout of {_failureOptions.HandlerTimeoutMs} ms.", ex);
+            _logger.LogWarning(processingFailure,
+                "Kafka handler timed out for message {MessageId} at {Topic}[{Partition}] offset {Offset}; attempt {Attempt} of {TotalAttempts}.",
                 transport.Id, result.Topic, result.Partition.Value, result.Offset.Value,
                 attempt + 1, _failureOptions.MaxRetryAttempts + 1);
 

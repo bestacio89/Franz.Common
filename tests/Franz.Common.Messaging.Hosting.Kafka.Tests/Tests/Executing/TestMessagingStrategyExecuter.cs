@@ -27,4 +27,13 @@ public sealed class TestMessagingStrategyExecuter : IMessagingStrategyExecuter
     _probe.SignalArrival(message.Id);
     return Task.CompletedTask;
   }
+
+  public Task ExecuteAsync(Message message, CancellationToken cancellationToken)
+  {
+    if (message.Body.Contains("__timeout__", StringComparison.Ordinal))
+      return Task.Delay(Timeout.Infinite, cancellationToken);
+
+    cancellationToken.ThrowIfCancellationRequested();
+    return ExecuteAsync(message);
+  }
 }

@@ -90,7 +90,7 @@ public sealed class KafkaMessagingHostedService : BackgroundService
       if (executer is null)
         throw new TechnicalException(Resources.StrategyExecuterNotFoundException);
 
-      await executer.ExecuteAsync(args.Message);
+      await executer.ExecuteAsync(args.Message, args.CancellationToken);
     }
     finally
     {
