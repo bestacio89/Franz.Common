@@ -308,7 +308,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
   {
     var queueName = $"transaction-queue-{Guid.CreateVersion7():N}";
     var connectionProvider = _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>();
-    await using var connection = await connectionProvider.GetConnectionAsync();
+    var connection = await connectionProvider.GetConnectionAsync();
     await using var publishingChannel = await connection.CreateChannelAsync();
     await publishingChannel.QueueDeclareAsync(
         queueName,
