@@ -105,7 +105,9 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
     else
     {
       exchange = _replayExchange;
-      routingKey = GetRetryRoutingKey(_queueName, replayCount);
+      // Retry count remains policy-driven, while the broker topology reuses
+      // the third (longest) delay stage for every subsequent retry.
+      routingKey = GetRetryRoutingKey(_queueName, Math.Min(replayCount, 3));
     }
 
     IChannel channel;
