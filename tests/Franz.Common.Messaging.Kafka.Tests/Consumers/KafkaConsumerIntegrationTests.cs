@@ -134,7 +134,7 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
       new TopicSpecification
       {
         Name = topic,
-        NumPartitions = 1,
+        NumPartitions = 2,
         ReplicationFactor = 1
       }
     });
@@ -142,34 +142,37 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
     using var producer = new ProducerBuilder<string, string>(
         new ProducerConfig { BootstrapServers = _fixture.BootstrapServers }).Build();
 
-    var produced = await producer.ProduceAsync(topic, new Message<string, string>
-    {
-      Key = "rebalance-key",
-      Value = "uncommitted-payload"
-    });
+    await producer.ProduceAsync(
+        new TopicPartition(topic, new Partition(0)),
+        new Message<string, string> { Key = "rebalance-key-0", Value = "uncommitted-payload-0" });
+    await producer.ProduceAsync(
+        new TopicPartition(topic, new Partition(1)),
+        new Message<string, string> { Key = "rebalance-key-1", Value = "uncommitted-payload-1" });
 
     var factory = BuildFactory(groupId);
     using var firstOwner = factory.Build();
     using var nextOwner = factory.Build();
 
     firstOwner.Subscribe(topic);
-    ConsumeResult<string, string>? firstDelivery = null;
+    var firstDeliveries = new List<ConsumeResult<string, string>>(capacity: 2);
     var assignmentDeadline = DateTime.UtcNow.AddSeconds(20);
-    while ((firstOwner.Assignment.Count == 0 || firstDelivery is null) &&
+    while ((firstOwner.Assignment.Count != 2 || firstDeliveries.Count != 2) &&
            DateTime.UtcNow < assignmentDeadline)
     {
-      firstDelivery ??= firstOwner.Consume(TimeSpan.FromMilliseconds(100));
+      var candidate = firstOwner.Consume(TimeSpan.FromMilliseconds(100));
+      if (candidate is not null &&
+          firstDeliveries.All(delivery => delivery.TopicPartition != candidate.TopicPartition))
+      {
+        firstDeliveries.Add(candidate);
+      }
     }
 
-    firstOwner.Assignment.Should().ContainSingle(
-        partition => StringComparer.Ordinal.Equals(partition.Topic, topic));
-    firstDelivery.Should().NotBeNull();
-    firstDelivery!.Message.Value.Should().Be("uncommitted-payload");
-    firstDelivery.TopicPartitionOffset.Should().Be(
-        new TopicPartitionOffset(topic, produced.Partition, produced.Offset));
+    firstOwner.Assignment.Should().HaveCount(2);
+    firstDeliveries.Should().HaveCount(2);
+    firstDeliveries.Select(delivery => delivery.TopicPartition).Should().OnlyHaveUniqueItems();
 
-    // The first consumer deliberately does not commit. Joining the second member
-    // forces a real broker group rebalance and transfers the only partition.
+    // Neither offset is committed. The second member forces a real rebalance;
+    // whichever partition moves must be delivered again to its new owner.
     nextOwner.Subscribe(topic);
 
     ConsumeResult<string, string>? redelivered = null;
@@ -181,20 +184,22 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
       if (candidate is not null)
         redelivered = candidate;
 
-      if (firstOwner.Assignment.Count == 0 &&
-          nextOwner.Assignment.Any(partition => StringComparer.Ordinal.Equals(partition.Topic, topic)) &&
+      if (firstOwner.Assignment.Count == 1 &&
+          nextOwner.Assignment.Count == 1 &&
           redelivered is not null)
       {
         break;
       }
     }
 
-    firstOwner.Assignment.Should().BeEmpty("the original consumer must relinquish its partition");
-    nextOwner.Assignment.Should().ContainSingle(
-        partition => StringComparer.Ordinal.Equals(partition.Topic, topic));
-    redelivered.Should().NotBeNull("the new owner must receive the uncommitted offset again");
-    redelivered!.Message.Value.Should().Be("uncommitted-payload");
-    redelivered.TopicPartitionOffset.Should().Be(firstDelivery.TopicPartitionOffset);
+    firstOwner.Assignment.Should().ContainSingle();
+    nextOwner.Assignment.Should().ContainSingle();
+    redelivered.Should().NotBeNull("the new owner must receive an uncommitted partition offset again");
+
+    var originalDelivery = firstDeliveries.Single(
+        delivery => delivery.TopicPartition == redelivered!.TopicPartition);
+    redelivered!.Message.Value.Should().Be(originalDelivery.Message.Value);
+    redelivered.TopicPartitionOffset.Should().Be(originalDelivery.TopicPartitionOffset);
 
     nextOwner.Commit(redelivered);
     KafkaMessagingCapabilities.Descriptor.Supports(MessagingCapability.PartitionedConsumption)
