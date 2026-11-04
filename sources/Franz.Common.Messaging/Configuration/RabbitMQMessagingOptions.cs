@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using Franz.Common.Messaging.Configuration;
 
 namespace Franz.Common.Messaging.RabbitMQ;
@@ -26,4 +26,7 @@ public sealed class RabbitMQMessagingOptions : MessagingOptions
   public bool? AutomaticRecoveryEnabled { get; set; } = true;
   public bool? TopologyRecoveryEnabled { get; set; } = true;
   public int? RequestedHeartbeatSeconds { get; set; } = 30;
+
+
+ 
 }
