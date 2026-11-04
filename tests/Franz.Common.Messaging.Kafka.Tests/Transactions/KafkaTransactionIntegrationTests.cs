@@ -2,6 +2,7 @@
 using Confluent.Kafka;
 using FluentAssertions;
 using Franz.Common.Messaging.Kafka;
+using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Senders;
 using Franz.Common.Messaging.Kafka.Tests.Fixtures;
