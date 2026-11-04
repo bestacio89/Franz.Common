@@ -318,6 +318,8 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
     await publishingChannel.BasicPublishAsync(
         exchange: string.Empty,
         routingKey: queueName,
+        mandatory: false,
+        basicProperties: new BasicProperties(),
         body: new ReadOnlyMemory<byte>(System.Text.Encoding.UTF8.GetBytes("committed")));
     await transaction.CompleteAsync();
 
@@ -330,6 +332,8 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
     await publishingChannel.BasicPublishAsync(
         exchange: string.Empty,
         routingKey: queueName,
+        mandatory: false,
+        basicProperties: new BasicProperties(),
         body: new ReadOnlyMemory<byte>(System.Text.Encoding.UTF8.GetBytes("rolled-back")));
     await transaction.RollbackAsync();
 
