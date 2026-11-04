@@ -100,8 +100,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
           _assemblyAccessor.GetEntryAssembly()
           ?? throw new InvalidOperationException("Entry assembly cannot be null."));
       await channel.ExchangeDeclarePassiveAsync(replayExchange, cancellationToken).ConfigureAwait(false);
-      var retryAttempts = _options.FailurePolicy?.MaxRetryAttempts ?? 3;
-      for (var retryNumber = 1; retryNumber <= retryAttempts; retryNumber++)
+      for (var retryNumber = 1; retryNumber <= 3; retryNumber++)
       {
         var retryQueue = $"{_queueName}-retry-{retryNumber}";
         await channel.QueueDeclarePassiveAsync(retryQueue, cancellationToken).ConfigureAwait(false);
@@ -200,8 +199,9 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
     var replayExchange = RabbitMQExchangeNamer.GetReplayExchangeName(_assemblyAccessor.GetEntryAssembly()
         ?? throw new InvalidOperationException("Entry assembly cannot be null."));
     await channel.ExchangeDeclareAsync(replayExchange, ExchangeType.Direct, durable: true, autoDelete: false, cancellationToken: cancellationToken).ConfigureAwait(false);
-    var retryAttempts = _options.FailurePolicy?.MaxRetryAttempts ?? 3;
-    for (var retryNumber = 1; retryNumber <= retryAttempts; retryNumber++)
+    // The policy controls the number of attempts; the topology stays bounded
+    // to the three progressive delay stages plus the dead-letter destination.
+    for (var retryNumber = 1; retryNumber <= 3; retryNumber++)
     {
       var routingKey = ProgressiveFourStepReplayStrategy.GetRetryRoutingKey(_queueName, retryNumber);
       var retryQueue = $"{_queueName}-retry-{retryNumber}";
