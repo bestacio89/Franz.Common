@@ -54,8 +54,8 @@ public sealed class KafkaMessageListener : IListener
     if (_topics.Length == 0 || _topics.Any(string.IsNullOrWhiteSpace))
       throw new InvalidOperationException("At least one non-empty Kafka topic must be configured.");
 
-    if (_failureOptions.MaxRetryAttempts < 0 || _failureOptions.RetryBackoffMs < 0 || _failureOptions.HandlerTimeoutMs <= 0)
-      throw new InvalidOperationException("Kafka failure retry settings and handler timeout must be valid positive values.");
+    if (_failureOptions.MaxRetryAttempts < 0 || _failureOptions.RetryBackoffMs < 0)
+      throw new InvalidOperationException("Kafka failure retry settings cannot be negative.");
 
     _consumer.Subscribe(_topics);
     _logger.LogInformation("Kafka listener subscribed to {Topics}", string.Join(", ", _topics));
@@ -111,28 +111,15 @@ public sealed class KafkaMessageListener : IListener
         for (var attempt = 0; attempt <= _failureOptions.MaxRetryAttempts; attempt++)
         {
           stoppingToken.ThrowIfCancellationRequested();
-          using var attemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-          attemptCancellation.CancelAfter(_failureOptions.HandlerTimeoutMs);
           try
           {
-            await OnMessageReceivedAsync(new MessageEventArgs(transport, attemptCancellation.Token));
+            await OnMessageReceivedAsync(new MessageEventArgs(transport));
             succeeded = true;
             break;
           }
           catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
           {
             throw;
-          }
-          catch (OperationCanceledException ex) when (attemptCancellation.IsCancellationRequested)
-          {
-            processingFailure = new TimeoutException($"Kafka handler attempt exceeded the configured timeout of {_failureOptions.HandlerTimeoutMs} ms.", ex);
-            _logger.LogWarning(processingFailure,
-                "Kafka handler timed out for message {MessageId} at {Topic}[{Partition}] offset {Offset}; attempt {Attempt} of {TotalAttempts}.",
-                transport.Id, result.Topic, result.Partition.Value, result.Offset.Value,
-                attempt + 1, _failureOptions.MaxRetryAttempts + 1);
-
-            if (attempt < _failureOptions.MaxRetryAttempts && _failureOptions.RetryBackoffMs > 0)
-              await Task.Delay(_failureOptions.RetryBackoffMs, stoppingToken);
           }
           catch (Exception ex)
           {
