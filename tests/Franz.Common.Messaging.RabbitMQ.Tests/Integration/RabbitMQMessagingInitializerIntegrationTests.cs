@@ -243,19 +243,21 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
         CreateAssemblyAccessor().Object,
         Options.Create(options));
 
+    var retryProperties = new BasicProperties
+    {
+      Headers = new Dictionary<string, object?>
+      {
+        [ProgressiveFourStepReplayStrategy.ReplayHeader] = 4
+      }
+    };
     var retryFive = new BasicDeliverEventArgs(
         "consumer",
         1,
         false,
         $"{queueName}-exchange",
         queueName,
-        new BasicProperties(),
+        retryProperties,
         new ReadOnlyMemory<byte>(System.Text.Encoding.UTF8.GetBytes("retry-payload")));
-
-    retryFive.BasicProperties.Headers = new Dictionary<string, object?>
-    {
-      [ProgressiveFourStepReplayStrategy.ReplayHeader] = 4
-    };
 
     RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.Retry).Should().BeTrue();
     RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.DeadLetter).Should().BeTrue();
@@ -275,18 +277,21 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       channelPool.Return(verificationChannel);
     }
 
+    var exhaustedProperties = new BasicProperties
+    {
+      Headers = new Dictionary<string, object?>
+      {
+        [ProgressiveFourStepReplayStrategy.ReplayHeader] = 5
+      }
+    };
     var exhausted = new BasicDeliverEventArgs(
         "consumer",
         2,
         false,
         $"{queueName}-exchange",
         queueName,
-        new BasicProperties(),
+        exhaustedProperties,
         new ReadOnlyMemory<byte>(System.Text.Encoding.UTF8.GetBytes("dead-letter-payload")));
-    exhausted.BasicProperties.Headers = new Dictionary<string, object?>
-    {
-      [ProgressiveFourStepReplayStrategy.ReplayHeader] = 5
-    };
 
     await strategy.ReplayAsync(exhausted, new InvalidOperationException("retry exhausted"));
 
