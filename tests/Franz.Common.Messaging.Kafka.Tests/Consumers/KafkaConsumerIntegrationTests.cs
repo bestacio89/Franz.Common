@@ -1,5 +1,6 @@
-﻿#nullable enable
+#nullable enable
 using Confluent.Kafka;
+using Confluent.Kafka.Admin;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -27,12 +28,11 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
       new KafkaConsumerFactory(
           Options.Create(new KafkaMessagingOptions
           {
-            GroupId = $"test-group-{Guid.NewGuid():N}",
+            GroupId = groupId ?? $"test-group-{Guid.NewGuid():N}",
             BootstrapServers = _fixture.BootstrapServers,
             Security = new KafkaSecurityOptions { AllowInsecureTransport = true },
             Consumer = new KafkaConsumerOptions
             {
-              
               EnableAutoCommit = false
             }
           }),
@@ -93,13 +93,15 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
 
     using var consumer = factory.Build();
     consumer.Subscribe(topic);
+
     try
     {
       _ = consumer.Consume(TimeSpan.FromSeconds(2));
     }
-    catch (ConsumeException exception) when (exception.Error.Code == ErrorCode.UnknownTopicOrPart)
+    catch (ConsumeException exception)
+        when (exception.Error.Code is ErrorCode.UnknownTopicOrPart or ErrorCode.LeaderNotAvailable)
     {
-      // The broker correctly rejects metadata for a topic that does not exist.
+      // Both are valid broker responses while metadata for an unknown topic is unavailable.
     }
 
     using var admin = new AdminClientBuilder(new AdminClientConfig
@@ -107,9 +109,10 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
       BootstrapServers = _fixture.BootstrapServers
     }).Build();
 
-    var metadata = admin.GetMetadata(topic, TimeSpan.FromSeconds(5));
-    metadata.Topics.Should().ContainSingle();
-    metadata.Topics[0].Error.Code.Should().Be(ErrorCode.UnknownTopicOrPart);
+    var metadata = admin.GetMetadata(TimeSpan.FromSeconds(5));
+    metadata.Topics.Should().NotContain(
+        candidate => StringComparer.Ordinal.Equals(candidate.Topic, topic),
+        "subscribing to an unknown topic must not provision it");
   }
 
   [Fact]
@@ -117,27 +120,40 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
   {
     var factory = BuildFactory();
     var topic = $"test-publish-{Guid.NewGuid():N}";
-    var tcs = new TaskCompletionSource<string>();
+
+    using var admin = new AdminClientBuilder(new AdminClientConfig
+    {
+      BootstrapServers = _fixture.BootstrapServers
+    }).Build();
+
+    await admin.CreateTopicsAsync(new[]
+    {
+      new TopicSpecification
+      {
+        Name = topic,
+        NumPartitions = 1,
+        ReplicationFactor = 1
+      }
+    });
 
     using var consumer = factory.Build();
     consumer.Subscribe(topic);
 
-    // Produce a test message using real Kafka producer
     using var producer = new ProducerBuilder<string, string>(
         new ProducerConfig { BootstrapServers = _fixture.BootstrapServers }).Build();
 
-    _ = Task.Run(() =>
+    var consumeTask = Task.Run(() => consumer.Consume(TimeSpan.FromSeconds(10)));
+    const string messageValue = "hello-world";
+
+    await producer.ProduceAsync(topic, new Message<string, string>
     {
-      var msg = consumer.Consume(TimeSpan.FromSeconds(10));
-      if (msg != null)
-        tcs.TrySetResult(msg.Message.Value);
+      Key = "key",
+      Value = messageValue
     });
 
-    var messageValue = "hello-world";
-    await producer.ProduceAsync(topic, new Message<string, string> { Key = "key", Value = messageValue });
-
-    var received = await tcs.Task.TimeoutAfter(TimeSpan.FromSeconds(5));
-    received.Should().Be(messageValue);
+    var received = await consumeTask.TimeoutAfter(TimeSpan.FromSeconds(15));
+    received.Should().NotBeNull();
+    received!.Message.Value.Should().Be(messageValue);
 
     consumer.Unsubscribe();
   }
