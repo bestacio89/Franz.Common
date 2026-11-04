@@ -18,7 +18,7 @@ public sealed class MessagingManifestTests
     manifest.Destinations.Select(static type => type.FullName)
         .Should().Equal(typeof(string).FullName, typeof(Uri).FullName);
     manifest.Subscriptions.Select(static type => type.FullName)
-        .Should().Equal(typeof(int).FullName, typeof(Guid).FullName);
+        .Should().Equal(typeof(Guid).FullName, typeof(int).FullName);
   }
 
   [Fact]

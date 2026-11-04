@@ -45,7 +45,7 @@ internal static class HandlerDiscovery
           .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
       var isIntegrationEvent = requestTypeSymbol is INamedTypeSymbol namedRequestType &&
           namedRequestType.AllInterfaces.Any(static implementedInterface =>
-              implementedInterface.ToDisplayString() == "Franz.Common.Business.Events.IIntegrationEvent");
+              implementedInterface.ToDisplayString() == "Franz.Common.Mediator.IIntegrationEvent");
       var responseType = interfaceSymbol.TypeArguments.Length > 1
           ? interfaceSymbol.TypeArguments[1].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
           : null;

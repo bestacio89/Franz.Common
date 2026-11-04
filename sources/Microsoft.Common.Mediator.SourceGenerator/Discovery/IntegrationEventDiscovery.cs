@@ -18,7 +18,7 @@ internal static class IntegrationEventDiscovery
       return null;
 
     var isIntegrationEvent = symbol.AllInterfaces.Any(static implementedInterface =>
-        implementedInterface.ToDisplayString() == "Franz.Common.Business.Events.IIntegrationEvent");
+        implementedInterface.ToDisplayString() == "Franz.Common.Mediator.IIntegrationEvent");
 
     return isIntegrationEvent
         ? symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)

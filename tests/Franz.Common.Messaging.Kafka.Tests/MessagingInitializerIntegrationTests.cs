@@ -183,6 +183,16 @@ public sealed class KafkaMessagingInitializerIntegrationTests
   }
 
   [Fact]
+  public void GeneratedManifest_ShouldIncludeIntegrationEventDestinationsAndSubscriptions()
+  {
+    var manifest = Franz.Common.Messaging.Manifest.MessagingManifestRegistry.Get(
+        typeof(TestIntegrationEventHandler).Assembly);
+
+    manifest.Destinations.Should().Contain(typeof(TestIntegrationEvent));
+    manifest.Subscriptions.Should().Contain(typeof(TestIntegrationEvent));
+  }
+
+  [Fact]
   public async Task InitializeAsync_SystemMode_ShouldCreateAssemblyBasedIntegrationEventTopic()
   {
     var sut = CreateSut(BuildIntegrationAccessor(), perEvent: false);
