@@ -153,14 +153,16 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
     using var nextOwner = factory.Build();
 
     firstOwner.Subscribe(topic);
+    ConsumeResult<string, string>? firstDelivery = null;
     var assignmentDeadline = DateTime.UtcNow.AddSeconds(20);
-    while (firstOwner.Assignment.Count == 0 && DateTime.UtcNow < assignmentDeadline)
-      firstOwner.Consume(TimeSpan.FromMilliseconds(100));
+    while ((firstOwner.Assignment.Count == 0 || firstDelivery is null) &&
+           DateTime.UtcNow < assignmentDeadline)
+    {
+      firstDelivery ??= firstOwner.Consume(TimeSpan.FromMilliseconds(100));
+    }
 
     firstOwner.Assignment.Should().ContainSingle(
         partition => StringComparer.Ordinal.Equals(partition.Topic, topic));
-
-    var firstDelivery = firstOwner.Consume(TimeSpan.FromSeconds(10));
     firstDelivery.Should().NotBeNull();
     firstDelivery!.Message.Value.Should().Be("uncommitted-payload");
     firstDelivery.TopicPartitionOffset.Should().Be(
