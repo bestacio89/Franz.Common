@@ -254,5 +254,70 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       obs.EnableLogging.Should().BeTrue();
       obs.LogMessagePayloads.Should().BeFalse();
     }
+
+    [Fact]
+    public void KafkaFailureOptions_ShouldReject_RetryBackoffBudgetThatExceedsMaxPollInterval()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions
+        {
+          SecurityProtocol = KafkaSecurityProtocol.Ssl
+        },
+        Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
+        Failure = new KafkaFailureOptions { MaxRetryAttempts = 3, RetryBackoffMs = 334 }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message =>
+          message.Contains("retry backoff budget", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void KafkaFailureOptions_ShouldAccept_RetryBackoffBudgetBelowMaxPollInterval()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions
+        {
+          SecurityProtocol = KafkaSecurityProtocol.Ssl
+        },
+        Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
+        Failure = new KafkaFailureOptions { MaxRetryAttempts = 3, RetryBackoffMs = 333 }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void KafkaFailureOptions_ShouldAllowZeroRetryBudget()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions
+        {
+          SecurityProtocol = KafkaSecurityProtocol.Ssl
+        },
+        Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
+        Failure = new KafkaFailureOptions { MaxRetryAttempts = 0, RetryBackoffMs = 60000 }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeFalse();
+    }
   }
 }

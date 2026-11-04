@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 namespace Franz.Common.Messaging.Kafka.Validation;
 
 /// <summary>
-/// Validates Kafka transport security before any Kafka client is constructed.
+/// Validates Kafka transport security and consumer retry timing before a Kafka client is constructed.
 /// </summary>
 public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessagingOptions>
 {
@@ -60,6 +60,23 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
     if (string.IsNullOrWhiteSpace(security.SslCertificateLocation)
         != string.IsNullOrWhiteSpace(security.SslKeyLocation))
       failures.Add("SslCertificateLocation and SslKeyLocation must be configured together.");
+
+    // The listener performs MaxRetryAttempts delays between attempts. That delay budget
+    // must fit strictly inside MaxPollIntervalMs so the consumer can continue polling
+    // and retain partition ownership while retrying a failed handler.
+    if (options.Consumer.MaxPollIntervalMs > 0 &&
+        options.Failure.MaxRetryAttempts >= 0 &&
+        options.Failure.RetryBackoffMs >= 0)
+    {
+      var retryBudgetMilliseconds =
+          (long)options.Failure.MaxRetryAttempts * options.Failure.RetryBackoffMs;
+
+      if (retryBudgetMilliseconds >= options.Consumer.MaxPollIntervalMs)
+      {
+        failures.Add(
+            $"Kafka retry backoff budget ({retryBudgetMilliseconds} ms) must be less than Consumer:MaxPollIntervalMs ({options.Consumer.MaxPollIntervalMs} ms).");
+      }
+    }
 
     return failures.Count == 0
         ? ValidateOptionsResult.Success
