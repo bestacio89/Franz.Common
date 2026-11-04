@@ -61,6 +61,32 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
         != string.IsNullOrWhiteSpace(security.SslKeyLocation))
       failures.Add("SslCertificateLocation and SslKeyLocation must be configured together.");
 
+    if (options.Consumer is null)
+      failures.Add("Consumer options must be configured.");
+
+    if (options.Failure is null)
+      failures.Add("Failure options must be configured.");
+
+    if (options.Topic is null)
+      failures.Add("Topic options must be configured.");
+    else
+    {
+      if (options.Topic.NumPartitions < 1)
+        failures.Add("Topic:NumPartitions must be greater than zero.");
+      if (options.Topic.ReplicationFactor < 1)
+        failures.Add("Topic:ReplicationFactor must be greater than zero.");
+      if (options.Topic.CreationTimeoutMs < 100 || options.Topic.CreationTimeoutMs > 300000)
+        failures.Add("Topic:CreationTimeoutMs must be between 100 and 300000 milliseconds.");
+      if (options.Topic.Configurations is null)
+        failures.Add("Topic:Configurations cannot be null.");
+      else if (options.Topic.Configurations.Any(pair =>
+          string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
+        failures.Add("Topic:Configurations must contain non-empty keys and non-null values.");
+    }
+
+    if (options.Consumer is null || options.Failure is null)
+      return ValidateOptionsResult.Fail(failures);
+
     // The listener performs MaxRetryAttempts delays between attempts. That delay budget
     // must fit strictly inside MaxPollIntervalMs so the consumer can continue polling
     // and retain partition ownership while retrying a failed handler.

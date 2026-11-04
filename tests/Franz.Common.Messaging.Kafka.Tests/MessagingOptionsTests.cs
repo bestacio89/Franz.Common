@@ -319,5 +319,40 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
 
       result.Failed.Should().BeFalse();
     }
+
+    [Fact]
+    public void KafkaTopicOptions_ShouldHaveSafeDefaults()
+    {
+      var topic = new KafkaTopicOptions();
+      topic.NumPartitions.Should().Be(1);
+      topic.ReplicationFactor.Should().Be(1);
+      topic.CreationTimeoutMs.Should().Be(30000);
+      topic.Configurations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void KafkaTopicOptions_ShouldRejectInvalidProvisioningValues()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Topic = new KafkaTopicOptions
+        {
+          NumPartitions = 0,
+          ReplicationFactor = 0,
+          CreationTimeoutMs = 0
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message => message.Contains("NumPartitions"));
+      result.Failures.Should().Contain(message => message.Contains("ReplicationFactor"));
+      result.Failures.Should().Contain(message => message.Contains("CreationTimeoutMs"));
+    }
   }
 }

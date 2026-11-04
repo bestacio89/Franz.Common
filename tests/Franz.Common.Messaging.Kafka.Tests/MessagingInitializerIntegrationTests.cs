@@ -95,6 +95,45 @@ public sealed class KafkaMessagingInitializerIntegrationTests
         BootstrapServers = _fixture.BootstrapServers
       }).Build();
 
+
+  [Fact]
+  public async Task InitializeAsync_ShouldApplyConfiguredPartitionCountAndReplicationFactor()
+  {
+    var options = new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = "configured-topic",
+      Failure = { DeadLetterTopic = "configured-topic-dlt" },
+      Topic = new KafkaTopicOptions { NumPartitions = 3, ReplicationFactor = 1 }
+    };
+
+    var sut = CreateSut(options: options);
+    await sut.InitializeAsync();
+
+    using var admin = BuildAdminClient();
+    var metadata = admin.GetMetadata(TimeSpan.FromSeconds(10));
+    var topic = metadata.Topics.Should().ContainSingle(item => item.Topic == "configured-topic").Subject;
+
+    topic.Partitions.Should().HaveCount(3);
+    topic.Partitions.Should().OnlyContain(partition => partition.Replicas.Count == 1);
+  }
+
+  [Fact]
+  public async Task InitializeAsync_ShouldRespectCancellationBeforeProvisioning()
+  {
+    var sut = CreateSut();
+    using var cancellation = new CancellationTokenSource();
+    cancellation.Cancel();
+
+    var action = () => sut.InitializeAsync(cancellation.Token).AsTask();
+
+    await action.Should().ThrowAsync<OperationCanceledException>();
+    using var admin = BuildAdminClient();
+    admin.GetMetadata(TimeSpan.FromSeconds(10)).Topics
+        .Should().NotContain(topic => topic.Topic == "main-topic");
+  }
+
   // =========================================================
   // SYSTEM MODE TESTS
   // =========================================================

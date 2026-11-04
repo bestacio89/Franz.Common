@@ -20,6 +20,7 @@ public class KafkaMessagingOptions
   [Required] public KafkaProducerOptions Producer { get; set; } = new();
   public KafkaFailureOptions Failure { get; set; } = new();
   public KafkaObservabilityOptions Observability { get; set; } = new();
+  public KafkaTopicOptions Topic { get; set; } = new();
 }
 
 public class KafkaSecurityOptions
@@ -130,4 +131,18 @@ public class KafkaObservabilityOptions
   public bool EnableTracing { get; set; } = true;
   public bool EnableLogging { get; set; } = true;
   public bool LogMessagePayloads { get; set; } = false;
+}
+public class KafkaTopicOptions
+{
+  [Range(1, 10000)]
+  public int NumPartitions { get; set; } = 1;
+
+  [Range(1, short.MaxValue)]
+  public short ReplicationFactor { get; set; } = 1;
+
+  [Range(100, 300000)]
+  public int CreationTimeoutMs { get; set; } = 30000;
+
+  /// <summary>Topic configuration keys and values passed to Kafka topic creation.</summary>
+  public Dictionary<string, string> Configurations { get; set; } = new(StringComparer.Ordinal);
 }

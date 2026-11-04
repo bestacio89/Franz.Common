@@ -39,6 +39,7 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
   // Static would cause the second initializer (event mode) to be skipped
   // because the first (system mode) already set the flag.
   private int _initialized;
+  private readonly SemaphoreSlim _initializationGate = new(1, 1);
 
   private readonly IAdminClient _adminClient;
   private readonly IAssemblyAccessor _assemblyAccessor;
@@ -72,19 +73,27 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
 
   public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
   {
-    if (Interlocked.Exchange(ref _initialized, 1) == 1)
-      return;
+    await _initializationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+    try
+    {
+      if (Volatile.Read(ref _initialized) == 1)
+        return;
 
-    await EnsureTopicAsync(_topicName, cancellationToken).ConfigureAwait(false);
-    await EnsureTopicAsync(_deadLetterTopicName, cancellationToken).ConfigureAwait(false);
+      await EnsureTopicAsync(_topicName, cancellationToken).ConfigureAwait(false);
+      await EnsureTopicAsync(_deadLetterTopicName, cancellationToken).ConfigureAwait(false);
 
-    foreach (var topic in DiscoverIntegrationEventTopics())
-      await EnsureTopicAsync(topic, cancellationToken).ConfigureAwait(false);
+      foreach (var topic in DiscoverIntegrationEventTopics())
+        await EnsureTopicAsync(topic, cancellationToken).ConfigureAwait(false);
+
+      // Publish the initialized state only after every destination has been provisioned.
+      // Failed and cancelled attempts remain retryable.
+      Volatile.Write(ref _initialized, 1);
+    }
+    finally
+    {
+      _initializationGate.Release();
+    }
   }
-
-  // =========================================================
-  // TOPIC DISCOVERY
-  // =========================================================
 
   private IReadOnlyCollection<string> DiscoverIntegrationEventTopics()
   {
@@ -137,21 +146,36 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
     if (string.IsNullOrWhiteSpace(name))
       return;
 
+    var topicOptions = _options.Topic;
+    var timeout = TimeSpan.FromMilliseconds(topicOptions.CreationTimeoutMs);
+    var specification = new TopicSpecification
+    {
+      Name = name,
+      NumPartitions = topicOptions.NumPartitions,
+      ReplicationFactor = topicOptions.ReplicationFactor,
+      Configs = topicOptions.Configurations.Count == 0
+          ? null
+          : new Dictionary<string, string>(topicOptions.Configurations, StringComparer.Ordinal)
+    };
+
     try
     {
-      await _adminClient.CreateTopicsAsync(new[]
-      {
-                new TopicSpecification
-                {
-                    Name              = name,
-                    NumPartitions     = 1,
-                    ReplicationFactor = 1
-                }
-            }).ConfigureAwait(false);
+      var creation = _adminClient.CreateTopicsAsync(
+          new[] { specification },
+          new CreateTopicsOptions
+          {
+            OperationTimeout = timeout,
+            RequestTimeout = timeout
+          });
+
+      // The Admin API has no CancellationToken overload. Cancellation stops this
+      // initializer from waiting or scheduling further topics; Kafka's request
+      // timeout bounds the broker request.
+      await creation.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
     }
     catch (CreateTopicsException ex)
     {
-      if (ex.Results.Any(r => r.Error.Code != ErrorCode.TopicAlreadyExists))
+      if (ex.Results.Any(result => result.Error.Code != ErrorCode.TopicAlreadyExists))
         throw;
     }
   }
