@@ -144,6 +144,100 @@ public sealed class TenantRequestAuthorizationTests
         Assert.Null(accessor.Current);
     }
 
+    [Fact]
+    public async Task Middleware_ExcludedPathBypassesTenantResolution()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/health/live";
+        var accessor = CreateExecutionAccessor(context);
+        var pipeline = new CountingTenantResolutionPipeline();
+        var options = new TenantResolutionOptions();
+        options.ExcludedPaths.Add("/health");
+        var middleware = new TenantResolutionMiddleware(
+            pipeline,
+            accessor,
+            Options.Create(options),
+            new ServiceCollection().BuildServiceProvider());
+        var called = false;
+
+        await middleware.InvokeAsync(context, _ => { called = true; return Task.CompletedTask; });
+
+        Assert.True(called);
+        Assert.Equal(0, pipeline.CallCount);
+        Assert.Null(accessor.Current);
+    }
+
+    [Fact]
+    public async Task Middleware_DoesNotExcludeSiblingPathWithSamePrefix()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/healthcheck";
+        var accessor = CreateExecutionAccessor(context);
+        var pipeline = new CountingTenantResolutionPipeline();
+        var options = new TenantResolutionOptions();
+        options.ExcludedPaths.Add("/health");
+        var middleware = new TenantResolutionMiddleware(
+            pipeline,
+            accessor,
+            Options.Create(options),
+            new ServiceCollection().BuildServiceProvider());
+
+        await middleware.InvokeAsync(context, _ => Task.CompletedTask);
+
+        Assert.Equal(1, pipeline.CallCount);
+        Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ClaimsAuthorizer_RequiresExactTenantGuidClaim()
+    {
+        var tenantId = Guid.NewGuid();
+        var tenant = new TenantInfo(tenantId, "tenant");
+        var authorizer = new ClaimsTenantRequestAuthorizer(
+            Options.Create(new TenantClaimsAuthorizationOptions()));
+        var matchingPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("tenant_id", tenantId.ToString("D"))], "test"));
+        var otherTenantPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("tenant_id", Guid.NewGuid().ToString("D"))], "test"));
+
+        Assert.True(await authorizer.IsAuthorizedAsync(matchingPrincipal, tenant));
+        Assert.False(await authorizer.IsAuthorizedAsync(otherTenantPrincipal, tenant));
+        Assert.False(await authorizer.IsAuthorizedAsync(
+            new ClaimsPrincipal(new ClaimsIdentity([new Claim("tenant_id", tenantId.ToString())])),
+            tenant));
+    }
+
+    [Fact]
+    public async Task Middleware_CanDisableAuthenticatedMembershipAuthorizationExplicitly()
+    {
+        var context = CreateAuthenticatedContext();
+        var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
+        var accessor = CreateExecutionAccessor(context);
+        var options = new TenantResolutionOptions { RequireAuthenticatedAuthorization = false };
+        var middleware = new TenantResolutionMiddleware(
+            new StubTenantResolutionPipeline(tenant),
+            accessor,
+            Options.Create(options),
+            new ServiceCollection().BuildServiceProvider());
+        var called = false;
+
+        await middleware.InvokeAsync(context, _ => { called = true; return Task.CompletedTask; });
+
+        Assert.True(called);
+        Assert.Null(accessor.Current);
+    }
+
+    private sealed class CountingTenantResolutionPipeline : ITenantResolutionPipeline
+    {
+        public int CallCount { get; private set; }
+
+        public Task<TenantResolutionResult?> ResolveAsync(object? context)
+        {
+            CallCount++;
+            return Task.FromResult<TenantResolutionResult?>(null);
+        }
+    }
+
     private static DefaultHttpContext CreateAuthenticatedContext()
     {
         var context = new DefaultHttpContext();

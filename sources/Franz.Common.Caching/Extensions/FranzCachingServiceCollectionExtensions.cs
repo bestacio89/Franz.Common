@@ -7,6 +7,8 @@ using Franz.Common.Caching.Pipelines;
 using Franz.Common.Caching.Providers;
 using Franz.Common.Caching.Settings;
 using Franz.Common.Mediator.Pipelines.Core;
+using Franz.Common.MultiTenancy;
+using Franz.Common.Caching.MultiTenancy;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -212,5 +214,35 @@ public static class FranzCachingServiceCollectionExtensions
     services.Replace(ServiceDescriptor.Scoped<ICacheKeyStrategy, TenantScopedCacheKeyStrategy>());
     return services;
   }
+
+  /// <summary>
+  /// Decorates the registered tenant store with time-bounded process-local caching.
+  /// The application must invalidate the cache after every successful tenant registry write.
+  /// </summary>
+  public static IServiceCollection AddTenantStoreCaching(
+      this IServiceCollection services,
+      Action<TenantStoreCacheOptions>? configure = null)
+  {
+    ArgumentNullException.ThrowIfNull(services);
+
+    if (services.Any(descriptor => descriptor.ServiceType == typeof(TenantStoreCacheRegistration)))
+      return services;
+
+    services.AddMemoryCache();
+    services.AddOptions<TenantStoreCacheOptions>()
+        .Configure(configure ?? (_ => { }))
+        .Validate(
+            options => options.AbsoluteExpiration > TimeSpan.Zero,
+            "Tenant-store cache expiration must be greater than zero.")
+        .ValidateOnStart();
+
+    services.TryAddSingleton<TenantStoreCacheState>();
+    services.TryAddSingleton<ITenantStoreCacheInvalidator, TenantStoreCacheInvalidator>();
+    services.Decorate<ITenantStore, CachedTenantStore>();
+    services.AddSingleton<TenantStoreCacheRegistration>();
+    return services;
+  }
+
+  private sealed class TenantStoreCacheRegistration { }
 
 }

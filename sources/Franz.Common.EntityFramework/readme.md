@@ -457,3 +457,69 @@ All EF provider adapters use the shared `DatabaseTargetResolver`; adapters const
 The relational provider qualification covers tenant-scoped EF Core reads and writes, fail-closed behavior when tenant execution context is absent, tenant ownership immutability, cross-tenant mutation rejection, query-filter behavior for supported set-based operations, and the repository `ExecuteBulkUpdateAsync` contract. The named relational engines in the qualification are PostgreSQL 16, MariaDB 11.4, MySQL 8.4, SQL Server 2022 and Oracle Free 23.
 
 Do not treat EF Core global query filters as a complete database security boundary. Raw SQL, stored procedures, direct connections, provider-native bulk APIs, and deliberate filter bypasses need explicit tenant enforcement and tests. Cosmos DB and MongoDB are not included in this relational qualification. See the [relational provider contract](../../Docs/relational-provider-contract.md) and [tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md).
+
+
+## Explicit multi-tenancy activation and shared-database classification
+
+Multi-tenancy is an application-level architectural choice. It is independent of `Database:IsolationMode`. Non-multi-tenant applications (for example, a game backend operated by one owner inside one environment) do not need tenant identifiers, tenant/global entity markers, or tenant execution contexts.
+
+The default is disabled:
+
+```json
+{
+  "MultiTenancy": {
+    "Enabled": false
+  },
+  "Database": {
+    "IsolationMode": "SharedDatabase",
+    "DatabaseName": "game"
+  }
+}
+```
+
+Registering the HTTP multi-tenancy or messaging multi-tenancy integration enables `MultiTenancyOptions.Enabled`. A host can also configure `MultiTenancyOptions` explicitly. A concrete `DbContext` that uses the classification gate must forward both `IOptions<DatabaseOptions>` and `IOptions<MultiTenancyOptions>`:
+
+```csharp
+public sealed class ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    IDispatcher dispatcher,
+    ITenantExecutionContextAccessor tenantContext,
+    IOptions<DatabaseOptions> databaseOptions,
+    IOptions<MultiTenancyOptions> multiTenancyOptions)
+    : DbContextBase(
+        options,
+        dispatcher,
+        tenantContextAccessor: tenantContext,
+        databaseOptions: databaseOptions,
+        multiTenancyOptions: multiTenancyOptions)
+{
+}
+```
+
+When multi-tenancy is enabled with `DatabaseIsolationMode.SharedDatabase`, every persisted `IEntity<TKey>` must declare exactly one ownership classification:
+
+- Tenant-owned entities implement `ITenantEntity` and expose their mapped `Guid TenantId`.
+- Cross-tenant entities implement `IGlobalEntity` only when the data is intentionally shared by every tenant.
+
+Entities implementing neither marker, or implementing both, cause EF model initialization to fail with a diagnostic listing the offending CLR types. When multi-tenancy is disabled, this classification gate is not applied, even when the database isolation mode is `SharedDatabase`. `TenantDatabase` and `DomainDatabase` retain their database-routing semantics; the shared-database classification gate does not apply to those modes.
+
+The concrete DbContext must forward the options because optional base-constructor dependencies are not injected automatically. Existing non-multi-tenant DbContexts can continue using the original constructor overload and do not need tenant-specific changes.
+
+
+## TenantDatabase operational guidance
+
+`DatabaseIsolationMode.TenantDatabase` selects a logical database name by replacing `{dbName}` with the validated tenant GUID. It does not, by itself, provision databases, resolve credentials, run migrations, or manage connection pools. The configured provider adapter and application composition root must use the resolved database target when constructing tenant-specific provider options.
+
+Operational requirements:
+
+- Resolve the tenant only from the validated tenant execution context. Missing context fails closed; do not fall back to a domain, header, route value, or arbitrary job payload.
+- Keep `DbContext` and tenant-specific provider options scoped to the tenant execution. Never mutate a singleton connection string or reuse a context across tenant identities.
+- Store only a secret reference such as `TenantInfo.ConnectionStringKey` in tenant metadata. Resolve credentials from the configured secret store; do not persist connection strings or credentials in `TenantInfo`.
+- Account for one connection pool per distinct effective connection string. Set provider pool limits deliberately, avoid large minimum-pool values per tenant, and budget aggregate connections across all active tenants and application instances.
+- Provision tenant databases through an explicit, idempotent provisioning workflow. Apply schema migrations per tenant database under a per-tenant distributed lock or lease so two application instances cannot migrate the same tenant concurrently.
+- Bound migration fan-out. Run migrations in controlled batches rather than launching one task per tenant, record per-tenant success/failure, and make retries safe. A failed tenant migration must not prevent unrelated tenants from being processed.
+- Do not migrate every tenant database synchronously during ordinary application startup. Use a deployment/provisioning job with observability, retry policy, and a recovery path.
+- When rotating credentials or changing a tenant's database target, invalidate cached tenant metadata and any application-level connection/provider-options cache, then ensure old pools are retired according to the provider's lifecycle contract.
+
+The framework's database-name resolver is a routing primitive, not a tenant database lifecycle manager. Validate provisioning, credential resolution, pool behavior, migration fan-out, and recovery against each concrete database provider used in production.
+
