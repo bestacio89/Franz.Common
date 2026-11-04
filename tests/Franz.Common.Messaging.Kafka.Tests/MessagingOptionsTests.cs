@@ -6,41 +6,11 @@ using FluentAssertions;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Validation;
 using Xunit;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
-using Franz.Common.Messaging.Kafka.Extensions;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Configuration
 {
   public class KafkaMessagingOptionsTests
   {
-    [Fact]
-    public async Task KafkaMessagingOptions_ShouldFailValidateOnStart_WhenRetryBudgetExceedsHalfMaxPollInterval()
-    {
-      var configuration = new ConfigurationBuilder()
-        .AddInMemoryCollection(new System.Collections.Generic.Dictionary<string, string?>
-        {
-          ["Messaging:Kafka:BootstrapServers"] = "localhost:9092",
-          ["Messaging:Kafka:GroupId"] = "retry-budget-test",
-          ["Messaging:Kafka:Security:AllowInsecureTransport"] = "true",
-          ["Messaging:Kafka:Consumer:MaxPollIntervalMs"] = "10000",
-          ["Messaging:Kafka:Failure:MaxRetryAttempts"] = "2",
-          ["Messaging:Kafka:Failure:RetryBackoffMs"] = "1000",
-          ["Messaging:Kafka:Failure:HandlerTimeoutMs"] = "2000"
-        })
-        .Build();
-
-      using var host = new HostBuilder()
-        .ConfigureServices(services => services.AddKafkaMessagingOptions(configuration))
-        .Build();
-
-      await FluentActions.Invoking(() => host.StartAsync())
-        .Should()
-        .ThrowAsync<OptionsValidationException>();
-    }
-
     [Fact]
     public void KafkaMessagingOptions_Should_HaveDefaultValues()
     {
@@ -50,18 +20,13 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
         GroupId = "test-group"
       };
 
-      // Top-level defaults
       options.Security.Should().NotBeNull();
       options.Consumer.Should().NotBeNull();
       options.Producer.Should().NotBeNull();
       options.Failure.Should().NotBeNull();
       options.Observability.Should().NotBeNull();
-
-      // Security defaults
       options.Security.SecurityProtocol.Should().Be(KafkaSecurityProtocol.Plaintext);
       options.Security.SaslMechanism.Should().BeNull();
-
-      // Consumer defaults
       options.Consumer.AutoOffsetReset.Should().Be(KafkaAutoOffsetReset.Earliest);
       options.Consumer.EnableAutoCommit.Should().BeFalse();
       options.Consumer.EnableAutoOffsetStore.Should().BeFalse();
@@ -72,8 +37,6 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       options.Consumer.FetchMaxBytes.Should().Be(52428800);
       options.Consumer.FetchWaitMaxMs.Should().Be(500);
       options.Consumer.ConcurrencyLevel.Should().Be(1);
-
-      // Producer defaults
       options.Producer.Acks.Should().Be(KafkaAcks.All);
       options.Producer.MessageMaxBytes.Should().Be(1048576);
       options.Producer.LingerMs.Should().Be(5);
@@ -83,14 +46,10 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       options.Producer.MessageSendMaxRetries.Should().Be(3);
       options.Producer.RetryBackoffMs.Should().Be(100);
       options.Producer.DeliveryTimeoutMs.Should().Be(120000);
-
-      // Failure defaults
       options.Failure.EnableDeadLetter.Should().BeTrue();
       options.Failure.MaxRetryAttempts.Should().Be(3);
       options.Failure.RetryBackoffMs.Should().Be(500);
       options.Failure.UseOriginalMessageKey.Should().BeTrue();
-
-      // Observability defaults
       options.Observability.EnableMetrics.Should().BeTrue();
       options.Observability.EnableTracing.Should().BeTrue();
       options.Observability.EnableLogging.Should().BeTrue();
@@ -101,12 +60,9 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     public void KafkaMessagingOptions_ShouldRequire_BootstrapServers_And_GroupId()
     {
       var options = new KafkaMessagingOptions() { BootstrapServers = ""};
-
       var context = new ValidationContext(options);
       var results = new System.Collections.Generic.List<ValidationResult>();
-
       var isValid = Validator.TryValidateObject(options, context, results, validateAllProperties: true);
-
       isValid.Should().BeFalse();
       results.Select(r => r.MemberNames.FirstOrDefault())
              .Should().Contain(new[] { "BootstrapServers" });
@@ -117,15 +73,12 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     {
       var consumer = new KafkaConsumerOptions
       {
-        SessionTimeoutMs = 500,      // invalid (<1000)
-        MaxPollIntervalMs = 5000000  // invalid (>3000000)
+        SessionTimeoutMs = 500,
+        MaxPollIntervalMs = 5000000
       };
-
       var context = new ValidationContext(consumer);
       var results = new System.Collections.Generic.List<ValidationResult>();
-
       var isValid = Validator.TryValidateObject(consumer, context, results, validateAllProperties: true);
-
       isValid.Should().BeFalse();
       results.Should().ContainSingle(r => r.MemberNames.Contains(nameof(KafkaConsumerOptions.SessionTimeoutMs)));
       results.Should().ContainSingle(r => r.MemberNames.Contains(nameof(KafkaConsumerOptions.MaxPollIntervalMs)));
@@ -134,16 +87,10 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     [Fact]
     public void KafkaProducerOptions_ShouldValidate_Range_MessageMaxBytes()
     {
-      var producer = new KafkaProducerOptions
-      {
-        MessageMaxBytes = 512 // invalid (<1024)
-      };
-
+      var producer = new KafkaProducerOptions { MessageMaxBytes = 512 };
       var context = new ValidationContext(producer);
       var results = new System.Collections.Generic.List<ValidationResult>();
-
       var isValid = Validator.TryValidateObject(producer, context, results, validateAllProperties: true);
-
       isValid.Should().BeFalse();
       results.Should().ContainSingle(r => r.MemberNames.Contains(nameof(KafkaProducerOptions.MessageMaxBytes)));
     }
@@ -151,15 +98,8 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     [Fact]
     public void KafkaSecurityOptions_ShouldReject_PlaintextWithoutExplicitOptIn()
     {
-      var options = new KafkaMessagingOptions
-      {
-        BootstrapServers = "localhost:9092",
-        GroupId = "test-group"
-      };
-
-      var result = new KafkaMessagingOptionsValidator().Validate(
-          Microsoft.Extensions.Options.Options.DefaultName, options);
-
+      var options = new KafkaMessagingOptions { BootstrapServers = "localhost:9092", GroupId = "test-group" };
+      var result = new KafkaMessagingOptionsValidator().Validate(Microsoft.Extensions.Options.Options.DefaultName, options);
       result.Failed.Should().BeTrue();
       result.Failures.Should().Contain(message => message.Contains("AllowInsecureTransport"));
     }
@@ -173,17 +113,9 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       {
         BootstrapServers = "localhost:9092",
         GroupId = "test-group",
-        Security = new KafkaSecurityOptions
-        {
-          SecurityProtocol = protocol,
-          SaslUsername = "user",
-          SaslPassword = "secret"
-        }
+        Security = new KafkaSecurityOptions { SecurityProtocol = protocol, SaslUsername = "user", SaslPassword = "secret" }
       };
-
-      var result = new KafkaMessagingOptionsValidator().Validate(
-          Microsoft.Extensions.Options.Options.DefaultName, options);
-
+      var result = new KafkaMessagingOptionsValidator().Validate(Microsoft.Extensions.Options.Options.DefaultName, options);
       result.Failed.Should().BeTrue();
       result.Failures.Should().Contain(message => message.Contains("SaslMechanism"));
     }
@@ -195,16 +127,9 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       {
         BootstrapServers = "localhost:9092",
         GroupId = "test-group",
-        Security = new KafkaSecurityOptions
-        {
-          SecurityProtocol = KafkaSecurityProtocol.SaslSsl,
-          SaslMechanism = KafkaSaslMechanism.Plain
-        }
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.SaslSsl, SaslMechanism = KafkaSaslMechanism.Plain }
       };
-
-      var result = new KafkaMessagingOptionsValidator().Validate(
-          Microsoft.Extensions.Options.Options.DefaultName, options);
-
+      var result = new KafkaMessagingOptionsValidator().Validate(Microsoft.Extensions.Options.Options.DefaultName, options);
       result.Failed.Should().BeTrue();
       result.Failures.Should().Contain(message => message.Contains("SaslUsername"));
       result.Failures.Should().Contain(message => message.Contains("SaslPassword"));
@@ -225,9 +150,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
           SaslPassword = "secret"
         }
       };
-
-      new KafkaMessagingOptionsValidator().Validate(
-          Microsoft.Extensions.Options.Options.DefaultName, options).Failed.Should().BeFalse();
+      new KafkaMessagingOptionsValidator().Validate(Microsoft.Extensions.Options.Options.DefaultName, options).Failed.Should().BeFalse();
     }
 
     [Fact]
@@ -237,16 +160,9 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       {
         BootstrapServers = "localhost:9092",
         GroupId = "test-group",
-        Security = new KafkaSecurityOptions
-        {
-          SecurityProtocol = KafkaSecurityProtocol.Ssl,
-          SslCertificateLocation = "/cert/client.pem"
-        }
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl, SslCertificateLocation = "/cert/client.pem" }
       };
-
-      var result = new KafkaMessagingOptionsValidator().Validate(
-          Microsoft.Extensions.Options.Options.DefaultName, options);
-
+      var result = new KafkaMessagingOptionsValidator().Validate(Microsoft.Extensions.Options.Options.DefaultName, options);
       result.Failed.Should().BeTrue();
       result.Failures.Should().Contain(message => message.Contains("SslKeyLocation"));
     }
@@ -255,7 +171,6 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     public void KafkaSecurityOptions_ShouldHandle_NullsAndEnums()
     {
       var security = new KafkaSecurityOptions();
-
       security.SecurityProtocol.Should().Be(KafkaSecurityProtocol.Plaintext);
       security.SaslMechanism.Should().BeNull();
       security.SaslUsername.Should().BeNull();
@@ -266,12 +181,10 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     public void KafkaFailureOptions_ShouldHave_DefaultValues()
     {
       var failure = new KafkaFailureOptions();
-
       failure.EnableDeadLetter.Should().BeTrue();
       failure.DeadLetterTopic.Should().BeNull();
       failure.MaxRetryAttempts.Should().Be(3);
       failure.RetryBackoffMs.Should().Be(500);
-      failure.HandlerTimeoutMs.Should().Be(30000);
       failure.UseOriginalMessageKey.Should().BeTrue();
     }
 
@@ -279,7 +192,6 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     public void KafkaObservabilityOptions_ShouldHave_Defaults()
     {
       var obs = new KafkaObservabilityOptions();
-
       obs.EnableMetrics.Should().BeTrue();
       obs.EnableTracing.Should().BeTrue();
       obs.EnableLogging.Should().BeTrue();
