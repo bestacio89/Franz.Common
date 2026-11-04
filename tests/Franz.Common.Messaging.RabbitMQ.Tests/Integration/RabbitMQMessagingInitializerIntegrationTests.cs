@@ -303,6 +303,85 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
   }
 
   [Fact]
+  public async Task ProgressiveReplay_ShouldSurfaceDeadLetterPublicationFailure()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"failed-dlq-consumer-{suffix}";
+    var options = new RabbitMQMessagingOptions
+    {
+      QueueName = queueName,
+      ExchangeName = $"{queueName}-exchange",
+      DeadLetterQueueName = $"{queueName}-dlq",
+      DeadLetterExchangeName = $"{queueName}-dead-letter",
+      ReplayStrategy = "NoReplay"
+    };
+
+    await using var modelProvider = new ModelProvider(
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    await new RabbitMQMessagingInitializer(
+        modelProvider,
+        CreateAssemblyAccessor().Object,
+        Options.Create(options)).InitializeAsync();
+
+    // Deliberately point the replay strategy at a destination that does not
+    // exist. Mandatory publishing with confirms must surface the unroutable
+    // dead-letter instead of allowing the listener to acknowledge the source.
+    var failureOptions = new RabbitMQMessagingOptions
+    {
+      QueueName = queueName,
+      DeadLetterQueueName = $"{queueName}-missing-dlq",
+      FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 0)
+    };
+    var strategy = new ProgressiveFourStepReplayStrategy(
+        (IConfirmChannelPool)_fixture.ServiceProvider.GetRequiredService<IChannelPool>(),
+        CreateAssemblyAccessor().Object,
+        Options.Create(failureOptions));
+    var delivery = new BasicDeliverEventArgs(
+        "consumer",
+        3,
+        false,
+        $"{queueName}-exchange",
+        queueName,
+        new BasicProperties(),
+        new ReadOnlyMemory<byte>(System.Text.Encoding.UTF8.GetBytes("unroutable")));
+
+    var act = () => strategy.ReplayAsync(delivery, new InvalidOperationException("exhausted"));
+
+    await act.Should().ThrowAsync<Exception>();
+  }
+
+  [Fact]
+  public async Task ProgressiveReplay_WhenDeadLetteringIsDisabled_ShouldNotPublish()
+  {
+    var confirmChannelPool = new Mock<IConfirmChannelPool>(MockBehavior.Strict);
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      QueueName = $"disabled-dlq-{Guid.CreateVersion7():N}",
+      FailurePolicy = new MessageFailurePolicy(
+          maxRetryAttempts: 0,
+          deadLetterOnExhaustion: false)
+    });
+    var strategy = new ProgressiveFourStepReplayStrategy(
+        confirmChannelPool.Object,
+        CreateAssemblyAccessor().Object,
+        options);
+    var delivery = new BasicDeliverEventArgs(
+        "consumer",
+        4,
+        false,
+        string.Empty,
+        options.Value.QueueName!,
+        new BasicProperties(),
+        ReadOnlyMemory<byte>.Empty);
+
+    await strategy.ReplayAsync(delivery, new InvalidOperationException("exhausted"));
+
+    confirmChannelPool.Verify(
+        pool => pool.GetPublisherConfirmChannelAsync(It.IsAny<CancellationToken>()),
+        Times.Never);
+  }
+
+  [Fact]
   public async Task RabbitMQTransaction_ShouldCommitAndRollbackPublishedMessages()
   {
     var queueName = $"transaction-queue-{Guid.CreateVersion7():N}";
