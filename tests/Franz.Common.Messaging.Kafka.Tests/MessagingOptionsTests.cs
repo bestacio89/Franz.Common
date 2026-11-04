@@ -241,6 +241,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       failure.DeadLetterTopic.Should().BeNull();
       failure.MaxRetryAttempts.Should().Be(3);
       failure.RetryBackoffMs.Should().Be(500);
+      failure.HandlerTimeoutMs.Should().Be(30000);
       failure.UseOriginalMessageKey.Should().BeTrue();
     }
 

@@ -86,6 +86,26 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
   }
 
   [Fact]
+  public void Consumer_ShouldNotCreateUnknownTopicsOnSubscription()
+  {
+    var factory = BuildFactory();
+    var topic = $"unknown-topic-{Guid.NewGuid():N}";
+
+    using var consumer = factory.Build();
+    consumer.Subscribe(topic);
+    _ = consumer.Consume(TimeSpan.FromSeconds(2));
+
+    using var admin = new AdminClientBuilder(new AdminClientConfig
+    {
+      BootstrapServers = _fixture.BootstrapServers
+    }).Build();
+
+    var metadata = admin.GetMetadata(topic, TimeSpan.FromSeconds(5));
+    metadata.Topics.Should().ContainSingle();
+    metadata.Topics[0].Error.Code.Should().Be(ErrorCode.UnknownTopicOrPart);
+  }
+
+  [Fact]
   public async Task Consumer_ShouldReceiveMessagePublishedToTopic()
   {
     var factory = BuildFactory();

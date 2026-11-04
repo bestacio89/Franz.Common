@@ -62,7 +62,8 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
       SaslPassword = _options.Security.SaslPassword,
       SslCaLocation = _options.Security.SslCaLocation,
       SslCertificateLocation = _options.Security.SslCertificateLocation,
-      SslKeyLocation = _options.Security.SslKeyLocation
+      SslKeyLocation = _options.Security.SslKeyLocation,
+      AllowAutoCreateTopics = false
     };
 
     return new ConsumerBuilder<string, string>(config)

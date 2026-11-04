@@ -50,7 +50,7 @@ public sealed class KafkaConsumerGroup : IConsumerGroup, IAsyncDisposable, IDisp
       SessionTimeoutMs = consumerOptions.SessionTimeoutMs,
       MaxPollIntervalMs = consumerOptions.MaxPollIntervalMs,
       FetchMaxBytes = consumerOptions.FetchMaxBytes,
-      AllowAutoCreateTopics = true
+      AllowAutoCreateTopics = false
     };
 
     _consumer = new ConsumerBuilder<Ignore, string>(config).Build();

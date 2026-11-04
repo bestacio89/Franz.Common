@@ -37,7 +37,7 @@ public sealed class KafkaConsumerProvider(
       HeartbeatIntervalMs = 2000,
 
       // .NET 10 / Cloud-Native Tuning
-      AllowAutoCreateTopics = true,
+      AllowAutoCreateTopics = false,
       SocketTimeoutMs = 30000
     };
 

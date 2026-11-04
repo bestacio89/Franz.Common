@@ -15,6 +15,29 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
 
     var failures = new List<string>();
     var security = options.Security;
+    var failure = options.Failure;
+
+    if (failure.MaxRetryAttempts < 0)
+      failures.Add("Failure:MaxRetryAttempts cannot be negative.");
+
+    if (failure.RetryBackoffMs < 0)
+      failures.Add("Failure:RetryBackoffMs cannot be negative.");
+
+    if (failure.HandlerTimeoutMs <= 0)
+      failures.Add("Failure:HandlerTimeoutMs must be greater than zero.");
+
+    if (options.Consumer.MaxPollIntervalMs > 0 && failure.MaxRetryAttempts >= 0 &&
+        failure.RetryBackoffMs >= 0 && failure.HandlerTimeoutMs > 0)
+    {
+      var attempts = (long)failure.MaxRetryAttempts + 1;
+      var handlerBudgetMs = attempts * failure.HandlerTimeoutMs;
+      var backoffBudgetMs = (long)failure.MaxRetryAttempts * failure.RetryBackoffMs;
+      var totalBudgetMs = handlerBudgetMs + backoffBudgetMs;
+      var safePollBudgetMs = options.Consumer.MaxPollIntervalMs / 2L;
+
+      if (totalBudgetMs > safePollBudgetMs)
+        failures.Add($"The Kafka retry budget ({totalBudgetMs} ms: {attempts} handler attempts plus retry backoff) must not exceed half of Consumer:MaxPollIntervalMs ({safePollBudgetMs} ms). Reduce retry attempts, handler timeout, or backoff, or increase MaxPollIntervalMs.");
+    }
 
     if (!Enum.IsDefined(security.SecurityProtocol))
       failures.Add("SecurityProtocol must be a defined KafkaSecurityProtocol value.");
