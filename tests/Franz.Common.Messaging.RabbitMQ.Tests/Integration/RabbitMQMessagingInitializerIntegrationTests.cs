@@ -3,6 +3,7 @@ using FluentAssertions;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Replay;
+using Franz.Common.Messaging.RabbitMQ.Transactions;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Franz.Common.Messaging.Manifest;
@@ -295,6 +296,48 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
     {
       channelPool.Return(verificationChannel);
     }
+  }
+
+  [Fact]
+  public async Task RabbitMQTransaction_ShouldCommitAndRollbackPublishedMessages()
+  {
+    var queueName = $"transaction-queue-{Guid.CreateVersion7():N}";
+    var connectionProvider = _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>();
+    await using var connection = await connectionProvider.GetConnectionAsync();
+    await using var publishingChannel = await connection.CreateChannelAsync();
+    await publishingChannel.QueueDeclareAsync(
+        queueName,
+        durable: false,
+        exclusive: false,
+        autoDelete: true);
+
+    var transaction = new RabbitMQMessagingTransaction();
+    transaction.Attach(publishingChannel);
+
+    await transaction.BeginAsync();
+    await publishingChannel.BasicPublishAsync(
+        exchange: string.Empty,
+        routingKey: queueName,
+        body: new ReadOnlyMemory<byte>(System.Text.Encoding.UTF8.GetBytes("committed")));
+    await transaction.CompleteAsync();
+
+    await using var consumingChannel = await connection.CreateChannelAsync();
+    var committed = await consumingChannel.BasicGetAsync(queueName, autoAck: true);
+    committed.Should().NotBeNull();
+    System.Text.Encoding.UTF8.GetString(committed!.Body.Span).Should().Be("committed");
+
+    await transaction.BeginAsync();
+    await publishingChannel.BasicPublishAsync(
+        exchange: string.Empty,
+        routingKey: queueName,
+        body: new ReadOnlyMemory<byte>(System.Text.Encoding.UTF8.GetBytes("rolled-back")));
+    await transaction.RollbackAsync();
+
+    var rolledBack = await consumingChannel.BasicGetAsync(queueName, autoAck: true);
+    rolledBack.Should().BeNull("a rolled-back publication must not become visible to consumers");
+
+    RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.TransactionalPublishing)
+        .Should().BeTrue();
   }
 
   private static Mock<IAssemblyAccessor> CreateAssemblyAccessor()
