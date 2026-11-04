@@ -97,7 +97,8 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
           _assemblyAccessor.GetEntryAssembly()
           ?? throw new InvalidOperationException("Entry assembly cannot be null."));
       await channel.ExchangeDeclarePassiveAsync(replayExchange, cancellationToken).ConfigureAwait(false);
-      for (var retryNumber = 1; retryNumber <= 3; retryNumber++)
+      var retryAttempts = _options.FailurePolicy?.MaxRetryAttempts ?? 3;
+      for (var retryNumber = 1; retryNumber <= retryAttempts; retryNumber++)
       {
         var retryQueue = $"{_queueName}-retry-{retryNumber}";
         await channel.QueueDeclarePassiveAsync(retryQueue, cancellationToken).ConfigureAwait(false);
@@ -203,7 +204,9 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       var arguments = new Dictionary<string, object?>
       {
         ["x-queue-type"] = GetQueueTypeName(),
-        ["x-message-ttl"] = ProgressiveFourStepReplayStrategy.GetRetryDelayMilliseconds(retryNumber),
+        ["x-message-ttl"] = _options.FailurePolicy is { } policy
+            ? checked((int)Math.Ceiling(policy.RetryBackoff.TotalMilliseconds))
+            : ProgressiveFourStepReplayStrategy.GetRetryDelayMilliseconds(retryNumber),
         ["x-dead-letter-exchange"] = string.Empty,
         ["x-dead-letter-routing-key"] = _queueName
       };

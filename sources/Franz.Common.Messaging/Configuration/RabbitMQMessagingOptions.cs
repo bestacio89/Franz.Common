@@ -28,6 +28,8 @@ public sealed class RabbitMQMessagingOptions : MessagingOptions
 
   /// <summary>RabbitMQ queue implementation used for application, dead-letter, and retry queues.</summary>
   public RabbitMQQueueType QueueType { get; set; } = RabbitMQQueueType.Quorum;
+  public MessageFailurePolicy? FailurePolicy { get; set; }
+  public MessageOrderingStrategy? OrderingStrategy { get; set; }
 
   public int? MessageTtlMilliseconds { get; set; }
   public long? MaxLength { get; set; }

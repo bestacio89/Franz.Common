@@ -40,6 +40,7 @@ public sealed class RabbitMQListener(
   private readonly string _queueName = ResolveQueueName(assemblyAccessor, options);
   private readonly object _lock = new();
   private readonly int _maxConcurrency = options?.Value.MaxConcurrency ?? 1;
+  private readonly TimeSpan? _handlerTimeout = options?.Value.FailurePolicy?.HandlerTimeout;
   private readonly SemaphoreSlim _acknowledgementLock = new(1, 1);
   private CancellationTokenSource? _cts;
   private Task? _listenTask;
@@ -212,7 +213,18 @@ public sealed class RabbitMQListener(
           ?? throw new InvalidOperationException(
               $"No message handler is configured for RabbitMQ queue '{_queueName}'.");
 
-      await handler(new MessageEventArgs(message)).ConfigureAwait(false);
+      using var handlerTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+      if (_handlerTimeout is { } timeout)
+        handlerTimeout.CancelAfter(timeout);
+
+      try
+      {
+        await handler(new MessageEventArgs(message, handlerTimeout.Token)).ConfigureAwait(false);
+      }
+      catch (OperationCanceledException ex) when (handlerTimeout.IsCancellationRequested && !ct.IsCancellationRequested)
+      {
+        throw new TimeoutException($"RabbitMQ message handler exceeded its configured timeout of {_handlerTimeout}.", ex);
+      }
     }
     catch (OperationCanceledException) when (ct.IsCancellationRequested)
     {

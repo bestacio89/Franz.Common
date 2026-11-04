@@ -109,7 +109,8 @@ public enum KafkaMessageKeyStrategy
 {
   MessageId,
   CorrelationId,
-  AggregateId
+  AggregateId,
+  None
 }
 
 public enum KafkaAcks { None, Leader, All }

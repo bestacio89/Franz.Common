@@ -24,6 +24,9 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
   private readonly string _queueName;
   private readonly string _replayExchange;
   private readonly string _deadLetterQueue;
+  private readonly int _maxRetryAttempts = 3;
+  private readonly int? _retryBackoffMilliseconds;
+  private readonly bool _deadLetterOnExhaustion = true;
 
   // Compatibility constructor for existing consumers. Framework DI uses the confirmed-channel overload.
   public ProgressiveFourStepReplayStrategy(IModelProvider provider, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
@@ -55,6 +58,12 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
     _replayExchange = RabbitMQExchangeNamer.GetReplayExchangeName(entry);
     _deadLetterQueue = settings.DeadLetterQueueName ?? RabbitMQQueueNamer.GetDeadLetterQueueName(entry);
     _publisherConfirmTimeoutSeconds = settings.PublisherConfirmTimeoutSeconds;
+    if (settings.FailurePolicy is { } policy)
+    {
+      _maxRetryAttempts = policy.MaxRetryAttempts;
+      _retryBackoffMilliseconds = checked((int)Math.Ceiling(policy.RetryBackoff.TotalMilliseconds));
+      _deadLetterOnExhaustion = policy.DeadLetterOnExhaustion;
+    }
   }
 
   private static (string Queue, string ReplayExchange, string DeadLetterQueue) ResolveTopology(
@@ -83,8 +92,11 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
 
     string exchange;
     string routingKey;
-    if (replayCount >= 4)
+    if (replayCount > _maxRetryAttempts)
     {
+      if (!_deadLetterOnExhaustion)
+        return;
+
       headers[ExceptionMessageHeader] = Truncate(ex.Message);
       headers[ExceptionStackTraceHeader] = Truncate(ex.StackTrace ?? string.Empty);
       exchange = string.Empty;
@@ -125,6 +137,11 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
       }
     }
   }
+
+  internal int GetConfiguredRetryDelayMilliseconds(int retryNumber)
+      => _retryBackoffMilliseconds ?? GetRetryDelayMilliseconds(retryNumber);
+
+  internal int MaxRetryAttempts => _maxRetryAttempts;
 
   internal static string GetRetryRoutingKey(string queueName, int retryNumber) => $"{queueName}-retry-{retryNumber}";
   internal static int GetRetryDelayMilliseconds(int retryNumber) => retryNumber switch

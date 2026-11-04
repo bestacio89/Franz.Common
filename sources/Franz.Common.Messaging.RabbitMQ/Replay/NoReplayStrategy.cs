@@ -20,6 +20,7 @@ public class NoReplayStrategy : IReplayStrategy
   private readonly IConfirmChannelPool? _confirmChannelPool;
   private readonly int _publisherConfirmTimeoutSeconds;
   private readonly string _deadLetterQueue;
+  private readonly bool _deadLetterOnExhaustion = true;
 
   // Compatibility constructor for existing consumers. Framework DI uses the confirmed-channel overload.
   public NoReplayStrategy(IModelProvider provider, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
@@ -49,6 +50,7 @@ public class NoReplayStrategy : IReplayStrategy
     var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
     _deadLetterQueue = settings.DeadLetterQueueName ?? RabbitMQQueueNamer.GetDeadLetterQueueName(entry);
     _publisherConfirmTimeoutSeconds = settings.PublisherConfirmTimeoutSeconds;
+    _deadLetterOnExhaustion = settings.FailurePolicy?.DeadLetterOnExhaustion ?? true;
   }
 
   private static string ResolveDeadLetterQueue(IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
@@ -63,6 +65,8 @@ public class NoReplayStrategy : IReplayStrategy
   {
     ArgumentNullException.ThrowIfNull(e);
     ArgumentNullException.ThrowIfNull(ex);
+    if (!_deadLetterOnExhaustion)
+      return;
 
     var headers = e.BasicProperties.Headers is null
         ? new Dictionary<string, object?>()

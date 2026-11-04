@@ -14,6 +14,7 @@ public sealed class MessagingPolicyTests
     policy.MaxRetryAttempts.Should().Be(3);
     policy.RetryBackoff.Should().Be(TimeSpan.FromMilliseconds(500));
     policy.DeadLetterOnExhaustion.Should().BeTrue();
+    policy.HandlerTimeout.Should().BeNull();
   }
 
   [Fact]
@@ -22,11 +23,13 @@ public sealed class MessagingPolicyTests
     var policy = new MessageFailurePolicy(
         maxRetryAttempts: 5,
         retryBackoff: TimeSpan.FromSeconds(2),
-        deadLetterOnExhaustion: false);
+        deadLetterOnExhaustion: false,
+        handlerTimeout: TimeSpan.FromSeconds(15));
 
     policy.MaxRetryAttempts.Should().Be(5);
     policy.RetryBackoff.Should().Be(TimeSpan.FromSeconds(2));
     policy.DeadLetterOnExhaustion.Should().BeFalse();
+    policy.HandlerTimeout.Should().Be(TimeSpan.FromSeconds(15));
   }
 
   [Theory]
@@ -46,6 +49,13 @@ public sealed class MessagingPolicyTests
 
     action.Should().Throw<ArgumentOutOfRangeException>()
         .WithParameterName("retryBackoff");
+  }
+
+  [Fact]
+  public void MessageFailurePolicy_ShouldRejectNonPositiveHandlerTimeout()
+  {
+    var action = () => new MessageFailurePolicy(handlerTimeout: TimeSpan.Zero);
+    action.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("handlerTimeout");
   }
 
   [Fact]
