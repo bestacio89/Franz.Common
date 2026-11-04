@@ -16,7 +16,7 @@ namespace Franz.Common.Messaging.RabbitMQ;
 
 public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
 {
-  private bool _isInitialized;
+  private int _isInitialized;
   private readonly SemaphoreSlim _initLock = new(1, 1);
 
   private readonly IModelProvider _modelProvider;
@@ -48,17 +48,17 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
 
   public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
   {
-    if (_isInitialized) return;
+    if (Volatile.Read(ref _isInitialized) == 1) return;
     if (_options.ProvisioningMode == ProvisioningMode.Off)
     {
-      _isInitialized = true;
+      Volatile.Write(ref _isInitialized, 1);
       return;
     }
 
     await _initLock.WaitAsync(cancellationToken).ConfigureAwait(false);
     try
     {
-      if (_isInitialized) return;
+      if (Volatile.Read(ref _isInitialized) == 1) return;
 
       var channel = await _modelProvider.GetChannelAsync(cancellationToken).ConfigureAwait(false);
 
@@ -68,15 +68,15 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       }
       else
       {
-        await InitializeExchangeAsync(channel, _exchangeName, ExchangeType.Headers, true).ConfigureAwait(false);
-        await InitializeQueueAsync(channel, _queueName, _exchangeName, _deadLetterExchangeName, _deadLetterQueueName, _options.QueueDurable).ConfigureAwait(false);
-        await InitializeDeadLetterQueueAsync(channel, _deadLetterQueueName, _deadLetterExchangeName).ConfigureAwait(false);
+        await InitializeExchangeAsync(channel, _exchangeName, ExchangeType.Headers, true, cancellationToken).ConfigureAwait(false);
+        await InitializeQueueAsync(channel, _queueName, _exchangeName, _deadLetterExchangeName, _deadLetterQueueName, _options.QueueDurable, cancellationToken).ConfigureAwait(false);
+        await InitializeDeadLetterQueueAsync(channel, _deadLetterQueueName, _deadLetterExchangeName, cancellationToken).ConfigureAwait(false);
         if (string.Equals(_options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase))
-          await InitializeReplayTopologyAsync(channel).ConfigureAwait(false);
+          await InitializeReplayTopologyAsync(channel, cancellationToken).ConfigureAwait(false);
         await InitializeExchangesForSubscriptionsAsync(channel, cancellationToken).ConfigureAwait(false);
       }
 
-      _isInitialized = true;
+      Volatile.Write(ref _isInitialized, 1);
     }
     finally
     {
@@ -131,9 +131,10 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       IChannel channel,
       string exchangeName,
       string type,
-      bool durable)
+      bool durable,
+      CancellationToken cancellationToken)
   {
-    await channel.ExchangeDeclareAsync(exchangeName, type, durable: durable, autoDelete: false)
+    await channel.ExchangeDeclareAsync(exchangeName, type, durable: durable, autoDelete: false, cancellationToken: cancellationToken)
         .ConfigureAwait(false);
   }
 
@@ -143,7 +144,8 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       string exchangeName,
       string deadLetterExchange,
       string deadLetterQueue,
-      bool durable)
+      bool durable,
+      CancellationToken cancellationToken)
   {
     var args = CreateQueueArguments();
     args["x-dead-letter-exchange"] = deadLetterExchange;
@@ -154,19 +156,22 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
         durable,
         exclusive: false,
         autoDelete: false,
-        arguments: args).ConfigureAwait(false);
+        arguments: args,
+        cancellationToken: cancellationToken).ConfigureAwait(false);
   }
 
   private async ValueTask InitializeDeadLetterQueueAsync(
       IChannel channel,
       string deadLetterQueueName,
-      string deadLetterExchangeName)
+      string deadLetterExchangeName,
+      CancellationToken cancellationToken)
   {
     await channel.ExchangeDeclareAsync(
         deadLetterExchangeName,
         ExchangeType.Direct,
         durable: true,
-        autoDelete: false).ConfigureAwait(false);
+        autoDelete: false,
+        cancellationToken: cancellationToken).ConfigureAwait(false);
 
     await channel.QueueDeclareAsync(
         deadLetterQueueName,
@@ -176,19 +181,21 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
         arguments: new Dictionary<string, object?>
         {
           ["x-queue-type"] = GetQueueTypeName()
-        }).ConfigureAwait(false);
+        },
+        cancellationToken: cancellationToken).ConfigureAwait(false);
 
     await channel.QueueBindAsync(
         deadLetterQueueName,
         deadLetterExchangeName,
-        routingKey: deadLetterQueueName).ConfigureAwait(false);
+        routingKey: deadLetterQueueName,
+        cancellationToken: cancellationToken).ConfigureAwait(false);
   }
 
-  private async ValueTask InitializeReplayTopologyAsync(IChannel channel)
+  private async ValueTask InitializeReplayTopologyAsync(IChannel channel, CancellationToken cancellationToken)
   {
     var replayExchange = RabbitMQExchangeNamer.GetReplayExchangeName(_assemblyAccessor.GetEntryAssembly()
         ?? throw new InvalidOperationException("Entry assembly cannot be null."));
-    await channel.ExchangeDeclareAsync(replayExchange, ExchangeType.Direct, durable: true, autoDelete: false).ConfigureAwait(false);
+    await channel.ExchangeDeclareAsync(replayExchange, ExchangeType.Direct, durable: true, autoDelete: false, cancellationToken: cancellationToken).ConfigureAwait(false);
     for (var retryNumber = 1; retryNumber <= 3; retryNumber++)
     {
       var routingKey = ProgressiveFourStepReplayStrategy.GetRetryRoutingKey(_queueName, retryNumber);
@@ -200,8 +207,8 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
         ["x-dead-letter-exchange"] = string.Empty,
         ["x-dead-letter-routing-key"] = _queueName
       };
-      await channel.QueueDeclareAsync(retryQueue, durable: _options.QueueDurable, exclusive: false, autoDelete: false, arguments: arguments).ConfigureAwait(false);
-      await channel.QueueBindAsync(retryQueue, replayExchange, routingKey).ConfigureAwait(false);
+      await channel.QueueDeclareAsync(retryQueue, durable: _options.QueueDurable, exclusive: false, autoDelete: false, arguments: arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
+      await channel.QueueBindAsync(retryQueue, replayExchange, routingKey, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
   }
 
@@ -216,26 +223,28 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
 
     foreach (var eventType in integrationEvents)
     {
-      await InitializeExchangeForSubscriptionAsync(channel, eventType)
+      await InitializeExchangeForSubscriptionAsync(channel, eventType, cancellationToken)
           .ConfigureAwait(false);
     }
   }
 
-  private static async ValueTask InitializeExchangeForSubscriptionAsync(
+  private async ValueTask InitializeExchangeForSubscriptionAsync(
       IChannel channel,
-      Type integrationEventType)
+      Type integrationEventType,
+      CancellationToken cancellationToken)
   {
     var sourceExchange = RabbitMQExchangeNamer.GetEventExchangeName(integrationEventType.Assembly);
     var eventName = HeaderNamer.GetEventClassName(integrationEventType);
 
     await channel.QueueBindAsync(
-        queue: RabbitMQQueueNamer.GetQueueName(integrationEventType.Assembly),
+        queue: _queueName,
         exchange: sourceExchange,
         routingKey: string.Empty,
         arguments: new Dictionary<string, object?>
         {
           [MessagingConstants.ClassName] = eventName,
           ["x-match"] = "all"
-        }).ConfigureAwait(false);
+        },
+        cancellationToken: cancellationToken).ConfigureAwait(false);
   }
 }
