@@ -144,13 +144,20 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
   internal int MaxRetryAttempts => _maxRetryAttempts;
 
   internal static string GetRetryRoutingKey(string queueName, int retryNumber) => $"{queueName}-retry-{retryNumber}";
-  internal static int GetRetryDelayMilliseconds(int retryNumber) => retryNumber switch
+  internal static int GetRetryDelayMilliseconds(int retryNumber)
   {
-    1 => 1_000,
-    2 => 10_000,
-    3 => 60_000,
-    _ => throw new ArgumentOutOfRangeException(nameof(retryNumber))
-  };
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(retryNumber);
+
+    // Keep the progressive schedule bounded when a policy configures more than
+    // the three default retry stages. Custom policies can still provide a fixed
+    // RetryBackoff that is applied by the topology initializer.
+    return retryNumber switch
+    {
+      1 => 1_000,
+      2 => 10_000,
+      _ => 60_000
+    };
+  }
 
   private static string Truncate(string value) => value.Length <= MaxHeaderTextLength ? value : value[..MaxHeaderTextLength];
 
