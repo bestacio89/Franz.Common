@@ -267,7 +267,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
     var verificationChannel = await channelPool.GetAsync();
     try
     {
-      var retryQueue = await verificationChannel.QueueDeclarePassiveAsync($"{queueName}-retry-5");
+      var retryQueue = await verificationChannel.QueueDeclarePassiveAsync($"{queueName}-retry-3");
       retryQueue.MessageCount.Should().Be(1);
     }
     finally
