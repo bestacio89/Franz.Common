@@ -95,6 +95,65 @@ public sealed class KafkaMessagingInitializerIntegrationTests
         BootstrapServers = _fixture.BootstrapServers
       }).Build();
 
+
+  [Fact]
+  public async Task InitializeAsync_ShouldApplyConfiguredPartitionCountAndReplicationFactor()
+  {
+    var options = new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = "configured-topic",
+      Failure = { DeadLetterTopic = "configured-topic-dlt" },
+      Topic = new KafkaTopicOptions
+      {
+        NumPartitions = 3,
+        ReplicationFactor = 1,
+        Configurations = new Dictionary<string, string> { ["cleanup.policy"] = "compact" }
+      }
+    };
+
+    var sut = CreateSut(options: options);
+    await sut.InitializeAsync();
+
+    using var admin = BuildAdminClient();
+    var metadata = admin.GetMetadata(TimeSpan.FromSeconds(10));
+    var topic = metadata.Topics.Should().ContainSingle(item => item.Topic == "configured-topic").Which;
+
+    topic.Partitions.Should().HaveCount(3);
+    topic.Partitions.Should().OnlyContain(partition => partition.Replicas.Count() == 1);
+
+    var config = await admin.DescribeConfigsAsync(new[]
+    {
+      new ConfigResource { Name = "configured-topic", Type = ResourceType.Topic }
+    });
+    config.Should().ContainSingle();
+    config[0].Entries["cleanup.policy"].Value.Should().Be("compact");
+  }
+
+  [Fact]
+  public async Task InitializeAsync_ShouldRespectCancellationBeforeProvisioning()
+  {
+    var topicName = $"cancellation-{Guid.NewGuid():N}";
+    var deadLetterTopicName = $"{topicName}-dlt";
+    var sut = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      Failure = { DeadLetterTopic = deadLetterTopicName }
+    });
+    using var cancellation = new CancellationTokenSource();
+    cancellation.Cancel();
+
+    var action = () => sut.InitializeAsync(cancellation.Token).AsTask();
+
+    await action.Should().ThrowAsync<OperationCanceledException>();
+    using var admin = BuildAdminClient();
+    admin.GetMetadata(TimeSpan.FromSeconds(10)).Topics
+        .Should().NotContain(topic => topic.Topic == topicName);
+  }
+
   // =========================================================
   // SYSTEM MODE TESTS
   // =========================================================
@@ -121,6 +180,16 @@ public sealed class KafkaMessagingInitializerIntegrationTests
     await sut.InitializeAsync();
 
     true.Should().BeTrue();
+  }
+
+  [Fact]
+  public void GeneratedManifest_ShouldIncludeIntegrationEventDestinationsAndSubscriptions()
+  {
+    var manifest = Franz.Common.Messaging.Manifest.MessagingManifestRegistry.Get(
+        typeof(TestIntegrationEventHandler).Assembly);
+
+    manifest.Destinations.Should().Contain(typeof(TestIntegrationEvent));
+    manifest.Subscriptions.Should().Contain(typeof(TestIntegrationEvent));
   }
 
   [Fact]

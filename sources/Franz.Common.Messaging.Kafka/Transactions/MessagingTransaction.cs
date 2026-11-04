@@ -96,6 +96,7 @@ public sealed class MessagingTransaction : IMessagingTransaction
     await _gate.WaitAsync(ct).ConfigureAwait(false);
     try
     {
+      ThrowIfDisposed();
       if (!_isActive)
         return;
 

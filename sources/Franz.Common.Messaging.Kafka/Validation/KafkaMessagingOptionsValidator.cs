@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 namespace Franz.Common.Messaging.Kafka.Validation;
 
 /// <summary>
-/// Validates Kafka transport security before any Kafka client is constructed.
+/// Validates Kafka transport security and consumer retry timing before a Kafka client is constructed.
 /// </summary>
 public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessagingOptions>
 {
@@ -60,6 +60,77 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
     if (string.IsNullOrWhiteSpace(security.SslCertificateLocation)
         != string.IsNullOrWhiteSpace(security.SslKeyLocation))
       failures.Add("SslCertificateLocation and SslKeyLocation must be configured together.");
+
+    if (options.Consumer is null)
+      failures.Add("Consumer options must be configured.");
+
+    if (options.Producer is null)
+      failures.Add("Producer options must be configured.");
+
+    if (options.Failure is null)
+      failures.Add("Failure options must be configured.");
+
+    if (options.Topic is null)
+      failures.Add("Topic options must be configured.");
+    else
+    {
+      if (options.Topic.NumPartitions < 1)
+        failures.Add("Topic:NumPartitions must be greater than zero.");
+      if (options.Topic.ReplicationFactor < 1)
+        failures.Add("Topic:ReplicationFactor must be greater than zero.");
+      if (options.Topic.CreationTimeoutMs < 100 || options.Topic.CreationTimeoutMs > 300000)
+        failures.Add("Topic:CreationTimeoutMs must be between 100 and 300000 milliseconds.");
+      if (options.Topic.Configurations is null)
+        failures.Add("Topic:Configurations cannot be null.");
+      else if (options.Topic.Configurations.Any(pair =>
+          string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
+        failures.Add("Topic:Configurations must contain non-empty keys and non-null values.");
+    }
+
+    if (options.Consumer is null || options.Failure is null || options.Producer is null)
+      return ValidateOptionsResult.Fail(failures);
+
+    if (options.Producer.DeliveryTimeoutMs <= 0 || options.Producer.DeliveryTimeoutMs > 900000)
+      failures.Add("Producer:DeliveryTimeoutMs must be between 1 and 900000 milliseconds.");
+    if (options.Producer.TransactionTimeoutMs <= 0 || options.Producer.TransactionTimeoutMs > 900000)
+      failures.Add("Producer:TransactionTimeoutMs must be between 1 and 900000 milliseconds.");
+    else if (options.Producer.DeliveryTimeoutMs > options.Producer.TransactionTimeoutMs)
+      failures.Add("Producer:DeliveryTimeoutMs must be less than or equal to Producer:TransactionTimeoutMs for transactional producers.");
+
+    if (options.Consumer.MaxPollIntervalMs <= 0)
+      failures.Add("Consumer:MaxPollIntervalMs must be greater than zero.");
+
+    if (!Enum.IsDefined(options.ProvisioningMode))
+      failures.Add("ProvisioningMode must be a defined value.");
+    if (options.OrderingStrategy.HasValue && !Enum.IsDefined(options.OrderingStrategy.Value))
+      failures.Add("OrderingStrategy must be a defined MessageOrderingStrategy value.");
+
+    var maxRetryAttempts = options.FailurePolicy?.MaxRetryAttempts ?? options.Failure.MaxRetryAttempts;
+    var retryBackoffMilliseconds = options.FailurePolicy?.RetryBackoff.TotalMilliseconds
+        ?? options.Failure.RetryBackoffMs;
+    var handlerTimeoutMilliseconds = options.FailurePolicy?.HandlerTimeout?.TotalMilliseconds
+        ?? options.Failure.HandlerTimeoutMs;
+
+    if (maxRetryAttempts < 0)
+      failures.Add("Failure:MaxRetryAttempts cannot be negative.");
+    if (retryBackoffMilliseconds < 0)
+      failures.Add("Failure:RetryBackoffMs cannot be negative.");
+    if (handlerTimeoutMilliseconds < 0)
+      failures.Add("Failure:HandlerTimeoutMs cannot be negative.");
+
+    // A single synchronous Consume/handler loop must finish its configured retry
+    // and cooperative timeout budget before Kafka revokes the consumer's partitions.
+    if (options.Consumer.MaxPollIntervalMs > 0 &&
+        maxRetryAttempts >= 0 &&
+        retryBackoffMilliseconds >= 0 &&
+        handlerTimeoutMilliseconds >= 0)
+    {
+      var retryBudgetMilliseconds = maxRetryAttempts * retryBackoffMilliseconds
+          + (maxRetryAttempts + 1) * handlerTimeoutMilliseconds;
+
+      if (retryBudgetMilliseconds >= options.Consumer.MaxPollIntervalMs)
+        failures.Add($"Kafka handler timeout and retry backoff budget ({retryBudgetMilliseconds} ms) must be less than Consumer:MaxPollIntervalMs ({options.Consumer.MaxPollIntervalMs} ms).");
+    }
 
     return failures.Count == 0
         ? ValidateOptionsResult.Success

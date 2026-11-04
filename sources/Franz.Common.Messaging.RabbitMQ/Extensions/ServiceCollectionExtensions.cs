@@ -108,6 +108,26 @@ public static class ServiceCollectionExtensions
         .Validate(options =>
             options.MaxConcurrency > 0 && options.MaxConcurrency <= ushort.MaxValue,
             "Messaging:RabbitMQ:MaxConcurrency must be between 1 and 65535.")
+        .Validate(options => Enum.IsDefined(options.QueueType),
+            "Messaging:RabbitMQ:QueueType must be Quorum or Classic.")
+        .Validate(options => options.MessageTtlMilliseconds is null or > 0,
+            "Messaging:RabbitMQ:MessageTtlMilliseconds must be greater than zero when configured.")
+        .Validate(options => options.MaxLength is null or > 0,
+            "Messaging:RabbitMQ:MaxLength must be greater than zero when configured.")
+        .Validate(options => options.MaxLengthBytes is null or > 0,
+            "Messaging:RabbitMQ:MaxLengthBytes must be greater than zero when configured.")
+        .Validate(options => options.DeliveryLimit is null or > 0,
+            "Messaging:RabbitMQ:DeliveryLimit must be greater than zero when configured.")
+        .Validate(options => options.DeliveryLimit is null || options.QueueType == RabbitMQQueueType.Quorum,
+            "Messaging:RabbitMQ:DeliveryLimit is supported only for quorum queues.")
+        .Validate(options => options.OrderingStrategy is null || Enum.IsDefined(options.OrderingStrategy.Value),
+            "Messaging:RabbitMQ:OrderingStrategy must be a defined MessageOrderingStrategy value.")
+        .Validate(options => options.OrderingStrategy is null or MessageOrderingStrategy.None || options.MaxConcurrency == 1,
+            "RabbitMQ preserves configured ordering only when MaxConcurrency is 1.")
+        .Validate(options => options.FailurePolicy is null ||
+            options.FailurePolicy.MaxRetryAttempts == 0 ||
+            string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase),
+            "RabbitMQ FailurePolicy retries require ReplayStrategy=ProgressiveFourStep.")
         .ValidateOnStart();
 
     return services;

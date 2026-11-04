@@ -27,6 +27,7 @@ public sealed class KafkaTransactionProducerFactory : IKafkaTransactionProducerF
         ? "franz"
         : _options.Producer.TransactionalIdPrefix.Trim();
     config.TransactionalId = $"{prefix}-{Environment.MachineName}-{Guid.NewGuid():N}";
+    config.TransactionTimeoutMs = _options.Producer.TransactionTimeoutMs;
 
     var producer = new ProducerBuilder<string, byte[]>(config)
         .SetKeySerializer(Serializers.Utf8)

@@ -2,6 +2,7 @@
 using FluentAssertions;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
@@ -289,6 +290,52 @@ public sealed class ServiceRegistrationTests
 
     await act.Should().ThrowAsync<OptionsValidationException>()
         .WithMessage("*MaxConcurrency*");
+  }
+
+  [Fact]
+  public void RabbitMQMessagingOptions_ShouldExposeSafeTopologyDefaults()
+  {
+    var options = new RabbitMQMessagingOptions();
+
+    options.ProvisioningMode.Should().Be(ProvisioningMode.Create);
+    options.QueueDurable.Should().BeTrue();
+    options.QueueType.Should().Be(RabbitMQQueueType.Quorum);
+    options.MaxConcurrency.Should().Be(1);
+  }
+
+  [Fact]
+  public async Task AddRabbitMQMessaging_ShouldRejectOrderedConsumptionWithConcurrentHandlers()
+  {
+    RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.OrderedConsumption)
+        .Should().BeTrue("the default single-consumer configuration preserves queue order");
+
+    using var host = CreateHost(new Dictionary<string, string?>
+    {
+      ["Messaging:RabbitMQ:BootStrapServers"] = _fixture.ConnectionString,
+      ["Messaging:RabbitMQ:MaxConcurrency"] = "2",
+      ["Messaging:RabbitMQ:OrderingStrategy"] = "AggregateId"
+    });
+
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>()
+        .WithMessage("*MaxConcurrency is 1*");
+  }
+
+  [Fact]
+  public async Task AddRabbitMQMessaging_ShouldRejectDeliveryLimitForClassicQueues()
+  {
+    using var host = CreateHost(new Dictionary<string, string?>
+    {
+      ["Messaging:RabbitMQ:BootStrapServers"] = _fixture.ConnectionString,
+      ["Messaging:RabbitMQ:QueueType"] = "Classic",
+      ["Messaging:RabbitMQ:DeliveryLimit"] = "5"
+    });
+
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>()
+        .WithMessage("*only for quorum queues*");
   }
 
   [Fact]

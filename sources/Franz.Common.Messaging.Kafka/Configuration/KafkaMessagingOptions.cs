@@ -1,5 +1,6 @@
 #nullable enable
 using System.ComponentModel.DataAnnotations;
+using Franz.Common.Messaging.Configuration;
 
 namespace Franz.Common.Messaging.Kafka.Configuration;
 
@@ -20,6 +21,10 @@ public class KafkaMessagingOptions
   [Required] public KafkaProducerOptions Producer { get; set; } = new();
   public KafkaFailureOptions Failure { get; set; } = new();
   public KafkaObservabilityOptions Observability { get; set; } = new();
+  public KafkaTopicOptions Topic { get; set; } = new();
+  public ProvisioningMode ProvisioningMode { get; set; } = ProvisioningMode.Create;
+  public MessageFailurePolicy? FailurePolicy { get; set; }
+  public MessageOrderingStrategy? OrderingStrategy { get; set; }
 }
 
 public class KafkaSecurityOptions
@@ -97,6 +102,11 @@ public class KafkaProducerOptions
 
   [Range(1, 900000)]
   public int DeliveryTimeoutMs { get; set; } = 120000;
+
+  /// <summary>Maximum duration of a Kafka transaction, in milliseconds. Must be at least the producer delivery timeout.</summary>
+  [Range(1, 900000)]
+  public int TransactionTimeoutMs { get; set; } = 120000;
+
   public string? DefaultKey { get; set; }
 }
 
@@ -104,7 +114,8 @@ public enum KafkaMessageKeyStrategy
 {
   MessageId,
   CorrelationId,
-  AggregateId
+  AggregateId,
+  None
 }
 
 public enum KafkaAcks { None, Leader, All }
@@ -122,6 +133,10 @@ public class KafkaFailureOptions
   public int RetryBackoffMs { get; set; } = 500;
 
   public bool UseOriginalMessageKey { get; set; } = true;
+
+  /// <summary>Optional cooperative handler timeout in milliseconds; zero disables it.</summary>
+  [Range(0, 900000)]
+  public int HandlerTimeoutMs { get; set; }
 }
 
 public class KafkaObservabilityOptions
@@ -130,4 +145,18 @@ public class KafkaObservabilityOptions
   public bool EnableTracing { get; set; } = true;
   public bool EnableLogging { get; set; } = true;
   public bool LogMessagePayloads { get; set; } = false;
+}
+public class KafkaTopicOptions
+{
+  [Range(1, 10000)]
+  public int NumPartitions { get; set; } = 1;
+
+  [Range(1, short.MaxValue)]
+  public short ReplicationFactor { get; set; } = 1;
+
+  [Range(100, 300000)]
+  public int CreationTimeoutMs { get; set; } = 30000;
+
+  /// <summary>Topic configuration keys and values passed to Kafka topic creation.</summary>
+  public Dictionary<string, string> Configurations { get; set; } = new(StringComparer.Ordinal);
 }

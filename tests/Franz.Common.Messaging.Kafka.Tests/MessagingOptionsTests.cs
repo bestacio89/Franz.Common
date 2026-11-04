@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -53,6 +53,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       options.Producer.MessageSendMaxRetries.Should().Be(3);
       options.Producer.RetryBackoffMs.Should().Be(100);
       options.Producer.DeliveryTimeoutMs.Should().Be(120000);
+      options.Producer.TransactionTimeoutMs.Should().Be(120000);
 
       // Failure defaults
       options.Failure.EnableDeadLetter.Should().BeTrue();
@@ -99,6 +100,50 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       isValid.Should().BeFalse();
       results.Should().ContainSingle(r => r.MemberNames.Contains(nameof(KafkaConsumerOptions.SessionTimeoutMs)));
       results.Should().ContainSingle(r => r.MemberNames.Contains(nameof(KafkaConsumerOptions.MaxPollIntervalMs)));
+    }
+
+
+    [Fact]
+    public void KafkaProducerOptions_ShouldRejectDeliveryTimeoutGreaterThanTransactionTimeout()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Producer = new KafkaProducerOptions
+        {
+          DeliveryTimeoutMs = 120001,
+          TransactionTimeoutMs = 120000
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message =>
+          message.Contains("DeliveryTimeoutMs", StringComparison.Ordinal) &&
+          message.Contains("TransactionTimeoutMs", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void KafkaProducerOptions_ShouldAcceptDeliveryTimeoutEqualToTransactionTimeout()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Producer = new KafkaProducerOptions
+        {
+          DeliveryTimeoutMs = 120000,
+          TransactionTimeoutMs = 120000
+        }
+      };
+
+      new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options).Failed.Should().BeFalse();
     }
 
     [Fact]
@@ -242,6 +287,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       failure.MaxRetryAttempts.Should().Be(3);
       failure.RetryBackoffMs.Should().Be(500);
       failure.UseOriginalMessageKey.Should().BeTrue();
+      failure.HandlerTimeoutMs.Should().Be(0);
     }
 
     [Fact]
@@ -254,5 +300,180 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       obs.EnableLogging.Should().BeTrue();
       obs.LogMessagePayloads.Should().BeFalse();
     }
+
+    [Fact]
+    public void KafkaFailureOptions_ShouldReject_RetryBackoffBudgetThatExceedsMaxPollInterval()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions
+        {
+          SecurityProtocol = KafkaSecurityProtocol.Ssl
+        },
+        Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
+        Failure = new KafkaFailureOptions { MaxRetryAttempts = 3, RetryBackoffMs = 334 }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message =>
+          message.Contains("retry backoff budget", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void KafkaFailureOptions_ShouldAccept_RetryBackoffBudgetBelowMaxPollInterval()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions
+        {
+          SecurityProtocol = KafkaSecurityProtocol.Ssl
+        },
+        Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
+        Failure = new KafkaFailureOptions { MaxRetryAttempts = 3, RetryBackoffMs = 333 }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void KafkaFailureOptions_ShouldAllowZeroRetryBudget()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions
+        {
+          SecurityProtocol = KafkaSecurityProtocol.Ssl
+        },
+        Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
+        Failure = new KafkaFailureOptions { MaxRetryAttempts = 0, RetryBackoffMs = 60000 }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void KafkaFailureOptions_ShouldIncludeHandlerTimeoutInMaxPollBudget()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
+        Failure = new KafkaFailureOptions
+        {
+          MaxRetryAttempts = 3,
+          RetryBackoffMs = 100,
+          HandlerTimeoutMs = 200
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message => message.Contains("budget", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void KafkaFailureOptions_ShouldAcceptHandlerAndRetryBudgetBelowMaxPollInterval()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
+        Failure = new KafkaFailureOptions
+        {
+          MaxRetryAttempts = 3,
+          RetryBackoffMs = 100,
+          HandlerTimeoutMs = 100
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void KafkaTopicOptions_ShouldHaveSafeDefaults()
+    {
+      var topic = new KafkaTopicOptions();
+      topic.NumPartitions.Should().Be(1);
+      topic.ReplicationFactor.Should().Be(1);
+      topic.CreationTimeoutMs.Should().Be(30000);
+      topic.Configurations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void KafkaTopicOptions_ShouldRejectInvalidProvisioningValues()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Topic = new KafkaTopicOptions
+        {
+          NumPartitions = 0,
+          ReplicationFactor = 0,
+          CreationTimeoutMs = 0
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message => message.Contains("NumPartitions"));
+      result.Failures.Should().Contain(message => message.Contains("ReplicationFactor"));
+      result.Failures.Should().Contain(message => message.Contains("CreationTimeoutMs"));
+    }
+
+    [Theory]
+    [InlineData(-1, 500)]
+    [InlineData(3, -1)]
+    public void KafkaFailureOptions_ShouldRejectNegativeRetrySettings(int attempts, int backoffMs)
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Failure = new KafkaFailureOptions
+        {
+          MaxRetryAttempts = attempts,
+          RetryBackoffMs = backoffMs
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      if (attempts < 0)
+        result.Failures.Should().Contain(message => message.Contains("MaxRetryAttempts"));
+      if (backoffMs < 0)
+        result.Failures.Should().Contain(message => message.Contains("RetryBackoffMs"));
+    }
+
   }
 }

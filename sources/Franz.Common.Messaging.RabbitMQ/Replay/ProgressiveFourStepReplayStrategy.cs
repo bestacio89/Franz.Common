@@ -1,5 +1,6 @@
 #nullable enable
 using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Reflection;
@@ -23,6 +24,9 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
   private readonly string _queueName;
   private readonly string _replayExchange;
   private readonly string _deadLetterQueue;
+  private readonly int _maxRetryAttempts = 3;
+  private readonly int? _retryBackoffMilliseconds;
+  private readonly bool _deadLetterOnExhaustion = true;
 
   // Compatibility constructor for existing consumers. Framework DI uses the confirmed-channel overload.
   public ProgressiveFourStepReplayStrategy(IModelProvider provider, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
@@ -50,10 +54,16 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
     ArgumentNullException.ThrowIfNull(options);
     var settings = options.Value;
     var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-    _queueName = settings.QueueName ?? QueueNamer.GetQueueName(entry);
-    _replayExchange = ExchangeNamer.GetReplayExchangeName(entry);
-    _deadLetterQueue = settings.DeadLetterQueueName ?? QueueNamer.GetDeadLetterQueueName(entry);
+    _queueName = settings.QueueName ?? RabbitMQQueueNamer.GetQueueName(entry);
+    _replayExchange = RabbitMQExchangeNamer.GetReplayExchangeName(entry);
+    _deadLetterQueue = settings.DeadLetterQueueName ?? RabbitMQQueueNamer.GetDeadLetterQueueName(entry);
     _publisherConfirmTimeoutSeconds = settings.PublisherConfirmTimeoutSeconds;
+    if (settings.FailurePolicy is { } policy)
+    {
+      _maxRetryAttempts = policy.MaxRetryAttempts;
+      _retryBackoffMilliseconds = checked((int)Math.Ceiling(policy.RetryBackoff.TotalMilliseconds));
+      _deadLetterOnExhaustion = policy.DeadLetterOnExhaustion;
+    }
   }
 
   private static (string Queue, string ReplayExchange, string DeadLetterQueue) ResolveTopology(
@@ -62,8 +72,8 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
     ArgumentNullException.ThrowIfNull(accessor);
     ArgumentNullException.ThrowIfNull(options);
     var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-    return (QueueNamer.GetQueueName(entry), ExchangeNamer.GetReplayExchangeName(entry),
-        QueueNamer.GetDeadLetterQueueName(entry));
+    return (RabbitMQQueueNamer.GetQueueName(entry), RabbitMQExchangeNamer.GetReplayExchangeName(entry),
+        RabbitMQQueueNamer.GetDeadLetterQueueName(entry));
   }
 
   public async Task ReplayAsync(BasicDeliverEventArgs e, Exception ex)
@@ -82,8 +92,11 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
 
     string exchange;
     string routingKey;
-    if (replayCount >= 4)
+    if (replayCount > _maxRetryAttempts)
     {
+      if (!_deadLetterOnExhaustion)
+        return;
+
       headers[ExceptionMessageHeader] = Truncate(ex.Message);
       headers[ExceptionStackTraceHeader] = Truncate(ex.StackTrace ?? string.Empty);
       exchange = string.Empty;
@@ -92,7 +105,9 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
     else
     {
       exchange = _replayExchange;
-      routingKey = GetRetryRoutingKey(_queueName, replayCount);
+      // Retry count remains policy-driven, while the broker topology reuses
+      // the third (longest) delay stage for every subsequent retry.
+      routingKey = GetRetryRoutingKey(_queueName, Math.Min(replayCount, 3));
     }
 
     IChannel channel;
@@ -125,14 +140,26 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
     }
   }
 
+  internal int GetConfiguredRetryDelayMilliseconds(int retryNumber)
+      => _retryBackoffMilliseconds ?? GetRetryDelayMilliseconds(retryNumber);
+
+  internal int MaxRetryAttempts => _maxRetryAttempts;
+
   internal static string GetRetryRoutingKey(string queueName, int retryNumber) => $"{queueName}-retry-{retryNumber}";
-  internal static int GetRetryDelayMilliseconds(int retryNumber) => retryNumber switch
+  internal static int GetRetryDelayMilliseconds(int retryNumber)
   {
-    1 => 1_000,
-    2 => 10_000,
-    3 => 60_000,
-    _ => throw new ArgumentOutOfRangeException(nameof(retryNumber))
-  };
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(retryNumber);
+
+    // Keep the progressive schedule bounded when a policy configures more than
+    // the three default retry stages. Custom policies can still provide a fixed
+    // RetryBackoff that is applied by the topology initializer.
+    return retryNumber switch
+    {
+      1 => 1_000,
+      2 => 10_000,
+      _ => 60_000
+    };
+  }
 
   private static string Truncate(string value) => value.Length <= MaxHeaderTextLength ? value : value[..MaxHeaderTextLength];
 

@@ -1,6 +1,7 @@
 #nullable enable
 using Confluent.Kafka;
 using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Transactions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
@@ -46,8 +47,7 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
           producer,
           serializer,
           assemblyAccessor,
-          options?.Value?.Producer?.MessageKeyStrategy
-              ?? throw new ArgumentNullException(nameof(options)),
+          ResolveKeyStrategy(options),
           logger,
           null)
   {
@@ -64,8 +64,7 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
           producer,
           serializer,
           assemblyAccessor,
-          options?.Value?.Producer?.MessageKeyStrategy
-              ?? throw new ArgumentNullException(nameof(options)),
+          ResolveKeyStrategy(options),
           logger,
           transactionContext ?? throw new ArgumentNullException(nameof(transactionContext)))
   {
@@ -125,9 +124,24 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
     }
   }
 
-  private static string ResolveMessageKey(Message message, KafkaMessageKeyStrategy strategy)
+  private static KafkaMessageKeyStrategy ResolveKeyStrategy(IOptions<KafkaMessagingOptions> options)
+  {
+    var settings = options?.Value ?? throw new ArgumentNullException(nameof(options));
+    return settings.OrderingStrategy switch
+    {
+      null => settings.Producer.MessageKeyStrategy,
+      MessageOrderingStrategy.None => KafkaMessageKeyStrategy.None,
+      MessageOrderingStrategy.MessageId => KafkaMessageKeyStrategy.MessageId,
+      MessageOrderingStrategy.CorrelationId => KafkaMessageKeyStrategy.CorrelationId,
+      MessageOrderingStrategy.AggregateId => KafkaMessageKeyStrategy.AggregateId,
+      _ => throw new ArgumentOutOfRangeException(nameof(options), settings.OrderingStrategy, "Unsupported message ordering strategy.")
+    };
+  }
+
+  private static string? ResolveMessageKey(Message message, KafkaMessageKeyStrategy strategy)
       => strategy switch
       {
+        KafkaMessageKeyStrategy.None => null,
         KafkaMessageKeyStrategy.MessageId => message.Id.ToString(),
         KafkaMessageKeyStrategy.CorrelationId => message.CorrelationId?.ToString()
             ?? throw new InvalidOperationException(
