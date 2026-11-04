@@ -87,6 +87,15 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
     if (options.Consumer is null || options.Failure is null)
       return ValidateOptionsResult.Fail(failures);
 
+    if (options.Consumer.MaxPollIntervalMs <= 0)
+      failures.Add("Consumer:MaxPollIntervalMs must be greater than zero.");
+
+    if (options.Failure.MaxRetryAttempts < 0)
+      failures.Add("Failure:MaxRetryAttempts cannot be negative.");
+
+    if (options.Failure.RetryBackoffMs < 0)
+      failures.Add("Failure:RetryBackoffMs cannot be negative.");
+
     // The listener performs MaxRetryAttempts delays between attempts. That delay budget
     // must fit strictly inside MaxPollIntervalMs so the consumer can continue polling
     // and retain partition ownership while retrying a failed handler.

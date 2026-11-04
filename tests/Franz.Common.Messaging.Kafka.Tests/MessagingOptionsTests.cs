@@ -354,5 +354,33 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       result.Failures.Should().Contain(message => message.Contains("ReplicationFactor"));
       result.Failures.Should().Contain(message => message.Contains("CreationTimeoutMs"));
     }
+
+    [Theory]
+    [InlineData(-1, 500)]
+    [InlineData(3, -1)]
+    public void KafkaFailureOptions_ShouldRejectNegativeRetrySettings(int attempts, int backoffMs)
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Failure = new KafkaFailureOptions
+        {
+          MaxRetryAttempts = attempts,
+          RetryBackoffMs = backoffMs
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      if (attempts < 0)
+        result.Failures.Should().Contain(message => message.Contains("MaxRetryAttempts"));
+      if (backoffMs < 0)
+        result.Failures.Should().Contain(message => message.Contains("RetryBackoffMs"));
+    }
+
   }
 }
