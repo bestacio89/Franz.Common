@@ -200,7 +200,8 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
     var replayExchange = RabbitMQExchangeNamer.GetReplayExchangeName(_assemblyAccessor.GetEntryAssembly()
         ?? throw new InvalidOperationException("Entry assembly cannot be null."));
     await channel.ExchangeDeclareAsync(replayExchange, ExchangeType.Direct, durable: true, autoDelete: false, cancellationToken: cancellationToken).ConfigureAwait(false);
-    for (var retryNumber = 1; retryNumber <= 3; retryNumber++)
+    var retryAttempts = _options.FailurePolicy?.MaxRetryAttempts ?? 3;
+    for (var retryNumber = 1; retryNumber <= retryAttempts; retryNumber++)
     {
       var routingKey = ProgressiveFourStepReplayStrategy.GetRetryRoutingKey(_queueName, retryNumber);
       var retryQueue = $"{_queueName}-retry-{retryNumber}";
