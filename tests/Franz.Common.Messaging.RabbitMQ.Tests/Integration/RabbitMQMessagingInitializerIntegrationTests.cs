@@ -8,7 +8,6 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Franz.Common.Messaging.Manifest;
 using Franz.Common.Messaging.RabbitMQ;
-using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.DependencyInjection;
