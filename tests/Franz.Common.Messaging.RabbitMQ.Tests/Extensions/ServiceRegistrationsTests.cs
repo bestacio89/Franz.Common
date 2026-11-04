@@ -292,6 +292,49 @@ public sealed class ServiceRegistrationTests
   }
 
   [Fact]
+  public void RabbitMQMessagingOptions_ShouldExposeSafeTopologyDefaults()
+  {
+    var options = new RabbitMQMessagingOptions();
+
+    options.ProvisioningMode.Should().Be(ProvisioningMode.Create);
+    options.QueueDurable.Should().BeTrue();
+    options.QueueType.Should().Be(RabbitMQQueueType.Quorum);
+    options.MaxConcurrency.Should().Be(1);
+  }
+
+  [Fact]
+  public async Task AddRabbitMQMessaging_ShouldRejectOrderedConsumptionWithConcurrentHandlers()
+  {
+    using var host = CreateHost(new Dictionary<string, string?>
+    {
+      ["Messaging:RabbitMQ:BootStrapServers"] = _fixture.ConnectionString,
+      ["Messaging:RabbitMQ:MaxConcurrency"] = "2",
+      ["Messaging:RabbitMQ:OrderingStrategy"] = "AggregateId"
+    });
+
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>()
+        .WithMessage("*MaxConcurrency is 1*");
+  }
+
+  [Fact]
+  public async Task AddRabbitMQMessaging_ShouldRejectDeliveryLimitForClassicQueues()
+  {
+    using var host = CreateHost(new Dictionary<string, string?>
+    {
+      ["Messaging:RabbitMQ:BootStrapServers"] = _fixture.ConnectionString,
+      ["Messaging:RabbitMQ:QueueType"] = "Classic",
+      ["Messaging:RabbitMQ:DeliveryLimit"] = "5"
+    });
+
+    var act = () => host.StartAsync();
+
+    await act.Should().ThrowAsync<OptionsValidationException>()
+        .WithMessage("*only for quorum queues*");
+  }
+
+  [Fact]
   public void AddRabbitMQMessaging_ShouldBeIdempotent()
   {
     _services.AddRabbitMQMessaging(_configuration);
