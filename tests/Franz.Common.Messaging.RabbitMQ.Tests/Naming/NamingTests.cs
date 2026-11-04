@@ -3,7 +3,7 @@ using Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure;
 using System.Reflection;
 using Xunit;
 using Xunit;
-using Franz.Common.Messaging.RabbitMQ;
+using Franz.Common.Messaging;
 using Franz.Common.Reflection;
 
 namespace Franz.Common.Messaging.RabbitMQ.Tests.Naming;
