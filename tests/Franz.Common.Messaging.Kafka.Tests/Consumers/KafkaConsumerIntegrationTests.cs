@@ -93,7 +93,14 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
 
     using var consumer = factory.Build();
     consumer.Subscribe(topic);
-    _ = consumer.Consume(TimeSpan.FromSeconds(2));
+    try
+    {
+      _ = consumer.Consume(TimeSpan.FromSeconds(2));
+    }
+    catch (ConsumeException exception) when (exception.Error.Code == ErrorCode.UnknownTopicOrPart)
+    {
+      // The broker correctly rejects metadata for a topic that does not exist.
+    }
 
     using var admin = new AdminClientBuilder(new AdminClientConfig
     {
