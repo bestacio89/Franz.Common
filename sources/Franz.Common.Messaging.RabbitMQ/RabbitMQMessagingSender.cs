@@ -51,7 +51,7 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
     ArgumentNullException.ThrowIfNull(message.Body);
 
     await _handler.ProcessAsync(message, cancellationToken).ConfigureAwait(false);
-    var queue = QueueNamer.GetQueueName(message.Kind);
+    var queue = RabbitMQQueueNamer.GetQueueName(message.Kind);
 
     var advancedPool = _channelPool as Connections.IConfirmChannelPool;
     var dedicatedChannel = advancedPool is not null;

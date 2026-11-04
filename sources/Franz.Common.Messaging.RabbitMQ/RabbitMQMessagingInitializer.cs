@@ -47,10 +47,10 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
     var assembly = _assemblyAccessor.GetEntryAssembly()
         ?? throw new InvalidOperationException("Entry assembly cannot be null.");
 
-    _exchangeName = _options.ExchangeName ?? ExchangeNamer.GetEventExchangeName(assembly);
-    _queueName = _options.QueueName ?? QueueNamer.GetQueueName(assembly);
-    _deadLetterQueueName = _options.DeadLetterQueueName ?? QueueNamer.GetDeadLetterQueueName(assembly);
-    _deadLetterExchangeName = _options.DeadLetterExchangeName ?? ExchangeNamer.GetDeadLetterExchangeName(assembly);
+    _exchangeName = _options.ExchangeName ?? RabbitMQExchangeNamer.GetEventExchangeName(assembly);
+    _queueName = _options.QueueName ?? RabbitMQQueueNamer.GetQueueName(assembly);
+    _deadLetterQueueName = _options.DeadLetterQueueName ?? RabbitMQQueueNamer.GetDeadLetterQueueName(assembly);
+    _deadLetterExchangeName = _options.DeadLetterExchangeName ?? RabbitMQExchangeNamer.GetDeadLetterExchangeName(assembly);
   }
 
   public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
@@ -141,7 +141,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
 
   private async ValueTask InitializeReplayTopologyAsync(IChannel channel)
   {
-    var replayExchange = ExchangeNamer.GetReplayExchangeName(_assemblyAccessor.GetEntryAssembly()
+    var replayExchange = RabbitMQExchangeNamer.GetReplayExchangeName(_assemblyAccessor.GetEntryAssembly()
         ?? throw new InvalidOperationException("Entry assembly cannot be null."));
     await channel.ExchangeDeclareAsync(replayExchange, ExchangeType.Direct, durable: true, autoDelete: false).ConfigureAwait(false);
     for (var retryNumber = 1; retryNumber <= 3; retryNumber++)
@@ -197,11 +197,11 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       IChannel channel,
       Type integrationEventType)
   {
-    var sourceExchange = ExchangeNamer.GetEventExchangeName(integrationEventType.Assembly);
+    var sourceExchange = RabbitMQExchangeNamer.GetEventExchangeName(integrationEventType.Assembly);
     var eventName = HeaderNamer.GetEventClassName(integrationEventType);
 
     await channel.QueueBindAsync(
-        queue: QueueNamer.GetQueueName(integrationEventType.Assembly),
+        queue: RabbitMQQueueNamer.GetQueueName(integrationEventType.Assembly),
         exchange: sourceExchange,
         routingKey: string.Empty,
         arguments: new Dictionary<string, object?>

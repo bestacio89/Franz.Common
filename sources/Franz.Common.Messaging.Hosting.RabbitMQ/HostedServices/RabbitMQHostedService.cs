@@ -52,7 +52,7 @@ public sealed class RabbitMQHostedService : BackgroundService
     var configuredQueueName = options?.Value.QueueName;
     _queueName = !string.IsNullOrWhiteSpace(configuredQueueName)
         ? configuredQueueName
-        : QueueNamer.GetQueueName(
+        : RabbitMQQueueNamer.GetQueueName(
             assemblyAccessor.GetEntryAssembly()
             ?? throw new InvalidOperationException("Entry assembly cannot be null."));
   }

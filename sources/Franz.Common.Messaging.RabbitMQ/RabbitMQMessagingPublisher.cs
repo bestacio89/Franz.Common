@@ -44,7 +44,7 @@ public sealed class RabbitMQMessagingPublisher(
     var message = _messageFactory.Build(evt);
     await _handler.ProcessAsync(message, ct).ConfigureAwait(false);
 
-    var exchange = _options.ExchangeName ?? ExchangeNamer.GetEventExchangeName(evt.GetType().Assembly);
+    var exchange = _options.ExchangeName ?? RabbitMQExchangeNamer.GetEventExchangeName(evt.GetType().Assembly);
     await PublishInternalAsync(message, exchange, ct).ConfigureAwait(false);
   }
 
