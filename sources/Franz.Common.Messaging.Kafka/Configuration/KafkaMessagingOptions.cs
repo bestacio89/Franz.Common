@@ -121,10 +121,6 @@ public class KafkaFailureOptions
   [Range(0, 60000)]
   public int RetryBackoffMs { get; set; } = 500;
 
-  /// <summary>Maximum duration of one handler attempt, in milliseconds.</summary>
-  [Range(1, 300000)]
-  public int HandlerTimeoutMs { get; set; } = 30000;
-
   public bool UseOriginalMessageKey { get; set; } = true;
 }
 
