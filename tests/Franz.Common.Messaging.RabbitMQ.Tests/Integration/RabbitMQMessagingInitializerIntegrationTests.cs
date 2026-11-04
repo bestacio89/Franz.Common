@@ -28,13 +28,12 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
         eventAssembly,
         new MessagingManifest(destinations: new[] { typeof(TestIntegrationEvent) }));
 
-    var entryAssembly = new Mock<IAssembly>();
-    entryAssembly.Setup(assembly => assembly.Name).Returns("Different.Entry.Service");
-    entryAssembly.Setup(assembly => assembly.Assembly)
-        .Returns(typeof(RabbitMQMessagingInitializer).Assembly);
+    // Use a real assembly wrapper so both Name and FullName satisfy the IAssembly contract.
+    // The event contract assembly remains distinct from the consuming service assembly.
+    var entryAssembly = new AssemblyWrapper(typeof(RabbitMQMessagingInitializer).Assembly);
 
     var accessor = new Mock<IAssemblyAccessor>();
-    accessor.Setup(value => value.GetEntryAssembly()).Returns(entryAssembly.Object);
+    accessor.Setup(value => value.GetEntryAssembly()).Returns(entryAssembly);
 
     var queueSuffix = Guid.CreateVersion7().ToString("N");
     var options = Options.Create(new RabbitMQMessagingOptions
