@@ -6,11 +6,41 @@ using FluentAssertions;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Validation;
 using Xunit;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Franz.Common.Messaging.Kafka.Extensions;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Configuration
 {
   public class KafkaMessagingOptionsTests
   {
+    [Fact]
+    public async Task KafkaMessagingOptions_ShouldFailValidateOnStart_WhenRetryBudgetExceedsHalfMaxPollInterval()
+    {
+      var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new System.Collections.Generic.Dictionary<string, string?>
+        {
+          ["Messaging:Kafka:BootstrapServers"] = "localhost:9092",
+          ["Messaging:Kafka:GroupId"] = "retry-budget-test",
+          ["Messaging:Kafka:Security:AllowInsecureTransport"] = "true",
+          ["Messaging:Kafka:Consumer:MaxPollIntervalMs"] = "10000",
+          ["Messaging:Kafka:Failure:MaxRetryAttempts"] = "2",
+          ["Messaging:Kafka:Failure:RetryBackoffMs"] = "1000",
+          ["Messaging:Kafka:Failure:HandlerTimeoutMs"] = "2000"
+        })
+        .Build();
+
+      using var host = new HostBuilder()
+        .ConfigureServices(services => services.AddKafkaMessagingOptions(configuration))
+        .Build();
+
+      await FluentActions.Invoking(() => host.StartAsync())
+        .Should()
+        .ThrowAsync<OptionsValidationException>();
+    }
+
     [Fact]
     public void KafkaMessagingOptions_Should_HaveDefaultValues()
     {
