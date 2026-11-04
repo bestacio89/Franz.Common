@@ -4,12 +4,10 @@ namespace Franz.Common.Messaging.Hosting;
 
 public class MessageEventArgs : EventArgs
 {
-    public MessageEventArgs(Message message, CancellationToken cancellationToken = default)
+    public MessageEventArgs(Message message)
     {
-        Message = message ?? throw new ArgumentNullException(nameof(message));
-        CancellationToken = cancellationToken;
+        Message = message;
     }
 
-    public Message Message { get; }
-    public CancellationToken CancellationToken { get; }
+    public Message Message { get; private set; }
 }
