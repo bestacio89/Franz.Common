@@ -1,5 +1,10 @@
 #nullable enable
 using FluentAssertions;
+using Franz.Common.Messaging.Configuration;
+using Franz.Common.Messaging.RabbitMQ.Connections;
+using Franz.Common.Messaging.RabbitMQ.Replay;
+using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
 using Franz.Common.Messaging.Manifest;
 using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Connections;
@@ -61,6 +66,243 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
     {
       channelPool.Return(verificationChannel);
     }
+  }
+
+  [Fact]
+  public async Task InitializeAsync_ShouldVerifyCreatedTopologyIncludingConfiguredRetryStages()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"verify-consumer-{suffix}";
+    var options = new RabbitMQMessagingOptions
+    {
+      QueueName = queueName,
+      ExchangeName = $"{queueName}-exchange",
+      DeadLetterQueueName = $"{queueName}-dlq",
+      DeadLetterExchangeName = $"{queueName}-dead-letter",
+      ReplayStrategy = "ProgressiveFourStep",
+      FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 5, retryBackoff: TimeSpan.FromSeconds(30))
+    };
+
+    await using (var createModelProvider = new ModelProvider(
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>()))
+    {
+      var createOptions = Options.Create(options);
+      var createAccessor = CreateAssemblyAccessor();
+      await new RabbitMQMessagingInitializer(createModelProvider, createAccessor.Object, createOptions)
+          .InitializeAsync();
+    }
+
+    options.ProvisioningMode = ProvisioningMode.Verify;
+    await using var verifyModelProvider = new ModelProvider(
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    var verifyAccessor = CreateAssemblyAccessor();
+
+    await new RabbitMQMessagingInitializer(
+        verifyModelProvider,
+        verifyAccessor.Object,
+        Options.Create(options)).InitializeAsync();
+
+    RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.ProvisioningVerification)
+        .Should().BeTrue();
+  }
+
+  [Fact]
+  public async Task InitializeAsync_ShouldApplyConfiguredQueueArguments()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"bounded-consumer-{suffix}";
+    var deadLetterExchange = $"{queueName}-dead-letter";
+    var deadLetterQueue = $"{queueName}-dlq";
+    var options = new RabbitMQMessagingOptions
+    {
+      QueueName = queueName,
+      ExchangeName = $"{queueName}-exchange",
+      DeadLetterQueueName = deadLetterQueue,
+      DeadLetterExchangeName = deadLetterExchange,
+      QueueType = RabbitMQQueueType.Classic,
+      MessageTtlMilliseconds = 5_000,
+      MaxLength = 100,
+      MaxLengthBytes = 10_000,
+      ReplayStrategy = "NoReplay"
+    };
+
+    await using var modelProvider = new ModelProvider(
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    await new RabbitMQMessagingInitializer(
+        modelProvider,
+        CreateAssemblyAccessor().Object,
+        Options.Create(options)).InitializeAsync();
+
+    var channelPool = _fixture.ServiceProvider.GetRequiredService<IChannelPool>();
+    var verificationChannel = await channelPool.GetAsync();
+    try
+    {
+      var expectedArguments = new Dictionary<string, object?>
+      {
+        ["x-queue-type"] = "classic",
+        ["x-message-ttl"] = 5_000,
+        ["x-max-length"] = 100L,
+        ["x-max-length-bytes"] = 10_000L,
+        ["x-dead-letter-exchange"] = deadLetterExchange,
+        ["x-dead-letter-routing-key"] = deadLetterQueue
+      };
+
+      await verificationChannel.QueueDeclareAsync(
+          queueName,
+          durable: true,
+          exclusive: false,
+          autoDelete: false,
+          arguments: expectedArguments);
+
+      RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.BoundedDestination)
+          .Should().BeTrue();
+      RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.DurableDelivery)
+          .Should().BeTrue();
+    }
+    finally
+    {
+      channelPool.Return(verificationChannel);
+    }
+
+    var mismatchChannel = await channelPool.GetAsync();
+    try
+    {
+      var mismatchedArguments = new Dictionary<string, object?>
+      {
+        ["x-queue-type"] = "classic",
+        ["x-message-ttl"] = 5_000,
+        ["x-max-length"] = 101L,
+        ["x-max-length-bytes"] = 10_000L,
+        ["x-dead-letter-exchange"] = deadLetterExchange,
+        ["x-dead-letter-routing-key"] = deadLetterQueue
+      };
+
+      var act = async () => await mismatchChannel.QueueDeclareAsync(
+          queueName,
+          durable: true,
+          exclusive: false,
+          autoDelete: false,
+          arguments: mismatchedArguments);
+
+      await act.Should().ThrowAsync<global::RabbitMQ.Client.Exceptions.OperationInterruptedException>();
+    }
+    finally
+    {
+      channelPool.Return(mismatchChannel);
+    }
+  }
+
+  [Fact]
+  public async Task InitializeAsync_WhenProvisioningIsOff_ShouldNotAccessBroker()
+  {
+    var modelProvider = new Mock<IModelProvider>(MockBehavior.Strict);
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      ProvisioningMode = ProvisioningMode.Off,
+      QueueName = $"off-consumer-{Guid.CreateVersion7():N}"
+    });
+
+    var initializer = new RabbitMQMessagingInitializer(
+        modelProvider.Object,
+        CreateAssemblyAccessor().Object,
+        options);
+
+    await initializer.InitializeAsync();
+
+    modelProvider.Verify(
+        provider => provider.GetChannelAsync(It.IsAny<CancellationToken>()),
+        Times.Never);
+  }
+
+  [Fact]
+  public async Task ProgressiveReplay_ShouldPublishConfiguredRetryAndDeadLetterStages()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"retry-consumer-{suffix}";
+    var deadLetterQueue = $"{queueName}-dlq";
+    var options = new RabbitMQMessagingOptions
+    {
+      QueueName = queueName,
+      ExchangeName = $"{queueName}-exchange",
+      DeadLetterQueueName = deadLetterQueue,
+      DeadLetterExchangeName = $"{queueName}-dead-letter",
+      ReplayStrategy = "ProgressiveFourStep",
+      FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 5, retryBackoff: TimeSpan.FromSeconds(30))
+    };
+
+    await using var modelProvider = new ModelProvider(
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    await new RabbitMQMessagingInitializer(
+        modelProvider,
+        CreateAssemblyAccessor().Object,
+        Options.Create(options)).InitializeAsync();
+
+    var channelPool = _fixture.ServiceProvider.GetRequiredService<IChannelPool>();
+    var strategy = new ProgressiveFourStepReplayStrategy(
+        (IConfirmChannelPool)channelPool,
+        CreateAssemblyAccessor().Object,
+        Options.Create(options));
+
+    var retryFive = new BasicDeliverEventArgs(
+        "consumer",
+        1,
+        false,
+        $"{queueName}-exchange",
+        queueName,
+        new BasicProperties(),
+        new ReadOnlyMemory<byte>(System.Text.Encoding.UTF8.GetBytes("retry-payload")));
+
+    retryFive.BasicProperties.Headers = new Dictionary<string, object?>
+    {
+      [ProgressiveFourStepReplayStrategy.ReplayHeader] = 4
+    };
+
+    await strategy.ReplayAsync(retryFive, new InvalidOperationException("retry failure"));
+
+    var verificationChannel = await channelPool.GetAsync();
+    try
+    {
+      var retryQueue = await verificationChannel.QueueDeclarePassiveAsync($"{queueName}-retry-5");
+      retryQueue.MessageCount.Should().Be(1);
+    }
+    finally
+    {
+      channelPool.Return(verificationChannel);
+    }
+
+    var exhausted = new BasicDeliverEventArgs(
+        "consumer",
+        2,
+        false,
+        $"{queueName}-exchange",
+        queueName,
+        new BasicProperties(),
+        new ReadOnlyMemory<byte>(System.Text.Encoding.UTF8.GetBytes("dead-letter-payload")));
+    exhausted.BasicProperties.Headers = new Dictionary<string, object?>
+    {
+      [ProgressiveFourStepReplayStrategy.ReplayHeader] = 5
+    };
+
+    await strategy.ReplayAsync(exhausted, new InvalidOperationException("retry exhausted"));
+
+    verificationChannel = await channelPool.GetAsync();
+    try
+    {
+      var deadLetter = await verificationChannel.QueueDeclarePassiveAsync(deadLetterQueue);
+      deadLetter.MessageCount.Should().Be(1);
+    }
+    finally
+    {
+      channelPool.Return(verificationChannel);
+    }
+  }
+
+  private static Mock<IAssemblyAccessor> CreateAssemblyAccessor()
+  {
+    var accessor = new Mock<IAssemblyAccessor>();
+    accessor.Setup(value => value.GetEntryAssembly())
+        .Returns(new AssemblyWrapper(typeof(RabbitMQMessagingInitializer).Assembly));
+    return accessor;
   }
 
   private sealed class TestIntegrationEvent;
