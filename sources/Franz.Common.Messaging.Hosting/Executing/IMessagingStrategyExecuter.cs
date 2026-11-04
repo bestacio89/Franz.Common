@@ -8,10 +8,4 @@ public interface IMessagingStrategyExecuter : IScopedDependency
   Task<bool> CanExecuteAsync(Message message);
 
   Task ExecuteAsync(Message message);
-
-  Task ExecuteAsync(Message message, CancellationToken cancellationToken)
-  {
-    cancellationToken.ThrowIfCancellationRequested();
-    return ExecuteAsync(message);
-  }
 }
