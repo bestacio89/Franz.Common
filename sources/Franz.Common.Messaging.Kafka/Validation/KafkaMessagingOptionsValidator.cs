@@ -119,7 +119,7 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
           + (maxRetryAttempts + 1) * handlerTimeoutMilliseconds;
 
       if (retryBudgetMilliseconds >= options.Consumer.MaxPollIntervalMs)
-        failures.Add($"Kafka handler and retry budget ({retryBudgetMilliseconds} ms) must be less than Consumer:MaxPollIntervalMs ({options.Consumer.MaxPollIntervalMs} ms).");
+        failures.Add($"Kafka handler timeout and retry backoff budget ({retryBudgetMilliseconds} ms) must be less than Consumer:MaxPollIntervalMs ({options.Consumer.MaxPollIntervalMs} ms).");
     }
 
     return failures.Count == 0

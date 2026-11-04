@@ -242,6 +242,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       failure.MaxRetryAttempts.Should().Be(3);
       failure.RetryBackoffMs.Should().Be(500);
       failure.UseOriginalMessageKey.Should().BeTrue();
+      failure.HandlerTimeoutMs.Should().Be(0);
     }
 
     [Fact]
@@ -312,6 +313,53 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
         },
         Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
         Failure = new KafkaFailureOptions { MaxRetryAttempts = 0, RetryBackoffMs = 60000 }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void KafkaFailureOptions_ShouldIncludeHandlerTimeoutInMaxPollBudget()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
+        Failure = new KafkaFailureOptions
+        {
+          MaxRetryAttempts = 3,
+          RetryBackoffMs = 100,
+          HandlerTimeoutMs = 200
+        }
+      };
+
+      var result = new KafkaMessagingOptionsValidator().Validate(
+          Microsoft.Extensions.Options.Options.DefaultName, options);
+
+      result.Failed.Should().BeTrue();
+      result.Failures.Should().Contain(message => message.Contains("budget", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void KafkaFailureOptions_ShouldAcceptHandlerAndRetryBudgetBelowMaxPollInterval()
+    {
+      var options = new KafkaMessagingOptions
+      {
+        BootstrapServers = "localhost:9092",
+        GroupId = "test-group",
+        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
+        Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
+        Failure = new KafkaFailureOptions
+        {
+          MaxRetryAttempts = 3,
+          RetryBackoffMs = 100,
+          HandlerTimeoutMs = 100
+        }
       };
 
       var result = new KafkaMessagingOptionsValidator().Validate(

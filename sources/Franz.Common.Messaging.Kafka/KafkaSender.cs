@@ -64,8 +64,7 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
           producer,
           serializer,
           assemblyAccessor,
-          options?.Value?.Producer?.MessageKeyStrategy
-              ?? throw new ArgumentNullException(nameof(options)),
+          ResolveKeyStrategy(options),
           logger,
           transactionContext ?? throw new ArgumentNullException(nameof(transactionContext)))
   {
