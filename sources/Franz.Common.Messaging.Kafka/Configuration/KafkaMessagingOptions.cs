@@ -21,6 +21,7 @@ public class KafkaMessagingOptions
   public KafkaFailureOptions Failure { get; set; } = new();
   public KafkaObservabilityOptions Observability { get; set; } = new();
   public KafkaTopicOptions Topic { get; set; } = new();
+  public ProvisioningMode ProvisioningMode { get; set; } = ProvisioningMode.Create;
 }
 
 public class KafkaSecurityOptions

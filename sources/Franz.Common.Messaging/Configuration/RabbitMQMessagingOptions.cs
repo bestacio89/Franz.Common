@@ -19,6 +19,20 @@ public sealed class RabbitMQMessagingOptions : MessagingOptions
   /// Set to 1 to preserve sequential processing.
   /// </summary>
   public int MaxConcurrency { get; set; } = 1;
+
+  /// <summary>Controls whether topology is created, verified, or left untouched.</summary>
+  public ProvisioningMode ProvisioningMode { get; set; } = ProvisioningMode.Create;
+
+  /// <summary>Whether application queues are durable.</summary>
+  public bool QueueDurable { get; set; } = true;
+
+  /// <summary>RabbitMQ queue implementation used for application, dead-letter, and retry queues.</summary>
+  public RabbitMQQueueType QueueType { get; set; } = RabbitMQQueueType.Quorum;
+
+  public int? MessageTtlMilliseconds { get; set; }
+  public long? MaxLength { get; set; }
+  public long? MaxLengthBytes { get; set; }
+  public int? DeliveryLimit { get; set; }
   // --- Connectivity ---
   public string? BootStrapServers { get; set; }   // URI-based
 
@@ -29,4 +43,9 @@ public sealed class RabbitMQMessagingOptions : MessagingOptions
 
 
  
+}
+public enum RabbitMQQueueType
+{
+  Quorum,
+  Classic
 }

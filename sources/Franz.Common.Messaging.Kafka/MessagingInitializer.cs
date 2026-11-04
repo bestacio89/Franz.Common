@@ -73,6 +73,9 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
 
   public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
   {
+    if (_options.ProvisioningMode == Franz.Common.Messaging.Configuration.ProvisioningMode.Off)
+      return;
+
     await _initializationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
     try
     {
@@ -97,30 +100,49 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
 
   private IReadOnlyCollection<string> DiscoverIntegrationEventTopics()
   {
-    var eventTypes = Franz.Common.Messaging.Manifest.MessagingManifestRegistry.GetAll()
-        .SelectMany(static manifest => manifest.Destinations)
+    var entryAssembly = _assemblyAccessor.GetEntryAssembly();
+    var companyPrefix = GetCompanyPrefix(entryAssembly);
+
+    var integrationEventTypes = AppDomain.CurrentDomain
+        .GetAssemblies()
+        .Where(a => !a.IsDynamic &&
+                    !string.IsNullOrWhiteSpace(a.FullName) &&
+                    a.FullName!.StartsWith(companyPrefix, StringComparison.OrdinalIgnoreCase))
+        .SelectMany(a =>
+        {
+          try { return a.ExportedTypes; }
+          catch { return Array.Empty<Type>(); }
+        })
+        .SelectMany(t => t.GetInterfaces())
+        .Where(i => i.IsGenericType &&
+                    i.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
+        .SelectMany(i => i.GenericTypeArguments)
+        .Where(t => typeof(IIntegrationEvent).IsAssignableFrom(t))
         .Distinct()
-        .ToArray();
+        .ToList();
 
     var topics = new HashSet<string>(StringComparer.Ordinal);
-    foreach (var eventType in eventTypes)
+
+    foreach (var evtType in integrationEventTypes)
     {
       var topic = _perEvent
-          ? TopicNamer.GetTopicName(eventType)
-          : TopicNamer.GetTopicName(new AssemblyWrapper(eventType.Assembly));
+          ? TopicNamer.GetTopicName(evtType)
+          : TopicNamer.GetTopicName(new AssemblyWrapper(evtType.Assembly));
 
-      var deadLetterTopic = _perEvent
-          ? TopicNamer.GetDeadLetterTopicName(eventType)
-          : TopicNamer.GetDeadLetterTopicName(new AssemblyWrapper(eventType.Assembly));
+      var dlt = _perEvent
+          ? TopicNamer.GetDeadLetterTopicName(evtType)
+          : TopicNamer.GetDeadLetterTopicName(new AssemblyWrapper(evtType.Assembly));
 
-      if (!string.IsNullOrWhiteSpace(topic))
-        topics.Add(topic);
-      if (!string.IsNullOrWhiteSpace(deadLetterTopic))
-        topics.Add(deadLetterTopic);
+      if (!string.IsNullOrWhiteSpace(topic)) topics.Add(topic);
+      if (!string.IsNullOrWhiteSpace(dlt)) topics.Add(dlt);
     }
 
-    return topics.ToArray();
+    return topics.ToList();
   }
+
+  // =========================================================
+  // INFRASTRUCTURE
+  // =========================================================
 
   private async ValueTask EnsureTopicAsync(string name, CancellationToken cancellationToken)
   {
@@ -141,6 +163,27 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
 
     try
     {
+      if (_options.ProvisioningMode == Franz.Common.Messaging.Configuration.ProvisioningMode.Verify)
+      {
+        var metadata = _adminClient.GetMetadata(name, timeout);
+        var existingTopic = metadata.Topics.SingleOrDefault(topic =>
+            string.Equals(topic.Topic, name, StringComparison.Ordinal));
+
+        if (existingTopic is null || existingTopic.Error.Code != ErrorCode.NoError)
+          throw new InvalidOperationException($"Required Kafka topic '{name}' does not exist or could not be inspected.");
+
+        if (existingTopic.Partitions.Count != topicOptions.NumPartitions)
+          throw new InvalidOperationException(
+              $"Kafka topic '{name}' has {existingTopic.Partitions.Count} partitions; {topicOptions.NumPartitions} are required.");
+
+        if (existingTopic.Partitions.Any(partition =>
+            partition.Replicas.Count != topicOptions.ReplicationFactor))
+          throw new InvalidOperationException(
+              $"Kafka topic '{name}' does not have the configured replication factor of {topicOptions.ReplicationFactor}.");
+
+        return;
+      }
+
       var creation = _adminClient.CreateTopicsAsync(
           new[] { specification },
           new CreateTopicsOptions
