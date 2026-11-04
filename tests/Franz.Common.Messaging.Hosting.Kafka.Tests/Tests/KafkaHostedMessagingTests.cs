@@ -44,6 +44,13 @@ public sealed class KafkaMessagingEngineTests
   [Fact]
   public async Task HandlerFailure_ShouldPublishOriginalPayloadToDeadLetterTopic()
   {
+    Franz.Common.Messaging.Kafka.KafkaMessagingCapabilities.Descriptor
+        .Supports(Franz.Common.Messaging.Configuration.MessagingCapability.Retry)
+        .Should().BeTrue();
+    Franz.Common.Messaging.Kafka.KafkaMessagingCapabilities.Descriptor
+        .Supports(Franz.Common.Messaging.Configuration.MessagingCapability.DeadLetter)
+        .Should().BeTrue();
+
     var serializer = _fixture.Host!.Services.GetRequiredService<IMessageSerializer>();
     var message = new Message("__fail__") { Id = Guid.CreateVersion7() };
     var payload = serializer.Serialize(message);
