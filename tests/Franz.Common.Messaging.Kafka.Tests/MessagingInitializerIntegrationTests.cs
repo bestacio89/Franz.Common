@@ -387,47 +387,35 @@ public sealed class KafkaMessagingInitializerIntegrationTests : IAsyncLifetime
   [Fact]
   public async Task InitializeAsync_EventMode_ShouldApplyPerEventTopicOptions()
   {
-    // This assertion requires the topic to be absent before provisioning. Use a
-    // dedicated broker so other initializer tests cannot pre-create manifest topics.
-    var isolatedFixture = new KafkaContainerFixture();
-    await isolatedFixture.InitializeAsync();
-
-    try
+    var eventType = typeof(KafkaMessagingRegistrationIntegrationTests.AnotherIntegrationEvent);
+    var eventTopic = TopicNamer.GetTopicName(eventType);
+    var options = new KafkaMessagingOptions
     {
-      var eventType = typeof(KafkaMessagingRegistrationIntegrationTests.AnotherIntegrationEvent);
-      var eventTopic = TopicNamer.GetTopicName(eventType);
-      var options = new KafkaMessagingOptions
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = $"event-options-{Guid.CreateVersion7():N}",
+      DeadLetterTopic = $"event-options-{Guid.CreateVersion7():N}-dlt",
+      Topic = new KafkaTopicOptions { NumPartitions = 1, ReplicationFactor = 1 },
+      EventTopicOptions = new Dictionary<string, KafkaTopicOptions>(StringComparer.Ordinal)
       {
-        GroupId = "test-group",
-        BootstrapServers = isolatedFixture.BootstrapServers,
-        TopicName = $"event-options-{Guid.CreateVersion7():N}",
-        DeadLetterTopic = $"event-options-{Guid.CreateVersion7():N}-dlt",
-        Topic = new KafkaTopicOptions { NumPartitions = 1, ReplicationFactor = 1 },
-        EventTopicOptions = new Dictionary<string, KafkaTopicOptions>(StringComparer.Ordinal)
-        {
-          [eventTopic] = new KafkaTopicOptions { NumPartitions = 3, ReplicationFactor = 1 }
-        }
-      };
-      var configuredOptions = Options.Create(options);
-      using var admin = new AdminClientBuilder(new AdminClientConfig
-      {
-        BootstrapServers = isolatedFixture.BootstrapServers
-      }).Build();
-      var sut = new KafkaMessagingInitializer(
-          admin,
-          new KafkaTopicNames(BuildIntegrationAccessor(), configuredOptions),
-          configuredOptions,
-          perEvent: true);
-
-      await sut.InitializeAsync();
-
-      var metadata = admin.GetMetadata(eventTopic, TimeSpan.FromSeconds(10));
-      metadata.Topics.Single(topic => topic.Topic == eventTopic).Partitions.Should().HaveCount(3);
-    }
-    finally
+        [eventTopic] = new KafkaTopicOptions { NumPartitions = 3, ReplicationFactor = 1 }
+      }
+    };
+    var configuredOptions = Options.Create(options);
+    using var admin = new AdminClientBuilder(new AdminClientConfig
     {
-      await isolatedFixture.DisposeAsync();
-    }
+      BootstrapServers = _fixture.BootstrapServers
+    }).Build();
+    var sut = new KafkaMessagingInitializer(
+        admin,
+        new KafkaTopicNames(BuildIntegrationAccessor(), configuredOptions),
+        configuredOptions,
+        perEvent: true);
+
+    await sut.InitializeAsync();
+
+    var metadata = admin.GetMetadata(eventTopic, TimeSpan.FromSeconds(10));
+    metadata.Topics.Single(topic => topic.Topic == eventTopic).Partitions.Should().HaveCount(3);
   }
 
   // =========================================================
