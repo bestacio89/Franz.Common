@@ -91,7 +91,7 @@
   },
   {
     "rule": "ASSEMBLY_SCAN",
-    "path": "sources/Franz.Common.Messaging/Adapters/MessagingDesarializerExtensions.cs",
+    "path": "sources/Franz.Common.Messaging/Adapters/MessageDeserializerExtensions.cs",
     "reason": "Existing runtime assembly discovery. Kafka topic discovery is tracked by K4; mediator registration is explicitly excluded; mapping and saga discovery require separate compatibility-preserving designs.",
     "ruleId": "SRC-004"
   },
