@@ -30,11 +30,13 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
 
   public RabbitMqContainer Container { get; } = new RabbitMqBuilder(Image)
       .WithCleanUp(true)
+      .WithPortBinding(15672, true)
       .WithWaitStrategy(Wait.ForUnixContainer()
           .UntilInternalTcpPortIsAvailable(5672))
             .Build();
 
   public string ConnectionString { get; private set; } = default!;
+  public string ManagementApiUrl => $"http://{Container.Hostname}:{Container.GetMappedPublicPort(15672)}";
   public ServiceProvider ServiceProvider { get; private set; } = default!;
 
   public Task InitializeAsync() => InitializeAsyncInternal();
@@ -50,6 +52,7 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
       services.AddSingleton(Options.Create(new RabbitMQMessagingOptions
     {
       BootStrapServers = ConnectionString,
+      ManagementApiUrl = ManagementApiUrl,
       UserName = "guest",
       Password = "guest",
       PublisherConfirmTimeoutSeconds = 5
