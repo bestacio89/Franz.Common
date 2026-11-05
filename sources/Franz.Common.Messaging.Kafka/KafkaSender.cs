@@ -93,7 +93,6 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
     catch (Exception ex) when (
         ex is JsonException or
         NotSupportedException or
-        InvalidOperationException or
         ArgumentException or
         FormatException or
         SerializationException)
