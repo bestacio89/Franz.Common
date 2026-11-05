@@ -33,10 +33,7 @@ public class MessageDeserializerExtensionsTests
     public Guid CorrelationId { get; set; }
   }
 
-  public record UnsubscribedTestEvent(string Info) : IEvent
-  {
-    public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
-  }
+  public record UnsubscribedTestEvent(string Info) : IEvent;
 
   [Fact]
   public void ToEvent_WhenTypeIsKnownButNotSubscribed_ShouldReturnNull()

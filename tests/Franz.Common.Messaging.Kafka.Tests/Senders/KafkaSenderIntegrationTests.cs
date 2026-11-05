@@ -8,7 +8,6 @@ using Franz.Common.Messaging.Kafka.Transactions;
 using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
-using Franz.Common.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -58,8 +57,7 @@ public sealed class KafkaSenderTests : IClassFixture<KafkaContainerFixture>, IAs
       }
     };
 
-    var topic = TopicNamer.GetTopicName(
-      _scope.ServiceProvider.GetRequiredService<IAssemblyAccessor>().GetEntryAssembly());
+    var topic = _scope.ServiceProvider.GetRequiredService<KafkaTopicNames>().TopicName;
 
     using var consumer = CreateTestConsumer();
 
