@@ -231,6 +231,10 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
     {
       throw;
     }
+    catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+    {
+      failures.Add($"RabbitMQ Management API binding inspection timed out: {ex.Message}");
+    }
     catch (HttpRequestException ex)
     {
       failures.Add($"RabbitMQ Management API binding inspection failed: {ex.Message}");
