@@ -116,8 +116,10 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
         else
           await DisposeChannelAsync(channel).ConfigureAwait(false);
       }
-      else
+      else if (publishCompleted)
         _channelPool.Return(channel);
+      else
+        await DisposeChannelAsync(channel).ConfigureAwait(false);
     }
   }
 
