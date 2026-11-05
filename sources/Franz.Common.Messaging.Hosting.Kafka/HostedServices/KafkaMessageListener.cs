@@ -1,6 +1,7 @@
 #nullable enable
 using System.Text;
 using Confluent.Kafka;
+using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
@@ -16,51 +17,28 @@ public sealed class KafkaMessageListener : IListener
   private readonly IMessageSerializer _serializer;
   private readonly string[] _topics;
   private readonly IProducer<string, byte[]>? _deadLetterProducer;
-  private readonly KafkaFailureOptions _failureOptions;
+  private readonly MessageFailurePolicy _failurePolicy;
+  private readonly string? _deadLetterTopic;
 
-  public KafkaMessageListener(
-      IConsumer<string, string> consumer,
-      IEnumerable<string> topics,
-      IMessageSerializer serializer,
-      ILogger<KafkaMessageListener> logger)
+  public KafkaMessageListener(IConsumer<string, string> consumer, IEnumerable<string> topics,
+      IMessageSerializer serializer, ILogger<KafkaMessageListener> logger)
   {
-    _consumer = consumer;
-    _topics = topics.ToArray();
-    _serializer = serializer;
-    _logger = logger;
-    _failureOptions = new KafkaFailureOptions();
+    _consumer = consumer ?? throw new ArgumentNullException(nameof(consumer));
+    _topics = topics?.ToArray() ?? throw new ArgumentNullException(nameof(topics));
+    _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+    _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    _failurePolicy = MessageFailurePolicy.Default;
   }
 
-  public KafkaMessageListener(
-      IConsumer<string, string> consumer,
-      IEnumerable<string> topics,
-      IMessageSerializer serializer,
-      ILogger<KafkaMessageListener> logger,
-      IProducer<string, byte[]> deadLetterProducer,
-      IOptions<KafkaMessagingOptions> options)
+  public KafkaMessageListener(IConsumer<string, string> consumer, IEnumerable<string> topics,
+      IMessageSerializer serializer, ILogger<KafkaMessageListener> logger,
+      IProducer<string, byte[]> deadLetterProducer, IOptions<KafkaMessagingOptions> options)
       : this(consumer, topics, serializer, logger)
   {
-    _deadLetterProducer = deadLetterProducer;
-    _failureOptions = ResolveFailureOptions(options.Value);
-  }
-
-  private static KafkaFailureOptions ResolveFailureOptions(KafkaMessagingOptions options)
-  {
-    var legacy = options.Failure ?? new KafkaFailureOptions();
-    if (options.FailurePolicy is not { } policy)
-      return legacy;
-
-    return new KafkaFailureOptions
-    {
-      EnableDeadLetter = policy.DeadLetterOnExhaustion,
-      DeadLetterTopic = legacy.DeadLetterTopic,
-      MaxRetryAttempts = policy.MaxRetryAttempts,
-      RetryBackoffMs = checked((int)Math.Ceiling(policy.RetryBackoff.TotalMilliseconds)),
-      HandlerTimeoutMs = policy.HandlerTimeout is { } timeout
-          ? checked((int)Math.Ceiling(timeout.TotalMilliseconds))
-          : legacy.HandlerTimeoutMs,
-      UseOriginalMessageKey = legacy.UseOriginalMessageKey
-    };
+    ArgumentNullException.ThrowIfNull(options);
+    _deadLetterProducer = deadLetterProducer ?? throw new ArgumentNullException(nameof(deadLetterProducer));
+    _failurePolicy = options.Value.FailurePolicy ?? MessageFailurePolicy.Default;
+    _deadLetterTopic = options.Value.DeadLetterTopic;
   }
 
   public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
@@ -69,39 +47,25 @@ public sealed class KafkaMessageListener : IListener
   {
     if (OnMessageReceivedAsync is null)
       throw new InvalidOperationException("A message handler must be configured before the Kafka listener starts.");
-
     if (_topics.Length == 0 || _topics.Any(string.IsNullOrWhiteSpace))
       throw new InvalidOperationException("At least one non-empty Kafka topic must be configured.");
 
-    if (_failureOptions.MaxRetryAttempts < 0 || _failureOptions.RetryBackoffMs < 0)
-      throw new InvalidOperationException("Kafka failure retry settings cannot be negative.");
-
     _consumer.Subscribe(_topics);
     _logger.LogInformation("Kafka listener subscribed to {Topics}", string.Join(", ", _topics));
-
     try
     {
       while (!stoppingToken.IsCancellationRequested)
       {
         ConsumeResult<string, string>? result;
-        try
-        {
-          result = _consumer.Consume(stoppingToken);
-        }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-          break;
-        }
+        try { result = _consumer.Consume(stoppingToken); }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
         catch (ConsumeException ex)
         {
           _logger.LogError(ex, "Kafka consume failed; the listener will continue polling.");
           continue;
         }
 
-        if (result is null)
-          continue;
-
-        // A null Kafka value is a valid tombstone for compacted topics.
+        if (result is null) continue;
         if (result.Message?.Value is null)
         {
           _logger.LogDebug("Ignoring Kafka tombstone on {Topic}[{Partition}] offset {Offset}.",
@@ -114,8 +78,7 @@ public sealed class KafkaMessageListener : IListener
         try
         {
           transport = _serializer.Deserialize<Message>(result.Message.Value);
-          if (transport is null)
-            throw new InvalidDataException("The serialized Kafka value deserialized to null.");
+          if (transport is null) throw new InvalidDataException("The serialized Kafka value deserialized to null.");
         }
         catch (Exception ex)
         {
@@ -127,53 +90,44 @@ public sealed class KafkaMessageListener : IListener
 
         Exception? processingFailure = null;
         var succeeded = false;
-        for (var attempt = 0; attempt <= _failureOptions.MaxRetryAttempts; attempt++)
+        for (var attempt = 0; attempt <= _failurePolicy.MaxRetryAttempts; attempt++)
         {
           stoppingToken.ThrowIfCancellationRequested();
           try
           {
             using var handlerTimeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-            if (_failureOptions.HandlerTimeoutMs > 0)
-              handlerTimeout.CancelAfter(_failureOptions.HandlerTimeoutMs);
-
+            if (_failurePolicy.HandlerTimeout is { } timeout) handlerTimeout.CancelAfter(timeout);
             try
             {
               await OnMessageReceivedAsync(new MessageEventArgs(transport, handlerTimeout.Token));
             }
-            catch (OperationCanceledException ex) when (handlerTimeout.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+            catch (OperationCanceledException ex)
+                when (handlerTimeout.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
             {
-              throw new TimeoutException($"Kafka message handler exceeded its configured timeout of {_failureOptions.HandlerTimeoutMs} ms.", ex);
+              throw new TimeoutException($"Kafka handler exceeded cooperative timeout {_failurePolicy.HandlerTimeout}.", ex);
             }
             succeeded = true;
             break;
           }
-          catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-          {
-            throw;
-          }
+          catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { throw; }
           catch (Exception ex)
           {
             processingFailure = ex;
             _logger.LogWarning(ex,
                 "Kafka handler failed for message {MessageId} at {Topic}[{Partition}] offset {Offset}; attempt {Attempt} of {TotalAttempts}.",
                 transport.Id, result.Topic, result.Partition.Value, result.Offset.Value,
-                attempt + 1, _failureOptions.MaxRetryAttempts + 1);
-
-            if (attempt < _failureOptions.MaxRetryAttempts && _failureOptions.RetryBackoffMs > 0)
-              await Task.Delay(_failureOptions.RetryBackoffMs, stoppingToken);
+                attempt + 1, _failurePolicy.MaxRetryAttempts + 1);
+            if (attempt < _failurePolicy.MaxRetryAttempts && _failurePolicy.RetryBackoff > TimeSpan.Zero)
+              await Task.Delay(_failurePolicy.RetryBackoff, stoppingToken);
           }
         }
 
         if (!succeeded)
         {
-          await DeadLetterAndCommitAsync(
-              result,
-              processingFailure ?? new InvalidOperationException("Kafka message processing failed."),
-              stoppingToken);
+          await DeadLetterAndCommitAsync(result,
+              processingFailure ?? new InvalidOperationException("Kafka message processing failed."), stoppingToken);
           continue;
         }
-
-        // Commit only after the complete processing pipeline succeeds.
         CommitAfterProcessing(result);
       }
     }
@@ -186,54 +140,28 @@ public sealed class KafkaMessageListener : IListener
 
   private void CommitAfterProcessing(ConsumeResult<string, string> result)
   {
-    try
+    try { _consumer.Commit(result); }
+    catch (KafkaException ex) when (ex.Error.Code is ErrorCode.Local_State or ErrorCode.IllegalGeneration
+        or ErrorCode.UnknownMemberId or ErrorCode.RebalanceInProgress)
     {
-      _consumer.Commit(result);
-    }
-    catch (KafkaException ex) when (IsRebalanceCommitFailure(ex))
-    {
-      // The handler has completed, but ownership may have changed before the
-      // offset commit reached the coordinator. Let the new owner redeliver;
-      // do not terminate the listener for this expected rebalance race.
       _logger.LogWarning(ex,
           "Kafka offset commit was rejected during rebalance for {Topic}[{Partition}] offset {Offset}. The message may be redelivered.",
           result.Topic, result.Partition.Value, result.Offset.Value);
     }
   }
 
-  private static bool IsRebalanceCommitFailure(KafkaException exception)
-      => exception.Error.Code is
-          ErrorCode.Local_State or
-          ErrorCode.IllegalGeneration or
-          ErrorCode.UnknownMemberId or
-          ErrorCode.RebalanceInProgress;
-
-  private async Task DeadLetterAndCommitAsync(
-      ConsumeResult<string, string> result,
-      Exception failure,
+  private async Task DeadLetterAndCommitAsync(ConsumeResult<string, string> result, Exception failure,
       CancellationToken cancellationToken)
   {
-    if (!_failureOptions.EnableDeadLetter)
-      throw new InvalidOperationException(
-          $"Kafka message at {result.Topic}[{result.Partition.Value}] offset {result.Offset.Value} failed and dead-lettering is disabled. Its offset was not committed.",
-          failure);
-
+    if (!_failurePolicy.DeadLetterOnExhaustion)
+      throw new InvalidOperationException($"Kafka message at {result.Topic}[{result.Partition.Value}] offset {result.Offset.Value} failed and dead-lettering is disabled. Its offset was not committed.", failure);
     if (_deadLetterProducer is null)
-      throw new InvalidOperationException(
-          $"Kafka message at {result.Topic}[{result.Partition.Value}] offset {result.Offset.Value} failed, but no dead-letter producer is registered. Its offset was not committed.",
-          failure);
+      throw new InvalidOperationException($"Kafka message at {result.Topic}[{result.Partition.Value}] offset {result.Offset.Value} failed, but no dead-letter producer is registered. Its offset was not committed.", failure);
 
-    var deadLetterTopic = string.IsNullOrWhiteSpace(_failureOptions.DeadLetterTopic)
-        ? $"{result.Topic}-dlt"
-        : _failureOptions.DeadLetterTopic;
-
+    var deadLetterTopic = string.IsNullOrWhiteSpace(_deadLetterTopic) ? $"{result.Topic}-dlt" : _deadLetterTopic;
     var headers = new Confluent.Kafka.Headers();
     if (result.Message.Headers is not null)
-    {
-      foreach (var header in result.Message.Headers)
-        headers.Add(header.Key, header.GetValueBytes());
-    }
-
+      foreach (var header in result.Message.Headers) headers.Add(header.Key, header.GetValueBytes());
     headers.Add("x-franz-original-topic", Encoding.UTF8.GetBytes(result.Topic));
     headers.Add("x-franz-original-partition", Encoding.UTF8.GetBytes(result.Partition.Value.ToString()));
     headers.Add("x-franz-original-offset", Encoding.UTF8.GetBytes(result.Offset.Value.ToString()));
@@ -241,23 +169,16 @@ public sealed class KafkaMessageListener : IListener
     headers.Add("x-franz-failure-message", Encoding.UTF8.GetBytes(failure.Message));
     headers.Add("x-franz-failure-utc", Encoding.UTF8.GetBytes(DateTimeOffset.UtcNow.ToString("O")));
 
-    var key = _failureOptions.UseOriginalMessageKey
-        ? result.Message.Key
-        : Guid.CreateVersion7().ToString();
-
     try
     {
-      await _deadLetterProducer.ProduceAsync(
-          deadLetterTopic,
+      await _deadLetterProducer.ProduceAsync(deadLetterTopic,
           new Confluent.Kafka.Message<string, byte[]>
           {
-            Key = key,
+            Key = result.Message.Key,
             Value = Encoding.UTF8.GetBytes(result.Message.Value),
             Headers = headers,
             Timestamp = result.Message.Timestamp
-          },
-          cancellationToken);
-
+          }, cancellationToken);
     }
     catch (Exception deadLetterFailure)
     {
@@ -266,8 +187,7 @@ public sealed class KafkaMessageListener : IListener
           new AggregateException(failure, deadLetterFailure));
     }
 
-    _logger.LogError(failure,
-        "Kafka message at {Topic}[{Partition}] offset {Offset} was published to dead-letter topic {DeadLetterTopic}.",
+    _logger.LogError(failure, "Kafka message at {Topic}[{Partition}] offset {Offset} was published to dead-letter topic {DeadLetterTopic}.",
         result.Topic, result.Partition.Value, result.Offset.Value, deadLetterTopic);
     CommitAfterProcessing(result);
   }

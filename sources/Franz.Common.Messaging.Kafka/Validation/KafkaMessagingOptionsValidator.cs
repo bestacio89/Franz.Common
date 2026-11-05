@@ -1,6 +1,8 @@
 #nullable enable
 using Franz.Common.Messaging.Kafka.Configuration;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
+using Franz.Common.Messaging.Configuration;
 
 namespace Franz.Common.Messaging.Kafka.Validation;
 
@@ -9,6 +11,11 @@ namespace Franz.Common.Messaging.Kafka.Validation;
 /// </summary>
 public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessagingOptions>
 {
+  private readonly ILogger<KafkaMessagingOptionsValidator>? _logger;
+
+  public KafkaMessagingOptionsValidator(ILogger<KafkaMessagingOptionsValidator>? logger = null)
+      => _logger = logger;
+
   public ValidateOptionsResult Validate(string? name, KafkaMessagingOptions options)
   {
     ArgumentNullException.ThrowIfNull(options);
@@ -67,9 +74,6 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
     if (options.Producer is null)
       failures.Add("Producer options must be configured.");
 
-    if (options.Failure is null)
-      failures.Add("Failure options must be configured.");
-
     if (options.Topic is null)
       failures.Add("Topic options must be configured.");
     else
@@ -87,7 +91,7 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
         failures.Add("Topic:Configurations must contain non-empty keys and non-null values.");
     }
 
-    if (options.Consumer is null || options.Failure is null || options.Producer is null)
+    if (options.Consumer is null || options.Producer is null)
       return ValidateOptionsResult.Fail(failures);
 
     if (options.Producer.DeliveryTimeoutMs <= 0 || options.Producer.DeliveryTimeoutMs > 900000)
@@ -102,21 +106,23 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
 
     if (!Enum.IsDefined(options.ProvisioningMode))
       failures.Add("ProvisioningMode must be a defined value.");
-    if (options.OrderingStrategy.HasValue && !Enum.IsDefined(options.OrderingStrategy.Value))
+    if (!Enum.IsDefined(options.OrderingStrategy))
       failures.Add("OrderingStrategy must be a defined MessageOrderingStrategy value.");
 
-    var maxRetryAttempts = options.FailurePolicy?.MaxRetryAttempts ?? options.Failure.MaxRetryAttempts;
-    var retryBackoffMilliseconds = options.FailurePolicy?.RetryBackoff.TotalMilliseconds
-        ?? options.Failure.RetryBackoffMs;
-    var handlerTimeoutMilliseconds = options.FailurePolicy?.HandlerTimeout?.TotalMilliseconds
-        ?? options.Failure.HandlerTimeoutMs;
+    var failurePolicy = options.FailurePolicy ?? MessageFailurePolicy.Default;
+    var maxRetryAttempts = failurePolicy.MaxRetryAttempts;
+    var retryBackoffMilliseconds = failurePolicy.RetryBackoff.TotalMilliseconds;
+    var handlerTimeoutMilliseconds = failurePolicy.HandlerTimeout?.TotalMilliseconds ?? 0;
+
+    if (failurePolicy.HandlerTimeout is null)
+      _logger?.LogWarning("Kafka handlers have no configured cooperative timeout; retry-budget validation cannot bound handler execution time.");
 
     if (maxRetryAttempts < 0)
-      failures.Add("Failure:MaxRetryAttempts cannot be negative.");
+      failures.Add("FailurePolicy:MaxRetryAttempts cannot be negative.");
     if (retryBackoffMilliseconds < 0)
-      failures.Add("Failure:RetryBackoffMs cannot be negative.");
+      failures.Add("FailurePolicy:RetryBackoff cannot be negative.");
     if (handlerTimeoutMilliseconds < 0)
-      failures.Add("Failure:HandlerTimeoutMs cannot be negative.");
+      failures.Add("FailurePolicy:HandlerTimeout cannot be negative.");
 
     // A single synchronous Consume/handler loop must finish its configured retry
     // and cooperative timeout budget before Kafka revokes the consumer's partitions.

@@ -20,8 +20,8 @@ public sealed class KafkaTopicNames
         ? settings.TopicName
         : TopicNamer.GetTopicName(entryAssembly);
 
-    DeadLetterTopicName = !string.IsNullOrWhiteSpace(settings.Failure.DeadLetterTopic)
-        ? settings.Failure.DeadLetterTopic
+    DeadLetterTopicName = !string.IsNullOrWhiteSpace(settings.DeadLetterTopic)
+        ? settings.DeadLetterTopic
         : TopicNamer.GetDeadLetterTopicName(entryAssembly);
   }
 

@@ -19,12 +19,12 @@ public class KafkaMessagingOptions
   public KafkaSecurityOptions Security { get; set; } = new();
   [Required] public KafkaConsumerOptions Consumer { get; set; } = new();
   [Required] public KafkaProducerOptions Producer { get; set; } = new();
-  public KafkaFailureOptions Failure { get; set; } = new();
   public KafkaObservabilityOptions Observability { get; set; } = new();
   public KafkaTopicOptions Topic { get; set; } = new();
   public ProvisioningMode ProvisioningMode { get; set; } = ProvisioningMode.Create;
-  public MessageFailurePolicy? FailurePolicy { get; set; }
-  public MessageOrderingStrategy? OrderingStrategy { get; set; }
+  public string? DeadLetterTopic { get; set; }
+  public MessageFailurePolicy FailurePolicy { get; set; } = MessageFailurePolicy.Default;
+  public MessageOrderingStrategy OrderingStrategy { get; set; } = MessageOrderingStrategy.MessageId;
 }
 
 public class KafkaSecurityOptions
@@ -92,7 +92,6 @@ public class KafkaProducerOptions
 
   /// <summary>Optional prefix for unique transaction producer identities. A unique suffix is generated per transaction.</summary>
   public string? TransactionalIdPrefix { get; set; }
-  public KafkaMessageKeyStrategy MessageKeyStrategy { get; set; } = KafkaMessageKeyStrategy.MessageId;
 
   [Range(0, 1000)]
   public int MessageSendMaxRetries { get; set; } = 3;
@@ -110,34 +109,8 @@ public class KafkaProducerOptions
   public string? DefaultKey { get; set; }
 }
 
-public enum KafkaMessageKeyStrategy
-{
-  MessageId,
-  CorrelationId,
-  AggregateId,
-  None
-}
-
 public enum KafkaAcks { None, Leader, All }
 public enum KafkaCompressionType { None, Gzip, Snappy, Lz4, Zstd }
-
-public class KafkaFailureOptions
-{
-  public bool EnableDeadLetter { get; set; } = true;
-  public string? DeadLetterTopic { get; set; }
-
-  [Range(0, 100)]
-  public int MaxRetryAttempts { get; set; } = 3;
-
-  [Range(0, 60000)]
-  public int RetryBackoffMs { get; set; } = 500;
-
-  public bool UseOriginalMessageKey { get; set; } = true;
-
-  /// <summary>Optional cooperative handler timeout in milliseconds; zero disables it.</summary>
-  [Range(0, 900000)]
-  public int HandlerTimeoutMs { get; set; }
-}
 
 public class KafkaObservabilityOptions
 {
