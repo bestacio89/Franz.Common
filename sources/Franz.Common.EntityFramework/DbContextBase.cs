@@ -213,8 +213,16 @@ public abstract class DbContextBase : DbContext
             if (!isDomainEntity && !isTenantEntity && !isConcurrencyTrackedEntity)
                 continue;
 
-            if (isTenantEntity)
-                modelBuilder.Entity(clrType).Property<Guid>(nameof(ITenantEntity.TenantId)).IsConcurrencyToken();
+            // Relational providers use TenantId as an optimistic-concurrency predicate.
+            // Cosmos only supports its native _etag property as a concurrency token; tenant
+            // isolation there is enforced by the partition key and the composed query filter.
+            if (isTenantEntity &&
+                !string.Equals(Database.ProviderName, "Microsoft.EntityFrameworkCore.Cosmos", StringComparison.Ordinal))
+            {
+                modelBuilder.Entity(clrType)
+                    .Property<Guid>(nameof(ITenantEntity.TenantId))
+                    .IsConcurrencyToken();
+            }
 
             if (isConcurrencyTrackedEntity)
                 modelBuilder.Entity(clrType)
