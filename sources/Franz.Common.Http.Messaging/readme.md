@@ -1,10 +1,10 @@
 # Franz.Common.Http.Messaging
 
-> Absolutely ✅ — here’s your fully updated Franz.Common.Http.Messaging README rewritten to match the structure you provided, with the new v1.6.17 changelog compacted but still complete and consistent with your ecosystem documentation style. --- A specialized library within the Franz Framework , designed to streamline the
+> HTTP endpoint integration for publishing messages and exposing messaging-backed application operations.
 
 ## Overview
 
-Absolutely ✅ — here’s your fully updated Franz.Common.Http.Messaging README rewritten to match the structure you provided, with the new v1.6.17 changelog compacted but still complete and consistent with your ecosystem documentation style. --- A specialized library within the Franz Framework , designed to streamline the
+HTTP endpoint integration for publishing messages and exposing messaging-backed application operations.
 
 ## Installation
 

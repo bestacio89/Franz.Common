@@ -1,10 +1,10 @@
 # Franz.Common.Http.EntityFramework
 
-> A specialized library within the Franz Framework that integrates Entity Framework Core with ASP.NET Core applications. This package simplifies transactional handling, dependency injection, and middleware configurations, enhancing database operations in HTTP-based services.
+> ASP.NET Core integration for Entity Framework Core request scopes, transaction boundaries, and persistence workflows.
 
 ## Overview
 
-A specialized library within the Franz Framework that integrates Entity Framework Core with ASP.NET Core applications. This package simplifies transactional handling, dependency injection, and middleware configurations, enhancing database operations in HTTP-based services.
+ASP.NET Core integration for Entity Framework Core request scopes, transaction boundaries, and persistence workflows.
 
 ## Installation
 

@@ -1,10 +1,10 @@
 # Franz.Common.Http.Refit
 
-> Package : Franz.Common.Http.Refit Refit integration for the Franz Framework — production-oriented, small-surface, and highly modular. Provides typed Refit clients pre-wired with correlation and tenant propagation , optional authentication , resilience with Polly , Serilog-friendly logging , and OpenTelemetry-friendly i
+> Refit client registration and configuration with shared HTTP headers and Franz.Common request context.
 
 ## Overview
 
-Package : Franz.Common.Http.Refit Refit integration for the Franz Framework — production-oriented, small-surface, and highly modular. Provides typed Refit clients pre-wired with correlation and tenant propagation , optional authentication , resilience with Polly , Serilog-friendly logging , and OpenTelemetry-friendly i
+Refit client registration and configuration with shared HTTP headers and Franz.Common request context.
 
 ## Installation
 

@@ -1,10 +1,10 @@
 # Franz.Common.Http
 
-> Provides Http integration and reusable abstractions for .NET applications built with Franz.Common.
+> Reusable ASP.NET Core API infrastructure, middleware, endpoint conventions, and application integration utilities.
 
 ## Overview
 
-Provides Http integration and reusable abstractions for .NET applications built with Franz.Common.
+Reusable ASP.NET Core API infrastructure, middleware, endpoint conventions, and application integration utilities.
 
 ## Installation
 

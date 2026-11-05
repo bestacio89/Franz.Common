@@ -1,10 +1,10 @@
 # Franz.Common.Http.Headers
 
-> Provides Http Headers integration and reusable abstractions for .NET applications built with Franz.Common.
+> ASP.NET Core request and response header accessors for correlation, identity, tenant, and application metadata.
 
 ## Overview
 
-Provides Http Headers integration and reusable abstractions for .NET applications built with Franz.Common.
+ASP.NET Core request and response header accessors for correlation, identity, tenant, and application metadata.
 
 ## Installation
 

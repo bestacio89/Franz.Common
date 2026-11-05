@@ -1,10 +1,10 @@
 # Franz.Common.Http.Identity
 
-> Provides Http Identity integration and reusable abstractions for .NET applications built with Franz.Common.
+> Authenticated-user context accessors for ASP.NET Core endpoints, claims, and authorization-aware application services.
 
 ## Overview
 
-Provides Http Identity integration and reusable abstractions for .NET applications built with Franz.Common.
+Authenticated-user context accessors for ASP.NET Core endpoints, claims, and authorization-aware application services.
 
 ## Installation
 

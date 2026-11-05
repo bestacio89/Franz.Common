@@ -1,10 +1,10 @@
 # Franz.Common.Http.MultiTenancy
 
-> Provides Http MultiTenancy integration and reusable abstractions for .NET applications built with Franz.Common.
+> ASP.NET Core tenant resolution and request-scoped isolation for multi-tenant HTTP applications.
 
 ## Overview
 
-Provides Http MultiTenancy integration and reusable abstractions for .NET applications built with Franz.Common.
+ASP.NET Core tenant resolution and request-scoped isolation for multi-tenant HTTP applications.
 
 ## Installation
 
