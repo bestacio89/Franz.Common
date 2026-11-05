@@ -18,7 +18,7 @@ using Xunit;
 namespace Franz.Common.Messaging.Kafka.Tests;
 
 [Collection("Kafka")]
-public sealed class KafkaMessagingInitializerIntegrationTests : IAsyncLifetime
+public sealed class KafkaMessagingInitializerIntegrationTests
 {
   private readonly KafkaContainerFixture _fixture;
 
@@ -26,18 +26,6 @@ public sealed class KafkaMessagingInitializerIntegrationTests : IAsyncLifetime
   {
     _fixture = fixture ?? throw new ArgumentNullException(nameof(fixture));
   }
-
-  public async Task InitializeAsync()
-  {
-    // Manifest-derived topic names are shared by every initializer in this test assembly.
-    // Remove them before each test so assertions exercise the current test's topology contract.
-    await DeleteTopicIfExistsAsync("common-in");
-    await DeleteTopicIfExistsAsync("common-dlt");
-    await DeleteTopicIfExistsAsync("test-integration-in");
-    await DeleteTopicIfExistsAsync("test-integration-dlt");
-  }
-
-  public Task DisposeAsync() => Task.CompletedTask;
 
   // =========================================================
   // FACTORY HELPERS
@@ -108,40 +96,6 @@ public sealed class KafkaMessagingInitializerIntegrationTests : IAsyncLifetime
         BootstrapServers = _fixture.BootstrapServers
       }).Build();
 
-
-  private async Task DeleteTopicIfExistsAsync(string topicName)
-  {
-    using var admin = BuildAdminClient();
-    var metadata = admin.GetMetadata(topicName, TimeSpan.FromSeconds(10));
-    var existingTopic = metadata.Topics.SingleOrDefault(topic => topic.Topic == topicName);
-
-    if (existingTopic is null || existingTopic.Error.Code == ErrorCode.UnknownTopicOrPart)
-      return;
-
-    existingTopic.Error.Code.Should().Be(ErrorCode.NoError);
-
-    await admin.DeleteTopicsAsync(
-        new[] { topicName },
-        new DeleteTopicsOptions
-        {
-          OperationTimeout = TimeSpan.FromSeconds(10),
-          RequestTimeout = TimeSpan.FromSeconds(10)
-        });
-
-    var deadline = DateTime.UtcNow.AddSeconds(10);
-    while (DateTime.UtcNow < deadline)
-    {
-      metadata = admin.GetMetadata(topicName, TimeSpan.FromSeconds(10));
-      var remainingTopic = metadata.Topics.SingleOrDefault(topic => topic.Topic == topicName);
-
-      if (remainingTopic is null || remainingTopic.Error.Code == ErrorCode.UnknownTopicOrPart)
-        return;
-
-      await Task.Delay(TimeSpan.FromMilliseconds(100));
-    }
-
-    throw new TimeoutException($"Kafka topic '{topicName}' was not deleted within the expected timeout.");
-  }
 
 
   [Fact]
