@@ -30,6 +30,14 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
     if (!_activeRegistrations.TryAdd(registration.Id, registration))
       throw new InvalidOperationException("A duplicate Kafka consumer registration identifier was generated.");
 
+    // Close the race where disposal starts after the initial guard but before
+    // the registration becomes visible to Dispose().
+    if (Volatile.Read(ref _disposed) == 1)
+    {
+      ReleaseRegistration(registration);
+      ThrowIfDisposed();
+    }
+
     return registration;
   }
 
@@ -47,6 +55,14 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
       throw new InvalidOperationException("The Kafka consumer registration is not active.");
 
     _registrations.Add(consumer, registration);
+
+    if (Volatile.Read(ref _disposed) == 1 ||
+        !_activeRegistrations.TryGetValue(registration.Id, out active) ||
+        !ReferenceEquals(active, registration))
+    {
+      _registrations.Remove(consumer);
+      throw new ObjectDisposedException(nameof(KafkaRebalanceCoordinator));
+    }
   }
 
   /// <summary>Gets the existing registration or creates one for externally constructed consumers.</summary>
