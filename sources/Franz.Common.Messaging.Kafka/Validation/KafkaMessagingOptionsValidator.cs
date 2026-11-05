@@ -1,6 +1,8 @@
 #nullable enable
 using Franz.Common.Messaging.Kafka.Configuration;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Franz.Common.Messaging.Configuration;
 
@@ -12,13 +14,21 @@ namespace Franz.Common.Messaging.Kafka.Validation;
 public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessagingOptions>
 {
   private readonly ILogger<KafkaMessagingOptionsValidator>? _logger;
+  private readonly IConfiguration? _configuration;
 
-  public KafkaMessagingOptionsValidator(ILogger<KafkaMessagingOptionsValidator>? logger = null)
-      => _logger = logger;
+  public KafkaMessagingOptionsValidator(
+      ILogger<KafkaMessagingOptionsValidator>? logger = null,
+      IConfiguration? configuration = null)
+  {
+    _logger = logger;
+    _configuration = configuration;
+  }
 
   public ValidateOptionsResult Validate(string? name, KafkaMessagingOptions options)
   {
     ArgumentNullException.ThrowIfNull(options);
+
+    WarnForLegacyConfiguration();
 
     var failures = new List<string>();
     var security = options.Security;
@@ -141,6 +151,89 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
         ? ValidateOptionsResult.Success
         : ValidateOptionsResult.Fail(failures);
   }
+
+  private void WarnForLegacyConfiguration()
+  {
+    if (_configuration is null)
+      return;
+
+    var kafka = _configuration.GetSection(KafkaMessagingOptions.SectionName);
+    var legacyFailure = kafka.GetSection("Failure");
+    var currentFailure = kafka.GetSection("FailurePolicy");
+
+    if (legacyFailure.Exists())
+    {
+      if (!currentFailure.Exists())
+      {
+        _logger?.LogWarning(
+            "The legacy Messaging:Kafka:Failure section is no longer consumed. Migrate its settings to Messaging:Kafka:FailurePolicy.");
+      }
+      else
+      {
+        var disagreements = new List<string>();
+        CompareInteger("MaxRetryAttempts", legacyFailure["MaxRetryAttempts"], currentFailure["MaxRetryAttempts"], disagreements);
+        CompareBoolean("EnableDeadLetter", legacyFailure["EnableDeadLetter"], currentFailure["DeadLetterOnExhaustion"], disagreements);
+        CompareMilliseconds("RetryBackoffMs", legacyFailure["RetryBackoffMs"], currentFailure["RetryBackoff"], disagreements);
+        CompareMilliseconds("HandlerTimeoutMs", legacyFailure["HandlerTimeoutMs"], currentFailure["HandlerTimeout"], disagreements);
+
+        if (disagreements.Count > 0)
+          _logger?.LogWarning(
+              "Both legacy Messaging:Kafka:Failure and canonical Messaging:Kafka:FailurePolicy are configured with conflicting values for {Settings}. The legacy Failure section is ignored.",
+              string.Join(", ", disagreements));
+      }
+    }
+
+    var legacyKeyStrategy = kafka.GetSection("Producer")["MessageKeyStrategy"];
+    var orderingStrategy = kafka["OrderingStrategy"];
+    if (!string.IsNullOrWhiteSpace(legacyKeyStrategy) &&
+        !string.IsNullOrWhiteSpace(orderingStrategy) &&
+        !string.Equals(legacyKeyStrategy, orderingStrategy, StringComparison.OrdinalIgnoreCase))
+    {
+      _logger?.LogWarning(
+          "Legacy Messaging:Kafka:Producer:MessageKeyStrategy='{LegacyStrategy}' conflicts with Messaging:Kafka:OrderingStrategy='{OrderingStrategy}'. The legacy setting is ignored.",
+          legacyKeyStrategy,
+          orderingStrategy);
+    }
+  }
+
+  private static void CompareInteger(
+      string name,
+      string? legacyValue,
+      string? currentValue,
+      ICollection<string> disagreements)
+  {
+    if (int.TryParse(legacyValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var legacy) &&
+        int.TryParse(currentValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var current) &&
+        legacy != current)
+      disagreements.Add(name);
+  }
+
+  private static void CompareBoolean(
+      string name,
+      string? legacyValue,
+      string? currentValue,
+      ICollection<string> disagreements)
+  {
+    if (bool.TryParse(legacyValue, out var legacy) &&
+        bool.TryParse(currentValue, out var current) &&
+        legacy != current)
+      disagreements.Add(name);
+  }
+
+  private static void CompareMilliseconds(
+      string name,
+      string? legacyMilliseconds,
+      string? currentDuration,
+      ICollection<string> disagreements)
+  {
+    if (!double.TryParse(legacyMilliseconds, NumberStyles.Float, CultureInfo.InvariantCulture, out var legacy))
+      return;
+
+    if (TimeSpan.TryParse(currentDuration, CultureInfo.InvariantCulture, out var current) &&
+        Math.Abs(legacy - current.TotalMilliseconds) > 0.001)
+      disagreements.Add(name);
+  }
+
   private static void ValidateTopicOptions(string name, KafkaTopicOptions? topicOptions, ICollection<string> failures)
   {
     if (topicOptions is null)
