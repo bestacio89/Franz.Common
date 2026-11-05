@@ -111,6 +111,57 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
   }
 
   [Fact]
+  public async Task VerifyMode_ShouldRejectMissingDeadLetterBinding()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"verify-binding-{suffix}";
+    var deadLetterExchange = $"{queueName}-dead-letter";
+    var deadLetterQueue = $"{queueName}-dlq";
+    var options = new RabbitMQMessagingOptions
+    {
+      QueueName = queueName,
+      ExchangeName = $"{queueName}-exchange",
+      DeadLetterExchangeName = deadLetterExchange,
+      DeadLetterQueueName = deadLetterQueue,
+      ManagementApiUrl = _fixture.ManagementApiUrl,
+      ReplayStrategy = RabbitMQReplayStrategy.NoReplay
+    };
+
+    await using (var createModelProvider = new ModelProvider(
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>()))
+    {
+      await new RabbitMQMessagingInitializer(
+          createModelProvider,
+          _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
+          CreateAssemblyAccessor().Object,
+          Options.Create(options)).InitializeAsync();
+    }
+
+    var connection = await _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>().GetConnectionAsync();
+    await using (var channel = await connection.CreateChannelAsync())
+    {
+      await channel.QueueUnbindAsync(
+          queue: deadLetterQueue,
+          exchange: deadLetterExchange,
+          routingKey: deadLetterQueue);
+    }
+
+    options.ProvisioningMode = ProvisioningMode.Verify;
+    await using var verifyModelProvider = new ModelProvider(
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    var verify = new RabbitMQMessagingInitializer(
+        verifyModelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
+        CreateAssemblyAccessor().Object,
+        Options.Create(options));
+
+    var act = () => verify.InitializeAsync().AsTask();
+
+    await act.Should().ThrowAsync<InvalidOperationException>()
+        .WithMessage("*required binding*");
+  }
+
+  [Fact]
   public async Task InitializeAsync_ShouldApplyConfiguredQueueArguments()
   {
     var suffix = Guid.CreateVersion7().ToString("N");
