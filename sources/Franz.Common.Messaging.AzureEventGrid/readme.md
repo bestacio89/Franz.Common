@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.AzureEventGrid
 
-> Franz.Common.Messaging.AzureEventGrid is the Azure Event Grid ingress adapter for the Franz Framework messaging stack . It provides a host-agnostic, mediator-driven entry point for Azure Event Grid events, converting external cloud notifications into deterministic Franz messages without leaking HTTP, serialization, or
+> Azure Event Grid integration for publishing and handling event notifications through Franz.Common messaging contracts.
 
 ## Overview
 
-Franz.Common.Messaging.AzureEventGrid is the Azure Event Grid ingress adapter for the Franz Framework messaging stack . It provides a host-agnostic, mediator-driven entry point for Azure Event Grid events, converting external cloud notifications into deterministic Franz messages without leaking HTTP, serialization, or
+Azure Event Grid integration for publishing and handling event notifications through Franz.Common messaging contracts.
 
 ## Installation
 

@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.AzureEventBus
 
-> Franz.Common.Messaging.AzureEventBus is the Azure Service Bus transport adapter for the Franz Framework messaging stack . It implements Franz messaging abstractions to provide durable, reliable, and mediator-driven event delivery using Azure Service Bus Topics & Subscriptions , while preserving all Franz guarantees: Th
+> Azure Service Bus transport adapter for durable message publishing and consumption using Franz.Common messaging contracts.
 
 ## Overview
 
-Franz.Common.Messaging.AzureEventBus is the Azure Service Bus transport adapter for the Franz Framework messaging stack . It implements Franz messaging abstractions to provide durable, reliable, and mediator-driven event delivery using Azure Service Bus Topics & Subscriptions , while preserving all Franz guarantees: Th
+Azure Service Bus transport adapter for durable message publishing and consumption using Franz.Common messaging contracts.
 
 ## Installation
 

@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.AzureEventHubs
 
-> Franz.Common.Messaging.AzureEventHubs is the Azure Event Hubs streaming transport adapter for the Franz Framework messaging stack . It provides high-throughput, partitioned, Kafka-style event streaming backed by Azure Event Hubs , while preserving all Franz architectural guarantees: This package is the streaming counte
+> Azure Event Hubs transport adapter for high-throughput event streaming with Franz.Common messaging contracts.
 
 ## Overview
 
-Franz.Common.Messaging.AzureEventHubs is the Azure Event Hubs streaming transport adapter for the Franz Framework messaging stack . It provides high-throughput, partitioned, Kafka-style event streaming backed by Azure Event Hubs , while preserving all Franz architectural guarantees: This package is the streaming counte
+Azure Event Hubs transport adapter for high-throughput event streaming with Franz.Common messaging contracts.
 
 ## Installation
 

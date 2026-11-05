@@ -1,10 +1,10 @@
 # Franz.Common.Mediator
 
-> Provides Mediator integration and reusable abstractions for .NET applications built with Franz.Common.
+> Mediator dispatch for commands, queries, notifications, and pipeline behaviors with explicit registration and AOT-aware execution.
 
 ## Overview
 
-Provides Mediator integration and reusable abstractions for .NET applications built with Franz.Common.
+Mediator dispatch for commands, queries, notifications, and pipeline behaviors with explicit registration and AOT-aware execution.
 
 ## Installation
 

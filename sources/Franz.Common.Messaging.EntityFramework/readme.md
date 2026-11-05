@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.EntityFramework
 
-> A specialized library within the Franz Framework designed to integrate Entity Framework Core with messaging workflows. This package ensures transactional consistency for outbox patterns in relational databases, while also supporting polyglot persistence by delegating messaging storage to MongoDB or Azure Cosmos DB when
+> Entity Framework Core persistence for messaging inbox and outbox workflows with transactional consistency.
 
 ## Overview
 
-A specialized library within the Franz Framework designed to integrate Entity Framework Core with messaging workflows. This package ensures transactional consistency for outbox patterns in relational databases, while also supporting polyglot persistence by delegating messaging storage to MongoDB or Azure Cosmos DB when
+Entity Framework Core persistence for messaging inbox and outbox workflows with transactional consistency.
 
 ## Installation
 

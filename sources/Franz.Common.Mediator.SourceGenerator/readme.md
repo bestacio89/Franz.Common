@@ -1,10 +1,10 @@
 # Franz.Common.Mediator.SourceGenerator
 
-> Roslyn source generator used by Franz.Common.Mediator to generate deterministic handler registrations at compile time.
+> Roslyn source generator that discovers Mediator handlers and emits deterministic compile-time registration code.
 
 ## Overview
 
-Roslyn source generator used by Franz.Common.Mediator to generate deterministic handler registrations at compile time.
+Roslyn source generator that discovers Mediator handlers and emits deterministic compile-time registration code.
 
 ## Installation
 

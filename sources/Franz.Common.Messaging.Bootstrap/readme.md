@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Bootstrap
 
-> Provides Messaging Bootstrap integration and reusable abstractions for .NET applications built with Franz.Common.
+> Dependency-injection registration and configuration for composing Franz.Common messaging transports and policies.
 
 ## Overview
 
-Provides Messaging Bootstrap integration and reusable abstractions for .NET applications built with Franz.Common.
+Dependency-injection registration and configuration for composing Franz.Common messaging transports and policies.
 
 ## Installation
 
