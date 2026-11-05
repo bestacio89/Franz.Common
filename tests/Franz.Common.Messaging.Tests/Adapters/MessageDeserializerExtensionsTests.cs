@@ -18,8 +18,8 @@ public class MessageDeserializerExtensionsTests
     var existing = MessagingManifestRegistry.Get(assembly);
     MessagingManifestRegistry.Register(assembly, new MessagingManifest(
         existing.Destinations,
-        existing.Subscriptions.Concat(new[] { typeof(TestEvent) }),
-        existing.KnownTypes.Concat(new[] { typeof(TestCommand), typeof(TestEvent), typeof(UnsubscribedTestEvent) })));
+        existing.Subscriptions.Concat(new[] { typeof(TestEvent), typeof(NoCorrelationTestEvent) }),
+        existing.KnownTypes.Concat(new[] { typeof(TestCommand), typeof(TestEvent), typeof(UnsubscribedTestEvent), typeof(NoCorrelationTestEvent) })));
   }
   // Define concrete types for testing reflection logic
   public record TestCommand(string Data) : ICommand
@@ -39,6 +39,11 @@ public class MessageDeserializerExtensionsTests
   }
 
   public record LateRegisteredTestEvent(string Info) : IEvent
+  {
+    public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
+  }
+
+  public record NoCorrelationTestEvent(string Info) : IEvent
   {
     public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
   }
@@ -71,6 +76,20 @@ public class MessageDeserializerExtensionsTests
 
     result.Should().BeOfType<LateRegisteredTestEvent>()
         .Which.Info.Should().Be("late");
+  }
+
+  [Fact]
+  public void ToEvent_WithoutCorrelationProperty_ShouldDeserializeWithoutCachingANullDictionaryValue()
+  {
+    var message = new Message(JsonSerializer.Serialize(new NoCorrelationTestEvent("no-correlation")))
+    {
+      MessageType = typeof(NoCorrelationTestEvent).FullName
+    };
+
+    var result = message.ToEvent();
+
+    result.Should().BeOfType<NoCorrelationTestEvent>()
+        .Which.Info.Should().Be("no-correlation");
   }
 
   [Fact]
