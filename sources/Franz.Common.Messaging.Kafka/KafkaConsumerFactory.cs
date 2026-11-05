@@ -75,9 +75,10 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
     var groupId = _options.GroupId ?? throw new InvalidOperationException("Kafka GroupId is required.");
     var registration = _rebalanceCoordinator.CreateRegistration(groupId);
 
+    IConsumer<string, string>? consumer = null;
     try
     {
-      var consumer = new ConsumerBuilder<string, string>(config)
+      consumer = new ConsumerBuilder<string, string>(config)
           .SetPartitionsAssignedHandler((client, partitions) =>
           {
             _rebalanceCoordinator.OnPartitionsAssigned(
@@ -139,6 +140,7 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
     }
     catch
     {
+      consumer?.Dispose();
       _rebalanceCoordinator.ReleaseRegistration(registration);
       throw;
     }
