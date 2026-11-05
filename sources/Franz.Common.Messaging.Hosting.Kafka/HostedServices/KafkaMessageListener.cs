@@ -26,6 +26,7 @@ public sealed class KafkaMessageListener : IListener
   private readonly string _groupId;
   private readonly KafkaRebalanceCoordinator.ConsumerRegistration _registration;
   private readonly ConcurrentQueue<PendingKafkaResult> _pendingResults = new();
+  private int _deferredConsumerRelease;
 
   public KafkaMessageListener(
       IConsumer<string, string> consumer,
@@ -206,7 +207,8 @@ public sealed class KafkaMessageListener : IListener
         }
         finally
         {
-          _rebalanceCoordinator.EndHandlerExecution(_registration);
+          if (Volatile.Read(ref _deferredConsumerRelease) == 0)
+            _rebalanceCoordinator.EndHandlerExecution(_registration);
           ResumeAssignedPartitions();
         }
 
@@ -250,7 +252,8 @@ public sealed class KafkaMessageListener : IListener
       }
       finally
       {
-        _rebalanceCoordinator.ReleaseConsumer(_consumer);
+        if (Volatile.Read(ref _deferredConsumerRelease) == 0)
+          _rebalanceCoordinator.ReleaseConsumer(_consumer);
         _logger.LogInformation("Kafka listener stopped.");
       }
     }
@@ -274,8 +277,6 @@ public sealed class KafkaMessageListener : IListener
     {
       if (handlerToken.IsCancellationRequested)
       {
-        ObserveHandlerCompletion(handlerTask);
-
         if (stoppingToken.IsCancellationRequested)
           throw new OperationCanceledException("Kafka listener is stopping while a handler is still running.", stoppingToken);
 
@@ -283,6 +284,7 @@ public sealed class KafkaMessageListener : IListener
             ? "the Kafka partition was revoked or lost"
             : $"the configured handler timeout {_failurePolicy.HandlerTimeout} elapsed";
 
+        DeferConsumerReleaseUntilHandlerCompletes(handlerTask);
         throw new HandlerDidNotStopException(
             $"Kafka handler did not stop after cancellation because {reason}. The consumer will stop without committing the message.");
       }
@@ -329,12 +331,21 @@ public sealed class KafkaMessageListener : IListener
     return Task.CompletedTask;
   }
 
-  private static void ObserveHandlerCompletion(Task handlerTask)
+  private void DeferConsumerReleaseUntilHandlerCompletes(Task handlerTask)
   {
+    Interlocked.Exchange(ref _deferredConsumerRelease, 1);
+
     _ = handlerTask.ContinueWith(
-        static completed => _ = completed.Exception,
+        completed =>
+        {
+          if (completed.IsFaulted)
+            _logger.LogError(completed.Exception, "A Kafka handler completed with an exception after its consumer had been stopped.");
+
+          _rebalanceCoordinator.EndHandlerExecution(_registration);
+          _rebalanceCoordinator.ReleaseConsumer(_consumer);
+        },
         CancellationToken.None,
-        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+        TaskContinuationOptions.ExecuteSynchronously,
         TaskScheduler.Default);
   }
 
@@ -427,7 +438,6 @@ public sealed class KafkaMessageListener : IListener
       }
       catch (OperationCanceledException)
       {
-        ObserveHandlerCompletion(deliveryTask);
         throw;
       }
       catch (Exception deadLetterFailure)
@@ -455,9 +465,6 @@ public sealed class KafkaMessageListener : IListener
   {
     while (!deliveryTask.IsCompleted)
     {
-      cancellationToken.ThrowIfCancellationRequested();
-      rebalanceToken.ThrowIfCancellationRequested();
-
       try
       {
         var polled = _consumer.Consume(TimeSpan.FromMilliseconds(100));
@@ -472,9 +479,11 @@ public sealed class KafkaMessageListener : IListener
       }
     }
 
-    cancellationToken.ThrowIfCancellationRequested();
-    rebalanceToken.ThrowIfCancellationRequested();
     await deliveryTask.ConfigureAwait(false);
+    cancellationToken.ThrowIfCancellationRequested();
+    // A successful dead-letter publication after revocation is intentionally
+    // not acknowledged on the source partition; redelivery remains safe. 
+    _ = rebalanceToken;
   }
 
   public Task StopListenAsync(CancellationToken cancellationToken = default)
