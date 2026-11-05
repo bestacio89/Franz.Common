@@ -75,7 +75,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
         var channel = await _modelProvider.GetChannelAsync(cancellationToken).ConfigureAwait(false);
         await InitializeExchangeAsync(channel, _exchangeName, ExchangeType.Headers, true, cancellationToken).ConfigureAwait(false);
         await InitializeDestinationExchangesAsync(channel, cancellationToken).ConfigureAwait(false);
-        await InitializeQueueAsync(channel, _queueName, _exchangeName, _deadLetterExchangeName, _deadLetterQueueName, _options.QueueDurable, cancellationToken).ConfigureAwait(false);
+        await InitializeQueueAsync(channel, _queueName, _options.QueueDurable, cancellationToken).ConfigureAwait(false);
         await InitializeDeadLetterQueueAsync(channel, _deadLetterQueueName, _deadLetterExchangeName, cancellationToken).ConfigureAwait(false);
         if (string.Equals(_options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase))
           await InitializeReplayTopologyAsync(channel, cancellationToken).ConfigureAwait(false);
@@ -239,9 +239,6 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
   private async ValueTask InitializeQueueAsync(
       IChannel channel,
       string queueName,
-      string exchangeName,
-      string deadLetterExchange,
-      string deadLetterQueue,
       bool durable,
       CancellationToken cancellationToken)
   {

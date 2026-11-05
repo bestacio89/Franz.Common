@@ -194,6 +194,94 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
     }
   }
 
+
+  [Fact]
+  public async Task VerifyMode_ShouldAggregateMissingTopologyAndReportQueueArgumentDrift()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"verify-drift-{suffix}";
+    var exchangeName = $"{queueName}-exchange";
+    var deadLetterExchange = $"{queueName}-dead-letter";
+    var deadLetterQueue = $"{queueName}-dlq";
+
+    var connection = await _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>().GetConnectionAsync();
+    await using (var legacyChannel = await connection.CreateChannelAsync())
+    {
+      await legacyChannel.QueueDeclareAsync(queueName, durable: true, exclusive: false, autoDelete: false,
+          arguments: new Dictionary<string, object?> { ["x-queue-type"] = "classic" });
+    }
+
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      ProvisioningMode = ProvisioningMode.Verify,
+      QueueName = queueName,
+      ExchangeName = exchangeName,
+      DeadLetterExchangeName = deadLetterExchange,
+      DeadLetterQueueName = deadLetterQueue,
+      QueueType = RabbitMQQueueType.Quorum
+    });
+
+    await using var modelProvider = new ModelProvider(_fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    var initializer = new RabbitMQMessagingInitializer(
+        modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
+        CreateAssemblyAccessor().Object,
+        options);
+
+    var act = () => initializer.InitializeAsync().AsTask();
+
+    var error = await act.Should().ThrowAsync<InvalidOperationException>();
+    error.Which.Message.Should().Contain(queueName)
+        .And.Contain(exchangeName)
+        .And.Contain(deadLetterExchange)
+        .And.Contain(deadLetterQueue);
+  }
+
+  [Fact]
+  public async Task CreateMode_ShouldPreserveMatchingLegacyQuorumTopology()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"legacy-quorum-{suffix}";
+    var exchangeName = $"{queueName}-exchange";
+    var deadLetterExchange = $"{queueName}-dead-letter";
+    var deadLetterQueue = $"{queueName}-dlq";
+
+    var connection = await _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>().GetConnectionAsync();
+    await using (var legacyChannel = await connection.CreateChannelAsync())
+    {
+      await legacyChannel.ExchangeDeclareAsync(exchangeName, ExchangeType.Headers, durable: true);
+      await legacyChannel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Direct, durable: true);
+      await legacyChannel.QueueDeclareAsync(queueName, durable: true, exclusive: false, autoDelete: false,
+          arguments: new Dictionary<string, object?>
+          {
+            ["x-queue-type"] = "quorum",
+            ["x-dead-letter-exchange"] = deadLetterExchange,
+            ["x-dead-letter-routing-key"] = deadLetterQueue
+          });
+      await legacyChannel.QueueDeclareAsync(deadLetterQueue, durable: true, exclusive: false, autoDelete: false,
+          arguments: new Dictionary<string, object?> { ["x-queue-type"] = "quorum" });
+    }
+
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      QueueName = queueName,
+      ExchangeName = exchangeName,
+      DeadLetterExchangeName = deadLetterExchange,
+      DeadLetterQueueName = deadLetterQueue,
+      QueueType = RabbitMQQueueType.Quorum,
+      ReplayStrategy = "NoReplay"
+    });
+
+    await using var modelProvider = new ModelProvider(_fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    var initializer = new RabbitMQMessagingInitializer(
+        modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
+        CreateAssemblyAccessor().Object,
+        options);
+
+    await initializer.InitializeAsync();
+  }
+
   [Fact]
   public async Task InitializeAsync_WhenProvisioningIsOff_ShouldNotAccessBroker()
   {
