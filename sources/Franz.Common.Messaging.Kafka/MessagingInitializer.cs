@@ -144,39 +144,31 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
           : new Dictionary<string, string>(topicOptions.Configurations, StringComparer.Ordinal)
     };
 
+    if (_options.ProvisioningMode == Franz.Common.Messaging.Configuration.ProvisioningMode.Verify)
+    {
+      VerifyTopic(name, topicOptions, timeout);
+      return;
+    }
+
     try
     {
-      if (_options.ProvisioningMode == Franz.Common.Messaging.Configuration.ProvisioningMode.Verify)
-      {
-        VerifyTopic(name, topicOptions, timeout);
-        return;
-      }
-
-      try
-      {
-        await _adminClient.CreateTopicsAsync(
-            new[] { specification },
-            new CreateTopicsOptions
-            {
-              OperationTimeout = timeout,
-              RequestTimeout = timeout
-            }).WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
-      }
-      catch (CreateTopicsException ex) when (
-          ex.Results.All(static result => result.Error.Code == ErrorCode.TopicAlreadyExists))
-      {
-        // Existing topics are reconciled below. Kafka permits increasing, but not
-        // decreasing, a topic's partition count.
-      }
-
-      await EnsureMinimumPartitionCountAsync(name, topicOptions, timeout, cancellationToken)
-          .ConfigureAwait(false);
+      await _adminClient.CreateTopicsAsync(
+          new[] { specification },
+          new CreateTopicsOptions
+          {
+            OperationTimeout = timeout,
+            RequestTimeout = timeout
+          }).WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
     }
-    catch (CreateTopicsException ex)
+    catch (CreateTopicsException ex) when (
+        ex.Results.All(static result => result.Error.Code == ErrorCode.TopicAlreadyExists))
     {
-      if (ex.Results.Any(result => result.Error.Code != ErrorCode.TopicAlreadyExists))
-        throw;
+      // Existing topics are reconciled below. Kafka permits increasing, but not
+      // decreasing, a topic's partition count.
     }
+
+    await EnsureMinimumPartitionCountAsync(name, topicOptions, timeout, cancellationToken)
+        .ConfigureAwait(false);
   }
 
   private void VerifyTopic(string name, KafkaTopicOptions topicOptions, TimeSpan timeout)
