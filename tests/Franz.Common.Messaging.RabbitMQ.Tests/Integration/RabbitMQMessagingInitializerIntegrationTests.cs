@@ -81,6 +81,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       ExchangeName = $"{queueName}-exchange",
       DeadLetterQueueName = $"{queueName}-dlq",
       DeadLetterExchangeName = $"{queueName}-dead-letter",
+      ManagementApiUrl = _fixture.ManagementApiUrl,
       ReplayStrategy = RabbitMQReplayStrategy.ProgressiveFourStep,
       FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 5, retryBackoff: TimeSpan.FromSeconds(30))
     };
