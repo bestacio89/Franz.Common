@@ -10,9 +10,6 @@ public sealed class TenantContextAccessor(
     IMessageContextAccessor messageContextAccessor,
     ITenantExecutionContextAccessor executionContextAccessor) : ITenantContextAccessor
 {
-    public Guid? GetCurrentId() => GetCurrentTenantId();
-    public void SetCurrentId(Guid tenantId) => SetCurrentTenantId(tenantId);
-
     public Guid? GetCurrentTenantId() => executionContextAccessor.Current?.TenantId;
 
     public void SetCurrentTenantId(Guid tenantId)
