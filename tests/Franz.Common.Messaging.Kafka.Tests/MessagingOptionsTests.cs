@@ -290,7 +290,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     }
 
     [Fact]
-    public void KafkaFailureOptions_ShouldReject_RetryBackoffBudgetThatExceedsMaxPollInterval()
+    public void FailurePolicy_ShouldReject_RetryBackoffBudgetThatExceedsMaxPollInterval()
     {
       var options = new KafkaMessagingOptions
       {
@@ -313,7 +313,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     }
 
     [Fact]
-    public void KafkaFailureOptions_ShouldAccept_RetryBackoffBudgetBelowMaxPollInterval()
+    public void FailurePolicy_ShouldAccept_RetryBackoffBudgetBelowMaxPollInterval()
     {
       var options = new KafkaMessagingOptions
       {
@@ -334,7 +334,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     }
 
     [Fact]
-    public void KafkaFailureOptions_ShouldAllowZeroRetryBudget()
+    public void FailurePolicy_ShouldAllowZeroRetryBudget()
     {
       var options = new KafkaMessagingOptions
       {
@@ -355,7 +355,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     }
 
     [Fact]
-    public void KafkaFailureOptions_ShouldIncludeHandlerTimeoutInMaxPollBudget()
+    public void FailurePolicy_ShouldIncludeHandlerTimeoutInMaxPollBudget()
     {
       var options = new KafkaMessagingOptions
       {
@@ -374,7 +374,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     }
 
     [Fact]
-    public void KafkaFailureOptions_ShouldAcceptHandlerAndRetryBudgetBelowMaxPollInterval()
+    public void FailurePolicy_ShouldAcceptHandlerAndRetryBudgetBelowMaxPollInterval()
     {
       var options = new KafkaMessagingOptions
       {

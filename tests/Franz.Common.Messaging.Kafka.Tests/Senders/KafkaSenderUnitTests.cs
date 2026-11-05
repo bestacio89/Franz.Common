@@ -4,7 +4,6 @@ using FluentAssertions;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Configuration;
-using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Senders;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
@@ -51,7 +50,7 @@ public sealed class KafkaSenderUnitTests
     {
       BootstrapServers = "localhost:9092",
       GroupId = "test-group",
-      Producer = new KafkaProducerOptions { OrderingStrategy = strategy }
+      OrderingStrategy = strategy
     });
 
     var topicNames = new KafkaTopicNames(mockAccessor.Object, options);
