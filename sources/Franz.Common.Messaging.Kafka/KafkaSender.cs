@@ -79,8 +79,17 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
 
   private byte[] Serialize(Message message)
   {
-    var value = _serializer.Serialize(message.Body);
-    return string.IsNullOrEmpty(value) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(value);
+    try
+    {
+      var value = _serializer.Serialize(message.Body);
+      return string.IsNullOrEmpty(value) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(value);
+    }
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+      throw new PermanentMessagingException(
+          $"Kafka message {message.Id} could not be serialized; retrying the same payload cannot resolve this failure.",
+          ex);
+    }
   }
 
   private static Confluent.Kafka.Headers BuildHeaders(Message message)
