@@ -290,13 +290,19 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
   [Fact]
   public async Task CreateMode_ShouldMatchExplicitQueueTypeWithBrokerDefaultQuorum()
   {
-    var configPath = Path.Combine(AppContext.BaseDirectory, "Infrastructure", "rabbitmq-quorum.conf");
     await using var container = new RabbitMqBuilder(RabbitMqContainerFixture.Image)
-        .WithResourceMapping(configPath, "/etc/rabbitmq/rabbitmq.conf")
         .WithCleanUp(true)
         .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(5672))
         .Build();
     await container.StartAsync();
+
+    // The default vhost metadata takes precedence over the node-wide setting.
+    // Configure the broker's effective default explicitly so this test verifies
+    // declarations that omit x-queue-type against a known quorum default.
+    var defaultQueueType = await container.ExecAsync(
+        ["rabbitmqctl", "update_vhost_metadata", "/", "--default-queue-type", "quorum"]);
+    defaultQueueType.ExitCode.Should().Be(0,
+        $"RabbitMQ must accept the quorum default queue type. stdout: {defaultQueueType.Stdout}; stderr: {defaultQueueType.Stderr}");
 
     var suffix = Guid.CreateVersion7().ToString("N");
     var queueName = $"broker-default-quorum-{suffix}";
