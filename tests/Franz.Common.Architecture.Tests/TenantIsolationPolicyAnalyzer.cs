@@ -26,7 +26,7 @@ internal static class TenantIsolationPolicyAnalyzer
         "SqlQueryRawAsync"
     };
 
-    internal static IReadOnlySet<string> Analyze(string source, string path)
+    internal static IReadOnlySet<string> Analyze(string source, string path, string? tenantFilterConventionSource = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -52,11 +52,50 @@ internal static class TenantIsolationPolicyAnalyzer
                 .OfType<MethodDeclarationSyntax>()
                 .SingleOrDefault(method => method.Identifier.ValueText == "OnModelCreating");
 
-            if (modelBuilderMethod is null || !HasTenantQueryFilter(modelBuilderMethod))
+            var hasContextFilter = modelBuilderMethod is not null && HasTenantQueryFilter(modelBuilderMethod);
+            var hasConventionFilter = !string.IsNullOrWhiteSpace(tenantFilterConventionSource)
+                && HasTenantQueryFilterConvention(tenantFilterConventionSource);
+
+            if (!hasContextFilter && !hasConventionFilter)
                 findings.Add("TENANT_QUERY_FILTER_MISSING");
         }
 
         return findings;
+    }
+
+    private static bool HasTenantQueryFilterConvention(string source)
+    {
+        var root = CSharpSyntaxTree.ParseText(source).GetRoot();
+        var convention = root.DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .SingleOrDefault(type => type.Identifier.ValueText == "TenantQueryFilterConvention");
+        if (convention is null)
+            return false;
+
+        var method = convention.Members.OfType<MethodDeclarationSyntax>()
+            .SingleOrDefault(member => member.Identifier.ValueText == "ProcessModelFinalizing");
+        if (method is null)
+            return false;
+
+        var invocations = method.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        var identifiesTenantEntities = invocations.Any(invocation =>
+            GetInvokedMethodName(invocation.Expression) == "IsAssignableFrom"
+            && invocation.ToString().Contains("ITenantEntity", StringComparison.Ordinal));
+        var appliesQueryFilter = invocations.Any(invocation =>
+            GetInvokedMethodName(invocation.Expression) == "SetQueryFilter");
+        var scopesFilterToCurrentTenant = method.DescendantNodes()
+            .OfType<IdentifierNameSyntax>()
+            .Any(identifier => identifier.Identifier.ValueText == "CurrentTenantId")
+            && method.DescendantNodes()
+                .OfType<IdentifierNameSyntax>()
+                .Any(identifier => identifier.Identifier.ValueText == "TenantId")
+            && method.DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Any(member =>
+                    member.Expression is IdentifierNameSyntax receiver
+                    && receiver.Identifier.ValueText == "EF"
+                    && member.Name.Identifier.ValueText == "Property");
+
+        return identifiesTenantEntities && appliesQueryFilter && scopesFilterToCurrentTenant;
     }
 
     private static bool HasTenantQueryFilter(MethodDeclarationSyntax method)

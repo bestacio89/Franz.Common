@@ -148,6 +148,9 @@ internal sealed class CachedTenantStore : ITenantStore
 
         var generation = _state.GetGeneration(key);
         var value = await factory().ConfigureAwait(false);
+        if (value is bool exists && !exists)
+            return value;
+
         StoreIfCurrent(key, value, generation);
         return value;
     }

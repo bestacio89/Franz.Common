@@ -16,8 +16,9 @@ public class TestCosmosDbContext : CosmosDbContextBase
       IDispatcher dispatcher,
       IOptions<CosmosOptions> cosmosOptions,
       ICurrentUserService? currentUser = null,
-      ITenantExecutionContextAccessor? tenantContextAccessor = null)
-      : base(options, dispatcher, cosmosOptions, currentUser, tenantContextAccessor)
+      ITenantExecutionContextAccessor? tenantContextAccessor = null,
+      IOptions<MultiTenancyOptions>? multiTenancyOptions = null)
+      : base(options, dispatcher, cosmosOptions, currentUser, tenantContextAccessor, multiTenancyOptions)
   {
   }
 

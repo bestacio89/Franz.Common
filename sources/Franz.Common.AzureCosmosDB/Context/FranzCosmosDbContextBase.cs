@@ -39,7 +39,27 @@ public abstract class CosmosDbContextBase : DbContextBase
         IOptions<CosmosOptions> cosmosOptions,
         ICurrentUserService? currentUser,
         ITenantExecutionContextAccessor? tenantContextAccessor)
-        : base(options, dispatcher, currentUser, tenantContextAccessor)
+        : this(options, dispatcher, cosmosOptions, currentUser, tenantContextAccessor, null)
+    {
+    }
+
+    /// <summary>
+    /// Creates a Cosmos context with explicit multi-tenancy activation.
+    /// </summary>
+    protected CosmosDbContextBase(
+        DbContextOptions options,
+        IDispatcher dispatcher,
+        IOptions<CosmosOptions> cosmosOptions,
+        ICurrentUserService? currentUser,
+        ITenantExecutionContextAccessor? tenantContextAccessor,
+        IOptions<MultiTenancyOptions>? multiTenancyOptions)
+        : base(
+            options,
+            dispatcher,
+            currentUser,
+            tenantContextAccessor,
+            databaseOptions: null,
+            multiTenancyOptions)
     {
         _cosmosOptions = cosmosOptions?.Value
             ?? throw new ArgumentNullException(nameof(cosmosOptions));

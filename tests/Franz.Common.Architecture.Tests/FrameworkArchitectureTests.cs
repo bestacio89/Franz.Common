@@ -280,6 +280,41 @@ public sealed class FrameworkArchitectureTests
     Assert.DoesNotContain("TENANT_QUERY_FILTER_MISSING", findings);
   }
 
+
+  [Fact]
+  public void Tenant_query_filter_policy_accepts_convention_based_tenant_scoping()
+  {
+    const string context = """
+      public sealed class DbContextBase
+      {
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+          base.OnModelCreating(modelBuilder);
+        }
+      }
+      """;
+    const string convention = """
+      internal sealed class TenantQueryFilterConvention
+      {
+        public void ProcessModelFinalizing()
+        {
+          var isTenantEntity = typeof(ITenantEntity).IsAssignableFrom(clrType);
+          var tenantId = EF.Property<Guid>(parameter, nameof(ITenantEntity.TenantId));
+          var currentTenantId = dbContext.CurrentTenantId;
+          entityType.SetQueryFilter(Expression.Lambda(
+            Expression.Equal(tenantId, currentTenantId), parameter));
+        }
+      }
+      """;
+
+    var findings = TenantIsolationPolicyAnalyzer.Analyze(
+      context,
+      "planted/DbContextBase.cs",
+      convention);
+
+    Assert.DoesNotContain("TENANT_QUERY_FILTER_MISSING", findings);
+  }
+
   [Fact]
   public void Runtime_source_policy_violations_must_be_explicitly_allowlisted()
   {
@@ -425,7 +460,19 @@ public sealed class FrameworkArchitectureTests
       var syntaxTree = CSharpSyntaxTree.ParseText(File.ReadAllText(file), path: relativePath);
       var root = syntaxTree.GetRoot();
 
-      foreach (var rule in TenantIsolationPolicyAnalyzer.Analyze(File.ReadAllText(file), relativePath))
+      var tenantFilterConventionPath = Path.Combine(
+        sourceRoot,
+        "Franz.Common.EntityFramework",
+        "TenantQueryFilterConvention.cs");
+      var tenantFilterConventionSource = relativePath == "sources/Franz.Common.EntityFramework/DbContextBase.cs"
+        && File.Exists(tenantFilterConventionPath)
+          ? File.ReadAllText(tenantFilterConventionPath)
+          : null;
+
+      foreach (var rule in TenantIsolationPolicyAnalyzer.Analyze(
+        File.ReadAllText(file),
+        relativePath,
+        tenantFilterConventionSource))
         findings.Add(new PolicyFinding(rule, relativePath));
 
       var usesDynamicTypes = root

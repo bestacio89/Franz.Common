@@ -4,8 +4,11 @@ namespace Franz.Common.Messaging.MultiTenancy.Configuration;
 public sealed class TenantMessagingOptions
 {
     /// <summary>
-    /// Requires every hosted message consumer to establish a validated tenant execution scope.
-    /// Enable this when tenant-filtered persistence is used by message handlers.
+    /// Requires hosted message consumers to establish a validated tenant execution scope.
     /// </summary>
+    /// <remarks>
+    /// Disabled by default because messaging tenancy services are also used for outbound metadata
+    /// propagation. Enable this when consumers process tenant-scoped data.
+    /// </remarks>
     public bool RequireTenantScope { get; set; }
 }

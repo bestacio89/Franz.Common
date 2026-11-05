@@ -53,7 +53,7 @@ public sealed class TenantMessageContextInitializer : ITenantMessageContextIniti
         ArgumentNullException.ThrowIfNull(message);
 
         var tenantId = ReadRequiredGuid(message, HeaderConstants.TenantId, "tenant");
-        var tenant = await _tenantStore.FindByIdAsync(tenantId).ConfigureAwait(false)
+        var tenant = await _tenantStore.FindByIdAsync(tenantId, cancellationToken).ConfigureAwait(false)
             ?? throw new TenantResolutionException("The message references an unknown tenant.");
         if (tenant.Status != TenantStatus.Active)
             throw new TenantResolutionException("The message tenant is not active.");

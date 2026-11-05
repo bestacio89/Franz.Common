@@ -57,17 +57,13 @@ public sealed class CosmosFixture : IAsyncLifetime
 
     // Core infrastructure
     services.AddLogging();
+    services.Configure<MultiTenancyOptions>(options => options.Enabled = true);
     services.AddScoped<ITenantExecutionContextAccessor, CosmosTestTenantExecutionContextAccessor>();
 
     services.AddSingleton(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
     services.AddSingleton<IIdGenerator<Guid>, GuidV7Generator>();
 
     services.AddSingleton<IDispatcher>(Substitute.For<IDispatcher>());
-
-    services.AddFranzCosmosDbContext<TestCosmosDbContext>(
-      configuration,
-      validateOnStart: false
-    );
 
     services.AddCosmosInfrastructure<TestCosmosDbContext>(configuration);
     services.AddCosmosTenantRepository<CosmosSdkTenantDocument>("TenantDocuments");

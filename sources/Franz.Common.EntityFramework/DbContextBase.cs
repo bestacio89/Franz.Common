@@ -4,9 +4,9 @@ using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Options;
-using System.Linq.Expressions;
 
 namespace Franz.Common.EntityFramework;
 
@@ -17,6 +17,9 @@ public abstract class DbContextBase : DbContext
     private readonly ITenantExecutionContextAccessor? _tenantContextAccessor;
     private readonly DatabaseOptions? _databaseOptions;
     private readonly bool _multiTenancyEnabled;
+
+    internal bool MultiTenancyEnabledForModel => _multiTenancyEnabled;
+    internal DatabaseIsolationMode? DatabaseIsolationModeForModel => _databaseOptions?.IsolationMode;
 
     protected DbContextBase(
         DbContextOptions options,
@@ -184,6 +187,18 @@ public abstract class DbContextBase : DbContext
         }
     }
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.ReplaceService<IModelCacheKeyFactory, TenantModelCacheKeyFactory>();
+        base.OnConfiguring(optionsBuilder);
+    }
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        configurationBuilder.Conventions.Add(_ => new TenantQueryFilterConvention(this));
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -198,38 +213,21 @@ public abstract class DbContextBase : DbContext
             if (!isDomainEntity && !isTenantEntity && !isConcurrencyTrackedEntity)
                 continue;
 
-            if (isTenantEntity)
-                modelBuilder.Entity(clrType).Property<Guid>(nameof(ITenantEntity.TenantId)).IsConcurrencyToken();
+            // Relational providers use TenantId as an optimistic-concurrency predicate.
+            // Cosmos only supports its native _etag property as a concurrency token; tenant
+            // isolation there is enforced by the partition key and the composed query filter.
+            if (isTenantEntity &&
+                !string.Equals(Database.ProviderName, "Microsoft.EntityFrameworkCore.Cosmos", StringComparison.Ordinal))
+            {
+                modelBuilder.Entity(clrType)
+                    .Property<Guid>(nameof(ITenantEntity.TenantId))
+                    .IsConcurrencyToken();
+            }
 
             if (isConcurrencyTrackedEntity)
                 modelBuilder.Entity(clrType)
                     .Property<long>(nameof(IConcurrencyTrackedEntity.ConcurrencyVersion))
                     .IsConcurrencyToken();
-
-            var parameter = Expression.Parameter(clrType, "entity");
-            Expression? filterBody = null;
-
-            if (isDomainEntity)
-            {
-                var isDeleted = Expression.Property(parameter, nameof(IEntity<object>.IsDeleted));
-                filterBody = Expression.Equal(isDeleted, Expression.Constant(false));
-            }
-
-            if (isTenantEntity)
-            {
-                var tenantId = Expression.Call(
-                    typeof(EF),
-                    nameof(EF.Property),
-                    new[] { typeof(Guid) },
-                    parameter,
-                    Expression.Constant(nameof(ITenantEntity.TenantId)));
-                var currentTenantId = Expression.Property(Expression.Constant(this), nameof(CurrentTenantId));
-                var tenantFilter = Expression.Equal(tenantId, currentTenantId);
-                filterBody = filterBody is null ? tenantFilter : Expression.AndAlso(filterBody, tenantFilter);
-            }
-
-            if (filterBody is not null)
-                modelBuilder.Entity(clrType).HasQueryFilter(Expression.Lambda(filterBody, parameter));
         }
     }
 }

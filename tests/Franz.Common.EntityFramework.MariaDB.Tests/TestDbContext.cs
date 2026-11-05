@@ -5,6 +5,7 @@ using Franz.Common.EntityFramework.ProviderContract.Tests;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.EntityFramework.MariaDB.Tests;
 
@@ -12,8 +13,15 @@ public sealed class TestDbContext(
     DbContextOptions<TestDbContext> options,
     IDispatcher dispatcher,
     ICurrentUserService? currentUser = null,
-    ITenantExecutionContextAccessor? tenantContextAccessor = null)
-    : DbContextBase(options, dispatcher, currentUser, tenantContextAccessor)
+    ITenantExecutionContextAccessor? tenantContextAccessor = null,
+    IOptions<MultiTenancyOptions>? multiTenancyOptions = null)
+    : DbContextBase(
+        options,
+        dispatcher,
+        currentUser,
+        tenantContextAccessor,
+        databaseOptions: null,
+        multiTenancyOptions ?? Options.Create(new MultiTenancyOptions { Enabled = true }))
 {
   public DbSet<TestEntity> Entities => Set<TestEntity>();
   public DbSet<TestChild> Children => Set<TestChild>();

@@ -69,6 +69,7 @@ public class OracleFixture : IAsyncLifetime
 
     services.AddSingleton(Substitute.For<IDispatcher>());
     services.AddLogging();
+    services.Configure<MultiTenancyOptions>(options => options.Enabled = true);
     services.AddSingleton<IIdGenerator<Guid>, GuidV7Generator>();
     services.AddTransient(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
 

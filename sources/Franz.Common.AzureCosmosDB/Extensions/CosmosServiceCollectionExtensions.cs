@@ -25,6 +25,22 @@ namespace Franz.Common.AzureCosmosDB.Extensions;
 public static class CosmosServiceCollectionExtensions
 {
   private const string DefaultSection = "Cosmos";
+  private static readonly Func<HttpClient> DefaultCosmosHttpClientFactory =
+      static () => CreateCosmosHttpClient(allowInvalidCertificates: false);
+  private static readonly Func<HttpClient> TestCosmosHttpClientFactory =
+      static () => CreateCosmosHttpClient(allowInvalidCertificates: true);
+
+  private static HttpClient CreateCosmosHttpClient(bool allowInvalidCertificates)
+  {
+    var handler = new HttpClientHandler();
+    if (allowInvalidCertificates)
+    {
+      handler.ServerCertificateCustomValidationCallback =
+          HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+    }
+
+    return new HttpClient(handler);
+  }
 
 
   /// <summary>
@@ -224,26 +240,14 @@ public static class CosmosServiceCollectionExtensions
   {
     ArgumentNullException.ThrowIfNull(settings);
 
-    builder.HttpClientFactory(() =>
-    {
-      var handler = new HttpClientHandler();
+    // Stable delegates prevent EF Core from creating a new internal service provider
+    // for every DbContextOptions instance.
+    var httpClientFactory = settings.Enabled &&
+        settings.ApplicationName?.Contains("Tests", StringComparison.OrdinalIgnoreCase) == true
+            ? TestCosmosHttpClientFactory
+            : DefaultCosmosHttpClientFactory;
 
-      if (settings.Enabled &&
-          settings.ApplicationName?.Contains("Tests", StringComparison.OrdinalIgnoreCase) == true)
-      {
-        handler.ServerCertificateCustomValidationCallback =
-            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
-      }
-
-      var client = new HttpClient(handler);
-
-      if (!string.IsNullOrWhiteSpace(settings.ApplicationName))
-      {
-        client.DefaultRequestHeaders.Add("User-Agent", settings.ApplicationName);
-      }
-
-      return client;
-    });
+    builder.HttpClientFactory(httpClientFactory);
 
     builder.ConnectionMode(Microsoft.Azure.Cosmos.ConnectionMode.Gateway);
     builder.LimitToEndpoint();

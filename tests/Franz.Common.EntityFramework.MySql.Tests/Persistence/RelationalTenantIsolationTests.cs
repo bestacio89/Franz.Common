@@ -1,7 +1,9 @@
 using Franz.Common.EntityFramework.ProviderContract.Tests;
 using Franz.Common.EntityFramework.MySql.Tests.Fixtures;
 using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microting.EntityFrameworkCore.MySql.Infrastructure;
 using NSubstitute;
 using Xunit;
@@ -21,7 +23,8 @@ public sealed class RelationalTenantIsolationTests(MySqlFixture fixture)
         await using var context = new TestDbContext(
             options,
             Substitute.For<IDispatcher>(),
-            tenantContextAccessor: TenantExecutionContextAccessor.ForTenant(tenantId));
+            tenantContextAccessor: TenantExecutionContextAccessor.ForTenant(tenantId),
+            multiTenancyOptions: Options.Create(new MultiTenancyOptions { Enabled = true }));
         await action(context);
     }
 }

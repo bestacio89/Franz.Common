@@ -6,6 +6,7 @@ using Franz.Common.Reflection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Franz.Common.Messaging.MultiTenancy;
 
 namespace Franz.Common.Messaging.Hosting.RabbitMQ.HostedServices;
 
@@ -19,6 +20,7 @@ public sealed class RabbitMQHostedService : BackgroundService
   private readonly IModelProvider _modelProvider;
   private readonly ILogger<RabbitMQHostedService> _logger;
   private readonly string _queueName;
+  private readonly IServiceProvider? _serviceProvider;
 
   /// <summary>
   /// Creates the hosted service using the assembly-derived queue name.
@@ -29,7 +31,7 @@ public sealed class RabbitMQHostedService : BackgroundService
       IAssemblyAccessor assemblyAccessor,
       ILogger<RabbitMQHostedService> logger,
       IQueueProvisioner? provisioner = null)
-      : this(listener, modelProvider, assemblyAccessor, logger, provisioner, options: null)
+      : this(listener, modelProvider, assemblyAccessor, logger, provisioner, options: null, serviceProvider: null)
   {
   }
 
@@ -42,12 +44,14 @@ public sealed class RabbitMQHostedService : BackgroundService
       IAssemblyAccessor assemblyAccessor,
       ILogger<RabbitMQHostedService> logger,
       IQueueProvisioner? provisioner,
-      IOptions<RabbitMQMessagingOptions>? options)
+      IOptions<RabbitMQMessagingOptions>? options,
+      IServiceProvider? serviceProvider = null)
   {
     _listener = listener;
     _modelProvider = modelProvider;
     _logger = logger;
     _provisioner = provisioner;
+    _serviceProvider = serviceProvider;
 
     var configuredQueueName = options?.Value.QueueName;
     _queueName = !string.IsNullOrWhiteSpace(configuredQueueName)
@@ -55,6 +59,14 @@ public sealed class RabbitMQHostedService : BackgroundService
         : RabbitMQQueueNamer.GetQueueName(
             assemblyAccessor.GetEntryAssembly()
             ?? throw new InvalidOperationException("Entry assembly cannot be null."));
+  }
+
+  public override Task StartAsync(CancellationToken cancellationToken)
+  {
+    if (_serviceProvider is not null)
+      TenantMessagingStartupValidation.Validate(_serviceProvider);
+
+    return base.StartAsync(cancellationToken);
   }
 
   protected override async Task ExecuteAsync(CancellationToken stoppingToken)

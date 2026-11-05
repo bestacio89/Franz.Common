@@ -14,6 +14,7 @@
     <ProjectReference Include="..\Franz.Common.Messaging.AzureEventGrid\Franz.Common.Messaging.AzureEventGrid.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.AzureEventHubs\Franz.Common.Messaging.AzureEventHubs.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging.Hosting\Franz.Common.Messaging.Hosting.csproj" />
+    <ProjectReference Include="..\Franz.Common.Messaging.MultiTenancy\Franz.Common.Messaging.MultiTenancy.csproj" />
   </ItemGroup>
 
 </Project>
