@@ -2,7 +2,7 @@
 using Franz.Common.Business.Domain;
 using Franz.Common.EntityFramework;
 using Franz.Common.Mediator.Dispatchers;
-using Franz.Common.Mediator.Testing;
+using Franz.Common.Testing.Mediator;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
