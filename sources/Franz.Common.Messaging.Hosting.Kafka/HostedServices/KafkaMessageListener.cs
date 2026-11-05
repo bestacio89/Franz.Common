@@ -429,9 +429,9 @@ public sealed class KafkaMessageListener : IListener
     headers.Add("x-franz-failure-utc", Encoding.UTF8.GetBytes(DateTimeOffset.UtcNow.ToString("O")));
 
     _rebalanceCoordinator.BeginHandlerExecution(_registration);
-    PauseAssignedPartitions();
     try
     {
+      PauseAssignedPartitions();
       var deliveryTask = _deadLetterProducer.ProduceAsync(deadLetterTopic,
           new Confluent.Kafka.Message<string, byte[]>
           {
