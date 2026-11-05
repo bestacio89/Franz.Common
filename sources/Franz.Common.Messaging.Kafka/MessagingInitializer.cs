@@ -74,6 +74,7 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
       if (Volatile.Read(ref _initialized) == 1)
         return;
 
+      ValidateReplicationFactorAgainstBrokerCount();
       await EnsureTopicAsync(_topicName, cancellationToken).ConfigureAwait(false);
       await EnsureTopicAsync(_deadLetterTopicName, cancellationToken).ConfigureAwait(false);
 
@@ -114,6 +115,15 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
     return topics.ToArray();
   }
 
+  private void ValidateReplicationFactorAgainstBrokerCount()
+  {
+    var timeout = TimeSpan.FromMilliseconds(_options.Topic.CreationTimeoutMs);
+    var brokerCount = _adminClient.GetMetadata(timeout).Brokers.Count;
+    if (brokerCount < _options.Topic.ReplicationFactor)
+      throw new InvalidOperationException(
+          $"Kafka replication factor {_options.Topic.ReplicationFactor} exceeds the available broker count ({brokerCount}).");
+  }
+
   private async ValueTask EnsureTopicAsync(string name, CancellationToken cancellationToken)
   {
     if (string.IsNullOrWhiteSpace(name))
@@ -142,9 +152,9 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
         if (existingTopic is null || existingTopic.Error.Code != ErrorCode.NoError)
           throw new InvalidOperationException($"Required Kafka topic '{name}' does not exist or could not be inspected.");
 
-        if (existingTopic.Partitions.Count != topicOptions.NumPartitions)
+        if (existingTopic.Partitions.Count < topicOptions.NumPartitions)
           throw new InvalidOperationException(
-              $"Kafka topic '{name}' has {existingTopic.Partitions.Count} partitions; {topicOptions.NumPartitions} are required.");
+              $"Kafka topic '{name}' has {existingTopic.Partitions.Count} partitions; at least {topicOptions.NumPartitions} are required.");
 
         if (existingTopic.Partitions.Any(partition =>
             partition.Replicas.Count() != topicOptions.ReplicationFactor))

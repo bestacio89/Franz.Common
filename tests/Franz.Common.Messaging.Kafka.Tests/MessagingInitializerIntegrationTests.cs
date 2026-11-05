@@ -6,6 +6,7 @@ using Franz.Common.Mediator;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Kafka;
 using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
@@ -152,6 +153,53 @@ public sealed class KafkaMessagingInitializerIntegrationTests
     using var admin = BuildAdminClient();
     admin.GetMetadata(TimeSpan.FromSeconds(10)).Topics
         .Should().NotContain(topic => topic.Topic == topicName);
+  }
+
+
+  [Fact]
+  public async Task InitializeAsync_VerifyMode_ShouldAcceptMorePartitionsThanConfiguredMinimum()
+  {
+    var topicName = $"verify-partitions-{Guid.NewGuid():N}";
+    var deadLetterTopicName = $"{topicName}-dlt";
+    var create = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      Topic = new KafkaTopicOptions { NumPartitions = 3, ReplicationFactor = 1 }
+    });
+    await create.InitializeAsync();
+
+    var verify = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      ProvisioningMode = ProvisioningMode.Verify,
+      Topic = new KafkaTopicOptions { NumPartitions = 2, ReplicationFactor = 1 }
+    });
+
+    await verify.InitializeAsync();
+  }
+
+  [Fact]
+  public async Task InitializeAsync_ShouldRejectReplicationFactorAboveBrokerCount()
+  {
+    var sut = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = $"replication-factor-{Guid.NewGuid():N}",
+      DeadLetterTopic = $"replication-factor-{Guid.NewGuid():N}-dlt",
+      Topic = new KafkaTopicOptions { ReplicationFactor = 2 }
+    });
+
+    var act = () => sut.InitializeAsync().AsTask();
+
+    await act.Should().ThrowAsync<InvalidOperationException>()
+        .WithMessage("*exceeds the available broker count*");
   }
 
   // =========================================================
