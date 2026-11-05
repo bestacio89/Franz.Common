@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <!--
+    Franz.Common 2.3.5 intentionally removes the test-only dispatcher from the
+    production Mediator package. Consumers must reference Franz.Common.Testing
+    and use Franz.Common.Testing.Mediator.TestDispatcher instead.
+    This is a deliberate package-boundary correction, not an accidental API loss.
+    Keep this suppression only while 2.3.4 is the published compatibility baseline.
+    After 2.3.5 is published, advance PackageValidationBaselineVersion to 2.3.5
+    and remove this transition suppression.
+  -->
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Franz.Common.Mediator.Testing.TestDispatcher</Target>
+    <Left>lib/net10.0/Franz.Common.Mediator.dll</Left>
+    <Right>lib/net10.0/Franz.Common.Mediator.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>
