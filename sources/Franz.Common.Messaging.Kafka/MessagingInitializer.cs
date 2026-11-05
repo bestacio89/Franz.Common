@@ -148,7 +148,7 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
     {
       if (_options.ProvisioningMode == Franz.Common.Messaging.Configuration.ProvisioningMode.Verify)
       {
-        VerifyTopic(name, topicOptions, timeout);
+        await VerifyTopicAsync(name, topicOptions, timeout, cancellationToken).ConfigureAwait(false);
         return;
       }
 
@@ -172,8 +172,14 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
     }
   }
 
-  private void VerifyTopic(string name, KafkaTopicOptions topicOptions, TimeSpan timeout)
+  private async ValueTask VerifyTopicAsync(
+      string name,
+      KafkaTopicOptions topicOptions,
+      TimeSpan timeout,
+      CancellationToken cancellationToken)
   {
+    cancellationToken.ThrowIfCancellationRequested();
+
     var metadata = _adminClient.GetMetadata(name, timeout);
     var existingTopic = metadata.Topics.SingleOrDefault(topic =>
         string.Equals(topic.Topic, name, StringComparison.Ordinal));
@@ -189,6 +195,42 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
         partition.Replicas.Count() != topicOptions.ReplicationFactor))
       throw new InvalidOperationException(
           $"Kafka topic '{name}' does not have the configured replication factor of {topicOptions.ReplicationFactor}.");
+
+    if (topicOptions.Configurations.Count == 0)
+      return;
+
+    var resources = await _adminClient.DescribeConfigsAsync(
+        new[]
+        {
+          new ConfigResource
+          {
+            Name = name,
+            Type = ResourceType.Topic
+          }
+        },
+        new DescribeConfigsOptions { RequestTimeout = timeout })
+        .WaitAsync(timeout, cancellationToken)
+        .ConfigureAwait(false);
+
+    var topicConfiguration = resources.SingleOrDefault()
+        ?? throw new InvalidOperationException($"Kafka topic '{name}' configuration could not be inspected.");
+
+    var mismatches = new List<string>();
+    foreach (var (key, expectedValue) in topicOptions.Configurations)
+    {
+      if (!topicConfiguration.Entries.TryGetValue(key, out var actualEntry))
+      {
+        mismatches.Add($"'{key}' is not exposed by the broker");
+        continue;
+      }
+
+      if (!string.Equals(actualEntry.Value, expectedValue, StringComparison.Ordinal))
+        mismatches.Add($"'{key}' is '{actualEntry.Value ?? "<unavailable>"}' but '{expectedValue}' is required");
+    }
+
+    if (mismatches.Count > 0)
+      throw new InvalidOperationException(
+          $"Kafka topic '{name}' configuration does not match the declared contract: {string.Join("; ", mismatches)}.");
   }
 
   private sealed record TopicPlan(string Name, KafkaTopicOptions Options);
