@@ -1,10 +1,10 @@
 # Franz.Common.Errors
 
-> Provides Errors integration and reusable abstractions for .NET applications built with Franz.Common.
+> Structured business and technical error contracts for consistent exception handling, diagnostics, and failure propagation.
 
 ## Overview
 
-Provides Errors integration and reusable abstractions for .NET applications built with Franz.Common.
+Structured business and technical error contracts for consistent exception handling, diagnostics, and failure propagation.
 
 ## Installation
 

@@ -1,10 +1,10 @@
 # Franz.Common.EntityFramework.PostGres
 
-> Provides EntityFramework PostGres integration and reusable abstractions for .NET applications built with Franz.Common.
+> PostgreSQL provider integration for Franz.Common Entity Framework Core persistence, including Npgsql configuration and model conventions.
 
 ## Overview
 
-Provides EntityFramework PostGres integration and reusable abstractions for .NET applications built with Franz.Common.
+PostgreSQL provider integration for Franz.Common Entity Framework Core persistence, including Npgsql configuration and model conventions.
 
 ## Installation
 

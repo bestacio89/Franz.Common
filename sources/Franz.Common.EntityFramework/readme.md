@@ -1,10 +1,10 @@
 # Franz.Common.EntityFramework
 
-> Provides EntityFramework integration and reusable abstractions for .NET applications built with Franz.Common.
+> Provider-agnostic Entity Framework Core persistence abstractions for repositories, unit-of-work operations, soft deletion, and auditing.
 
 ## Overview
 
-Provides EntityFramework integration and reusable abstractions for .NET applications built with Franz.Common.
+Provider-agnostic Entity Framework Core persistence abstractions for repositories, unit-of-work operations, soft deletion, and auditing.
 
 ## Installation
 

@@ -1,10 +1,10 @@
 # Franz.Common.EntityFramework.Oracle
 
-> A specialized library within the Franz Framework that extends Entity Framework Core support for Oracle Database using the Oracle.EntityFrameworkCore provider. This package simplifies the configuration and integration of Oracle databases in .NET applications, supporting both single-tenant and multi-tenant environments.
+> Oracle provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
 
 ## Overview
 
-A specialized library within the Franz Framework that extends Entity Framework Core support for Oracle Database using the Oracle.EntityFrameworkCore provider. This package simplifies the configuration and integration of Oracle databases in .NET applications, supporting both single-tenant and multi-tenant environments.
+Oracle provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
 
 ## Installation
 

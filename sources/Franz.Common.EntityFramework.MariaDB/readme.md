@@ -1,10 +1,10 @@
 # Franz.Common.EntityFramework.MariaDB
 
-> A library within the Franz Framework designed to extend Entity Framework Core support for MariaDB using the Microting.EntityFrameworkCore.MySql provider. This package simplifies the configuration and integration of MariaDB with EF Core in .NET applications.
+> MariaDB provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
 
 ## Overview
 
-A library within the Franz Framework designed to extend Entity Framework Core support for MariaDB using the Microting.EntityFrameworkCore.MySql provider. This package simplifies the configuration and integration of MariaDB with EF Core in .NET applications.
+MariaDB provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
 
 ## Installation
 

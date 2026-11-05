@@ -1,10 +1,10 @@
 # Franz.Common.EntityFramework.SQLServer
 
-> Provides EntityFramework SQLServer integration and reusable abstractions for .NET applications built with Franz.Common.
+> SQL Server provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
 
 ## Overview
 
-Provides EntityFramework SQLServer integration and reusable abstractions for .NET applications built with Franz.Common.
+SQL Server provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
 
 ## Installation
 

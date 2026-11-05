@@ -1,10 +1,10 @@
 # Franz.Common.DependencyInjection
 
-> A core library within the Franz Framework , designed to simplify and enhance the usage of dependency injection in .NET applications. This package provides utilities and extensions for efficient registration of services, managing lifetimes, and ensuring clean dependency resolution.
+> Assembly scanning and service-registration conventions for deterministic dependency lifetimes and application composition.
 
 ## Overview
 
-A core library within the Franz Framework , designed to simplify and enhance the usage of dependency injection in .NET applications. This package provides utilities and extensions for efficient registration of services, managing lifetimes, and ensuring clean dependency resolution.
+Assembly scanning and service-registration conventions for deterministic dependency lifetimes and application composition.
 
 ## Installation
 
