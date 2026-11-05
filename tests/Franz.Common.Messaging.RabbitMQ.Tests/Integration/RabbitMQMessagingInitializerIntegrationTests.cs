@@ -238,6 +238,48 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
   }
 
   [Fact]
+  public async Task CreateMode_ShouldExplainIncompatibleQueueCreatedByVersion234()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"legacy-234-{suffix}";
+    var connection = await _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>().GetConnectionAsync();
+
+    // Version 2.3.4 relied on the broker's default queue type and did not
+    // declare x-queue-type explicitly. The default RabbitMQ 4.0 broker uses classic.
+    await using (var legacyChannel = await connection.CreateChannelAsync())
+    {
+      await legacyChannel.QueueDeclareAsync(
+          queueName,
+          durable: true,
+          exclusive: false,
+          autoDelete: false,
+          arguments: null);
+    }
+
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      QueueName = queueName,
+      ExchangeName = $"{queueName}-exchange",
+      DeadLetterExchangeName = $"{queueName}-dead-letter",
+      DeadLetterQueueName = $"{queueName}-dlq",
+      QueueType = RabbitMQQueueType.Quorum
+    });
+
+    await using var modelProvider = new ModelProvider(_fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    var initializer = new RabbitMQMessagingInitializer(
+        modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
+        CreateAssemblyAccessor().Object,
+        options);
+
+    var act = () => initializer.InitializeAsync().AsTask();
+
+    var error = await act.Should().ThrowAsync<InvalidOperationException>();
+    error.Which.Message.Should().Contain(queueName)
+        .And.Contain("incompatible");
+  }
+
+  [Fact]
   public async Task CreateMode_ShouldPreserveMatchingLegacyQuorumTopology()
   {
     var suffix = Guid.CreateVersion7().ToString("N");
