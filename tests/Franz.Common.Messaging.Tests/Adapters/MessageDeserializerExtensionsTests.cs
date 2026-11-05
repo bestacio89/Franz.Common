@@ -38,11 +38,36 @@ public class MessageDeserializerExtensionsTests
     public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
   }
 
+  public record LateRegisteredTestEvent(string Info) : IEvent;
+
   [Fact]
   public void ToEvent_WhenTypeIsKnownButNotSubscribed_ShouldReturnNull()
   {
     var message = new Message("{}") { MessageType = typeof(UnsubscribedTestEvent).FullName };
     message.ToEvent().Should().BeNull();
+  }
+
+  [Fact]
+  public void ToEvent_WhenManifestIsRegisteredAfterAnInitialMiss_ShouldResolveOnTheNextLookup()
+  {
+    var message = new Message(JsonSerializer.Serialize(new LateRegisteredTestEvent("late")))
+    {
+      MessageType = typeof(LateRegisteredTestEvent).FullName
+    };
+
+    message.ToEvent().Should().BeNull();
+
+    var assembly = typeof(MessageDeserializerExtensionsTests).Assembly;
+    var existing = MessagingManifestRegistry.Get(assembly);
+    MessagingManifestRegistry.Register(assembly, new MessagingManifest(
+        existing.Destinations,
+        existing.Subscriptions.Concat(new[] { typeof(LateRegisteredTestEvent) }),
+        existing.KnownTypes.Concat(new[] { typeof(LateRegisteredTestEvent) })));
+
+    var result = message.ToEvent();
+
+    result.Should().BeOfType<LateRegisteredTestEvent>()
+        .Which.Info.Should().Be("late");
   }
 
   [Fact]
