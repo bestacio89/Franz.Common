@@ -304,8 +304,8 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       return (username, password);
 
     return (
-        username ?? Uri.UnescapeDataString(credentials[0]),
-        password ?? Uri.UnescapeDataString(credentials[1]));
+        string.IsNullOrWhiteSpace(username) ? Uri.UnescapeDataString(credentials[0]) : username,
+        string.IsNullOrWhiteSpace(password) ? Uri.UnescapeDataString(credentials[1]) : password);
   }
 
   private string ResolveManagementVirtualHost()
