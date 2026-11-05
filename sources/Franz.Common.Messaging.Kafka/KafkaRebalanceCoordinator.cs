@@ -307,8 +307,9 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
   {
     ThrowIfDisposed();
     if (!_activeRegistrations.TryGetValue(registration.Id, out var state) ||
-        !ReferenceEquals(state, registration))
-      throw new InvalidOperationException("The Kafka consumer registration is no longer active.");
+        !ReferenceEquals(state, registration) ||
+        registration.DisposeWhenIdle)
+      throw new InvalidOperationException("The Kafka consumer registration is no longer active or is being released.");
   }
 
   private static void DisposeSources(IEnumerable<CancellationTokenSource>? sources)
