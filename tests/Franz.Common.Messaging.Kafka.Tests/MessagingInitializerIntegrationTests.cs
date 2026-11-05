@@ -18,7 +18,7 @@ using Xunit;
 namespace Franz.Common.Messaging.Kafka.Tests;
 
 [Collection("Kafka")]
-public sealed class KafkaMessagingInitializerIntegrationTests
+public sealed class KafkaMessagingInitializerIntegrationTests : IAsyncLifetime
 {
   private readonly KafkaContainerFixture _fixture;
 
@@ -26,6 +26,18 @@ public sealed class KafkaMessagingInitializerIntegrationTests
   {
     _fixture = fixture ?? throw new ArgumentNullException(nameof(fixture));
   }
+
+  public async Task InitializeAsync()
+  {
+    // Manifest-derived topic names are shared by every initializer in this test assembly.
+    // Remove them before each test so assertions exercise the current test's topology contract.
+    await DeleteTopicIfExistsAsync("common-in");
+    await DeleteTopicIfExistsAsync("common-dlt");
+    await DeleteTopicIfExistsAsync("test-integration-in");
+    await DeleteTopicIfExistsAsync("test-integration-dlt");
+  }
+
+  public Task DisposeAsync() => Task.CompletedTask;
 
   // =========================================================
   // FACTORY HELPERS
