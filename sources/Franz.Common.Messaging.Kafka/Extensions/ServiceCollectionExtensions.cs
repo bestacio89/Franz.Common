@@ -10,6 +10,7 @@ using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Hosting;
+using Franz.Common.Messaging.Manifest;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Connections;
 using Franz.Common.Messaging.Kafka.Modeling;
@@ -56,7 +57,7 @@ public static class ServiceCollectionExtensions
   // inside MessagingPublisher construction.
   //
   // AddFranzMediator MUST be called before this method so that
-  // DiscoverHandledEventTypes() finds registered handlers.
+  // the generated manifest supplies the registered handler set.
   // =========================================================
 
   public static IServiceCollection AddEventBasedKafkaMessaging(
@@ -65,7 +66,7 @@ public static class ServiceCollectionExtensions
       => AddEventBasedKafkaMessagingCore(
           services,
           configuration,
-          DiscoverHandledEventTypes());
+          DiscoverHandledEventTypes(services));
 
   /// <summary>
   /// Registers event-based Kafka messaging for an explicit set of integration event types.
@@ -101,6 +102,7 @@ public static class ServiceCollectionExtensions
           nameof(eventTypes));
     }
 
+    ValidateConfiguredSubscriptions(services, eventTypes);
     return AddEventBasedKafkaMessagingCore(
         services,
         configuration,
@@ -396,20 +398,54 @@ public static class ServiceCollectionExtensions
   // EVENT TYPE DISCOVERY
   // =========================================================
 
-  private static IEnumerable<Type> DiscoverHandledEventTypes()
-      => AppDomain.CurrentDomain
-          .GetAssemblies()
-          .SelectMany(a =>
-          {
-            try { return a.ExportedTypes; }
-            catch { return Array.Empty<Type>(); }
-          })
-          .SelectMany(t => t.GetInterfaces())
-          .Where(i => i.IsGenericType &&
-                      i.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
-          .SelectMany(i => i.GenericTypeArguments)
-          .Where(t => typeof(IIntegrationEvent).IsAssignableFrom(t))
-          .Distinct();
+  private static IEnumerable<Type> DiscoverHandledEventTypes(IServiceCollection services)
+  {
+    var registeredHandlers = GetRegisteredIntegrationEventHandlers(services);
+    var manifests = MessagingManifestRegistry.GetAll();
+    if (manifests.Count == 0 && registeredHandlers.Count > 0)
+      throw new InvalidOperationException(
+          "Integration event handlers are registered but no generated messaging manifest is available. Ensure the Franz mediator source generator runs in every handler assembly.");
+
+    var manifestSubscriptions = manifests.SelectMany(static manifest => manifest.Subscriptions)
+        .Where(static type => typeof(IIntegrationEvent).IsAssignableFrom(type)).ToHashSet();
+    ValidateManifestSubscriptions(registeredHandlers, manifestSubscriptions);
+    return manifestSubscriptions.OrderBy(static type => type.FullName, StringComparer.Ordinal);
+  }
+
+  private static void ValidateConfiguredSubscriptions(IServiceCollection services, IEnumerable<Type> configuredTypes)
+  {
+    var registeredHandlers = GetRegisteredIntegrationEventHandlers(services);
+    var manifests = MessagingManifestRegistry.GetAll();
+    if (manifests.Count == 0 && registeredHandlers.Count > 0)
+      throw new InvalidOperationException(
+          "Integration event handlers are registered but no generated messaging manifest is available. Ensure the Franz mediator source generator runs in every handler assembly.");
+
+    var manifestSubscriptions = manifests.SelectMany(static manifest => manifest.Subscriptions)
+        .Where(static type => typeof(IIntegrationEvent).IsAssignableFrom(type)).ToHashSet();
+    ValidateManifestSubscriptions(registeredHandlers, manifestSubscriptions);
+
+    var configured = configuredTypes.ToHashSet();
+    var missing = manifestSubscriptions.Except(configured).ToArray();
+    var unhandled = configured.Except(manifestSubscriptions).ToArray();
+    if (missing.Length > 0 || unhandled.Length > 0)
+      throw new InvalidOperationException(
+          $"Kafka configured subscriptions do not match generated handlers. Missing configured subscriptions: {string.Join(", ", missing.Select(static type => type.FullName))}. Unhandled configured subscriptions: {string.Join(", ", unhandled.Select(static type => type.FullName))}.");
+  }
+
+  private static HashSet<Type> GetRegisteredIntegrationEventHandlers(IServiceCollection services)
+      => services.Where(static descriptor => descriptor.ServiceType.IsGenericType &&
+              descriptor.ServiceType.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
+          .Select(static descriptor => descriptor.ServiceType.GenericTypeArguments[0])
+          .Where(static type => typeof(IIntegrationEvent).IsAssignableFrom(type)).ToHashSet();
+
+  private static void ValidateManifestSubscriptions(IReadOnlySet<Type> registeredHandlers, IReadOnlySet<Type> manifestSubscriptions)
+  {
+    var missingFromManifest = registeredHandlers.Except(manifestSubscriptions).ToArray();
+    var missingHandlers = manifestSubscriptions.Except(registeredHandlers).ToArray();
+    if (missingFromManifest.Length > 0 || missingHandlers.Length > 0)
+      throw new InvalidOperationException(
+          $"Generated messaging manifest and registered integration event handlers disagree. Missing from manifest: {string.Join(", ", missingFromManifest.Select(static type => type.FullName))}. Missing registered handlers: {string.Join(", ", missingHandlers.Select(static type => type.FullName))}.");
+  }
 
   // =========================================================
   // MODEL PROVIDER (unchanged)

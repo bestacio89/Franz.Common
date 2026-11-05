@@ -7,6 +7,7 @@ using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Hosting;
+using Franz.Common.Messaging.Manifest;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Hosting;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
@@ -170,6 +171,28 @@ public static class ServiceCollectionExtensions
     return services;
   }
 
+  private static void ValidateMessagingManifest(IServiceCollection services)
+  {
+    var registeredHandlers = services
+        .Where(static descriptor => descriptor.ServiceType.IsGenericType &&
+            descriptor.ServiceType.GetGenericTypeDefinition().Name.StartsWith("INotificationHandler", StringComparison.Ordinal))
+        .Select(static descriptor => descriptor.ServiceType.GenericTypeArguments[0])
+        .Where(static type => typeof(IIntegrationEvent).IsAssignableFrom(type)).ToHashSet();
+
+    var manifests = MessagingManifestRegistry.GetAll();
+    if (manifests.Count == 0 && registeredHandlers.Count > 0)
+      throw new InvalidOperationException(
+          "Integration event handlers are registered but no generated messaging manifest is available. Ensure the Franz mediator source generator runs in every handler assembly.");
+
+    var manifestSubscriptions = manifests.SelectMany(static manifest => manifest.Subscriptions)
+        .Where(static type => typeof(IIntegrationEvent).IsAssignableFrom(type)).ToHashSet();
+    var missingFromManifest = registeredHandlers.Except(manifestSubscriptions).ToArray();
+    var missingHandlers = manifestSubscriptions.Except(registeredHandlers).ToArray();
+    if (missingFromManifest.Length > 0 || missingHandlers.Length > 0)
+      throw new InvalidOperationException(
+          $"Generated messaging manifest and registered integration event handlers disagree. Missing from manifest: {string.Join(", ", missingFromManifest.Select(static type => type.FullName))}. Missing registered handlers: {string.Join(", ", missingHandlers.Select(static type => type.FullName))}.");
+  }
+
   public static IServiceCollection AddOnlyHighLifetimeModelProvider(this IServiceCollection services, ServiceLifetime serviceLifetime)
   {
     var serviceType = typeof(IModelProvider);
@@ -195,6 +218,7 @@ public static class ServiceCollectionExtensions
 
   public static IServiceCollection AddRabbitMQMessagingConsumer(this IServiceCollection services, IConfiguration configuration)
   {
+    ValidateMessagingManifest(services);
     services.AddOnlyHighLifetimeModelProvider(ServiceLifetime.Singleton)
             .AddRabbitMQMessagingConfiguration(configuration)
             .AddNoDuplicateScoped<MessageContextAccessor>()

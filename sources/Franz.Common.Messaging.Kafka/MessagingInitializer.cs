@@ -65,7 +65,6 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
 
   public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
   {
-    EnsureMessagingManifestRegistered();
     if (_options.ProvisioningMode == Franz.Common.Messaging.Configuration.ProvisioningMode.Off)
       return;
 
@@ -90,13 +89,6 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
     {
       _initializationGate.Release();
     }
-  }
-
-  private static void EnsureMessagingManifestRegistered()
-  {
-    if (Franz.Common.Messaging.Manifest.MessagingManifestRegistry.GetAll().Count == 0)
-      throw new InvalidOperationException(
-          "No generated messaging manifest is registered. Ensure the Franz mediator source generator is referenced and runs in the application compilation.");
   }
 
   private IReadOnlyCollection<string> DiscoverIntegrationEventTopics()

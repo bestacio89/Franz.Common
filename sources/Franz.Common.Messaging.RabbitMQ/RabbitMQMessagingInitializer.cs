@@ -53,7 +53,6 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
 
   public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
   {
-    EnsureMessagingManifestRegistered();
     if (Volatile.Read(ref _isInitialized) == 1) return;
     if (_options.ProvisioningMode == ProvisioningMode.Off)
     {
@@ -88,13 +87,6 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
     {
       _initLock.Release();
     }
-  }
-
-  private static void EnsureMessagingManifestRegistered()
-  {
-    if (Franz.Common.Messaging.Manifest.MessagingManifestRegistry.GetAll().Count == 0)
-      throw new InvalidOperationException(
-          "No generated messaging manifest is registered. Ensure the Franz mediator source generator is referenced and runs in the application compilation.");
   }
 
   private async ValueTask VerifyTopologyAsync(CancellationToken cancellationToken)
