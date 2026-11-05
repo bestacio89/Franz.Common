@@ -247,7 +247,7 @@ Kafka is treated as a **transport**, not an execution model.
 
 ## 🧾 Versioning & Changelog
 
-### **Current Version:** v2.3.4
+### **Current Version:** v2.3.5
 
 ### **Version 1.7.01**
 
@@ -263,7 +263,7 @@ Kafka is treated as a **transport**, not an execution model.
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - Full granular control of KafkaMessagingOptions.
-- All APIs remain fully backward compatible.
+- Removed redundant synchronous disposal from `KafkaModel`; use `IAsyncDisposable`.
 - Tests, listeners, and pipeline components modernized.
 
 ### 2.0.7 – Kafka Registration now handles per Event registration automatically, no need to specify each event type manually.
