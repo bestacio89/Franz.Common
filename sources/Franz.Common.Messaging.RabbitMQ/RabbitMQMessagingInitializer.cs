@@ -2,6 +2,8 @@
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
+using Franz.Common.Messaging.RabbitMQ.Connections;
+using RabbitMQ.Client.Exceptions;
 using Franz.Common.Messaging.RabbitMQ.Replay;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
@@ -20,6 +22,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
   private readonly SemaphoreSlim _initLock = new(1, 1);
 
   private readonly IModelProvider _modelProvider;
+  private readonly IConnectionProvider _connectionProvider;
   private readonly IAssemblyAccessor _assemblyAccessor;
   private readonly RabbitMQMessagingOptions _options;
 
@@ -30,10 +33,12 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
 
   public RabbitMQMessagingInitializer(
       IModelProvider modelProvider,
+      IConnectionProvider connectionProvider,
       IAssemblyAccessor assemblyAccessor,
       IOptions<RabbitMQMessagingOptions> options)
   {
     _modelProvider = modelProvider ?? throw new ArgumentNullException(nameof(modelProvider));
+    _connectionProvider = connectionProvider ?? throw new ArgumentNullException(nameof(connectionProvider));
     _assemblyAccessor = assemblyAccessor ?? throw new ArgumentNullException(nameof(assemblyAccessor));
     _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
@@ -61,14 +66,13 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
     {
       if (Volatile.Read(ref _isInitialized) == 1) return;
 
-      var channel = await _modelProvider.GetChannelAsync(cancellationToken).ConfigureAwait(false);
-
       if (_options.ProvisioningMode == ProvisioningMode.Verify)
       {
-        await VerifyTopologyAsync(channel, cancellationToken).ConfigureAwait(false);
+        await VerifyTopologyAsync(cancellationToken).ConfigureAwait(false);
       }
       else
       {
+        var channel = await _modelProvider.GetChannelAsync(cancellationToken).ConfigureAwait(false);
         await InitializeExchangeAsync(channel, _exchangeName, ExchangeType.Headers, true, cancellationToken).ConfigureAwait(false);
         await InitializeDestinationExchangesAsync(channel, cancellationToken).ConfigureAwait(false);
         await InitializeQueueAsync(channel, _queueName, _exchangeName, _deadLetterExchangeName, _deadLetterQueueName, _options.QueueDurable, cancellationToken).ConfigureAwait(false);
@@ -93,26 +97,87 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
           "No generated messaging manifest is registered. Ensure the Franz mediator source generator is referenced and runs in the application compilation.");
   }
 
-  private async ValueTask VerifyTopologyAsync(IChannel channel, CancellationToken cancellationToken)
+  private async ValueTask VerifyTopologyAsync(CancellationToken cancellationToken)
   {
-    await channel.ExchangeDeclarePassiveAsync(_exchangeName, cancellationToken).ConfigureAwait(false);
+    var failures = new List<string>();
+
+    await VerifyExchangeAsync(_exchangeName, ExchangeType.Headers, durable: true, failures, cancellationToken)
+        .ConfigureAwait(false);
+
     foreach (var destinationExchange in GetDestinationExchangeNames())
-      await channel.ExchangeDeclarePassiveAsync(destinationExchange, cancellationToken).ConfigureAwait(false);
-    await channel.QueueDeclarePassiveAsync(_queueName, cancellationToken).ConfigureAwait(false);
-    await channel.ExchangeDeclarePassiveAsync(_deadLetterExchangeName, cancellationToken).ConfigureAwait(false);
-    await channel.QueueDeclarePassiveAsync(_deadLetterQueueName, cancellationToken).ConfigureAwait(false);
+      await VerifyExchangeAsync(destinationExchange, ExchangeType.Headers, durable: true, failures, cancellationToken)
+          .ConfigureAwait(false);
+
+    await VerifyQueueAsync(_queueName, _options.QueueDurable, CreateMainQueueArguments(), failures, cancellationToken)
+        .ConfigureAwait(false);
+
+    await VerifyExchangeAsync(_deadLetterExchangeName, ExchangeType.Direct, durable: true, failures, cancellationToken)
+        .ConfigureAwait(false);
+    await VerifyQueueAsync(_deadLetterQueueName, _options.QueueDurable, CreateDeadLetterQueueArguments(), failures, cancellationToken)
+        .ConfigureAwait(false);
 
     if (string.Equals(_options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase))
     {
       var replayExchange = RabbitMQExchangeNamer.GetReplayExchangeName(
           _assemblyAccessor.GetEntryAssembly()
           ?? throw new InvalidOperationException("Entry assembly cannot be null."));
-      await channel.ExchangeDeclarePassiveAsync(replayExchange, cancellationToken).ConfigureAwait(false);
+      await VerifyExchangeAsync(replayExchange, ExchangeType.Direct, durable: true, failures, cancellationToken)
+          .ConfigureAwait(false);
+
       for (var retryNumber = 1; retryNumber <= 3; retryNumber++)
       {
         var retryQueue = $"{_queueName}-retry-{retryNumber}";
-        await channel.QueueDeclarePassiveAsync(retryQueue, cancellationToken).ConfigureAwait(false);
+        await VerifyQueueAsync(retryQueue, _options.QueueDurable,
+            CreateRetryQueueArguments(retryNumber), failures, cancellationToken).ConfigureAwait(false);
       }
+    }
+
+    if (failures.Count > 0)
+      throw new InvalidOperationException(
+          "RabbitMQ topology verification failed: " + string.Join("; ", failures));
+  }
+
+  private async ValueTask VerifyExchangeAsync(
+      string exchangeName,
+      string exchangeType,
+      bool durable,
+      ICollection<string> failures,
+      CancellationToken cancellationToken)
+  {
+    var connection = await _connectionProvider.GetConnectionAsync(cancellationToken).ConfigureAwait(false);
+    await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+    try
+    {
+      await channel.ExchangeDeclarePassiveAsync(exchangeName, cancellationToken).ConfigureAwait(false);
+      await channel.ExchangeDeclareAsync(exchangeName, exchangeType, durable: durable,
+          autoDelete: false, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+    catch (OperationInterruptedException ex)
+    {
+      failures.Add($"exchange '{exchangeName}' is missing or incompatible ({ex.Message})");
+    }
+  }
+
+  private async ValueTask VerifyQueueAsync(
+      string queueName,
+      bool durable,
+      IDictionary<string, object?> expectedArguments,
+      ICollection<string> failures,
+      CancellationToken cancellationToken)
+  {
+    var connection = await _connectionProvider.GetConnectionAsync(cancellationToken).ConfigureAwait(false);
+    await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+    try
+    {
+      await channel.QueueDeclarePassiveAsync(queueName, cancellationToken).ConfigureAwait(false);
+      // Redeclaring an existing queue with the expected arguments is idempotent
+      // and lets RabbitMQ validate immutable queue type and argument contracts.
+      await channel.QueueDeclareAsync(queueName, durable, exclusive: false, autoDelete: false,
+          arguments: expectedArguments, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+    catch (OperationInterruptedException ex)
+    {
+      failures.Add($"queue '{queueName}' is missing or has incompatible type/arguments ({ex.Message})");
     }
   }
 
@@ -138,6 +203,28 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
   private string GetQueueTypeName()
       => _options.QueueType == RabbitMQQueueType.Quorum ? "quorum" : "classic";
 
+  private Dictionary<string, object?> CreateMainQueueArguments()
+  {
+    var arguments = CreateQueueArguments();
+    arguments["x-dead-letter-exchange"] = _deadLetterExchangeName;
+    arguments["x-dead-letter-routing-key"] = _deadLetterQueueName;
+    return arguments;
+  }
+
+  private Dictionary<string, object?> CreateDeadLetterQueueArguments()
+      => new() { ["x-queue-type"] = GetQueueTypeName() };
+
+  private Dictionary<string, object?> CreateRetryQueueArguments(int retryNumber)
+      => new()
+      {
+        ["x-queue-type"] = GetQueueTypeName(),
+        ["x-message-ttl"] = _options.FailurePolicy is { } policy
+            ? checked((int)Math.Ceiling(policy.RetryBackoff.TotalMilliseconds))
+            : ProgressiveFourStepReplayStrategy.GetRetryDelayMilliseconds(retryNumber),
+        ["x-dead-letter-exchange"] = string.Empty,
+        ["x-dead-letter-routing-key"] = _queueName
+      };
+
   private static async ValueTask InitializeExchangeAsync(
       IChannel channel,
       string exchangeName,
@@ -158,17 +245,22 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       bool durable,
       CancellationToken cancellationToken)
   {
-    var args = CreateQueueArguments();
-    args["x-dead-letter-exchange"] = deadLetterExchange;
-    args["x-dead-letter-routing-key"] = deadLetterQueue;
-
-    await channel.QueueDeclareAsync(
-        queueName,
-        durable,
-        exclusive: false,
-        autoDelete: false,
-        arguments: args,
-        cancellationToken: cancellationToken).ConfigureAwait(false);
+    try
+    {
+      await channel.QueueDeclareAsync(
+          queueName,
+          durable,
+          exclusive: false,
+          autoDelete: false,
+          arguments: CreateMainQueueArguments(),
+          cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+    catch (OperationInterruptedException ex)
+    {
+      throw new InvalidOperationException(
+          $"RabbitMQ queue '{queueName}' could not be redeclared with the configured queue type/arguments. Existing broker topology is incompatible: {ex.Message}",
+          ex);
+    }
   }
 
   private async ValueTask InitializeDeadLetterQueueAsync(
@@ -184,16 +276,22 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
         autoDelete: false,
         cancellationToken: cancellationToken).ConfigureAwait(false);
 
-    await channel.QueueDeclareAsync(
-        deadLetterQueueName,
-        durable: _options.QueueDurable,
-        exclusive: false,
-        autoDelete: false,
-        arguments: new Dictionary<string, object?>
-        {
-          ["x-queue-type"] = GetQueueTypeName()
-        },
-        cancellationToken: cancellationToken).ConfigureAwait(false);
+    try
+    {
+      await channel.QueueDeclareAsync(
+          deadLetterQueueName,
+          durable: _options.QueueDurable,
+          exclusive: false,
+          autoDelete: false,
+          arguments: CreateDeadLetterQueueArguments(),
+          cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+    catch (OperationInterruptedException ex)
+    {
+      throw new InvalidOperationException(
+          $"RabbitMQ dead-letter queue '{deadLetterQueueName}' could not be redeclared with the configured queue type/arguments: {ex.Message}",
+          ex);
+    }
 
     await channel.QueueBindAsync(
         deadLetterQueueName,
@@ -213,16 +311,18 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
     {
       var routingKey = ProgressiveFourStepReplayStrategy.GetRetryRoutingKey(_queueName, retryNumber);
       var retryQueue = $"{_queueName}-retry-{retryNumber}";
-      var arguments = new Dictionary<string, object?>
+      try
       {
-        ["x-queue-type"] = GetQueueTypeName(),
-        ["x-message-ttl"] = _options.FailurePolicy is { } policy
-            ? checked((int)Math.Ceiling(policy.RetryBackoff.TotalMilliseconds))
-            : ProgressiveFourStepReplayStrategy.GetRetryDelayMilliseconds(retryNumber),
-        ["x-dead-letter-exchange"] = string.Empty,
-        ["x-dead-letter-routing-key"] = _queueName
-      };
-      await channel.QueueDeclareAsync(retryQueue, durable: _options.QueueDurable, exclusive: false, autoDelete: false, arguments: arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
+        await channel.QueueDeclareAsync(retryQueue, durable: _options.QueueDurable, exclusive: false,
+            autoDelete: false, arguments: CreateRetryQueueArguments(retryNumber),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+      }
+      catch (OperationInterruptedException ex)
+      {
+        throw new InvalidOperationException(
+            $"RabbitMQ retry queue '{retryQueue}' could not be redeclared with the configured queue type/arguments: {ex.Message}",
+            ex);
+      }
       await channel.QueueBindAsync(retryQueue, replayExchange, routingKey, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
   }

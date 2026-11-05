@@ -51,7 +51,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
 
     await using var modelProvider = new ModelProvider(
         _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
-    var initializer = new RabbitMQMessagingInitializer(modelProvider, accessor.Object, options);
+    var initializer = new RabbitMQMessagingInitializer(modelProvider, _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(), accessor.Object, options);
 
     await initializer.InitializeAsync();
 
@@ -88,7 +88,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
     {
       var createOptions = Options.Create(options);
       var createAccessor = CreateAssemblyAccessor();
-      await new RabbitMQMessagingInitializer(createModelProvider, createAccessor.Object, createOptions)
+      await new RabbitMQMessagingInitializer(createModelProvider, _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(), createAccessor.Object, createOptions)
           .InitializeAsync();
     }
 
@@ -99,6 +99,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
 
     await new RabbitMQMessagingInitializer(
         verifyModelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
         verifyAccessor.Object,
         Options.Create(options)).InitializeAsync();
 
@@ -130,6 +131,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
         _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
     await new RabbitMQMessagingInitializer(
         modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
         CreateAssemblyAccessor().Object,
         Options.Create(options)).InitializeAsync();
 
@@ -204,6 +206,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
 
     var initializer = new RabbitMQMessagingInitializer(
         modelProvider.Object,
+        Mock.Of<IConnectionProvider>(),
         CreateAssemblyAccessor().Object,
         options);
 
@@ -234,6 +237,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
         _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
     await new RabbitMQMessagingInitializer(
         modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
         CreateAssemblyAccessor().Object,
         Options.Create(options)).InitializeAsync();
 
@@ -325,6 +329,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
         _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
     await new RabbitMQMessagingInitializer(
         modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
         CreateAssemblyAccessor().Object,
         Options.Create(options)).InitializeAsync();
 
