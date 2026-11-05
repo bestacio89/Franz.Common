@@ -18,8 +18,8 @@ public class MessageDeserializerExtensionsTests
     var existing = MessagingManifestRegistry.Get(assembly);
     MessagingManifestRegistry.Register(assembly, new MessagingManifest(
         existing.Destinations,
-        existing.Subscriptions,
-        existing.KnownTypes.Concat(new[] { typeof(TestCommand), typeof(TestEvent) })));
+        existing.Subscriptions.Concat(new[] { typeof(TestEvent) }),
+        existing.KnownTypes.Concat(new[] { typeof(TestCommand), typeof(TestEvent), typeof(UnsubscribedTestEvent) })));
   }
   // Define concrete types for testing reflection logic
   public record TestCommand(string Data) : ICommand
@@ -31,6 +31,15 @@ public class MessageDeserializerExtensionsTests
   {
     public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
     public Guid CorrelationId { get; set; }
+  }
+
+  public record UnsubscribedTestEvent(string Info) : IEvent;
+
+  [Fact]
+  public void ToEvent_WhenTypeIsKnownButNotSubscribed_ShouldReturnNull()
+  {
+    var message = new Message("{}") { MessageType = typeof(UnsubscribedTestEvent).FullName };
+    message.ToEvent().Should().BeNull();
   }
 
   [Fact]
