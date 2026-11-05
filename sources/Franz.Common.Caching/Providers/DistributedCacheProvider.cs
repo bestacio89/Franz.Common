@@ -96,9 +96,6 @@ public sealed class DistributedCacheProvider(
 
   public Task RemoveAsync(string key, CancellationToken ct = default) => cache.RemoveAsync(key, ct);
 
-  public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
-      => throw new NotSupportedException("Tag-based invalidation is not supported by DistributedCacheProvider.");
-
   public void Dispose()
   {
     foreach (var semaphore in _locks.Values)
