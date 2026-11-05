@@ -11,6 +11,8 @@ namespace Franz.Common.EntityFramework;
 /// </summary>
 internal sealed class TenantModelCacheKeyFactory : IModelCacheKeyFactory
 {
+    public TenantModelCacheKeyFactory() { }
+
     public object Create(DbContext context, bool designTime)
         => context is DbContextBase dbContext
             ? (context.GetType(), dbContext.MultiTenancyEnabledForModel, dbContext.DatabaseIsolationModeForModel, designTime)
