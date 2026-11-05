@@ -82,7 +82,7 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
           .SetPartitionsAssignedHandler((client, partitions) =>
           {
             _rebalanceCoordinator.OnPartitionsAssigned(
-                registration, partitions.Select(static partition => partition.TopicPartition));
+                registration, partitions);
 
             if (_rebalanceCoordinator.IsHandlerExecutionActive(registration) && partitions.Count > 0)
             {
