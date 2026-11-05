@@ -179,6 +179,7 @@ public static class ServiceCollectionExtensions
   {
     services.AddNoDuplicateSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
     services.AddNoDuplicateSingleton<KafkaTopicNames>();
+    services.AddNoDuplicateSingleton<KafkaRebalanceCoordinator>();
 
     services.AddKafkaProducer(configuration, serviceKey);
     services.AddKafkaAdmin(configuration, serviceKey, perEvent);

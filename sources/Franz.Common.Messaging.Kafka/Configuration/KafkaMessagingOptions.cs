@@ -59,6 +59,9 @@ public class KafkaConsumerOptions
   [Range(1, 10000)]
   public int MaxPollRecords { get; set; } = 500;
 
+  /// <summary>Opt in to Kafka's cooperative-sticky partition assignor.</summary>
+  public bool EnableCooperativeStickyAssignor { get; set; } = false;
+
   [Range(1, int.MaxValue)]
   public int FetchMinBytes { get; set; } = 1;
 

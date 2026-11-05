@@ -11,13 +11,16 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
 {
   private readonly KafkaMessagingOptions _options;
   private readonly ILogger<KafkaConsumerFactory> _logger;
+  private readonly KafkaRebalanceCoordinator _rebalanceCoordinator;
 
   public KafkaConsumerFactory(
       IOptions<KafkaMessagingOptions> options,
-      ILogger<KafkaConsumerFactory> logger)
+      ILogger<KafkaConsumerFactory> logger,
+      KafkaRebalanceCoordinator rebalanceCoordinator)
   {
     _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    _rebalanceCoordinator = rebalanceCoordinator ?? throw new ArgumentNullException(nameof(rebalanceCoordinator));
   }
 
   public IConsumer<string, string> Build()
@@ -63,14 +66,33 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
       SslCaLocation = _options.Security.SslCaLocation,
       SslCertificateLocation = _options.Security.SslCertificateLocation,
       SslKeyLocation = _options.Security.SslKeyLocation,
-      AllowAutoCreateTopics = false
+      AllowAutoCreateTopics = false,
+      PartitionAssignmentStrategy = _options.Consumer.EnableCooperativeStickyAssignor
+          ? PartitionAssignmentStrategy.CooperativeSticky
+          : PartitionAssignmentStrategy.Range
     };
 
+    var groupId = config.GroupId;
+
     return new ConsumerBuilder<string, string>(config)
+        .SetPartitionsAssignedHandler((consumer, partitions) =>
+        {
+          _rebalanceCoordinator.OnPartitionsAssigned(groupId);
+          if (_rebalanceCoordinator.IsHandlerExecutionActive(groupId) && partitions.Count > 0)
+          {
+            try { consumer.Pause(partitions); }
+            catch (KafkaException ex)
+            {
+              _logger.LogWarning(ex, "Could not pause newly assigned Kafka partitions while a handler is in flight.");
+            }
+          }
+        })
         .SetPartitionsRevokedHandler((_, partitions) =>
         {
           if (partitions.Count == 0)
             return;
+
+          _rebalanceCoordinator.OnPartitionsRevoked(groupId);
 
           _logger.LogInformation(
               "Kafka partitions revoked for group {GroupId}: {Partitions}.",
@@ -81,6 +103,8 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
         {
           if (partitions.Count == 0)
             return;
+
+          _rebalanceCoordinator.OnPartitionsLost(groupId);
 
           _logger.LogWarning(
               "Kafka partitions lost for group {GroupId}: {Partitions}. Offsets may be redelivered; handlers must be idempotent.",
