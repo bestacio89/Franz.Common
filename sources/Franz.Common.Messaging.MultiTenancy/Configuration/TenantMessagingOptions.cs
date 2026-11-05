@@ -7,5 +7,12 @@ public sealed class TenantMessagingOptions
     /// Requires every hosted message consumer to establish a validated tenant execution scope.
     /// Enable this when tenant-filtered persistence is used by message handlers.
     /// </summary>
+    /// <summary>
+    /// Requires hosted message consumers to establish a validated tenant execution scope.
+    /// </summary>
+    /// <remarks>
+    /// Disabled by default because messaging tenancy services are also used for outbound metadata
+    /// propagation. Enable this when consumers process tenant-scoped data.
+    /// </remarks>
     public bool RequireTenantScope { get; set; }
 }
