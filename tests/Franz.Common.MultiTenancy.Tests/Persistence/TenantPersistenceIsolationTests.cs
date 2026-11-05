@@ -55,7 +55,7 @@ public sealed class TenantPersistenceIsolationTests
             await context.SaveChangesAsync();
 
             var deleted = context.Entities.IgnoreQueryFilters().Single(entity => entity.Name == "deleted");
-            context.Entities.Remove(deleted);
+            deleted.MarkDeleted("test");
             await context.SaveChangesAsync();
         }
 
