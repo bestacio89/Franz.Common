@@ -38,7 +38,10 @@ public class MessageDeserializerExtensionsTests
     public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
   }
 
-  public record LateRegisteredTestEvent(string Info) : IEvent;
+  public record LateRegisteredTestEvent(string Info) : IEvent
+  {
+    public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
+  }
 
   [Fact]
   public void ToEvent_WhenTypeIsKnownButNotSubscribed_ShouldReturnNull()
