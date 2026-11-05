@@ -1,10 +1,10 @@
 # Franz.Common.Messaging
 
-> A messaging abstraction library within the Franz Framework that provides a unified foundation for building reliable, resilient, and extensible distributed messaging systems. It supports outbox , inbox , retries , dead-letter queues , and multiple transports (starting with Kafka and MongoDB ).
+> Transport-agnostic messaging contracts, dispatch policies, delivery context, and integration points for transport adapters.
 
 ## Overview
 
-A messaging abstraction library within the Franz Framework that provides a unified foundation for building reliable, resilient, and extensible distributed messaging systems. It supports outbox , inbox , retries , dead-letter queues , and multiple transports (starting with Kafka and MongoDB ).
+Transport-agnostic messaging contracts, dispatch policies, delivery context, and integration points for transport adapters.
 
 ## Installation
 

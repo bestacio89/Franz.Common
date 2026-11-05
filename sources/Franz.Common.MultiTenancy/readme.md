@@ -1,10 +1,10 @@
 # Franz.Common.MultiTenancy
 
-> Provides MultiTenancy integration and reusable abstractions for .NET applications built with Franz.Common.
+> Tenant resolution and execution-context abstractions for enforcing isolation across application and persistence boundaries.
 
 ## Overview
 
-Provides MultiTenancy integration and reusable abstractions for .NET applications built with Franz.Common.
+Tenant resolution and execution-context abstractions for enforcing isolation across application and persistence boundaries.
 
 ## Installation
 

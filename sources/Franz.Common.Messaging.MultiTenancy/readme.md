@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.MultiTenancy
 
-> A library within the Franz Framework that adds multi-tenancy support to messaging workflows. This package provides tools for managing tenant and domain-specific messaging contexts, enabling seamless integration of multi-tenancy in distributed systems.
+> Tenant context propagation and tenant-aware message metadata for isolated multi-tenant messaging workflows.
 
 ## Overview
 
-A library within the Franz Framework that adds multi-tenancy support to messaging workflows. This package provides tools for managing tenant and domain-specific messaging contexts, enabling seamless integration of multi-tenancy in distributed systems.
+Tenant context propagation and tenant-aware message metadata for isolated multi-tenant messaging workflows.
 
 ## Installation
 

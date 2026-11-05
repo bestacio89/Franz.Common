@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Sagas
 
-> Franz.Common.Messaging.Sagas provides long-running workflow orchestration , distributed coordination , and deterministic state machines fully integrated into the Franz architecture. Sagas in Franz unify: They operate transport-agnostically and integrate seamlessly with: --- --- New persistence providers added: Both sup
+> Saga orchestration contracts and execution support for coordinating long-running distributed workflows.
 
 ## Overview
 
-Franz.Common.Messaging.Sagas provides long-running workflow orchestration , distributed coordination , and deterministic state machines fully integrated into the Franz architecture. Sagas in Franz unify: They operate transport-agnostically and integrate seamlessly with: --- --- New persistence providers added: Both sup
+Saga orchestration contracts and execution support for coordinating long-running distributed workflows.
 
 ## Installation
 

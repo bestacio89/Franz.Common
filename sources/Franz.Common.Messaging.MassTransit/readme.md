@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.MassTransit
 
-> Provides Messaging MassTransit integration and reusable abstractions for .NET applications built with Franz.Common.
+> MassTransit transport adapter for publishing and consuming Franz.Common message contracts.
 
 ## Overview
 
-Provides Messaging MassTransit integration and reusable abstractions for .NET applications built with Franz.Common.
+MassTransit transport adapter for publishing and consuming Franz.Common message contracts.
 
 ## Installation
 

@@ -1,10 +1,10 @@
 # Franz.Common.MongoDB
 
-> --- Franz.Common.MongoDB/ ├── Configuration/ │ └── MongoOptions.cs ├── Outbox/ │ ├── MongoMessageStore.cs │ └── DeadLetterCollection.cs ├── Inbox/ │ └── MongoInboxStore.cs ├── Extensions/ │ └── ServiceCollectionExtensions.cs └── MongoServiceRegistration.cs json "Mongo": { "ConnectionString": "mongodb://localhost:27017"
+> MongoDB persistence integration for Franz.Common repositories and durable messaging-related storage.
 
 ## Overview
 
---- Franz.Common.MongoDB/ ├── Configuration/ │ └── MongoOptions.cs ├── Outbox/ │ ├── MongoMessageStore.cs │ └── DeadLetterCollection.cs ├── Inbox/ │ └── MongoInboxStore.cs ├── Extensions/ │ └── ServiceCollectionExtensions.cs └── MongoServiceRegistration.cs json "Mongo": { "ConnectionString": "mongodb://localhost:27017"
+MongoDB persistence integration for Franz.Common repositories and durable messaging-related storage.
 
 ## Installation
 

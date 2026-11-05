@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.RabbitMQ
 
-> Provides Messaging RabbitMQ integration and reusable abstractions for .NET applications built with Franz.Common.
+> RabbitMQ transport adapter for Franz.Common messaging, including topology provisioning, acknowledgements, retries, and dead-letter routing.
 
 ## Overview
 
-Provides Messaging RabbitMQ integration and reusable abstractions for .NET applications built with Franz.Common.
+RabbitMQ transport adapter for Franz.Common messaging, including topology provisioning, acknowledgements, retries, and dead-letter routing.
 
 ## Installation
 
