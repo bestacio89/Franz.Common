@@ -97,6 +97,44 @@ public sealed class KafkaMessagingInitializerIntegrationTests
       }).Build();
 
 
+  private async Task DeleteTopicIfExistsAsync(string topicName)
+  {
+    using var admin = BuildAdminClient();
+    var metadata = admin.GetMetadata(topicName, TimeSpan.FromSeconds(10));
+    var existingTopic = metadata.Topics.SingleOrDefault(topic => topic.Topic == topicName);
+
+    if (existingTopic is null || existingTopic.Error.Code == ErrorCode.UnknownTopicOrPart)
+      return;
+
+    existingTopic.Error.Code.Should().Be(ErrorCode.NoError);
+
+    var results = await admin.DeleteTopicsAsync(
+        new[] { topicName },
+        new DeleteTopicsOptions
+        {
+          OperationTimeout = TimeSpan.FromSeconds(10),
+          RequestTimeout = TimeSpan.FromSeconds(10)
+        });
+
+    results.Should().ContainSingle(result =>
+        result.Topic == topicName && result.Error.Code == ErrorCode.NoError);
+
+    var deadline = DateTime.UtcNow.AddSeconds(10);
+    while (DateTime.UtcNow < deadline)
+    {
+      metadata = admin.GetMetadata(topicName, TimeSpan.FromSeconds(10));
+      var remainingTopic = metadata.Topics.SingleOrDefault(topic => topic.Topic == topicName);
+
+      if (remainingTopic is null || remainingTopic.Error.Code == ErrorCode.UnknownTopicOrPart)
+        return;
+
+      await Task.Delay(TimeSpan.FromMilliseconds(100));
+    }
+
+    throw new TimeoutException($"Kafka topic '{topicName}' was not deleted within the expected timeout.");
+  }
+
+
   [Fact]
   public async Task InitializeAsync_ShouldApplyConfiguredPartitionCountAndReplicationFactor()
   {
@@ -287,6 +325,12 @@ public sealed class KafkaMessagingInitializerIntegrationTests
   {
     var eventType = typeof(KafkaMessagingRegistrationIntegrationTests.AnotherIntegrationEvent);
     var eventTopic = TopicNamer.GetTopicName(eventType);
+
+    // Other event-mode initializer tests provision every manifest destination using
+    // the default topic options. Remove this shared-broker topic so this test can
+    // verify that its explicit three-partition configuration is applied at creation.
+    await DeleteTopicIfExistsAsync(eventTopic);
+
     var sut = CreateSut(
         BuildIntegrationAccessor(),
         new KafkaMessagingOptions
