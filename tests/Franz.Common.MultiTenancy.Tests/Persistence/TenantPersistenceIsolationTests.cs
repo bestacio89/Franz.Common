@@ -186,7 +186,7 @@ public sealed class TenantPersistenceIsolationTests
     {
         var tenantId = Guid.NewGuid();
         var options = new DbContextOptionsBuilder<TestDbContext>()
-            .UseCosmos("https://localhost:8081", "local-test-key", "filter-tests")
+            .UseCosmos("https://localhost:8081", Convert.ToBase64String(new byte[32]), "filter-tests")
             .Options;
 
         using var context = new TestDbContext(

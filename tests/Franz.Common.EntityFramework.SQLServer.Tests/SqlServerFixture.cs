@@ -46,6 +46,7 @@ public class SqlServerFixture : IAsyncLifetime
     var dispatcher = Substitute.For<IDispatcher>();
     services.AddSingleton(dispatcher);
     services.AddLogging();
+    services.Configure<MultiTenancyOptions>(options => options.Enabled = true);
     services.AddSingleton<IIdGenerator<Guid>, GuidV7Generator>();
     services.AddTransient(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
 

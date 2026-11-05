@@ -57,6 +57,7 @@ public sealed class CosmosFixture : IAsyncLifetime
 
     // Core infrastructure
     services.AddLogging();
+    services.Configure<MultiTenancyOptions>(options => options.Enabled = true);
     services.AddScoped<ITenantExecutionContextAccessor, CosmosTestTenantExecutionContextAccessor>();
 
     services.AddSingleton(typeof(IEntityFactory<,>), typeof(EntityFactory<,>));
