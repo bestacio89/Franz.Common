@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.AzureEventGrid
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> Azure Event Grid integration for publishing and handling event notifications through Franz.Common messaging contracts.
 
 ## Overview
 
-The `Franz.Common.Messaging.AzureEventGrid` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Azure Event Grid integration for publishing and handling event notifications through Franz.Common messaging contracts.
 
 ## Installation
 
@@ -274,3 +274,8 @@ MIT License — see `LICENSE`.
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

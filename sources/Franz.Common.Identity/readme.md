@@ -1,10 +1,10 @@
 # Franz.Common.Identity
 
-> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+> Identity execution-context abstractions for accessing the current authenticated principal and its claims across application services.
 
 ## Overview
 
-The `Franz.Common.Identity` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Identity execution-context abstractions for accessing the current authenticated principal and its claims across application services.
 
 ## Installation
 
@@ -30,7 +30,7 @@ This package defines the **core abstractions** for accessing user identity infor
 
 ---
 -**Current Version:** v2.3.4
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 ---
 ## **Features**
 
@@ -92,7 +92,7 @@ The **Franz.Common.Identity** package integrates seamlessly with:
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team.
+This package is part of the open-source Franz.Common ecosystem. Contributions are limited to the internal development team.
 
 1. Clone the repository @ [Franz.Common](https://github.com/bestacio89/Franz.Common/)
 2. Create a feature branch.
@@ -100,11 +100,9 @@ This package is part of a private framework. Contributions are limited to the in
 
 ---
 
-## **License**
+## License
 
-Licensed under the MIT License. See the `LICENSE` file for details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 

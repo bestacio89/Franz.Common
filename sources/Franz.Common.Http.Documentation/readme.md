@@ -1,10 +1,10 @@
 # Franz.Common.Http.Documentation
 
-> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+> OpenAPI and endpoint-documentation conventions for consistent ASP.NET Core API descriptions.
 
 ## Overview
 
-The `Franz.Common.Http.Documentation` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+OpenAPI and endpoint-documentation conventions for consistent ASP.NET Core API descriptions.
 
 ## Installation
 
@@ -60,7 +60,7 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 ## **Version Information**
 
 **Current Version:** v2.3.4
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -83,14 +83,12 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 
 ## **Installation**
 
-### **From Private Azure Feed**
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.Http.Documentation
+```
+
 ```
 
 Install the package:
@@ -214,18 +212,16 @@ The **Franz.Common.Http.Documentation** package integrates seamlessly with:
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team.
+This package is part of the open-source Franz.Common ecosystem. Contributions are limited to the internal development team.
 1. Clone the repository at https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review. All PRs must comply with **Franz Tribunal** architecture rules.
 
 ---
 
-## **License**
+## License
 
-MIT License. See the `LICENSE` file for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 

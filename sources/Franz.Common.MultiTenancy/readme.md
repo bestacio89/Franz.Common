@@ -1,10 +1,10 @@
 # Franz.Common.MultiTenancy
 
-> Shared framework capability for the Franz.Common framework on .NET 10.
+> Tenant resolution and execution-context abstractions for enforcing isolation across application and persistence boundaries.
 
 ## Overview
 
-The `Franz.Common.MultiTenancy` package provides shared framework capability within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Tenant resolution and execution-context abstractions for enforcing isolation across application and persistence boundaries.
 
 ## Installation
 
@@ -42,8 +42,8 @@ A lightweight library within the **Franz Framework** designed to enable multi-te
 
 ## **Version Information**
 
-**Current Version:** v2.3.4
-- Part of the private **Franz Framework** ecosystem.
+**Current Version:** v2.3.5
+- Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -55,21 +55,18 @@ This package does not depend on external libraries and is designed to be easily 
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.MultiTenancy
+```
+
 ```
 
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.MultiTenancy  
+dotnet add package Franz.Common.MultiTenancy
 ```
 
 ---
@@ -145,18 +142,16 @@ The **Franz.Common.MultiTenancy** package serves as a foundational utility for e
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
+Contributions are welcome under the MIT License. To propose a change:
 1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
 ---
 
-## **License**
+## License
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 
@@ -203,4 +198,4 @@ Tenant resolution identifies a candidate; it does not by itself authorize execut
 Tenant stores must guarantee globally unique verified hostname mappings. The in-memory implementation is intended only for tests and local demonstrations.
 
 
-`ITenantValidator` retains its original `IsValidAsync(Guid)` contract. The cancellation-aware overload has a default implementation that delegates to the original method, so existing validators remain source-compatible while new implementations can observe request cancellation.
+`ITenantValidator` exposes one canonical contract: `IsValidAsync(Guid, CancellationToken)`. Implementations must observe cancellation and must not rely on a parameterless compatibility overload.

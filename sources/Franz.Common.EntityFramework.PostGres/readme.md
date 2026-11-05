@@ -1,10 +1,10 @@
 # Franz.Common.EntityFramework.PostGres
 
-> Persistence and infrastructure integration for the Franz.Common framework on .NET 10.
+> PostgreSQL provider integration for Franz.Common Entity Framework Core persistence, including Npgsql configuration and model conventions.
 
 ## Overview
 
-The `Franz.Common.EntityFramework.PostGres` package provides persistence and infrastructure integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+PostgreSQL provider integration for Franz.Common Entity Framework Core persistence, including Npgsql configuration and model conventions.
 
 ## Installation
 
@@ -45,7 +45,7 @@ A dedicated library within the **Franz Framework** that extends **Entity Framewo
 ## **Version Information**
 
 **Current Version:** v2.3.4
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -60,21 +60,18 @@ This package relies on:
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.EntityFramework.PostGres
+```
+
 ```
 
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.EntityFramework.Postgres  
+dotnet add package Franz.Common.EntityFramework.Postgres
 ```
 
 ---
@@ -150,18 +147,16 @@ Ensure these dependencies are installed to leverage the library's full capabilit
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
+Contributions are welcome under the MIT License. To propose a change:
 1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
 ---
 
-## **License**
+## License
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 
@@ -193,7 +188,7 @@ PostgreSQL EF Core dependencies are aligned with the .NET 10 servicing baseline.
 
 ## Database-per-tenant routing
 
-When `Database:DatabaseName` contains the `{dbName}` token, `AddPostgresDatabase` prefers `ITenantExecutionContextAccessor.Current.TenantId` as the database key. For backward compatibility, if no tenant execution context is available, the current adapter retains its legacy `IDomainContextAccessor.GetCurrentDomainId()` fallback; when neither identity is available, the token suffix is removed. This domain fallback is transitional: PR #162 will move routing policy into `Franz.Common.EntityFramework` and make domain-based routing an explicit opt-in, separate from tenant routing. For a shared-database deployment, configure a concrete database name without the token. Never derive tenant routing from a raw request header or unvalidated message metadata.
+When `Database:DatabaseName` contains the `{dbName}` token, routing is determined exclusively by the configured `DatabaseIsolationMode`. `TenantDatabase` requires a validated `ITenantExecutionContextAccessor.Current.TenantId`; it never falls back to domain identity. `DomainDatabase` is a separate, explicit opt-in that requires `IDomainContextAccessor.GetCurrentDomainId()`. `SharedDatabase` rejects tokenized names. Missing context fails closed; there is no compatibility fallback. For a shared-database deployment, configure a concrete database name without the token. Never derive tenant routing from a raw request header or unvalidated message metadata.
 
 For shared-database deployments, keep the `DbContextBase` tenant query/write enforcement enabled. For stronger isolation, define PostgreSQL row-level security policies in migrations and set the tenant session variable inside the same explicit transaction using a transaction-local setting (`set_config(..., true)`). A session-level setting must not be used with pooled connections because it can leak between tenants. The application role should not own protected tables or have `BYPASSRLS`.
 

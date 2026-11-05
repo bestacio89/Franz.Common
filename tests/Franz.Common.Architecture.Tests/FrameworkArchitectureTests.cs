@@ -167,7 +167,7 @@ public sealed class FrameworkArchitectureTests
       Path.Combine(
         RepositoryRoot.Value,
         "sources",
-        "Microsoft.Common.Mediator.SourceGenerator",
+        "Franz.Common.Mediator.SourceGenerator",
         "Franz.Common.Mediator.SourceGenerator.csproj"),
       Path.Combine(
         RepositoryRoot.Value,
@@ -414,7 +414,7 @@ public sealed class FrameworkArchitectureTests
       var relativePath = NormalizePath(Path.GetRelativePath(RepositoryRoot.Value, file));
 
       if (relativePath.StartsWith("sources/Franz.Common.Testing/", StringComparison.Ordinal)
-        || relativePath.StartsWith("sources/Microsoft.Common.Mediator.SourceGenerator/", StringComparison.Ordinal)
+        || relativePath.StartsWith("sources/Franz.Common.Mediator.SourceGenerator/", StringComparison.Ordinal)
         || relativePath.Split('/').Any(segment =>
           segment is "bin" or "obj" || segment.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)))
         continue;

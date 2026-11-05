@@ -55,9 +55,6 @@ public sealed class MemoryCacheProvider : ICacheProvider
     return Task.CompletedTask;
   }
 
-  public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
-      => throw new NotSupportedException("Tag-based invalidation is not supported by MemoryCacheProvider.");
-
   private MemoryCacheEntryOptions CreateMemoryCacheOptions(CacheOptions? requestOptions)
   {
     var globalSettings = _optionsMonitor.CurrentValue;

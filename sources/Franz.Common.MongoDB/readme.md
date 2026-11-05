@@ -1,10 +1,10 @@
 # Franz.Common.MongoDB
 
-> Persistence and infrastructure integration for the Franz.Common framework on .NET 10.
+> MongoDB persistence integration for Franz.Common repositories and durable messaging-related storage.
 
 ## Overview
 
-The `Franz.Common.MongoDB` package provides persistence and infrastructure integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+MongoDB persistence integration for Franz.Common repositories and durable messaging-related storage.
 
 ## Installation
 
@@ -50,7 +50,7 @@ The older generic `MongoRepository<TEntity>` remains available for non-tenant co
 ```markdown
 # Franz.Common.MongoDB
 
-A library within the **Franz Framework** designed to streamline the integration of MongoDB into .NET applications.  
+A library within the **Franz Framework** designed to streamline the integration of MongoDB into .NET applications.
 This package provides utilities for configuring MongoDB services, registering them with dependency injection, and enabling reliable **messaging persistence** patterns such as **Outbox** and **Inbox**.
 
 ---
@@ -183,7 +183,7 @@ if (!await _inboxStore.HasProcessedAsync(message.Id))
 ## 📝 Version Information
 
 * **Current Version:** v2.3.5
-* Part of the private **Franz Framework** ecosystem.
+* Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -235,3 +235,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 ## Dependency maintenance — October 2026
 
 The MongoDB driver was upgraded as part of the .NET 10 dependency baseline. Validate serialization, compression, and persistence integration tests against the resolved driver/transitive package graph before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

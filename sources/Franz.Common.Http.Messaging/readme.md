@@ -1,10 +1,10 @@
 # Franz.Common.Http.Messaging
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> HTTP endpoint integration for publishing messages and exposing messaging-backed application operations.
 
 ## Overview
 
-The `Franz.Common.Http.Messaging` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+HTTP endpoint integration for publishing messages and exposing messaging-backed application operations.
 
 ## Installation
 
@@ -56,7 +56,7 @@ This package ensures seamless messaging health monitoring and transactional cons
 ## **Version Information**
 
 * **Current Version:** v2.3.4
-* Part of the private **Franz Framework** ecosystem.
+* Part of the open-source Franz.Common ecosystem.
 ---
 
 ## **Dependencies**
@@ -72,14 +72,12 @@ This package depends on:
 
 ## **Installation**
 
-### From Private Azure Feed
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.Http.Messaging
+```
+
 ```
 
 Install the package:
@@ -174,12 +172,9 @@ To contribute:
 
 ---
 
-## **License**
+## License
 
-Licensed under the **MIT License**.
-See the `LICENSE` file for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 

@@ -1,6 +1,10 @@
 # Franz.Common.Http.Authentication
 
-JWT bearer authentication helpers for Franz.Common on .NET 10.
+> JWT bearer authentication helpers for ASP.NET Core with strict token validation and fail-fast configuration.
+
+## Overview
+
+JWT bearer authentication helpers for ASP.NET Core with strict token validation and fail-fast configuration.
 
 ## Installation
 
@@ -59,4 +63,4 @@ This helper is specifically for symmetric signing. For Entra ID, Keycloak, or an
 
 ## License
 
-MIT. See the repository license.
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

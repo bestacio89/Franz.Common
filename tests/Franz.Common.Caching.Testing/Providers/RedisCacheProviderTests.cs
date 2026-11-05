@@ -116,14 +116,4 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
     await act.Should().ThrowAsync<ArgumentException>();
   }
 
-  [Fact]
-  public async Task RemoveByTagAsync_Should_Throw_NotSupportedException()
-  {
-    // Act
-    var act = () => _provider.RemoveByTagAsync("any-tag");
-
-    // Assert
-    await act.Should().ThrowAsync<NotSupportedException>()
-        .WithMessage("*performance reasons*");
-  }
 }

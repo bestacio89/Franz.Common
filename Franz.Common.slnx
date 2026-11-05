@@ -71,7 +71,7 @@
     <Project Path="sources/Franz.Common.SSO/Franz.Common.SSO.csproj" />
     <Project Path="sources/Franz.Common.Testing/Franz.Common.Testing.csproj" />
     <Project Path="sources/Franz.Common/Franz.Common.csproj" />
-    <Project Path="sources/Microsoft.Common.Mediator.SourceGenerator/Franz.Common.Mediator.SourceGenerator.csproj" Id="af59ed84-f6a3-44cb-9347-b32b22ed27b8" />
+    <Project Path="sources/Franz.Common.Mediator.SourceGenerator/Franz.Common.Mediator.SourceGenerator.csproj" Id="af59ed84-f6a3-44cb-9347-b32b22ed27b8" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj" />
@@ -94,5 +94,6 @@
     <Project Path="tests/Franz.Common.Messaging.Kafka.Tests/Franz.Common.Messaging.Kafka.Tests.csproj" />
     <Project Path="tests/Franz.Common.Messaging.RabbitMQ.Tests/Franz.Common.Messaging.RabbitMQ.Tests.csproj" />
     <Project Path="tests/Franz.Common.Messaging.Tests/Franz.Common.Messaging.Tests.csproj" />
+    <Project Path="tests/Franz.Common.SSO.Tests/Franz.Common.SSO.Tests.csproj" />
   </Folder>
 </Solution>

@@ -101,16 +101,6 @@ public sealed class MemoryCacheProviderTests : IDisposable
     result.Value.Should().Be("fresh");
   }
 
-  [Fact]
-  public async Task RemoveByTagAsync_Should_Throw_NotSupportedException()
-  {
-    // Arrange & Act
-    var act = () => _provider.RemoveByTagAsync("any-tag");
-
-    // Assert
-    await act.Should().ThrowAsync<NotSupportedException>()
-        .WithMessage("*Tag-based*support*"); // Broadened to catch 'support' or 'supported'
-  }
 
   [Theory]
   [InlineData("")]

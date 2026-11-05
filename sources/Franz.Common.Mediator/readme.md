@@ -1,12 +1,10 @@
 # Franz.Common.Mediator
 
-> A compile-time-generated application dispatch and pipeline runtime for Franz.Common on .NET 10.
+> Mediator dispatch for commands, queries, notifications, and pipeline behaviors with explicit registration and AOT-aware execution.
 
 ## Overview
 
-`Franz.Common.Mediator` provides strongly typed dispatch for application commands, queries, notifications, events, and stream queries. Handler discovery and invoker generation happen at compile time through the Roslyn source generator shipped with the Mediator package.
-
-The runtime uses generated registration contributions and strongly typed invokers instead of runtime assembly scanning, expression-tree compilation, or reflective handler/processor invocation. This keeps application composition deterministic and supports trimming and Native AOT.
+Mediator dispatch for commands, queries, notifications, and pipeline behaviors with explicit registration and AOT-aware execution.
 
 ## Installation
 
@@ -210,3 +208,8 @@ Franz Mediator:
 ## Architectural direction
 
 Mediator's execution model remains explicit, composable, and contract-oriented. The current implementation moves handler composition and invoker construction to compile time, removing runtime discovery and reflective dispatch from the supported generated path while preserving the established registration APIs.
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

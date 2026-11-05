@@ -10,7 +10,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Franz.Common.Mediator.Testing
+namespace Franz.Common.Testing.Mediator
 {
   /// <summary>
   /// A lightweight dispatcher for testing handlers without DI.

@@ -1,10 +1,10 @@
 # Franz.Common.Http.Identity
 
-> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+> Authenticated-user context accessors for ASP.NET Core endpoints, claims, and authorization-aware application services.
 
 ## Overview
 
-The `Franz.Common.Http.Identity` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Authenticated-user context accessors for ASP.NET Core endpoints, claims, and authorization-aware application services.
 
 ## Installation
 
@@ -30,7 +30,7 @@ This package provides tools for **identity context access**, **dependency inject
 
 ---
 -**Current Version:** v2.3.4
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 ---
 ## **Features**
 
@@ -192,7 +192,7 @@ The **Franz.Common.Http.Identity** package integrates seamlessly with:
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team.
+This package is part of the open-source Franz.Common ecosystem. Contributions are limited to the internal development team.
 
 1. Clone the repository @ [Franz.Common](https://github.com/bestacio89/Franz.Common/)
 2. Create a feature branch.
@@ -200,11 +200,9 @@ This package is part of a private framework. Contributions are limited to the in
 
 ---
 
-## **License**
+## License
 
-Licensed under the MIT License. See the `LICENSE` file for details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 
@@ -220,7 +218,6 @@ Licensed under the MIT License. See the `LICENSE` file for details.
   * Keycloak (`AddFranzKeycloakIdentity`).
 * Config-driven setup via `appsettings.json`.
 * Unified claims mapping into `FranzIdentityContext`.
-
 
 
 ### Version 1.3

@@ -26,6 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Testing\Franz.Common.Testing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

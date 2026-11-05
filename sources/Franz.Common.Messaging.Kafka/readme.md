@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Kafka
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> Kafka transport adapter for Franz.Common messaging, including topic provisioning, consumer groups, acknowledgements, and delivery lifecycle.
 
 ## Overview
 
-The `Franz.Common.Messaging.Kafka` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Kafka transport adapter for Franz.Common messaging, including topic provisioning, consumer groups, acknowledgements, and delivery lifecycle.
 
 ## Installation
 
@@ -101,13 +101,13 @@ This separation ensures:
 
 This package depends on:
 
-- **Confluent.Kafka** (2.3.0)  
+- **Confluent.Kafka** (2.3.0)
   Core Kafka client implementation
 
-- **Franz.Common.Messaging**  
+- **Franz.Common.Messaging**
   Core messaging abstractions and contracts
 
-- **Franz.Common.Annotations**  
+- **Franz.Common.Annotations**
   Messaging and modeling annotations
 
 > ⚠️ Hosting integration is intentionally excluded.
@@ -247,7 +247,7 @@ Kafka is treated as a **transport**, not an execution model.
 
 ## 🧾 Versioning & Changelog
 
-### **Current Version:** v2.3.4
+### **Current Version:** v2.3.5
 
 ### **Version 1.7.01**
 
@@ -263,7 +263,7 @@ Kafka is treated as a **transport**, not an execution model.
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
 - Full granular control of KafkaMessagingOptions.
-- All APIs remain fully backward compatible.
+- Removed redundant synchronous disposal from `KafkaModel`; use `IAsyncDisposable`.
 - Tests, listeners, and pipeline components modernized.
 
 ### 2.0.7 – Kafka Registration now handles per Event registration automatically, no need to specify each event type manually.
@@ -297,3 +297,8 @@ That separation is what makes Franz:
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

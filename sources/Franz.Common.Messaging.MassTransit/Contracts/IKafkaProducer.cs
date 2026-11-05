@@ -1,11 +1,9 @@
-﻿using Franz.Common.Messaging.MassTransit.Clients;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.MassTransit.Contracts;
-public interface IKafkaProducer:IMessagingClient
+
+public interface IKafkaProducer
 {
+    Task PublishAsync<T>(T message, string topic, CancellationToken cancellationToken = default);
 }

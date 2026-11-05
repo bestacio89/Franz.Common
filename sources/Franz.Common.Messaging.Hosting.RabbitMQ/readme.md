@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Hosting.RabbitMQ
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> Hosted-service integration for RabbitMQ consumers and publishers, including graceful startup and shutdown.
 
 ## Overview
 
-The `Franz.Common.Messaging.Hosting.RabbitMQ` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Hosted-service integration for RabbitMQ consumers and publishers, including graceful startup and shutdown.
 
 ## Installation
 
@@ -149,7 +149,7 @@ public class OutboxHostedService : BackgroundService
 ## 📝 Version Information
 
 * **Current Version:** v2.3.4
-* Part of the private **Franz Framework** ecosystem.
+* Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -184,3 +184,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

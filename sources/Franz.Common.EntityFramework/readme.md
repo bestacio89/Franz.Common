@@ -1,10 +1,10 @@
 # Franz.Common.EntityFramework
 
-> Persistence and infrastructure integration for the Franz.Common framework on .NET 10.
+> Provider-agnostic Entity Framework Core persistence abstractions for repositories, unit-of-work operations, soft deletion, and auditing.
 
 ## Overview
 
-The `Franz.Common.EntityFramework` package provides persistence and infrastructure integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Provider-agnostic Entity Framework Core persistence abstractions for repositories, unit-of-work operations, soft deletion, and auditing.
 
 ## Installation
 
@@ -523,3 +523,7 @@ Operational requirements:
 
 The framework's database-name resolver is a routing primitive, not a tenant database lifecycle manager. Validate provisioning, credential resolution, pool behavior, migration fan-out, and recovery against each concrete database provider used in production.
 
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

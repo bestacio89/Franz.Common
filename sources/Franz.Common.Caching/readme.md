@@ -1,10 +1,10 @@
 # Franz.Common.Caching
 
-> Caching and performance for the Franz.Common framework on .NET 10.
+> Caching abstractions and provider integrations for in-memory and distributed caching, including hybrid L1/L2 strategies and observability.
 
 ## Overview
 
-The `Franz.Common.Caching` package provides the caching and performance capability within Franz.Common. It is designed to be composed with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Caching abstractions and provider integrations for in-memory and distributed caching, including hybrid L1/L2 strategies and observability.
 
 ## Installation
 
@@ -48,7 +48,7 @@ Provides **unified cache abstractions**, **hybrid caching (L1 + L2)**, Mediator 
   * `ICacheProvider`
   * `ICacheKeyStrategy`
   * `ISettingsCache`
-  * **Single cache options model** (TTL, sliding, priority, tags)
+  * **Single cache options model** (TTL, sliding, priority)
 
 * ⚡ **Hybrid caching support**
 
@@ -187,7 +187,7 @@ Exports relevant stats only (hits/misses/size) to Excel for **offline analysis**
 ---
 
 ## 📝 Changelog
-### V2.2.14 - Enhanced Configuration 
+### V2.2.14 - Enhanced Configuration
 - Configuration section is now Caching instea "Franz:Caching" for clarity and consistency.
 
 ### v2.0.1 – Internal Modernization
@@ -209,6 +209,7 @@ Exports relevant stats only (hits/misses/size) to Excel for **offline analysis**
 ### **1.7.7**
 
 * Unified cache options across all providers
+* Key-based invalidation is the supported cache removal contract; tag invalidation is not exposed
 * Hybrid cache provider stabilized (L1 + L2)
 * Removed legacy entry options
 * Provider internals aligned with Mediator pipeline
@@ -281,3 +282,8 @@ services.AddTenantScopedCacheKeys();
 ```
 
 Keys are prefixed with `tenant:{tenantId}:` when a validated tenant context exists and `global:` otherwise. This prevents identical requests from sharing cache entries across tenants. The tenant context accessor must be registered by the HTTP, messaging, or application execution adapter before the cache strategy is resolved. Do not use the global namespace for data that is logically tenant-owned.
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

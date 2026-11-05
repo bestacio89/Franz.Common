@@ -9,5 +9,4 @@ public interface ICacheProvider
     CancellationToken ct = default);
 
   Task RemoveAsync(string key, CancellationToken ct = default);
-  Task RemoveByTagAsync(string tag, CancellationToken ct = default);
 }

@@ -1,10 +1,10 @@
 # Franz.Common.Messaging
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> Transport-agnostic messaging contracts, dispatch policies, delivery context, and integration points for transport adapters.
 
 ## Overview
 
-The `Franz.Common.Messaging` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Transport-agnostic messaging contracts, dispatch policies, delivery context, and integration points for transport adapters.
 
 ## Installation
 
@@ -25,7 +25,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 
 ## Package-specific guide
 
-A messaging abstraction library within the **Franz Framework** that provides a unified foundation for building reliable, resilient, and extensible distributed messaging systems.  
+A messaging abstraction library within the **Franz Framework** that provides a unified foundation for building reliable, resilient, and extensible distributed messaging systems.
 
 It supports **outbox**, **inbox**, **retries**, **dead-letter queues**, and **multiple transports** (starting with **Kafka** and **MongoDB**).
 
@@ -186,15 +186,13 @@ builder.Services.AddOutboxHostedListener();
 ## 📝 Version Information
 
 * **Current Version:** v2.3.4
-* Part of the private **Franz Framework** ecosystem.
+* Part of the open-source Franz.Common ecosystem.
 
 ---
 
 ## 📜 License
 
 This library is licensed under the MIT License. See the `LICENSE` file for details.
-
-
 
 
 ## **Changelog**
@@ -230,3 +228,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 ## Dependency maintenance — October 2026
 
 The messaging core dependency references were reviewed as part of the repository-wide .NET 10 servicing update. The intended public messaging contracts remain unchanged. Verify all transport, serialization, and persistence integration tests against the resolved dependency graph before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

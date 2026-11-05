@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.MassTransit
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> MassTransit transport adapter for publishing and consuming Franz.Common message contracts.
 
 ## Overview
 
-The `Franz.Common.Messaging.MassTransit` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+MassTransit transport adapter for publishing and consuming Franz.Common message contracts.
 
 ## Installation
 
@@ -35,8 +35,6 @@ A library within the **Franz Framework** that integrates **MassTransit** with me
   - Extends **MassTransit** functionality to Kafka-based workflows.
 - **Kafka Messaging**:
   - Interfaces for Kafka producers (`IKafkaProducer`) and consumers (`IKafkaConsumer`).
-- **Messaging Client**:
-  - `IMessagingClient` for abstracting and managing messaging operations.
 - **Service Registration**:
   - `ServiceRegistration` to streamline the setup of Kafka producers and consumers.
 
@@ -44,8 +42,8 @@ A library within the **Franz Framework** that integrates **MassTransit** with me
 
 ## **Version Information**
 
-**Current Version:** v2.3.4
-- Part of the private **Franz Framework** ecosystem.
+**Current Version:** v2.3.5
+- Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -59,21 +57,18 @@ This package relies on:
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.Messaging.MassTransit
+```
+
 ```
 
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.MassTransit  
+dotnet add package Franz.Common.Messaging.MassTransit
 ```
 
 ---
@@ -104,48 +99,34 @@ Define Kafka producer and consumer interfaces:
 ```csharp
 using Franz.Common.Messaging.MassTransit.Contracts;
 
-public interface IOrderCreatedProducer : IKafkaProducer<OrderCreatedEvent> { }
-public interface IOrderCreatedConsumer : IKafkaConsumer<OrderCreatedEvent> { }
+public interface IOrderCreatedProducer : IKafkaProducer { }
+public interface IOrderCreatedConsumer : IKafkaConsumer { }
 ```
 
-Implement the producer and consumer logic:
+Use the role-specific contracts directly. Producers expose publishing only; consumers expose scoped subscription only.
 
 ```csharp
-using Franz.Common.Messaging.MassTransit.Clients;
-
-public class OrderCreatedProducer : KafkaProducer<OrderCreatedEvent>, IOrderCreatedProducer
+public sealed class OrderPublisher(IKafkaProducer producer)
 {
-    public OrderCreatedProducer(IMessagingClient client) : base(client) { }
+    public Task PublishAsync(OrderCreatedEvent message, CancellationToken ct)
+        => producer.PublishAsync(message, "orders.created", ct);
 }
 
-public class OrderCreatedConsumer : KafkaConsumer<OrderCreatedEvent>, IOrderCreatedConsumer
+public sealed class OrderConsumer(IKafkaConsumer consumer)
 {
-    public OrderCreatedConsumer(IMessagingClient client) : base(client) { }
-}
-```
-
-### **3. Use Messaging Clients**
-
-Leverage `IMessagingClient` to abstract messaging operations:
-
-```csharp
-using Franz.Common.Messaging.MassTransit.Clients;
-
-public class MessagingService
-{
-    private readonly IMessagingClient _messagingClient;
-
-    public MessagingService(IMessagingClient messagingClient)
-    {
-        _messagingClient = messagingClient;
-    }
-
-    public async Task PublishMessageAsync<T>(T message) where T : class
-    {
-        await _messagingClient.PublishAsync(message);
-    }
+    public Task StartAsync(CancellationToken ct)
+        => consumer.SubscribeAsync<OrderCreatedEvent>(
+            "orders.created",
+            async (services, message) =>
+            {
+                var handler = services.GetRequiredService<IOrderCreatedHandler>();
+                await handler.HandleAsync(message, ct);
+            },
+            ct);
 }
 ```
+
+There is no combined `IMessagingClient` abstraction and no unscoped captured-handler overload. Each consumer delivery is executed through a fresh dependency-injection scope.
 
 ---
 
@@ -160,30 +141,28 @@ The **Franz.Common.Messaging.MassTransit** package integrates seamlessly with:
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
+Contributions are welcome under the MIT License. To propose a change:
 1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
 ---
 
-## **License**
+## License
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 
 ### v2.0.1 – Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
+- Role-specific producer/consumer contracts; scoped consumer handlers only.
 - Tests, listeners, and pipeline components modernized.
 
 ### Version 1.2.65
 - Added `IKafkaProducer` and `IKafkaConsumer` interfaces for Kafka operations.
-- Integrated `IMessagingClient` for abstracted messaging operations.
+- Removed the combined `IMessagingClient`; producer and consumer contracts are independent.
 - Provided `ServiceRegistration` for streamlined Kafka setup with MassTransit.
 - Full compatibility with **MassTransit** and **MassTransit.Kafka**.
 
@@ -197,4 +176,4 @@ This library is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## Tenant-aware Kafka handlers in 2.3.4
 
-When tenant-aware processing is enabled, prefer the scoped-handler overload so handler dependencies are resolved from the per-delivery service provider and cannot be accidentally captured across tenant executions. The legacy captured-handler overload fails closed under tenant-aware processing because its handler lifetime cannot be proven safe. Verify Kafka header mapping and tenant authorization in the configured consumer pipeline; header presence alone does not establish tenant membership. See the [messaging execution lifecycle](../../docs/multitenancy-execution-lifecycle.md).
+When tenant-aware processing is enabled, prefer the scoped-handler overload so handler dependencies are resolved from the per-delivery service provider and cannot be accidentally captured across tenant executions. The unscoped captured-handler overload has been removed. Every consumer handler receives the per-delivery service provider and executes inside a fresh scope. Verify Kafka header mapping and tenant authorization in the configured consumer pipeline; header presence alone does not establish tenant membership. See the [messaging execution lifecycle](../../docs/multitenancy-execution-lifecycle.md).

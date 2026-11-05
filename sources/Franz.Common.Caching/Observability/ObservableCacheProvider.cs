@@ -50,13 +50,6 @@ public sealed class ObservableCacheProvider : ICacheProvider
     NotifyRemove(key);
   }
 
-  [Obsolete("Tag-based invalidation is disabled in Franz.Common. Use key-based removal.")]
-  public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
-  {
-    // Fail fast to prevent hidden performance degradation
-    throw new NotSupportedException("Tag-based observability is deprecated.");
-  }
-
   #region Observer Notifications
 
   private void NotifySet<T>(string key, T value, CacheOptions? options)

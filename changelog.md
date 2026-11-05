@@ -25,8 +25,16 @@
 - Propagate client tenant metadata only from a validated execution context.
 - Scope server/client behavior providers to prevent scoped behavior instances from being cached across requests.
 
+### Public API boundary corrections
+- Split the MassTransit Kafka producer and consumer contracts; remove the combined `IMessagingClient`, the producer's unsupported subscribe stub, the consumer's unsupported publish stub, and the unscoped captured-handler overload. Kafka consumer handlers now always receive the per-delivery service provider.
+- Move `TestDispatcher` out of the production Mediator package into `Franz.Common.Testing`.
+- Remove the unsupported `ICacheProvider.RemoveByTagAsync` contract and its provider stubs; key-based invalidation is the supported cache API.
+- Remove the `FranzSagaOptions.EnableValidation` alias; use `ValidateMappings`.
+- Make `ITenantValidator.IsValidAsync(Guid, CancellationToken)` the sole validation contract; implementations must accept and honor cancellation.
+- Remove redundant `GetCurrentId`/`SetCurrentId` aliases from messaging tenant/domain accessors and the synchronous `KafkaModel.Dispose()` entry point; the model is asynchronously disposable.
+
 ### Release boundary
-- No changes to relational EF provider behavior, messaging transports, cache strategy, or database routing.
+- No changes to relational EF provider behavior or database routing. Messaging and cache API boundary corrections are listed above; they remove obsolete contracts without changing the underlying transport or cache execution strategies.
 - Set the shared package version to 2.3.5 and file version to 2.3.5.0; retain assembly version 2.3.0.0.
 - NuGet publication remains gated on successful Release build, full tests, and release checks.
 

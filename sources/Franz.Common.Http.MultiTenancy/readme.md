@@ -1,10 +1,10 @@
 # Franz.Common.Http.MultiTenancy
 
-> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+> ASP.NET Core tenant resolution and request-scoped isolation for multi-tenant HTTP applications.
 
 ## Overview
 
-The `Franz.Common.Http.MultiTenancy` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+ASP.NET Core tenant resolution and request-scoped isolation for multi-tenant HTTP applications.
 
 ## Installation
 
@@ -43,7 +43,7 @@ A library within the **Franz Framework** that extends multi-tenancy support for 
 ## **Version Information**
 
 **Current Version:** v2.3.5
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -61,21 +61,18 @@ This package relies on:
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.Http.MultiTenancy
+```
+
 ```
 
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Http.MultiTenancy  
+dotnet add package Franz.Common.Http.MultiTenancy
 ```
 
 ---
@@ -152,18 +149,16 @@ Ensure these dependencies are installed to fully leverage the library's capabili
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
+Contributions are welcome under the MIT License. To propose a change:
 1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
 ---
 
-## **License**
+## License
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 
@@ -227,7 +222,7 @@ Tenant and domain accessors read server-established values from `HttpContext.Ite
 
 The JWT claim resolver ignores unauthenticated principals. Register only the resolution strategies appropriate to the application. Query-string and header selection must not be treated as authorization: applications must still authorize the authenticated principal's membership in the resolved tenant.
 
-**Compatibility note:** HTTP accessors no longer read tenant/domain IDs from request headers. Consumers that previously used caller-supplied headers as ambient state must use a trusted resolver and the execution context accessor. `ITenantValidator.IsValidAsync` now accepts a cancellation token.
+**Compatibility note:** HTTP accessors no longer read tenant/domain IDs from request headers. Consumers that previously used caller-supplied headers as ambient state must use a trusted resolver and the execution context accessor. `ITenantValidator` requires the cancellation-aware `IsValidAsync(Guid, CancellationToken)` contract; implementations must be updated accordingly.
 
 
 ## Authenticated tenant membership
