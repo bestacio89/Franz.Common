@@ -14,16 +14,6 @@ public sealed class FranzSagaOptions
   public string Persistence { get; set; } = "Memory";
 
   /// <summary>
-  /// Whether saga mappings should be validated during application startup.
-  /// Alias of ValidateMappings for backward compatibility.
-  /// </summary>
-  public bool EnableValidation
-  {
-    get => ValidateMappings;
-    set => ValidateMappings = value;
-  }
-
-  /// <summary>
   /// Strict mapping validation used by SagaBuilder.Build().
   /// </summary>
   public bool ValidateMappings { get; set; } = true;
