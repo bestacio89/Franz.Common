@@ -10,9 +10,6 @@ public sealed class DomainContextAccessor(
     IMessageContextAccessor messageContextAccessor,
     ITenantExecutionContextAccessor executionContextAccessor) : IDomainContextAccessor
 {
-    public Guid? GetCurrentId() => GetCurrentDomainId();
-    public void SetCurrentId(Guid domainId) => SetCurrentDomainId(domainId);
-
     public Guid? GetCurrentDomainId() => executionContextAccessor.Current?.DomainId;
 
     public void SetCurrentDomainId(Guid domainId)
