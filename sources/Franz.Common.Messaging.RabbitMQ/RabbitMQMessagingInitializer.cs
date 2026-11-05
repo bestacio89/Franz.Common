@@ -27,7 +27,10 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
   private static readonly HttpClient ManagementApiClient = new(new SocketsHttpHandler
   {
     PooledConnectionLifetime = TimeSpan.FromMinutes(5)
-  });
+  })
+  {
+    Timeout = TimeSpan.FromSeconds(15)
+  };
 
   private int _isInitialized;
   private readonly SemaphoreSlim _initLock = new(1, 1);
