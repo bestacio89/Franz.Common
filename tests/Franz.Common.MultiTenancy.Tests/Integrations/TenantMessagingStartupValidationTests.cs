@@ -11,23 +11,23 @@ namespace Franz.Common.MultiTenancy.Tests.Integrations;
 public sealed class TenantMessagingStartupValidationTests
 {
     [Fact]
-    public void AddMessagingMultitenancyContext_RequiresTenantScopeByDefault()
+    public void AddMessagingMultitenancyContext_LeavesTenantScopeOptionalByDefault()
     {
         var services = new ServiceCollection();
         services.AddMessagingMultitenancyContext();
         using var provider = services.BuildServiceProvider();
 
-        Assert.True(provider.GetRequiredService<IOptions<TenantMessagingOptions>>().Value.RequireTenantScope);
+        Assert.False(provider.GetRequiredService<IOptions<TenantMessagingOptions>>().Value.RequireTenantScope);
     }
 
     [Fact]
-    public void AddMessagingMultitenancyContext_AllowsExplicitTenantScopeOptOut()
+    public void AddMessagingMultitenancyContext_EnablesTenantScopeWhenExplicitlyRequired()
     {
         var services = new ServiceCollection();
-        services.AddMessagingMultitenancyContext(options => options.RequireTenantScope = false);
+        services.AddMessagingMultitenancyContext(options => options.RequireTenantScope = true);
         using var provider = services.BuildServiceProvider();
 
-        Assert.False(provider.GetRequiredService<IOptions<TenantMessagingOptions>>().Value.RequireTenantScope);
+        Assert.True(provider.GetRequiredService<IOptions<TenantMessagingOptions>>().Value.RequireTenantScope);
     }
 
     [Fact]
