@@ -178,7 +178,11 @@ public sealed class KafkaMessagingInitializerIntegrationTests
       TopicName = topicName,
       DeadLetterTopic = deadLetterTopicName,
       ProvisioningMode = ProvisioningMode.Verify,
-      Topic = new KafkaTopicOptions { NumPartitions = 2, ReplicationFactor = 1 }
+      Topic = new KafkaTopicOptions { NumPartitions = 2, ReplicationFactor = 1 },
+      EventTopicOptions = new Dictionary<string, KafkaTopicOptions>(StringComparer.Ordinal)
+      {
+        ["common-in"] = new KafkaTopicOptions { NumPartitions = 1, ReplicationFactor = 1 }
+      }
     });
 
     await verify.InitializeAsync();
@@ -281,7 +285,8 @@ public sealed class KafkaMessagingInitializerIntegrationTests
   [Fact]
   public async Task InitializeAsync_EventMode_ShouldApplyPerEventTopicOptions()
   {
-    var eventTopic = TopicNamer.GetTopicName(typeof(TestIntegrationEvent));
+    var eventType = typeof(KafkaMessagingRegistrationIntegrationTests.AnotherIntegrationEvent);
+    var eventTopic = TopicNamer.GetTopicName(eventType);
     var sut = CreateSut(
         BuildIntegrationAccessor(),
         new KafkaMessagingOptions
