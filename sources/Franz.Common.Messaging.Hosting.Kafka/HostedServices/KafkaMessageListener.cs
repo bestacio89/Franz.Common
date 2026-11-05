@@ -1,5 +1,6 @@
 #nullable enable
 using System.Text;
+using System.Diagnostics;
 using Confluent.Kafka;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Configuration;
@@ -23,6 +24,7 @@ public sealed class KafkaMessageListener : IListener
   private readonly string? _deadLetterTopic;
   private readonly KafkaRebalanceCoordinator _rebalanceCoordinator;
   private readonly string _groupId;
+  private readonly KafkaRebalanceCoordinator.ConsumerRegistration _registration;
   private readonly ConcurrentQueue<PendingKafkaResult> _pendingResults = new();
 
   public KafkaMessageListener(
@@ -44,6 +46,7 @@ public sealed class KafkaMessageListener : IListener
     _failurePolicy = options.Value.FailurePolicy;
     _deadLetterTopic = options.Value.DeadLetterTopic;
     _groupId = options.Value.GroupId ?? throw new InvalidOperationException("Kafka GroupId is required for rebalance coordination.");
+    _registration = _rebalanceCoordinator.GetOrCreateRegistration(_consumer, _groupId);
   }
 
   public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
@@ -110,9 +113,9 @@ public sealed class KafkaMessageListener : IListener
         var succeeded = false;
         var rebalanceInterrupted = false;
         var groupId = _groupId;
-        var rebalanceToken = _rebalanceCoordinator.GetRebalanceToken(groupId, result.TopicPartition);
+        var rebalanceToken = _rebalanceCoordinator.GetRebalanceToken(_registration, result.TopicPartition);
 
-        _rebalanceCoordinator.BeginHandlerExecution(groupId);
+        _rebalanceCoordinator.BeginHandlerExecution(_registration);
         try
         {
           PauseAssignedPartitions();
@@ -135,7 +138,7 @@ public sealed class KafkaMessageListener : IListener
 
               try
               {
-                await InvokeHandlerWhilePollingAsync(transport, handlerTimeout.Token);
+                await InvokeHandlerWhilePollingAsync(transport, handlerTimeout.Token, rebalanceToken, stoppingToken);
               }
               catch (OperationCanceledException ex)
                   when (handlerTimeout.IsCancellationRequested &&
@@ -156,6 +159,13 @@ public sealed class KafkaMessageListener : IListener
             {
               rebalanceInterrupted = true;
               break;
+            }
+            catch (HandlerDidNotStopException)
+            {
+              // A timed-out or revoked handler that ignores cancellation may still be
+              // executing. Stop this consumer instead of retrying or acknowledging work
+              // concurrently with the abandoned handler.
+              throw;
             }
             catch (Exception ex)
             {
@@ -182,7 +192,7 @@ public sealed class KafkaMessageListener : IListener
         }
         finally
         {
-          _rebalanceCoordinator.EndHandlerExecution(groupId);
+          _rebalanceCoordinator.EndHandlerExecution(_registration);
           ResumeAssignedPartitions();
         }
 
@@ -208,25 +218,54 @@ public sealed class KafkaMessageListener : IListener
     }
     finally
     {
-      _consumer.Close();
-      _logger.LogInformation("Kafka listener stopped.");
+      try
+      {
+        _consumer.Close();
+      }
+      finally
+      {
+        _rebalanceCoordinator.ReleaseConsumer(_consumer);
+        _logger.LogInformation("Kafka listener stopped.");
+      }
     }
   }
 
-  private async Task InvokeHandlerWhilePollingAsync(Message message, CancellationToken handlerToken)
+  private async Task InvokeHandlerWhilePollingAsync(
+      Message message,
+      CancellationToken handlerToken,
+      CancellationToken rebalanceToken,
+      CancellationToken stoppingToken)
   {
     // Run handler invocation off the consumer thread so synchronous handler work cannot
     // starve Consume() and trigger MaxPollIntervalMs while the handler is in flight.
+    var handler = OnMessageReceivedAsync
+        ?? throw new InvalidOperationException("A message handler must remain configured while the Kafka listener is running.");
     var handlerTask = Task.Run(
-        () => OnMessageReceivedAsync!(new MessageEventArgs(message, handlerToken)),
+        () => handler(new MessageEventArgs(message, handlerToken)),
         CancellationToken.None);
+
     while (!handlerTask.IsCompleted)
     {
+      if (handlerToken.IsCancellationRequested)
+      {
+        ObserveHandlerCompletion(handlerTask);
+
+        if (stoppingToken.IsCancellationRequested)
+          throw new OperationCanceledException("Kafka listener is stopping while a handler is still running.", stoppingToken);
+
+        var reason = rebalanceToken.IsCancellationRequested
+            ? "the Kafka partition was revoked or lost"
+            : $"the configured handler timeout {_failurePolicy.HandlerTimeout} elapsed";
+
+        throw new HandlerDidNotStopException(
+            $"Kafka handler did not stop after cancellation because {reason}. The consumer will stop without committing the message.");
+      }
+
       try
       {
         var polled = _consumer.Consume(TimeSpan.FromMilliseconds(100));
         if (polled is not null)
-          _pendingResults.Enqueue(new PendingKafkaResult(polled, _rebalanceCoordinator.GetRebalanceToken(_groupId, polled.TopicPartition)));
+          _pendingResults.Enqueue(new PendingKafkaResult(polled, _rebalanceCoordinator.GetRebalanceToken(_registration, polled.TopicPartition)));
       }
       catch (ConsumeException ex)
       {
@@ -241,11 +280,12 @@ public sealed class KafkaMessageListener : IListener
       CancellationToken rebalanceToken,
       CancellationToken stoppingToken)
   {
-    var remaining = delay;
-    while (remaining > TimeSpan.Zero)
+    var stopwatch = Stopwatch.StartNew();
+    while (stopwatch.Elapsed < delay)
     {
       stoppingToken.ThrowIfCancellationRequested();
       rebalanceToken.ThrowIfCancellationRequested();
+      var remaining = delay - stopwatch.Elapsed;
       var interval = remaining > TimeSpan.FromMilliseconds(100)
           ? TimeSpan.FromMilliseconds(100)
           : remaining;
@@ -259,10 +299,20 @@ public sealed class KafkaMessageListener : IListener
       {
         _logger.LogWarning(ex, "Kafka poll failed during retry backoff.");
       }
-      remaining -= interval;
     }
     return Task.CompletedTask;
   }
+
+  private static void ObserveHandlerCompletion(Task handlerTask)
+  {
+    _ = handlerTask.ContinueWith(
+        static completed => _ = completed.Exception,
+        CancellationToken.None,
+        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+        TaskScheduler.Default);
+  }
+
+  private sealed class HandlerDidNotStopException(string message) : InvalidOperationException(message);
 
   private sealed record PendingKafkaResult(ConsumeResult<string, string> Result, CancellationToken RebalanceToken);
 
