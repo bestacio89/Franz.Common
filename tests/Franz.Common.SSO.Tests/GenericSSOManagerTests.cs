@@ -1,6 +1,10 @@
 using Franz.Common.SSO;
 using Franz.Common.SSO.Interfaces;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -78,6 +82,14 @@ public sealed class GenericSSOManagerTests
   private static Mock<UserManager<IdentityUser>> CreateUserManager()
     => new(Mock.Of<IUserStore<IdentityUser>>(), null, null, null, null, null, null, null, null);
 
-  private static Mock<SignInManager<IdentityUser>> CreateSignInManager(UserManager<IdentityUser> userManager)
-    => new(userManager, null, null, null, null, null, null);
+  private static Mock<SignInManager<IdentityUser>> CreateSignInManager(
+    UserManager<IdentityUser> userManager)
+    => new(
+      userManager,
+      Mock.Of<IHttpContextAccessor>(),
+      Mock.Of<IUserClaimsPrincipalFactory<IdentityUser>>(),
+      Options.Create(new IdentityOptions()),
+      Mock.Of<ILogger<SignInManager<IdentityUser>>>(),
+      Mock.Of<IAuthenticationSchemeProvider>(),
+      Mock.Of<IUserConfirmation<IdentityUser>>());
 }
