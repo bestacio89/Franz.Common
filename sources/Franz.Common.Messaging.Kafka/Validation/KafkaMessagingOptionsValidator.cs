@@ -133,8 +133,8 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
     if (handlerTimeoutMilliseconds < 0)
       failures.Add("FailurePolicy:HandlerTimeout cannot be negative.");
 
-    // A single synchronous Consume/handler loop must finish its configured retry
-    // and cooperative timeout budget before Kafka revokes the consumer's partitions.
+    // The listener's poll loop must remain within the configured retry and cooperative
+    // timeout budget so the consumer can maintain group membership.
     if (options.Consumer.MaxPollIntervalMs > 0 &&
         maxRetryAttempts >= 0 &&
         retryBackoffMilliseconds >= 0 &&
@@ -175,6 +175,7 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
         CompareBoolean("EnableDeadLetter", legacyFailure["EnableDeadLetter"], currentFailure["DeadLetterOnExhaustion"], disagreements);
         CompareMilliseconds("RetryBackoffMs", legacyFailure["RetryBackoffMs"], currentFailure["RetryBackoff"], disagreements);
         CompareMilliseconds("HandlerTimeoutMs", legacyFailure["HandlerTimeoutMs"], currentFailure["HandlerTimeout"], disagreements);
+        CompareString("DeadLetterTopic", legacyFailure["DeadLetterTopic"], kafka["DeadLetterTopic"], disagreements);
 
         if (disagreements.Count > 0)
           _logger?.LogWarning(
@@ -185,14 +186,20 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
 
     var legacyKeyStrategy = kafka.GetSection("Producer")["MessageKeyStrategy"];
     var orderingStrategy = kafka["OrderingStrategy"];
-    if (!string.IsNullOrWhiteSpace(legacyKeyStrategy) &&
-        !string.IsNullOrWhiteSpace(orderingStrategy) &&
-        !string.Equals(legacyKeyStrategy, orderingStrategy, StringComparison.OrdinalIgnoreCase))
+    if (!string.IsNullOrWhiteSpace(legacyKeyStrategy))
     {
-      _logger?.LogWarning(
-          "Legacy Messaging:Kafka:Producer:MessageKeyStrategy='{LegacyStrategy}' conflicts with Messaging:Kafka:OrderingStrategy='{OrderingStrategy}'. The legacy setting is ignored.",
-          legacyKeyStrategy,
-          orderingStrategy);
+      if (string.IsNullOrWhiteSpace(orderingStrategy))
+      {
+        _logger?.LogWarning(
+            "Legacy Messaging:Kafka:Producer:MessageKeyStrategy is no longer consumed. Configure Messaging:Kafka:OrderingStrategy instead.");
+      }
+      else if (!string.Equals(legacyKeyStrategy, orderingStrategy, StringComparison.OrdinalIgnoreCase))
+      {
+        _logger?.LogWarning(
+            "Legacy Messaging:Kafka:Producer:MessageKeyStrategy='{LegacyStrategy}' conflicts with Messaging:Kafka:OrderingStrategy='{OrderingStrategy}'. The legacy setting is ignored.",
+            legacyKeyStrategy,
+            orderingStrategy);
+      }
     }
   }
 
@@ -217,6 +224,18 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
     if (bool.TryParse(legacyValue, out var legacy) &&
         bool.TryParse(currentValue, out var current) &&
         legacy != current)
+      disagreements.Add(name);
+  }
+
+  private static void CompareString(
+      string name,
+      string? legacyValue,
+      string? currentValue,
+      ICollection<string> disagreements)
+  {
+    if (!string.IsNullOrWhiteSpace(legacyValue) &&
+        !string.IsNullOrWhiteSpace(currentValue) &&
+        !string.Equals(legacyValue, currentValue, StringComparison.Ordinal))
       disagreements.Add(name);
   }
 
