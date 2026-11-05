@@ -70,7 +70,9 @@ public static class MessageDeserializerExtensions
   private static Type? ResolveTypeFromManifest(string typeName, Type expectedBase)
   {
     var matches = MessagingManifestRegistry.GetAll()
-        .SelectMany(static manifest => manifest.KnownTypes)
+        .SelectMany(manifest => expectedBase == typeof(IEvent)
+            ? manifest.Subscriptions
+            : manifest.KnownTypes)
         .Where(type =>
             expectedBase.IsAssignableFrom(type) &&
             (string.Equals(type.FullName, typeName, StringComparison.Ordinal) ||
