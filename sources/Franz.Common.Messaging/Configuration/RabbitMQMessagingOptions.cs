@@ -11,8 +11,8 @@ public sealed class RabbitMQMessagingOptions : MessagingOptions
   public string? DeadLetterExchangeName { get; set; }
   public string? DeadLetterQueueName { get; set; }
   public string? DefaultRoutingKey { get; set; }
-  /// <summary>Replay strategy: "NoReplay" or "ProgressiveFourStep".</summary>
-  public string ReplayStrategy { get; set; } = "NoReplay";
+  /// <summary>Controls whether failed deliveries are dead-lettered immediately or routed through progressive retry queues.</summary>
+  public RabbitMQReplayStrategy ReplayStrategy { get; set; } = RabbitMQReplayStrategy.NoReplay;
 
   /// <summary>
   /// Maximum number of deliveries processed concurrently by each RabbitMQ listener.
@@ -50,4 +50,11 @@ public enum RabbitMQQueueType
 {
   Quorum,
   Classic
+}
+
+
+public enum RabbitMQReplayStrategy
+{
+  NoReplay = 0,
+  ProgressiveFourStep = 1
 }

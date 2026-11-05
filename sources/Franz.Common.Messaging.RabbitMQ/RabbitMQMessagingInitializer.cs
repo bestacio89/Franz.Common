@@ -76,7 +76,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
         await InitializeDestinationExchangesAsync(channel, cancellationToken).ConfigureAwait(false);
         await InitializeQueueAsync(channel, _queueName, _options.QueueDurable, cancellationToken).ConfigureAwait(false);
         await InitializeDeadLetterQueueAsync(channel, _deadLetterQueueName, _deadLetterExchangeName, cancellationToken).ConfigureAwait(false);
-        if (string.Equals(_options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase))
+        if (_options.ReplayStrategy == RabbitMQReplayStrategy.ProgressiveFourStep)
           await InitializeReplayTopologyAsync(channel, cancellationToken).ConfigureAwait(false);
         await InitializeExchangesForSubscriptionsAsync(channel, cancellationToken).ConfigureAwait(false);
       }
@@ -108,7 +108,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
     await VerifyQueueAsync(_deadLetterQueueName, _options.QueueDurable, CreateDeadLetterQueueArguments(), failures, cancellationToken)
         .ConfigureAwait(false);
 
-    if (string.Equals(_options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase))
+    if (_options.ReplayStrategy == RabbitMQReplayStrategy.ProgressiveFourStep)
     {
       var replayExchange = RabbitMQExchangeNamer.GetReplayExchangeName(
           _assemblyAccessor.GetEntryAssembly()

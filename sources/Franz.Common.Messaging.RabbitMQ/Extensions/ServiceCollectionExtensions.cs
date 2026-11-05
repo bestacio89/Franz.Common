@@ -103,9 +103,8 @@ public static class ServiceCollectionExtensions
             options.RequestedHeartbeatSeconds is null or > 0,
             "Messaging:RabbitMQ:RequestedHeartbeatSeconds must be greater than zero when configured.")
         .Validate(options =>
-            string.Equals(options.ReplayStrategy, "NoReplay", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase),
-            "Messaging:RabbitMQ:ReplayStrategy must be NoReplay or ProgressiveFourStep.")
+            Enum.IsDefined(options.ReplayStrategy),
+            "Messaging:RabbitMQ:ReplayStrategy must be a defined RabbitMQReplayStrategy value.")
         .Validate(options =>
             options.PublisherConfirmTimeoutSeconds > 0,
             "Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds must be greater than zero.")
@@ -130,7 +129,7 @@ public static class ServiceCollectionExtensions
             "RabbitMQ preserves configured ordering only when MaxConcurrency is 1.")
         .Validate(options => options.FailurePolicy is null ||
             options.FailurePolicy.MaxRetryAttempts == 0 ||
-            string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase),
+            options.ReplayStrategy == RabbitMQReplayStrategy.ProgressiveFourStep,
             "RabbitMQ FailurePolicy retries require ReplayStrategy=ProgressiveFourStep.")
         .ValidateOnStart();
 
@@ -231,7 +230,7 @@ public static class ServiceCollectionExtensions
               var accessor = sp.GetRequiredService<IAssemblyAccessor>();
               var rabbitOptions = sp.GetRequiredService<IOptions<RabbitMQMessagingOptions>>();
 
-              return string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase)
+              return options.ReplayStrategy == RabbitMQReplayStrategy.ProgressiveFourStep
                   ? new ProgressiveFourStepReplayStrategy(confirmChannelPool, accessor, rabbitOptions)
                   : new NoReplayStrategy(confirmChannelPool, accessor, rabbitOptions);
             });

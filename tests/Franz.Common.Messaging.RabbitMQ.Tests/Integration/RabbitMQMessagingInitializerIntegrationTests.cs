@@ -46,7 +46,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       QueueName = $"manifest-consumer-{queueSuffix}",
       DeadLetterQueueName = $"manifest-consumer-{queueSuffix}-dlq",
       DeadLetterExchangeName = $"manifest-consumer-{queueSuffix}-dead-letter",
-      ReplayStrategy = "NoReplay"
+      ReplayStrategy = RabbitMQReplayStrategy.NoReplay
     });
 
     await using var modelProvider = new ModelProvider(
@@ -79,7 +79,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       ExchangeName = $"{queueName}-exchange",
       DeadLetterQueueName = $"{queueName}-dlq",
       DeadLetterExchangeName = $"{queueName}-dead-letter",
-      ReplayStrategy = "ProgressiveFourStep",
+      ReplayStrategy = RabbitMQReplayStrategy.ProgressiveFourStep,
       FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 5, retryBackoff: TimeSpan.FromSeconds(30))
     };
 
@@ -124,7 +124,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       MessageTtlMilliseconds = 5_000,
       MaxLength = 100,
       MaxLengthBytes = 10_000,
-      ReplayStrategy = "NoReplay"
+      ReplayStrategy = RabbitMQReplayStrategy.NoReplay
     };
 
     await using var modelProvider = new ModelProvider(
@@ -269,7 +269,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       DeadLetterExchangeName = deadLetterExchange,
       DeadLetterQueueName = deadLetterQueue,
       QueueType = RabbitMQQueueType.Quorum,
-      ReplayStrategy = "NoReplay"
+      ReplayStrategy = RabbitMQReplayStrategy.NoReplay
     });
 
     await using var modelProvider = new ModelProvider(_fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
@@ -317,7 +317,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       ExchangeName = $"{queueName}-exchange",
       DeadLetterQueueName = deadLetterQueue,
       DeadLetterExchangeName = $"{queueName}-dead-letter",
-      ReplayStrategy = "ProgressiveFourStep",
+      ReplayStrategy = RabbitMQReplayStrategy.ProgressiveFourStep,
       FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 5, retryBackoff: TimeSpan.FromSeconds(30))
     };
 
@@ -410,7 +410,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       ExchangeName = $"{queueName}-exchange",
       DeadLetterQueueName = $"{queueName}-dlq",
       DeadLetterExchangeName = $"{queueName}-dead-letter",
-      ReplayStrategy = "NoReplay"
+      ReplayStrategy = RabbitMQReplayStrategy.NoReplay
     };
 
     await using var modelProvider = new ModelProvider(
