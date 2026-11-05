@@ -18,7 +18,7 @@ public sealed class KafkaMessageListener : IListener
   private readonly ILogger<KafkaMessageListener> _logger;
   private readonly IMessageSerializer _serializer;
   private readonly string[] _topics;
-  private readonly IProducer<string, byte[]>? _deadLetterProducer;
+  private readonly IProducer<string, byte[]> _deadLetterProducer;
   private readonly MessageFailurePolicy _failurePolicy;
   private readonly string? _deadLetterTopic;
   private readonly KafkaRebalanceCoordinator _rebalanceCoordinator;
@@ -41,7 +41,7 @@ public sealed class KafkaMessageListener : IListener
     ArgumentNullException.ThrowIfNull(options);
     _deadLetterProducer = deadLetterProducer ?? throw new ArgumentNullException(nameof(deadLetterProducer));
     _rebalanceCoordinator = rebalanceCoordinator ?? throw new ArgumentNullException(nameof(rebalanceCoordinator));
-    _failurePolicy = options.Value.FailurePolicy ?? MessageFailurePolicy.Default;
+    _failurePolicy = options.Value.FailurePolicy;
     _deadLetterTopic = options.Value.DeadLetterTopic;
     _groupId = options.Value.GroupId ?? throw new InvalidOperationException("Kafka GroupId is required for rebalance coordination.");
   }
@@ -293,8 +293,6 @@ public sealed class KafkaMessageListener : IListener
   {
     if (!_failurePolicy.DeadLetterOnExhaustion)
       throw new InvalidOperationException($"Kafka message at {result.Topic}[{result.Partition.Value}] offset {result.Offset.Value} failed and dead-lettering is disabled. Its offset was not committed.", failure);
-    if (_deadLetterProducer is null)
-      throw new InvalidOperationException($"Kafka message at {result.Topic}[{result.Partition.Value}] offset {result.Offset.Value} failed, but no dead-letter producer is registered. Its offset was not committed.", failure);
 
     var deadLetterTopic = string.IsNullOrWhiteSpace(_deadLetterTopic) ? $"{result.Topic}-dlt" : _deadLetterTopic;
     var headers = new Confluent.Kafka.Headers();
