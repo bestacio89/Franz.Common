@@ -110,7 +110,17 @@ public sealed class KafkaMessageListener : IListener
         {
           _logger.LogError(ex, "Kafka message at {Topic}[{Partition}] offset {Offset} could not be deserialized.",
               result.Topic, result.Partition.Value, result.Offset.Value);
-          await DeadLetterAndCommitAsync(result, ex, resultRebalanceToken, stoppingToken);
+          try
+          {
+            await DeadLetterAndCommitAsync(result, ex, resultRebalanceToken, stoppingToken);
+          }
+          catch (OperationCanceledException) when (
+              resultRebalanceToken.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+          {
+            _logger.LogInformation(
+                "Skipping dead-letter offset commit for {Topic}[{Partition}] offset {Offset} because its partition was revoked or lost.",
+                result.Topic, result.Partition.Value, result.Offset.Value);
+          }
           continue;
         }
 
@@ -213,10 +223,20 @@ public sealed class KafkaMessageListener : IListener
 
         if (!succeeded)
         {
-          await DeadLetterAndCommitAsync(result,
-              processingFailure ?? new InvalidOperationException("Kafka message processing failed."),
-              rebalanceToken,
-              stoppingToken);
+          try
+          {
+            await DeadLetterAndCommitAsync(result,
+                processingFailure ?? new InvalidOperationException("Kafka message processing failed."),
+                rebalanceToken,
+                stoppingToken);
+          }
+          catch (OperationCanceledException) when (
+              rebalanceToken.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+          {
+            _logger.LogInformation(
+                "Skipping dead-letter offset commit for {Topic}[{Partition}] offset {Offset} because its partition was revoked or lost.",
+                result.Topic, result.Partition.Value, result.Offset.Value);
+          }
           continue;
         }
         CommitAfterProcessing(result, rebalanceToken);
