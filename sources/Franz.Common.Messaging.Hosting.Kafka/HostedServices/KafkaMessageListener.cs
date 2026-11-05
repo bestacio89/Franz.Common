@@ -87,11 +87,15 @@ public sealed class KafkaMessageListener : IListener
         }
 
         if (result is null) continue;
+        var resultRebalanceToken = _rebalanceCoordinator.GetRebalanceToken(_registration, result.TopicPartition);
+        if (resultRebalanceToken.IsCancellationRequested)
+          continue;
+
         if (result.Message?.Value is null)
         {
           _logger.LogDebug("Ignoring Kafka tombstone on {Topic}[{Partition}] offset {Offset}.",
               result.Topic, result.Partition.Value, result.Offset.Value);
-          CommitAfterProcessing(result);
+          CommitAfterProcessing(result, resultRebalanceToken);
           continue;
         }
 
@@ -105,7 +109,7 @@ public sealed class KafkaMessageListener : IListener
         {
           _logger.LogError(ex, "Kafka message at {Topic}[{Partition}] offset {Offset} could not be deserialized.",
               result.Topic, result.Partition.Value, result.Offset.Value);
-          await DeadLetterAndCommitAsync(result, ex, stoppingToken);
+          await DeadLetterAndCommitAsync(result, ex, resultRebalanceToken, stoppingToken);
           continue;
         }
 
@@ -113,7 +117,7 @@ public sealed class KafkaMessageListener : IListener
         var succeeded = false;
         var rebalanceInterrupted = false;
         var groupId = _groupId;
-        var rebalanceToken = _rebalanceCoordinator.GetRebalanceToken(_registration, result.TopicPartition);
+        var rebalanceToken = resultRebalanceToken;
 
         _rebalanceCoordinator.BeginHandlerExecution(_registration);
         try
@@ -210,10 +214,12 @@ public sealed class KafkaMessageListener : IListener
         if (!succeeded)
         {
           await DeadLetterAndCommitAsync(result,
-              processingFailure ?? new InvalidOperationException("Kafka message processing failed."), stoppingToken);
+              processingFailure ?? new InvalidOperationException("Kafka message processing failed."),
+              rebalanceToken,
+              stoppingToken);
           continue;
         }
-        CommitAfterProcessing(result);
+        CommitAfterProcessing(result, rebalanceToken);
       }
     }
     finally
@@ -340,8 +346,18 @@ public sealed class KafkaMessageListener : IListener
     }
   }
 
-  private void CommitAfterProcessing(ConsumeResult<string, string> result)
+  private void CommitAfterProcessing(
+      ConsumeResult<string, string> result,
+      CancellationToken rebalanceToken)
   {
+    if (rebalanceToken.IsCancellationRequested)
+    {
+      _logger.LogDebug(
+          "Skipping Kafka offset commit for {Topic}[{Partition}] offset {Offset} because its partition is no longer assigned.",
+          result.Topic, result.Partition.Value, result.Offset.Value);
+      return;
+    }
+
     try { _consumer.Commit(result); }
     catch (KafkaException ex) when (ex.Error.Code is ErrorCode.Local_State or ErrorCode.IllegalGeneration
         or ErrorCode.UnknownMemberId or ErrorCode.RebalanceInProgress)
@@ -352,7 +368,10 @@ public sealed class KafkaMessageListener : IListener
     }
   }
 
-  private async Task DeadLetterAndCommitAsync(ConsumeResult<string, string> result, Exception failure,
+  private async Task DeadLetterAndCommitAsync(
+      ConsumeResult<string, string> result,
+      Exception failure,
+      CancellationToken rebalanceToken,
       CancellationToken cancellationToken)
   {
     if (!_failurePolicy.DeadLetterOnExhaustion)
@@ -369,9 +388,10 @@ public sealed class KafkaMessageListener : IListener
     headers.Add("x-franz-failure-message", Encoding.UTF8.GetBytes(failure.Message));
     headers.Add("x-franz-failure-utc", Encoding.UTF8.GetBytes(DateTimeOffset.UtcNow.ToString("O")));
 
+    _rebalanceCoordinator.BeginHandlerExecution(_registration);
     try
     {
-      await _deadLetterProducer.ProduceAsync(deadLetterTopic,
+      var deliveryTask = _deadLetterProducer.ProduceAsync(deadLetterTopic,
           new Confluent.Kafka.Message<string, byte[]>
           {
             Key = result.Message.Key,
@@ -379,31 +399,68 @@ public sealed class KafkaMessageListener : IListener
             Headers = headers,
             Timestamp = result.Message.Timestamp
           }, cancellationToken);
+
+      try
+      {
+        await AwaitWhilePollingAsync(deliveryTask, rebalanceToken, cancellationToken).ConfigureAwait(false);
+      }
+      catch (OperationCanceledException)
+      {
+        ObserveHandlerCompletion(deliveryTask);
+        throw;
+      }
+      catch (Exception deadLetterFailure)
+      {
+        throw new InvalidOperationException(
+            $"Failed to publish Kafka message at {result.Topic}[{result.Partition.Value}] offset {result.Offset.Value} to dead-letter topic '{deadLetterTopic}'. The original offset was not committed.",
+            new AggregateException(failure, deadLetterFailure));
+      }
+
+      _logger.LogError(failure, "Kafka message at {Topic}[{Partition}] offset {Offset} was published to dead-letter topic {DeadLetterTopic}.",
+          result.Topic, result.Partition.Value, result.Offset.Value, deadLetterTopic);
+      CommitAfterProcessing(result, rebalanceToken);
     }
-    catch (Exception deadLetterFailure)
+    finally
     {
-      throw new InvalidOperationException(
-          $"Failed to publish Kafka message at {result.Topic}[{result.Partition.Value}] offset {result.Offset.Value} to dead-letter topic '{deadLetterTopic}'. The original offset was not committed.",
-          new AggregateException(failure, deadLetterFailure));
+      _rebalanceCoordinator.EndHandlerExecution(_registration);
+    }
+  }
+
+  private async Task AwaitWhilePollingAsync(
+      Task deliveryTask,
+      CancellationToken rebalanceToken,
+      CancellationToken cancellationToken)
+  {
+    while (!deliveryTask.IsCompleted)
+    {
+      cancellationToken.ThrowIfCancellationRequested();
+      rebalanceToken.ThrowIfCancellationRequested();
+
+      try
+      {
+        var polled = _consumer.Consume(TimeSpan.FromMilliseconds(100));
+        if (polled is not null)
+          _pendingResults.Enqueue(new PendingKafkaResult(
+              polled,
+              _rebalanceCoordinator.GetRebalanceToken(_registration, polled.TopicPartition)));
+      }
+      catch (ConsumeException ex)
+      {
+        _logger.LogWarning(ex, "Kafka poll failed while a dead-letter publication was in flight.");
+      }
     }
 
-    _logger.LogError(failure, "Kafka message at {Topic}[{Partition}] offset {Offset} was published to dead-letter topic {DeadLetterTopic}.",
-        result.Topic, result.Partition.Value, result.Offset.Value, deadLetterTopic);
-    CommitAfterProcessing(result);
+    cancellationToken.ThrowIfCancellationRequested();
+    rebalanceToken.ThrowIfCancellationRequested();
+    await deliveryTask.ConfigureAwait(false);
   }
 
   public Task StopListenAsync(CancellationToken cancellationToken = default)
   {
-    try
-    {
-      _logger.LogInformation("Kafka consumer unsubscribing.");
-      _consumer.Unsubscribe();
-      return Task.CompletedTask;
-    }
-    catch (Exception ex)
-    {
-      _logger.LogError(ex, "Kafka consumer unsubscribe failed.");
-      return Task.FromException(ex);
-    }
+    // The consumer is polled by the listener thread only. Unsubscribe from a
+    // host shutdown thread would violate Confluent.Kafka consumer thread safety;
+    // BackgroundService cancellation releases the blocking Consume call.
+    _logger.LogInformation("Kafka listener shutdown requested.");
+    return Task.CompletedTask;
   }
 }
