@@ -9,12 +9,15 @@ using System.Linq.Expressions;
 namespace Franz.Common.EntityFramework;
 
 /// <summary>
-/// Composes Franz persistence filters with the application's existing unnamed
-/// query filter after the derived DbContext has completed model configuration.
-/// A single unnamed filter is retained for EF Core 10 compatibility.
+/// Composes Franz persistence predicates with application query filters after
+/// the derived DbContext has completed model configuration. The convention
+/// preserves the model's filter style so EF Core 10 never mixes named and
+/// unnamed filters on the same entity type.
 /// </summary>
 internal sealed class TenantQueryFilterConvention(DbContextBase dbContext) : IModelFinalizingConvention
 {
+    private const string FrameworkQueryFilterName = "Franz.Common.Persistence";
+
     public void ProcessModelFinalizing(
         IConventionModelBuilder modelBuilder,
         IConventionContext<IConventionModelBuilder> context)
@@ -29,16 +32,30 @@ internal sealed class TenantQueryFilterConvention(DbContextBase dbContext) : IMo
             if (!isDomainEntity && !applyTenantIsolation)
                 continue;
 
-            var applicationFilter = entityType.GetQueryFilter();
-            var parameter = applicationFilter?.Parameters[0]
+            var applicationFilters = entityType.GetDeclaredQueryFilters();
+            var namedApplicationFilters = applicationFilters
+                .Where(filter => !filter.IsAnonymous)
+                .ToArray();
+            var anonymousApplicationFilter = applicationFilters
+                .SingleOrDefault(filter => filter.IsAnonymous);
+
+            if (namedApplicationFilters.Length > 0 && anonymousApplicationFilter is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Entity '{clrType.FullName}' has both named and unnamed application query filters. " +
+                    "EF Core 10 does not support mixing these filter styles on the same entity type.");
+            }
+
+            var parameter = anonymousApplicationFilter?.Expression.Parameters[0]
                 ?? Expression.Parameter(clrType, "entity");
-            var filterBody = applicationFilter?.Body ?? Expression.Constant(true);
+            var filterBody = anonymousApplicationFilter?.Expression.Body ?? Expression.Constant(true);
 
             if (isDomainEntity)
             {
                 var isDeleted = Expression.Property(parameter, nameof(IEntity<object>.IsDeleted));
-                var softDeletionFilter = Expression.Equal(isDeleted, Expression.Constant(false));
-                filterBody = Expression.AndAlso(filterBody, softDeletionFilter);
+                filterBody = Expression.AndAlso(
+                    filterBody,
+                    Expression.Equal(isDeleted, Expression.Constant(false)));
             }
 
             if (applyTenantIsolation)
@@ -58,7 +75,22 @@ internal sealed class TenantQueryFilterConvention(DbContextBase dbContext) : IMo
                     Expression.Equal(tenantId, currentTenantId));
             }
 
-            entityType.SetQueryFilter(Expression.Lambda(filterBody, parameter));
+            var composedFilter = Expression.Lambda(filterBody, parameter);
+
+            if (namedApplicationFilters.Length == 0)
+            {
+                entityType.SetQueryFilter(composedFilter);
+                continue;
+            }
+
+            if (namedApplicationFilters.Any(filter => filter.Key == FrameworkQueryFilterName))
+            {
+                throw new InvalidOperationException(
+                    $"Entity '{clrType.FullName}' already declares the reserved query filter name " +
+                    $"'{FrameworkQueryFilterName}'. Rename the application filter to avoid a collision.");
+            }
+
+            entityType.SetQueryFilter(FrameworkQueryFilterName, composedFilter);
         }
     }
 
