@@ -1,10 +1,10 @@
 # Franz.Common.Mapping.Generators
 
-> Object mapping for the Franz.Common framework on .NET 10.
+> Version 2.2.2 Franz.Common.Mapping.Generators is a high-performance Incremental Source Generator designed for .NET 10. It eliminates the boilerplate of manual object-to-object mapping by automatically implementing partial classes that inherit from IMapper<TSource, TDestination> or IAsyncMapper<TSource, TDestination> .
 
 ## Overview
 
-The `Franz.Common.Mapping.Generators` package provides object mapping within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Version 2.2.2 Franz.Common.Mapping.Generators is a high-performance Incremental Source Generator designed for .NET 10. It eliminates the boilerplate of manual object-to-object mapping by automatically implementing partial classes that inherit from IMapper<TSource, TDestination> or IAsyncMapper<TSource, TDestination> .
 
 ## Installation
 
@@ -51,8 +51,8 @@ Add the generator project as an analyzer to your target project:
 
 ```xml
 <ItemGroup>
-  <ProjectReference Include="..\Franz.Common.Mapping.Generators.csproj" 
-                    OutputItemType="Analyzer" 
+  <ProjectReference Include="..\Franz.Common.Mapping.Generators.csproj"
+                    OutputItemType="Analyzer"
                     ReferenceOutputAssembly="false" />
 </ItemGroup>
 ```
@@ -144,3 +144,8 @@ public partial class UserMapper
 * **Support**: Added `ValueTask` support for `IAsyncMapper`.
 
 **Would you like me to add a section on how to handle custom property mapping using partial methods?**
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

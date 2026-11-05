@@ -1,10 +1,10 @@
 # Franz.Common.Logging
 
-> Shared framework capability for the Franz.Common framework on .NET 10.
+> A comprehensive logging library within the Franz Framework , designed to enhance application monitoring and diagnostics using Serilog and Elastic APM . This package provides tools for centralized logging, tracing, and seamless integration with .NET applications.
 
 ## Overview
 
-The `Franz.Common.Logging` package provides shared framework capability within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+A comprehensive logging library within the Franz Framework , designed to enhance application monitoring and diagnostics using Serilog and Elastic APM . This package provides tools for centralized logging, tracing, and seamless integration with .NET applications.
 
 ## Installation
 
@@ -29,7 +29,7 @@ A comprehensive logging library within the **Franz Framework**, designed to enha
 This package provides tools for centralized logging, tracing, and seamless integration with .NET applications.
 
 * **Current Version:** v2.3.4
-* Part of the private **Franz Framework** ecosystem.
+* Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -49,7 +49,6 @@ This package provides tools for centralized logging, tracing, and seamless integ
 * **Self-contained, production-ready defaults**
 * Automatic UTF-8-safe encoding, rolling files, environment-aware enrichers.
 * Global noise suppression applied consistently.
-
 
 
 ---
@@ -79,19 +78,16 @@ This package provides tools for centralized logging, tracing, and seamless integ
 * Human-readable logs for Dev (prod-dev-.log).
 
 
-
 ---
 
 ## **Installation**
 
-### From Private Azure Feed
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.Logging
+```
+
 
 ```
 
@@ -112,7 +108,7 @@ dotnet add package Franz.Common.Logging --version 2.3.3
 using Franz.Common.Logging.Extensions;
 
 var host = Host.CreateDefaultBuilder(args)
-    .UseLog() 
+    .UseLog()
     .Build();
 
 await host.RunAsync();
@@ -125,7 +121,7 @@ await host.RunAsync();
 using Franz.Common.Logging.Extensions;
 
 var host = Host.CreateDefaultBuilder(args)
-    .UseDesktopLog() 
+    .UseDesktopLog()
     .Build();
 
 await host.RunAsync();
@@ -141,7 +137,7 @@ await host.RunAsync();
 using Franz.Common.Logging.Extensions;
 
 var host = Host.CreateDefaultBuilder(args)
-    .UseHybridLog() 
+    .UseHybridLog()
     .Build();
 
 await host.RunAsync();
@@ -181,3 +177,8 @@ await host.RunAsync();
 ## Dependency maintenance — October 2026
 
 The logging package is aligned with the .NET 10 servicing baseline. Snappier is pinned to patched version 1.3.1 because the dependency graph previously resolved vulnerable 1.0.0. The public logging contracts are not intentionally changed. Validate restore, Release build, and the full solution tests before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

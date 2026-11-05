@@ -1,10 +1,10 @@
 # Franz.Common.Mediator.OpenTelemetry
 
-> Application dispatch and request pipelines for the Franz.Common framework on .NET 10.
+> OpenTelemetry integration for the Franz Framework . This package provides automatic distributed tracing across applications using the Franz ecosystem, including Mediator pipelines, HTTP calls, and custom instrumentation.
 
 ## Overview
 
-The `Franz.Common.Mediator.OpenTelemetry` package provides application dispatch and request pipelines within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+OpenTelemetry integration for the Franz Framework . This package provides automatic distributed tracing across applications using the Franz ecosystem, including Mediator pipelines, HTTP calls, and custom instrumentation.
 
 ## Installation
 
@@ -29,7 +29,7 @@ OpenTelemetry integration for the **Franz Framework**.
 This package provides **automatic distributed tracing** across applications using the Franz ecosystem, including Mediator pipelines, HTTP calls, and custom instrumentation.
 
 * **Current Version:** v2.3.4
-* Part of the private **Franz Framework** ecosystem.
+* Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -126,3 +126,8 @@ Tags:
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

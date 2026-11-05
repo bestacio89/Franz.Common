@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.EntityFramework
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> A specialized library within the Franz Framework designed to integrate Entity Framework Core with messaging workflows. This package ensures transactional consistency for outbox patterns in relational databases, while also supporting polyglot persistence by delegating messaging storage to MongoDB or Azure Cosmos DB when
 
 ## Overview
 
-The `Franz.Common.Messaging.EntityFramework` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+A specialized library within the Franz Framework designed to integrate Entity Framework Core with messaging workflows. This package ensures transactional consistency for outbox patterns in relational databases, while also supporting polyglot persistence by delegating messaging storage to MongoDB or Azure Cosmos DB when
 
 ## Installation
 
@@ -54,7 +54,7 @@ This package ensures **transactional consistency** for outbox patterns in relati
 ## **Version Information**
 
 * **Current Version:** v2.3.4
-* Part of the private **Franz Framework** ecosystem.
+* Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -73,20 +73,18 @@ This package relies on:
 
 ## **Installation**
 
-### **From Private Azure Feed**
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.Messaging.EntityFramework
+```
+
 ```
 
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Messaging.EntityFramework  
+dotnet add package Franz.Common.Messaging.EntityFramework
 ```
 
 ---
@@ -220,3 +218,8 @@ The **Franz.Common.Messaging.EntityFramework** package integrates seamlessly wit
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

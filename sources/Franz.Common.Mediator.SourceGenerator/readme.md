@@ -1,6 +1,18 @@
 # Franz.Common.Mediator.SourceGenerator
 
-Roslyn source generator used by Franz.Common.Mediator to generate deterministic mediator handler registrations at compile time.
+> Roslyn source generator used by Franz.Common.Mediator to generate deterministic handler registrations at compile time.
+
+## Overview
+
+Roslyn source generator used by Franz.Common.Mediator to generate deterministic handler registrations at compile time.
+
+## Installation
+
+The source generator is included with the Mediator package; applications should install the supported entry point:
+
+```bash
+dotnet add package Franz.Common.Mediator
+```
 
 ## Compatibility
 
@@ -23,3 +35,8 @@ as an interface, abstract type, or generic type parameter: the concrete request
 cannot be established reliably at compile time. Those paths retain the runtime
 generated-registry guard, which throws a descriptive exception when no invoker
 exists. The warning is not a substitute for runtime integration tests.
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

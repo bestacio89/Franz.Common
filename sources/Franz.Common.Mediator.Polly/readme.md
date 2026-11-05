@@ -1,10 +1,10 @@
 # Franz.Common.Mediator.Polly
 
-> Application dispatch and request pipelines for the Franz.Common framework on .NET 10.
+> Franz.Common.Mediator.Polly extends [Franz.Common.Mediator](https://www.nuget.org/packages/Franz.Common.Mediator/) with Polly-based resilience pipelines . It gives you retry, circuit breaker, advanced circuit breaker, timeout, and bulkhead isolation for Mediator requests — all with enriched Serilog logging, context-awa
 
 ## Overview
 
-The `Franz.Common.Mediator.Polly` package provides application dispatch and request pipelines within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Franz.Common.Mediator.Polly extends [Franz.Common.Mediator](https://www.nuget.org/packages/Franz.Common.Mediator/) with Polly-based resilience pipelines . It gives you retry, circuit breaker, advanced circuit breaker, timeout, and bulkhead isolation for Mediator requests — all with enriched Serilog logging, context-awa
 
 ## Installation
 
@@ -35,7 +35,7 @@ It gives you **retry, circuit breaker, advanced circuit breaker, timeout, and bu
 * **Current Version:** v2.3.4
 * **Target Frameworks**: .NET 9+
 * **Dependencies**: `Polly`, `Serilog`, `Franz.Common.Mediator`
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 ---
 
 ## ✨ Features
@@ -293,3 +293,8 @@ Configure it once — and your Mediator pipelines automatically enforce retries,
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

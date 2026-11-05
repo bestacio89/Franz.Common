@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Hosting.Kafka
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> A Kafka hosting integration for the Franz Framework that connects the Kafka transport layer ( Franz.Common.Messaging.Kafka ) to the .NET hosting runtime ( Microsoft.Extensions.Hosting ). This package is responsible only for: > 🧱 Kafka transport, producers, consumers, and configuration live in > Franz.Common.Messaging.
 
 ## Overview
 
-The `Franz.Common.Messaging.Hosting.Kafka` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+A Kafka hosting integration for the Franz Framework that connects the Kafka transport layer ( Franz.Common.Messaging.Kafka ) to the .NET hosting runtime ( Microsoft.Extensions.Hosting ). This package is responsible only for: > 🧱 Kafka transport, producers, consumers, and configuration live in > Franz.Common.Messaging.
 
 ## Installation
 
@@ -34,7 +34,7 @@ This package is responsible **only** for:
 - hosted listeners
 - message dispatch orchestration
 
-> 🧱 Kafka transport, producers, consumers, and configuration live in  
+> 🧱 Kafka transport, producers, consumers, and configuration live in
 > **Franz.Common.Messaging.Kafka**
 
 ---
@@ -42,16 +42,16 @@ This package is responsible **only** for:
 ## ✨ Features
 
 ### Hosted Services
-- **`KafkaHostedService`**  
+- **`KafkaHostedService`**
   Runs a Kafka listener inside a .NET `BackgroundService`.
 
-- **`MessagingHostedService`**  
+- **`MessagingHostedService`**
   Orchestrates message dispatch:
   - creates scoped execution contexts
   - resolves messaging strategies
   - dispatches messages safely
 
-- **`OutboxHostedService`**  
+- **`OutboxHostedService`**
   Publishes messages stored in an outbox (SQL / Mongo) to Kafka reliably.
 
 ### Dependency Injection Extensions
@@ -264,3 +264,8 @@ This project's dependency references were reviewed and updated as part of the re
 - **Offsets are committed after processing.** Auto commit and auto offset storage are rejected by the consumer factory. A handler failure does not advance the original message's offset. Dead-letter publication must succeed before the original offset is committed.
 - **Rebalance observability.** Partition revocation and partition loss are logged separately. A lost partition is no longer owned by this consumer, so do not assume that an in-flight handler's eventual completion can be committed by the former owner.
 - **No exactly-once claim for external effects.** Kafka offset commits do not atomically include external database writes. Use an outbox/inbox or a Kafka transaction with the relevant consumer offsets when the workflow requires atomic Kafka-to-Kafka processing.
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

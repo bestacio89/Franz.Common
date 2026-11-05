@@ -1,10 +1,10 @@
 # Franz.Common.Mapping
 
-> Object mapping for the Franz.Common framework on .NET 10.
+> A deterministic, high-performance object mapping engine for the Franz Framework. --- Franz.Common.Mapping is a deterministic object mapping engine , designed to replace traditional “magic mappers” with a strict, explicit execution model .
 
 ## Overview
 
-The `Franz.Common.Mapping` package provides object mapping within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+A deterministic, high-performance object mapping engine for the Franz Framework. --- Franz.Common.Mapping is a deterministic object mapping engine , designed to replace traditional “magic mappers” with a strict, explicit execution model .
 
 ## Installation
 
@@ -257,3 +257,8 @@ Franz Mapping guarantees:
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
