@@ -198,4 +198,4 @@ Tenant resolution identifies a candidate; it does not by itself authorize execut
 Tenant stores must guarantee globally unique verified hostname mappings. The in-memory implementation is intended only for tests and local demonstrations.
 
 
-`ITenantValidator` retains its original `IsValidAsync(Guid)` contract. The cancellation-aware overload has a default implementation that delegates to the original method, so existing validators remain source-compatible while new implementations can observe request cancellation.
+`ITenantValidator` exposes one canonical contract: `IsValidAsync(Guid, CancellationToken)`. Implementations must observe cancellation and must not rely on a parameterless compatibility overload.
