@@ -8,6 +8,12 @@ using Franz.Common.Messaging.RabbitMQ.Replay;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,6 +24,11 @@ namespace Franz.Common.Messaging.RabbitMQ;
 
 public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
 {
+  private static readonly HttpClient ManagementApiClient = new(new SocketsHttpHandler
+  {
+    PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+  });
+
   private int _isInitialized;
   private readonly SemaphoreSlim _initLock = new(1, 1);
 
@@ -124,9 +135,220 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       }
     }
 
+    await VerifyBindingsAsync(failures, cancellationToken).ConfigureAwait(false);
+
     if (failures.Count > 0)
       throw new InvalidOperationException(
           "RabbitMQ topology verification failed: " + string.Join("; ", failures));
+  }
+
+  private async ValueTask VerifyBindingsAsync(
+      ICollection<string> failures,
+      CancellationToken cancellationToken)
+  {
+    if (string.IsNullOrWhiteSpace(_options.ManagementApiUrl) ||
+        !Uri.TryCreate(_options.ManagementApiUrl, UriKind.Absolute, out var managementBaseUri) ||
+        (managementBaseUri.Scheme != Uri.UriSchemeHttp && managementBaseUri.Scheme != Uri.UriSchemeHttps))
+    {
+      failures.Add(
+          "binding verification requires a valid Messaging:RabbitMQ:ManagementApiUrl (the RabbitMQ Management HTTP API); AMQP does not expose passive binding inspection");
+      return;
+    }
+
+    var (username, password) = ResolveManagementCredentials();
+    if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+    {
+      failures.Add("binding verification requires Management API credentials or reusable AMQP credentials");
+      return;
+    }
+
+    var virtualHost = ResolveManagementVirtualHost();
+    var requestUri = new Uri(
+        managementBaseUri,
+        $"/api/bindings/{Uri.EscapeDataString(virtualHost)}");
+
+    try
+    {
+      using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+      var credentialBytes = Encoding.UTF8.GetBytes($"{username}:{password}");
+      request.Headers.Authorization = new AuthenticationHeaderValue(
+          "Basic", Convert.ToBase64String(credentialBytes));
+
+      using var response = await ManagementApiClient.SendAsync(
+          request,
+          HttpCompletionOption.ResponseHeadersRead,
+          cancellationToken).ConfigureAwait(false);
+
+      if (!response.IsSuccessStatusCode)
+      {
+        failures.Add(
+            $"RabbitMQ Management API binding inspection returned HTTP {(int)response.StatusCode} ({response.ReasonPhrase})");
+        return;
+      }
+
+      var actualBindings = await response.Content
+          .ReadFromJsonAsync<List<RabbitMQBinding>>(cancellationToken: cancellationToken)
+          .ConfigureAwait(false);
+
+      if (actualBindings is null)
+      {
+        failures.Add("RabbitMQ Management API returned an empty or invalid binding inventory");
+        return;
+      }
+
+      foreach (var expected in GetExpectedBindings())
+      {
+        var actual = actualBindings.FirstOrDefault(binding =>
+            string.Equals(binding.Source, expected.Source, StringComparison.Ordinal) &&
+            string.Equals(binding.Destination, expected.Destination, StringComparison.Ordinal) &&
+            string.Equals(binding.DestinationType, expected.DestinationType, StringComparison.Ordinal) &&
+            string.Equals(binding.RoutingKey, expected.RoutingKey, StringComparison.Ordinal));
+
+        if (actual is null)
+        {
+          failures.Add(
+              $"required binding '{expected.Source}' -> '{expected.Destination}' with routing key '{expected.RoutingKey}' is missing");
+          continue;
+        }
+
+        foreach (var (argumentName, expectedValue) in expected.Arguments)
+        {
+          if (!actual.Arguments.TryGetValue(argumentName, out var actualValue) ||
+              actualValue.ValueKind != JsonValueKind.String ||
+              !string.Equals(actualValue.GetString(), expectedValue, StringComparison.Ordinal))
+          {
+            failures.Add(
+                $"binding '{expected.Source}' -> '{expected.Destination}' has an incorrect or missing '{argumentName}' argument");
+          }
+        }
+
+        if (actual.Arguments.Count != expected.Arguments.Count)
+          failures.Add(
+              $"binding '{expected.Source}' -> '{expected.Destination}' has unexpected binding arguments");
+      }
+    }
+    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+    {
+      throw;
+    }
+    catch (HttpRequestException ex)
+    {
+      failures.Add($"RabbitMQ Management API binding inspection failed: {ex.Message}");
+    }
+    catch (JsonException ex)
+    {
+      failures.Add($"RabbitMQ Management API returned an invalid binding inventory: {ex.Message}");
+    }
+  }
+
+  private IReadOnlyCollection<ExpectedBinding> GetExpectedBindings()
+  {
+    var bindings = new List<ExpectedBinding>
+    {
+      new(_deadLetterExchangeName, _deadLetterQueueName, "queue", _deadLetterQueueName,
+          new Dictionary<string, string>(StringComparer.Ordinal))
+    };
+
+    if (_options.ReplayStrategy == RabbitMQReplayStrategy.ProgressiveFourStep)
+    {
+      var replayExchange = RabbitMQExchangeNamer.GetReplayExchangeName(
+          _assemblyAccessor.GetEntryAssembly()
+          ?? throw new InvalidOperationException("Entry assembly cannot be null."));
+
+      for (var retryNumber = 1; retryNumber <= 3; retryNumber++)
+      {
+        bindings.Add(new ExpectedBinding(
+            replayExchange,
+            $"{_queueName}-retry-{retryNumber}",
+            "queue",
+            ProgressiveFourStepReplayStrategy.GetRetryRoutingKey(_queueName, retryNumber),
+            new Dictionary<string, string>(StringComparer.Ordinal)));
+      }
+    }
+
+    var integrationEvents = Franz.Common.Messaging.Manifest.MessagingManifestRegistry.GetAll()
+        .SelectMany(static manifest => manifest.Subscriptions)
+        .Distinct();
+
+    foreach (var eventType in integrationEvents)
+    {
+      var sourceExchange = RabbitMQExchangeNamer.GetEventExchangeName(eventType.Assembly);
+      var eventName = HeaderNamer.GetEventClassName(eventType);
+      bindings.Add(new ExpectedBinding(
+          sourceExchange,
+          _queueName,
+          "queue",
+          string.Empty,
+          new Dictionary<string, string>(StringComparer.Ordinal)
+          {
+            [MessagingConstants.ClassName] = eventName,
+            ["x-match"] = "all"
+          }));
+    }
+
+    return bindings;
+  }
+
+  private (string? Username, string? Password) ResolveManagementCredentials()
+  {
+    var username = _options.ManagementApiUsername ?? _options.UserName;
+    var password = _options.ManagementApiPassword ?? _options.Password;
+
+    if ((!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password)) ||
+        string.IsNullOrWhiteSpace(_options.BootStrapServers) ||
+        !Uri.TryCreate(_options.BootStrapServers, UriKind.Absolute, out var amqpUri))
+      return (username, password);
+
+    var credentials = amqpUri.UserInfo.Split(':', 2);
+    if (credentials.Length != 2)
+      return (username, password);
+
+    return (
+        username ?? Uri.UnescapeDataString(credentials[0]),
+        password ?? Uri.UnescapeDataString(credentials[1]));
+  }
+
+  private string ResolveManagementVirtualHost()
+  {
+    if (!string.IsNullOrWhiteSpace(_options.ManagementApiVirtualHost))
+      return _options.ManagementApiVirtualHost;
+
+    if (!string.IsNullOrWhiteSpace(_options.VirtualHost))
+      return _options.VirtualHost;
+
+    if (!string.IsNullOrWhiteSpace(_options.BootStrapServers) &&
+        Uri.TryCreate(_options.BootStrapServers, UriKind.Absolute, out var amqpUri))
+    {
+      var path = Uri.UnescapeDataString(amqpUri.AbsolutePath.Trim('/'));
+      return string.IsNullOrWhiteSpace(path) ? "/" : path;
+    }
+
+    return "/";
+  }
+
+  private sealed record ExpectedBinding(
+      string Source,
+      string Destination,
+      string DestinationType,
+      string RoutingKey,
+      IReadOnlyDictionary<string, string> Arguments);
+
+  private sealed class RabbitMQBinding
+  {
+    [JsonPropertyName("source")]
+    public string Source { get; init; } = string.Empty;
+
+    [JsonPropertyName("destination")]
+    public string Destination { get; init; } = string.Empty;
+
+    [JsonPropertyName("destination_type")]
+    public string DestinationType { get; init; } = string.Empty;
+
+    [JsonPropertyName("routing_key")]
+    public string RoutingKey { get; init; } = string.Empty;
+
+    [JsonPropertyName("arguments")]
+    public Dictionary<string, JsonElement> Arguments { get; init; } = new(StringComparer.Ordinal);
   }
 
   private async ValueTask VerifyExchangeAsync(
