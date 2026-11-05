@@ -23,7 +23,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Senders;
 public sealed class KafkaSenderUnitTests
 {
   private static (KafkaSender Sender, Mock<IProducer<string, byte[]>> Producer) BuildSender(
-      KafkaMessageKeyStrategy strategy = KafkaMessageKeyStrategy.MessageId)
+      MessageOrderingStrategy strategy = MessageOrderingStrategy.MessageId)
   {
     var mockAssembly = new Mock<IAssembly>();
     mockAssembly.Setup(a => a.Name).Returns("Company.Test.Api");
@@ -51,7 +51,7 @@ public sealed class KafkaSenderUnitTests
     {
       BootstrapServers = "localhost:9092",
       GroupId = "test-group",
-      Producer = new KafkaProducerOptions { MessageKeyStrategy = strategy }
+      Producer = new KafkaProducerOptions { OrderingStrategy = strategy }
     });
 
     var topicNames = new KafkaTopicNames(mockAccessor.Object, options);
@@ -108,7 +108,7 @@ public sealed class KafkaSenderUnitTests
   [Fact]
   public async Task SendAsync_ShouldUseAggregateId_WhenConfigured()
   {
-    var (sender, producer) = BuildSender(KafkaMessageKeyStrategy.AggregateId);
+    var (sender, producer) = BuildSender(MessageOrderingStrategy.AggregateId);
     var aggregateId = Guid.NewGuid();
     var message = new Message { AggregateId = aggregateId };
     Confluent.Kafka.Message<string, byte[]>? produced = null;
@@ -131,7 +131,7 @@ public sealed class KafkaSenderUnitTests
   [Fact]
   public async Task SendAsync_ShouldFail_WhenAggregateIdIsMissingForAggregateStrategy()
   {
-    var (sender, producer) = BuildSender(KafkaMessageKeyStrategy.AggregateId);
+    var (sender, producer) = BuildSender(MessageOrderingStrategy.AggregateId);
     Func<Task> act = async () => await sender.SendAsync(new Message());
 
     await act.Should().ThrowAsync<PermanentMessagingException>()
@@ -145,7 +145,7 @@ public sealed class KafkaSenderUnitTests
   [Fact]
   public async Task SendAsync_ShouldFail_WhenCorrelationIdIsMissingForCorrelationStrategy()
   {
-    var (sender, producer) = BuildSender(KafkaMessageKeyStrategy.CorrelationId);
+    var (sender, producer) = BuildSender(MessageOrderingStrategy.CorrelationId);
     var message = new Message { CorrelationId = null };
     Func<Task> act = async () => await sender.SendAsync(message);
 

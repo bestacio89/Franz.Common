@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using FluentAssertions;
 using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Validation;
 using Xunit;
 
@@ -24,7 +25,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       options.Security.Should().NotBeNull();
       options.Consumer.Should().NotBeNull();
       options.Producer.Should().NotBeNull();
-      options.Failure.Should().NotBeNull();
+      options.FailurePolicy.Should().NotBeNull();
       options.Observability.Should().NotBeNull();
 
       // Security defaults
@@ -55,11 +56,11 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
       options.Producer.DeliveryTimeoutMs.Should().Be(120000);
       options.Producer.TransactionTimeoutMs.Should().Be(120000);
 
-      // Failure defaults
-      options.Failure.EnableDeadLetter.Should().BeTrue();
-      options.Failure.MaxRetryAttempts.Should().Be(3);
-      options.Failure.RetryBackoffMs.Should().Be(500);
-      options.Failure.UseOriginalMessageKey.Should().BeTrue();
+      // Broker-neutral failure policy defaults
+      options.FailurePolicy.MaxRetryAttempts.Should().Be(3);
+      options.FailurePolicy.RetryBackoff.Should().Be(TimeSpan.FromMilliseconds(500));
+      options.FailurePolicy.DeadLetterOnExhaustion.Should().BeTrue();
+      options.FailurePolicy.HandlerTimeout.Should().BeNull();
 
       // Observability defaults
       options.Observability.EnableMetrics.Should().BeTrue();
@@ -278,19 +279,6 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     }
 
     [Fact]
-    public void KafkaFailureOptions_ShouldHave_DefaultValues()
-    {
-      var failure = new KafkaFailureOptions();
-
-      failure.EnableDeadLetter.Should().BeTrue();
-      failure.DeadLetterTopic.Should().BeNull();
-      failure.MaxRetryAttempts.Should().Be(3);
-      failure.RetryBackoffMs.Should().Be(500);
-      failure.UseOriginalMessageKey.Should().BeTrue();
-      failure.HandlerTimeoutMs.Should().Be(0);
-    }
-
-    [Fact]
     public void KafkaObservabilityOptions_ShouldHave_Defaults()
     {
       var obs = new KafkaObservabilityOptions();
@@ -313,7 +301,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
           SecurityProtocol = KafkaSecurityProtocol.Ssl
         },
         Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
-        Failure = new KafkaFailureOptions { MaxRetryAttempts = 3, RetryBackoffMs = 334 }
+        FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 3, retryBackoff: TimeSpan.FromMilliseconds(334))
       };
 
       var result = new KafkaMessagingOptionsValidator().Validate(
@@ -336,7 +324,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
           SecurityProtocol = KafkaSecurityProtocol.Ssl
         },
         Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
-        Failure = new KafkaFailureOptions { MaxRetryAttempts = 3, RetryBackoffMs = 333 }
+        FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 3, retryBackoff: TimeSpan.FromMilliseconds(333))
       };
 
       var result = new KafkaMessagingOptionsValidator().Validate(
@@ -357,7 +345,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
           SecurityProtocol = KafkaSecurityProtocol.Ssl
         },
         Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
-        Failure = new KafkaFailureOptions { MaxRetryAttempts = 0, RetryBackoffMs = 60000 }
+        FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 0, retryBackoff: TimeSpan.FromMilliseconds(60000))
       };
 
       var result = new KafkaMessagingOptionsValidator().Validate(
@@ -375,12 +363,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
         GroupId = "test-group",
         Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
         Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
-        Failure = new KafkaFailureOptions
-        {
-          MaxRetryAttempts = 3,
-          RetryBackoffMs = 100,
-          HandlerTimeoutMs = 200
-        }
+        FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 3, retryBackoff: TimeSpan.FromMilliseconds(100), handlerTimeout: TimeSpan.FromMilliseconds(200))
       };
 
       var result = new KafkaMessagingOptionsValidator().Validate(
@@ -399,12 +382,7 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
         GroupId = "test-group",
         Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
         Consumer = new KafkaConsumerOptions { MaxPollIntervalMs = 1000 },
-        Failure = new KafkaFailureOptions
-        {
-          MaxRetryAttempts = 3,
-          RetryBackoffMs = 100,
-          HandlerTimeoutMs = 100
-        }
+        FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 3, retryBackoff: TimeSpan.FromMilliseconds(100), handlerTimeout: TimeSpan.FromMilliseconds(100))
       };
 
       var result = new KafkaMessagingOptionsValidator().Validate(
@@ -451,28 +429,11 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration
     [Theory]
     [InlineData(-1, 500)]
     [InlineData(3, -1)]
-    public void KafkaFailureOptions_ShouldRejectNegativeRetrySettings(int attempts, int backoffMs)
+    public void MessageFailurePolicy_ShouldRejectNegativeRetrySettings(int attempts, int backoffMs)
     {
-      var options = new KafkaMessagingOptions
-      {
-        BootstrapServers = "localhost:9092",
-        GroupId = "test-group",
-        Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl },
-        Failure = new KafkaFailureOptions
-        {
-          MaxRetryAttempts = attempts,
-          RetryBackoffMs = backoffMs
-        }
-      };
-
-      var result = new KafkaMessagingOptionsValidator().Validate(
-          Microsoft.Extensions.Options.Options.DefaultName, options);
-
-      result.Failed.Should().BeTrue();
-      if (attempts < 0)
-        result.Failures.Should().Contain(message => message.Contains("MaxRetryAttempts"));
-      if (backoffMs < 0)
-        result.Failures.Should().Contain(message => message.Contains("RetryBackoffMs"));
+      var act = () => new MessageFailurePolicy(maxRetryAttempts: attempts,
+          retryBackoff: TimeSpan.FromMilliseconds(backoffMs));
+      act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
   }

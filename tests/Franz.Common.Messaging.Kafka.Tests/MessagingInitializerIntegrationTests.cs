@@ -41,7 +41,7 @@ public sealed class KafkaMessagingInitializerIntegrationTests
       GroupId = "test-group",
       BootstrapServers = _fixture.BootstrapServers,
       TopicName = "main-topic",
-      Failure = { DeadLetterTopic = "dead-letter-topic" }
+      DeadLetterTopic = "dead-letter-topic"
     });
 
     var adminClient = new AdminClientBuilder(new AdminClientConfig
@@ -105,7 +105,7 @@ public sealed class KafkaMessagingInitializerIntegrationTests
       GroupId = "test-group",
       BootstrapServers = _fixture.BootstrapServers,
       TopicName = "configured-topic",
-      Failure = { DeadLetterTopic = "configured-topic-dlt" },
+      DeadLetterTopic = "configured-topic-dlt",
       Topic = new KafkaTopicOptions
       {
         NumPartitions = 3,
@@ -142,7 +142,7 @@ public sealed class KafkaMessagingInitializerIntegrationTests
       GroupId = "test-group",
       BootstrapServers = _fixture.BootstrapServers,
       TopicName = topicName,
-      Failure = { DeadLetterTopic = deadLetterTopicName }
+      DeadLetterTopic = deadLetterTopicName
     });
     using var cancellation = new CancellationTokenSource();
     cancellation.Cancel();
