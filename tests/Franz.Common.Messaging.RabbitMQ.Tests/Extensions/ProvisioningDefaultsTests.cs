@@ -55,7 +55,8 @@ public sealed class RabbitMqProvisioningDefaultsTests
           {
             ["Messaging:RabbitMQ:BootStrapServers"] = "amqp://service:secret@localhost:5672/",
             ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = "5",
-            ["Messaging:RabbitMQ:SslEnabled"] = "false"
+            ["Messaging:RabbitMQ:SslEnabled"] = "false",
+            ["Messaging:RabbitMQ:ManagementApiUrl"] = "http://localhost:15672"
           })
           .Build();
 }
