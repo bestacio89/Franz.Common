@@ -21,6 +21,7 @@ public sealed class KafkaModel(IConnectionFactoryProvider connectionFactoryProvi
         Acks = Acks.All,
         EnableIdempotence = true
     }).Build();
+    private int _disposed;
 
     public async ValueTask Produce<TMessage>(string topic, TMessage message, CancellationToken cancel)
     {
