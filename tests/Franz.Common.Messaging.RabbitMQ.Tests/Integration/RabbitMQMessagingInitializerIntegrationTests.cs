@@ -244,10 +244,12 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
   {
     var suffix = Guid.CreateVersion7().ToString("N");
     var queueName = $"legacy-234-{suffix}";
+    var deadLetterExchange = $"{queueName}-dead-letter";
+    var deadLetterQueue = $"{queueName}-dlq";
     var connection = await _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>().GetConnectionAsync();
 
-    // Version 2.3.4 relied on the broker's default queue type and did not
-    // declare x-queue-type explicitly. The default RabbitMQ 4.0 broker uses classic.
+    // Version 2.3.4 declared the dead-letter arguments but relied on the broker's
+    // default queue type. The default RabbitMQ 4.0 broker uses classic.
     await using (var legacyChannel = await connection.CreateChannelAsync())
     {
       await legacyChannel.QueueDeclareAsync(
@@ -255,15 +257,19 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
           durable: true,
           exclusive: false,
           autoDelete: false,
-          arguments: null);
+          arguments: new Dictionary<string, object?>
+          {
+            ["x-dead-letter-exchange"] = deadLetterExchange,
+            ["x-dead-letter-routing-key"] = deadLetterQueue
+          });
     }
 
     var options = Options.Create(new RabbitMQMessagingOptions
     {
       QueueName = queueName,
       ExchangeName = $"{queueName}-exchange",
-      DeadLetterExchangeName = $"{queueName}-dead-letter",
-      DeadLetterQueueName = $"{queueName}-dlq",
+      DeadLetterExchangeName = deadLetterExchange,
+      DeadLetterQueueName = deadLetterQueue,
       QueueType = RabbitMQQueueType.Quorum
     });
 
