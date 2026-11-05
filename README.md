@@ -472,7 +472,7 @@ This release documents the tenant-isolation and messaging execution-boundary wor
 
 For supported tenant-aware messaging integrations, each delivery is processed with a validated tenant execution context and a delivery-scoped dependency-injection lifetime. The context is cleaned up after success, failure, or cancellation. Outbound tenant/domain metadata is derived from validated execution context rather than trusted from stale or caller-controlled metadata. Outbox dispatch creates a fresh scope per stored message and resolves dispatch dependencies from that scope.
 
-The MassTransit Kafka integration includes a scoped-handler overload that resolves delivery dependencies from the delivery scope. When tenant-aware processing is enabled, the legacy overload that captures a handler instance fails closed rather than silently reusing a handler whose lifetime may cross tenant boundaries. Each transport still requires its documented registration and metadata conventions; see [the execution lifecycle contract](docs/multitenancy-execution-lifecycle.md).
+The MassTransit Kafka integration exposes only the scoped-handler contract: every delivery receives a fresh service scope, and the handler resolves its dependencies from that delivery scope. There is no captured-handler overload. Each transport still requires its documented registration and metadata conventions; see [the execution lifecycle contract](docs/multitenancy-execution-lifecycle.md).
 
 ### Relational persistence qualification
 
