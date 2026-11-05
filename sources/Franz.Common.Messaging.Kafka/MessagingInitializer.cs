@@ -144,31 +144,32 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
           : new Dictionary<string, string>(topicOptions.Configurations, StringComparer.Ordinal)
     };
 
-    if (_options.ProvisioningMode == Franz.Common.Messaging.Configuration.ProvisioningMode.Verify)
-    {
-      VerifyTopic(name, topicOptions, timeout);
-      return;
-    }
-
     try
     {
-      await _adminClient.CreateTopicsAsync(
+      if (_options.ProvisioningMode == Franz.Common.Messaging.Configuration.ProvisioningMode.Verify)
+      {
+        VerifyTopic(name, topicOptions, timeout);
+        return;
+      }
+
+      var creation = _adminClient.CreateTopicsAsync(
           new[] { specification },
           new CreateTopicsOptions
           {
             OperationTimeout = timeout,
             RequestTimeout = timeout
-          }).WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
-    }
-    catch (CreateTopicsException ex) when (
-        ex.Results.All(static result => result.Error.Code == ErrorCode.TopicAlreadyExists))
-    {
-      // Existing topics are reconciled below. Kafka permits increasing, but not
-      // decreasing, a topic's partition count.
-    }
+          });
 
-    await EnsureMinimumPartitionCountAsync(name, topicOptions, timeout, cancellationToken)
-        .ConfigureAwait(false);
+      // The Admin API has no CancellationToken overload. Cancellation stops this
+      // initializer from waiting or scheduling further topics; Kafka's request
+      // timeout bounds the broker request.
+      await creation.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+    }
+    catch (CreateTopicsException ex)
+    {
+      if (ex.Results.Any(result => result.Error.Code != ErrorCode.TopicAlreadyExists))
+        throw;
+    }
   }
 
   private void VerifyTopic(string name, KafkaTopicOptions topicOptions, TimeSpan timeout)
@@ -188,39 +189,6 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
         partition.Replicas.Count() != topicOptions.ReplicationFactor))
       throw new InvalidOperationException(
           $"Kafka topic '{name}' does not have the configured replication factor of {topicOptions.ReplicationFactor}.");
-  }
-
-  private async Task EnsureMinimumPartitionCountAsync(
-      string name,
-      KafkaTopicOptions topicOptions,
-      TimeSpan timeout,
-      CancellationToken cancellationToken)
-  {
-    var metadata = _adminClient.GetMetadata(name, timeout);
-    var existingTopic = metadata.Topics.SingleOrDefault(topic =>
-        string.Equals(topic.Topic, name, StringComparison.Ordinal));
-
-    if (existingTopic is null || existingTopic.Error.Code != ErrorCode.NoError)
-      throw new InvalidOperationException($"Kafka topic '{name}' was not available after provisioning.");
-
-    var currentPartitionCount = existingTopic.Partitions.Count;
-    if (currentPartitionCount >= topicOptions.NumPartitions)
-      return;
-
-    await _adminClient.CreatePartitionsAsync(
-        new[]
-        {
-          new PartitionsSpecification
-          {
-            Topic = name,
-            IncreaseTo = topicOptions.NumPartitions
-          }
-        },
-        new CreatePartitionsOptions
-        {
-          OperationTimeout = timeout,
-          RequestTimeout = timeout
-        }).WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
   }
 
   private sealed record TopicPlan(string Name, KafkaTopicOptions Options);
