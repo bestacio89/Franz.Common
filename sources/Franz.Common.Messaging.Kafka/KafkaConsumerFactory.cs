@@ -11,13 +11,16 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
 {
   private readonly KafkaMessagingOptions _options;
   private readonly ILogger<KafkaConsumerFactory> _logger;
+  private readonly KafkaRebalanceCoordinator _rebalanceCoordinator;
 
   public KafkaConsumerFactory(
       IOptions<KafkaMessagingOptions> options,
-      ILogger<KafkaConsumerFactory> logger)
+      ILogger<KafkaConsumerFactory> logger,
+      KafkaRebalanceCoordinator rebalanceCoordinator)
   {
     _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    _rebalanceCoordinator = rebalanceCoordinator ?? throw new ArgumentNullException(nameof(rebalanceCoordinator));
   }
 
   public IConsumer<string, string> Build()
@@ -63,41 +66,83 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
       SslCaLocation = _options.Security.SslCaLocation,
       SslCertificateLocation = _options.Security.SslCertificateLocation,
       SslKeyLocation = _options.Security.SslKeyLocation,
-      AllowAutoCreateTopics = false
+      AllowAutoCreateTopics = false,
+      PartitionAssignmentStrategy = _options.Consumer.EnableCooperativeStickyAssignor
+          ? PartitionAssignmentStrategy.CooperativeSticky
+          : PartitionAssignmentStrategy.Range
     };
 
-    return new ConsumerBuilder<string, string>(config)
-        .SetPartitionsRevokedHandler((_, partitions) =>
-        {
-          if (partitions.Count == 0)
-            return;
+    var groupId = _options.GroupId ?? throw new InvalidOperationException("Kafka GroupId is required.");
+    var registration = _rebalanceCoordinator.CreateRegistration(groupId);
 
-          _logger.LogInformation(
-              "Kafka partitions revoked for group {GroupId}: {Partitions}.",
-              config.GroupId,
-              string.Join(", ", partitions.Select(partition => $"{partition.Topic}[{partition.Partition.Value}]@{partition.Offset.Value}")));
-        })
-        .SetPartitionsLostHandler((_, partitions) =>
-        {
-          if (partitions.Count == 0)
-            return;
+    IConsumer<string, string>? consumer = null;
+    try
+    {
+      consumer = new ConsumerBuilder<string, string>(config)
+          .SetPartitionsAssignedHandler((client, partitions) =>
+          {
+            _rebalanceCoordinator.OnPartitionsAssigned(
+                registration, partitions);
 
-          _logger.LogWarning(
-              "Kafka partitions lost for group {GroupId}: {Partitions}. Offsets may be redelivered; handlers must be idempotent.",
-              config.GroupId,
-              string.Join(", ", partitions.Select(partition => $"{partition.Topic}[{partition.Partition.Value}]@{partition.Offset.Value}")));
-        })
-        .SetErrorHandler((_, error) =>
-        {
-          if (error.IsFatal)
-            _logger.LogCritical("Fatal Kafka error: {Reason} | Local: {IsLocal}",
-                error.Reason, error.IsLocalError);
-          else
-            _logger.LogWarning("Kafka warning: {Reason}", error.Reason);
-        })
-        .SetStatisticsHandler((_, json) => _logger.LogTrace("Kafka statistics: {Stats}", json))
-        .SetLogHandler((_, message) =>
-            _logger.LogDebug("Kafka internal log: [{Level}] {Message}", message.Level, message.Message))
-        .Build();
+            if (_rebalanceCoordinator.IsHandlerExecutionActive(registration) && partitions.Count > 0)
+            {
+              try { client.Pause(partitions); }
+              catch (KafkaException ex)
+              {
+                _logger.LogWarning(ex,
+                    "Could not pause newly assigned Kafka partitions for consumer {ConsumerId} while a handler is in flight.",
+                    registration.Id);
+              }
+            }
+          })
+          .SetPartitionsRevokedHandler((_, partitions) =>
+          {
+            if (partitions.Count == 0)
+              return;
+
+            _rebalanceCoordinator.OnPartitionsRevoked(
+                registration, partitions.Select(static partition => partition.TopicPartition));
+
+            _logger.LogInformation(
+                "Kafka partitions revoked for consumer {ConsumerId} in group {GroupId}: {Partitions}.",
+                registration.Id,
+                groupId,
+                string.Join(", ", partitions.Select(partition => $"{partition.Topic}[{partition.Partition.Value}]@{partition.Offset.Value}")));
+          })
+          .SetPartitionsLostHandler((_, partitions) =>
+          {
+            if (partitions.Count == 0)
+              return;
+
+            _rebalanceCoordinator.OnPartitionsLost(
+                registration, partitions.Select(static partition => partition.TopicPartition));
+
+            _logger.LogWarning(
+                "Kafka partitions lost for consumer {ConsumerId} in group {GroupId}: {Partitions}. Offsets may be redelivered; handlers must be idempotent.",
+                registration.Id,
+                groupId,
+                string.Join(", ", partitions.Select(partition => $"{partition.Topic}[{partition.Partition.Value}]@{partition.Offset.Value}")));
+          })
+          .SetErrorHandler((_, error) =>
+          {
+            if (error.IsFatal)
+              _logger.LogCritical("Fatal Kafka error: {Reason} | Local: {IsLocal}", error.Reason, error.IsLocalError);
+            else
+              _logger.LogWarning("Kafka warning: {Reason}", error.Reason);
+          })
+          .SetStatisticsHandler((_, json) => _logger.LogTrace("Kafka statistics: {Stats}", json))
+          .SetLogHandler((_, message) =>
+              _logger.LogDebug("Kafka internal log: [{Level}] {Message}", message.Level, message.Message))
+          .Build();
+
+      _rebalanceCoordinator.RegisterConsumer(consumer, registration);
+      return consumer;
+    }
+    catch
+    {
+      consumer?.Dispose();
+      _rebalanceCoordinator.ReleaseRegistration(registration);
+      throw;
+    }
   }
 }

@@ -1,6 +1,10 @@
 #nullable enable
 using Franz.Common.Messaging.Kafka.Configuration;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
+using System.Globalization;
+using Microsoft.Extensions.Logging;
+using Franz.Common.Messaging.Configuration;
 
 namespace Franz.Common.Messaging.Kafka.Validation;
 
@@ -9,9 +13,22 @@ namespace Franz.Common.Messaging.Kafka.Validation;
 /// </summary>
 public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessagingOptions>
 {
+  private readonly ILogger<KafkaMessagingOptionsValidator>? _logger;
+  private readonly IConfiguration? _configuration;
+
+  public KafkaMessagingOptionsValidator(
+      ILogger<KafkaMessagingOptionsValidator>? logger = null,
+      IConfiguration? configuration = null)
+  {
+    _logger = logger;
+    _configuration = configuration;
+  }
+
   public ValidateOptionsResult Validate(string? name, KafkaMessagingOptions options)
   {
     ArgumentNullException.ThrowIfNull(options);
+
+    WarnForLegacyConfiguration();
 
     var failures = new List<string>();
     var security = options.Security;
@@ -67,27 +84,23 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
     if (options.Producer is null)
       failures.Add("Producer options must be configured.");
 
-    if (options.Failure is null)
-      failures.Add("Failure options must be configured.");
+    ValidateTopicOptions("Topic", options.Topic, failures);
+    if (options.DeadLetterTopicOptions is not null)
+      ValidateTopicOptions("DeadLetterTopicOptions", options.DeadLetterTopicOptions, failures);
 
-    if (options.Topic is null)
-      failures.Add("Topic options must be configured.");
+    if (options.EventTopicOptions is null)
+      failures.Add("EventTopicOptions cannot be null.");
     else
     {
-      if (options.Topic.NumPartitions < 1)
-        failures.Add("Topic:NumPartitions must be greater than zero.");
-      if (options.Topic.ReplicationFactor < 1)
-        failures.Add("Topic:ReplicationFactor must be greater than zero.");
-      if (options.Topic.CreationTimeoutMs < 100 || options.Topic.CreationTimeoutMs > 300000)
-        failures.Add("Topic:CreationTimeoutMs must be between 100 and 300000 milliseconds.");
-      if (options.Topic.Configurations is null)
-        failures.Add("Topic:Configurations cannot be null.");
-      else if (options.Topic.Configurations.Any(pair =>
-          string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
-        failures.Add("Topic:Configurations must contain non-empty keys and non-null values.");
+      foreach (var (topicName, topicOptions) in options.EventTopicOptions)
+      {
+        if (string.IsNullOrWhiteSpace(topicName))
+          failures.Add("EventTopicOptions keys must be non-empty generated topic names.");
+        ValidateTopicOptions($"EventTopicOptions:{topicName}", topicOptions, failures);
+      }
     }
 
-    if (options.Consumer is null || options.Failure is null || options.Producer is null)
+    if (options.Consumer is null || options.Producer is null)
       return ValidateOptionsResult.Fail(failures);
 
     if (options.Producer.DeliveryTimeoutMs <= 0 || options.Producer.DeliveryTimeoutMs > 900000)
@@ -102,24 +115,26 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
 
     if (!Enum.IsDefined(options.ProvisioningMode))
       failures.Add("ProvisioningMode must be a defined value.");
-    if (options.OrderingStrategy.HasValue && !Enum.IsDefined(options.OrderingStrategy.Value))
+    if (!Enum.IsDefined(options.OrderingStrategy))
       failures.Add("OrderingStrategy must be a defined MessageOrderingStrategy value.");
 
-    var maxRetryAttempts = options.FailurePolicy?.MaxRetryAttempts ?? options.Failure.MaxRetryAttempts;
-    var retryBackoffMilliseconds = options.FailurePolicy?.RetryBackoff.TotalMilliseconds
-        ?? options.Failure.RetryBackoffMs;
-    var handlerTimeoutMilliseconds = options.FailurePolicy?.HandlerTimeout?.TotalMilliseconds
-        ?? options.Failure.HandlerTimeoutMs;
+    var failurePolicy = options.FailurePolicy ?? MessageFailurePolicy.Default;
+    var maxRetryAttempts = failurePolicy.MaxRetryAttempts;
+    var retryBackoffMilliseconds = failurePolicy.RetryBackoff.TotalMilliseconds;
+    var handlerTimeoutMilliseconds = failurePolicy.HandlerTimeout?.TotalMilliseconds ?? 0;
+
+    if (failurePolicy.HandlerTimeout is null)
+      _logger?.LogWarning("Kafka handlers have no configured cooperative timeout; retry-budget validation cannot bound handler execution time.");
 
     if (maxRetryAttempts < 0)
-      failures.Add("Failure:MaxRetryAttempts cannot be negative.");
+      failures.Add("FailurePolicy:MaxRetryAttempts cannot be negative.");
     if (retryBackoffMilliseconds < 0)
-      failures.Add("Failure:RetryBackoffMs cannot be negative.");
+      failures.Add("FailurePolicy:RetryBackoff cannot be negative.");
     if (handlerTimeoutMilliseconds < 0)
-      failures.Add("Failure:HandlerTimeoutMs cannot be negative.");
+      failures.Add("FailurePolicy:HandlerTimeout cannot be negative.");
 
-    // A single synchronous Consume/handler loop must finish its configured retry
-    // and cooperative timeout budget before Kafka revokes the consumer's partitions.
+    // The listener's poll loop must remain within the configured retry and cooperative
+    // timeout budget so the consumer can maintain group membership.
     if (options.Consumer.MaxPollIntervalMs > 0 &&
         maxRetryAttempts >= 0 &&
         retryBackoffMilliseconds >= 0 &&
@@ -136,4 +151,127 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
         ? ValidateOptionsResult.Success
         : ValidateOptionsResult.Fail(failures);
   }
+
+  private void WarnForLegacyConfiguration()
+  {
+    if (_configuration is null)
+      return;
+
+    var kafka = _configuration.GetSection(KafkaMessagingOptions.SectionName);
+    var legacyFailure = kafka.GetSection("Failure");
+    var currentFailure = kafka.GetSection("FailurePolicy");
+
+    if (legacyFailure.Exists())
+    {
+      if (!currentFailure.Exists())
+      {
+        _logger?.LogWarning(
+            "The legacy Messaging:Kafka:Failure section is no longer consumed. Migrate its settings to Messaging:Kafka:FailurePolicy.");
+      }
+      else
+      {
+        var disagreements = new List<string>();
+        CompareInteger("MaxRetryAttempts", legacyFailure["MaxRetryAttempts"], currentFailure["MaxRetryAttempts"], disagreements);
+        CompareBoolean("EnableDeadLetter", legacyFailure["EnableDeadLetter"], currentFailure["DeadLetterOnExhaustion"], disagreements);
+        CompareMilliseconds("RetryBackoffMs", legacyFailure["RetryBackoffMs"], currentFailure["RetryBackoff"], disagreements);
+        CompareMilliseconds("HandlerTimeoutMs", legacyFailure["HandlerTimeoutMs"], currentFailure["HandlerTimeout"], disagreements);
+        CompareString("DeadLetterTopic", legacyFailure["DeadLetterTopic"], kafka["DeadLetterTopic"], disagreements);
+
+        if (disagreements.Count > 0)
+          _logger?.LogWarning(
+              "Both legacy Messaging:Kafka:Failure and canonical Messaging:Kafka:FailurePolicy are configured with conflicting values for {Settings}. The legacy Failure section is ignored.",
+              string.Join(", ", disagreements));
+      }
+    }
+
+    var legacyKeyStrategy = kafka.GetSection("Producer")["MessageKeyStrategy"];
+    var orderingStrategy = kafka["OrderingStrategy"];
+    if (!string.IsNullOrWhiteSpace(legacyKeyStrategy))
+    {
+      if (string.IsNullOrWhiteSpace(orderingStrategy))
+      {
+        _logger?.LogWarning(
+            "Legacy Messaging:Kafka:Producer:MessageKeyStrategy is no longer consumed. Configure Messaging:Kafka:OrderingStrategy instead.");
+      }
+      else if (!string.Equals(legacyKeyStrategy, orderingStrategy, StringComparison.OrdinalIgnoreCase))
+      {
+        _logger?.LogWarning(
+            "Legacy Messaging:Kafka:Producer:MessageKeyStrategy='{LegacyStrategy}' conflicts with Messaging:Kafka:OrderingStrategy='{OrderingStrategy}'. The legacy setting is ignored.",
+            legacyKeyStrategy,
+            orderingStrategy);
+      }
+    }
+  }
+
+  private static void CompareInteger(
+      string name,
+      string? legacyValue,
+      string? currentValue,
+      ICollection<string> disagreements)
+  {
+    if (int.TryParse(legacyValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var legacy) &&
+        int.TryParse(currentValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var current) &&
+        legacy != current)
+      disagreements.Add(name);
+  }
+
+  private static void CompareBoolean(
+      string name,
+      string? legacyValue,
+      string? currentValue,
+      ICollection<string> disagreements)
+  {
+    if (bool.TryParse(legacyValue, out var legacy) &&
+        bool.TryParse(currentValue, out var current) &&
+        legacy != current)
+      disagreements.Add(name);
+  }
+
+  private static void CompareString(
+      string name,
+      string? legacyValue,
+      string? currentValue,
+      ICollection<string> disagreements)
+  {
+    if (!string.IsNullOrWhiteSpace(legacyValue) &&
+        !string.IsNullOrWhiteSpace(currentValue) &&
+        !string.Equals(legacyValue, currentValue, StringComparison.Ordinal))
+      disagreements.Add(name);
+  }
+
+  private static void CompareMilliseconds(
+      string name,
+      string? legacyMilliseconds,
+      string? currentDuration,
+      ICollection<string> disagreements)
+  {
+    if (!double.TryParse(legacyMilliseconds, NumberStyles.Float, CultureInfo.InvariantCulture, out var legacy))
+      return;
+
+    if (TimeSpan.TryParse(currentDuration, CultureInfo.InvariantCulture, out var current) &&
+        Math.Abs(legacy - current.TotalMilliseconds) > 0.001)
+      disagreements.Add(name);
+  }
+
+  private static void ValidateTopicOptions(string name, KafkaTopicOptions? topicOptions, ICollection<string> failures)
+  {
+    if (topicOptions is null)
+    {
+      failures.Add($"{name} must be configured.");
+      return;
+    }
+
+    if (topicOptions.NumPartitions < 1)
+      failures.Add($"{name}:NumPartitions must be greater than zero.");
+    if (topicOptions.ReplicationFactor < 1)
+      failures.Add($"{name}:ReplicationFactor must be greater than zero.");
+    if (topicOptions.CreationTimeoutMs < 100 || topicOptions.CreationTimeoutMs > 300000)
+      failures.Add($"{name}:CreationTimeoutMs must be between 100 and 300000 milliseconds.");
+    if (topicOptions.Configurations is null)
+      failures.Add($"{name}:Configurations cannot be null.");
+    else if (topicOptions.Configurations.Any(pair =>
+        string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
+      failures.Add($"{name}:Configurations must contain non-empty keys and non-null values.");
+  }
+
 }

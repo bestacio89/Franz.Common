@@ -1,13 +1,10 @@
 #nullable enable
-using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Connections;
-using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using Franz.Common.Messaging;
 
 namespace Franz.Common.Messaging.RabbitMQ.Replay;
 
@@ -16,27 +13,10 @@ public class NoReplayStrategy : IReplayStrategy
   public const string ExceptionMessageHeader = "x-exception-message";
   public const string ExceptionStackTraceHeader = "x-exception-stacktrace";
   private const int MaxHeaderTextLength = 4_096;
-  private readonly IModelProvider? _legacyProvider;
-  private readonly IConfirmChannelPool? _confirmChannelPool;
+  private readonly IConfirmChannelPool _confirmChannelPool;
   private readonly int _publisherConfirmTimeoutSeconds;
   private readonly string _deadLetterQueue;
   private readonly bool _deadLetterOnExhaustion = true;
-
-  // Compatibility constructor for existing consumers. Framework DI uses the confirmed-channel overload.
-  public NoReplayStrategy(IModelProvider provider, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
-  {
-    _legacyProvider = provider ?? throw new ArgumentNullException(nameof(provider));
-    _deadLetterQueue = ResolveDeadLetterQueue(accessor, options);
-    _publisherConfirmTimeoutSeconds = options.Value.PublisherConfirmTimeoutSeconds;
-  }
-
-  public NoReplayStrategy(IConfirmChannelPool confirmChannelPool, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
-  {
-    _confirmChannelPool = confirmChannelPool ?? throw new ArgumentNullException(nameof(confirmChannelPool));
-    _deadLetterQueue = ResolveDeadLetterQueue(accessor, options);
-    _publisherConfirmTimeoutSeconds = options.Value.PublisherConfirmTimeoutSeconds;
-  }
-
 
   public NoReplayStrategy(
       IConfirmChannelPool confirmChannelPool,
@@ -51,14 +31,6 @@ public class NoReplayStrategy : IReplayStrategy
     _deadLetterQueue = settings.DeadLetterQueueName ?? RabbitMQQueueNamer.GetDeadLetterQueueName(entry);
     _publisherConfirmTimeoutSeconds = settings.PublisherConfirmTimeoutSeconds;
     _deadLetterOnExhaustion = settings.FailurePolicy?.DeadLetterOnExhaustion ?? true;
-  }
-
-  private static string ResolveDeadLetterQueue(IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
-  {
-    ArgumentNullException.ThrowIfNull(accessor);
-    ArgumentNullException.ThrowIfNull(options);
-    var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-    return RabbitMQQueueNamer.GetDeadLetterQueueName(entry);
   }
 
   public async Task ReplayAsync(BasicDeliverEventArgs e, Exception ex)
@@ -80,10 +52,7 @@ public class NoReplayStrategy : IReplayStrategy
       Headers = headers
     };
 
-    var confirmed = _confirmChannelPool is not null;
-    var channel = confirmed
-        ? await _confirmChannelPool!.GetPublisherConfirmChannelAsync().ConfigureAwait(false)
-        : await _legacyProvider!.GetChannelAsync().ConfigureAwait(false);
+    var channel = await _confirmChannelPool.GetPublisherConfirmChannelAsync().ConfigureAwait(false);
 
     var published = false;
     using var confirmationTimeout = new CancellationTokenSource(
@@ -92,18 +61,15 @@ public class NoReplayStrategy : IReplayStrategy
     {
       await channel.BasicPublishAsync(exchange: string.Empty, routingKey: _deadLetterQueue,
           mandatory: true, basicProperties: properties, body: e.Body,
-          cancellationToken: confirmed ? confirmationTimeout.Token : CancellationToken.None).ConfigureAwait(false);
+          cancellationToken: confirmationTimeout.Token).ConfigureAwait(false);
       published = true;
     }
     finally
     {
-      if (confirmed)
-      {
-        if (published)
-          _confirmChannelPool!.ReturnPublisherConfirmChannel(channel);
-        else
-          await DisposeChannelAsync(channel).ConfigureAwait(false);
-      }
+      if (published)
+        _confirmChannelPool.ReturnPublisherConfirmChannel(channel);
+      else
+        await DisposeChannelAsync(channel).ConfigureAwait(false);
     }
   }
 

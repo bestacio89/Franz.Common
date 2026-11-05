@@ -4,10 +4,10 @@ using FluentAssertions;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Kafka.Senders;
 using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Kafka.Transactions;
 using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
-using Franz.Common.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -57,8 +57,7 @@ public sealed class KafkaSenderTests : IClassFixture<KafkaContainerFixture>, IAs
       }
     };
 
-    var topic = TopicNamer.GetTopicName(
-      _scope.ServiceProvider.GetRequiredService<IAssemblyAccessor>().GetEntryAssembly());
+    var topic = _scope.ServiceProvider.GetRequiredService<KafkaTopicNames>().TopicName;
 
     using var consumer = CreateTestConsumer();
 
@@ -139,9 +138,10 @@ public sealed class KafkaSenderTests : IClassFixture<KafkaContainerFixture>, IAs
     var sut = new KafkaSender(
       mockProducer.Object,
       _scope.ServiceProvider.GetRequiredService<IMessageSerializer>(),
-      _scope.ServiceProvider.GetRequiredService<IAssemblyAccessor>(),
+      _scope.ServiceProvider.GetRequiredService<KafkaTopicNames>(),
       _scope.ServiceProvider.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
-      _scope.ServiceProvider.GetRequiredService<ILogger<KafkaSender>>()
+      _scope.ServiceProvider.GetRequiredService<ILogger<KafkaSender>>(),
+      new KafkaTransactionContext()
     );
 
     Func<Task> act = async () => await sut.SendAsync(message);
@@ -167,8 +167,10 @@ public sealed class KafkaSenderTests : IClassFixture<KafkaContainerFixture>, IAs
     var sut = new KafkaSender(
       mockProducer.Object,
       _scope.ServiceProvider.GetRequiredService<IMessageSerializer>(),
-      _scope.ServiceProvider.GetRequiredService<IAssemblyAccessor>(),
-      _scope.ServiceProvider.GetRequiredService<ILogger<KafkaSender>>()
+      _scope.ServiceProvider.GetRequiredService<KafkaTopicNames>(),
+      _scope.ServiceProvider.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
+      _scope.ServiceProvider.GetRequiredService<ILogger<KafkaSender>>(),
+      new KafkaTransactionContext()
     );
 
     Func<Task> act = async () => await sut.SendAsync(message);

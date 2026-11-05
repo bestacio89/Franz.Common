@@ -115,6 +115,7 @@ public sealed class RabbitMQHostingFixture : IAsyncLifetime
 
     // Exercise the opt-in bounded consumer mode in hosting integration tests.
     // Production defaults remain sequential (MaxConcurrency = 1).
+    configDict["Messaging:RabbitMQ:ProvisioningMode"] = "Create";
     configDict["Messaging:RabbitMQ:MaxConcurrency"] = "3";
     configDict["Messaging:RabbitMQ:ReplayStrategy"] = "ProgressiveFourStep";
     configDict["Messaging:RabbitMQ:DeadLetterQueueName"] = $"{_rabbit.QueueName}-dead-letter";

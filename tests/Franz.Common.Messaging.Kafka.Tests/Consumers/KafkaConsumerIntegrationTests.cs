@@ -25,7 +25,9 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
     _fixture = fixture ?? throw new ArgumentNullException(nameof(fixture));
   }
 
-  private KafkaConsumerFactory BuildFactory(string? groupId = null) =>
+  private KafkaConsumerFactory BuildFactory(
+      string? groupId = null,
+      KafkaRebalanceCoordinator? rebalanceCoordinator = null) =>
       new KafkaConsumerFactory(
           Options.Create(new KafkaMessagingOptions
           {
@@ -39,7 +41,8 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
               MaxPollIntervalMs = 30_000
             }
           }),
-          NullLogger<KafkaConsumerFactory>.Instance);
+          NullLogger<KafkaConsumerFactory>.Instance,
+          rebalanceCoordinator ?? new KafkaRebalanceCoordinator());
 
   private static Task DriveUntilAssigned(IConsumer<string, string> consumer,
       TaskCompletionSource assignedTcs,
@@ -69,10 +72,24 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
   [Fact]
   public void MultipleConsumers_ShouldBeIndependent()
   {
-    var factory = BuildFactory();
+    var groupId = $"same-group-{Guid.NewGuid():N}";
+    using var coordinator = new KafkaRebalanceCoordinator();
+    var factory = BuildFactory(groupId, coordinator);
 
     using var c1 = factory.Build();
     using var c2 = factory.Build();
+
+    var firstRegistration = coordinator.GetOrCreateRegistration(c1, groupId);
+    var secondRegistration = coordinator.GetOrCreateRegistration(c2, groupId);
+    firstRegistration.Id.Should().NotBe(secondRegistration.Id);
+
+    var partition = new TopicPartition($"independent-{Guid.NewGuid():N}", new Partition(0));
+    var firstToken = coordinator.GetRebalanceToken(firstRegistration, partition);
+    var secondToken = coordinator.GetRebalanceToken(secondRegistration, partition);
+    coordinator.OnPartitionsRevoked(firstRegistration, new[] { partition });
+
+    firstToken.IsCancellationRequested.Should().BeTrue();
+    secondToken.IsCancellationRequested.Should().BeFalse();
 
     var topic = $"test-indep-{Guid.NewGuid():N}";
     c1.Subscribe(topic);

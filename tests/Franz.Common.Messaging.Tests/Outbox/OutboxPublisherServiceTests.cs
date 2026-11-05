@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Outbox;
 using Franz.Common.Messaging.Storage;
 using Microsoft.Extensions.Logging;
@@ -55,6 +56,31 @@ public class OutboxPublisherServiceTests
     _mockStore.Verify(s =>
         s.MarkAsSentAsync(storedMessage.Id, It.IsAny<CancellationToken>()),
         Times.Once);
+  }
+
+  [Fact]
+  public async Task ProcessOutboxOnce_WhenSenderReportsPermanentFailure_ShouldDeadLetterEvenWhenTransientDeadLetteringIsDisabled()
+  {
+    var options = Options.Create(new OutboxOptions
+    {
+      Enabled = true,
+      DeadLetterEnabled = false,
+      MaxRetries = 10,
+      BatchSize = 10
+    });
+    var storedMessage = new StoredMessage { Id = Guid.CreateVersion7(), RetryCount = 0 };
+    _mockStore.Setup(s => s.GetPendingAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<StoredMessage> { storedMessage });
+    _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
+        .ThrowsAsync(new PermanentMessagingException("The configured ordering key is missing."));
+
+    var service = new OutboxPublisherService(_mockStore.Object, _mockSender.Object, options, _mockLogger.Object);
+    await service.ProcessOutboxOnceAsync(CancellationToken.None);
+
+    _mockStore.Verify(s => s.MoveToDeadLetterAsync(
+        It.Is<StoredMessage>(message => message.Id == storedMessage.Id),
+        It.IsAny<CancellationToken>()), Times.Once);
+    _mockStore.Verify(s => s.UpdateRetryAsync(It.IsAny<StoredMessage>(), It.IsAny<CancellationToken>()), Times.Never);
   }
 
   [Fact]

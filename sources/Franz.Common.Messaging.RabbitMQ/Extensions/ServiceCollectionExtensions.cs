@@ -1,4 +1,5 @@
 ﻿using Franz.Common.DependencyInjection.Extensions;
+using Franz.Common.Mediator;
 using Franz.Common.Errors;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Configuration;
@@ -7,6 +8,7 @@ using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Hosting;
+using Franz.Common.Messaging.Manifest;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging.RabbitMQ.Hosting;
 using Franz.Common.Messaging.RabbitMQ.Modeling;
@@ -15,7 +17,9 @@ using Franz.Common.Messaging.RabbitMQ.Transactions;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 using System.Linq;
 
 namespace Franz.Common.Messaging.RabbitMQ.Extensions;
@@ -68,6 +72,8 @@ public static class ServiceCollectionExtensions
     if (!section.Exists())
       throw new TechnicalException("RabbitMQ messaging configuration missing");
 
+    var provisioningModeIsConfigured = section["ProvisioningMode"] is not null;
+
     services.AddOptions<RabbitMQMessagingOptions>()
         .Bind(section)
         .Validate(options =>
@@ -99,9 +105,17 @@ public static class ServiceCollectionExtensions
             options.RequestedHeartbeatSeconds is null or > 0,
             "Messaging:RabbitMQ:RequestedHeartbeatSeconds must be greater than zero when configured.")
         .Validate(options =>
-            string.Equals(options.ReplayStrategy, "NoReplay", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase),
-            "Messaging:RabbitMQ:ReplayStrategy must be NoReplay or ProgressiveFourStep.")
+            Enum.IsDefined(options.ReplayStrategy),
+            "Messaging:RabbitMQ:ReplayStrategy must be a defined RabbitMQReplayStrategy value.")
+        .Validate(options =>
+            options.ProvisioningMode != ProvisioningMode.Verify ||
+            !string.IsNullOrWhiteSpace(options.ManagementApiUrl),
+            "Messaging:RabbitMQ:ManagementApiUrl is required when ProvisioningMode is Verify so bindings can be inspected.")
+        .Validate(options =>
+            string.IsNullOrWhiteSpace(options.ManagementApiUrl) ||
+            (Uri.TryCreate(options.ManagementApiUrl, UriKind.Absolute, out var managementUri) &&
+             (managementUri.Scheme == Uri.UriSchemeHttp || managementUri.Scheme == Uri.UriSchemeHttps)),
+            "Messaging:RabbitMQ:ManagementApiUrl must be an absolute http:// or https:// URI.")
         .Validate(options =>
             options.PublisherConfirmTimeoutSeconds > 0,
             "Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds must be greater than zero.")
@@ -126,9 +140,21 @@ public static class ServiceCollectionExtensions
             "RabbitMQ preserves configured ordering only when MaxConcurrency is 1.")
         .Validate(options => options.FailurePolicy is null ||
             options.FailurePolicy.MaxRetryAttempts == 0 ||
-            string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase),
+            options.ReplayStrategy == RabbitMQReplayStrategy.ProgressiveFourStep,
             "RabbitMQ FailurePolicy retries require ReplayStrategy=ProgressiveFourStep.")
         .ValidateOnStart();
+
+    services.AddSingleton<IConfigureOptions<RabbitMQMessagingOptions>>(serviceProvider =>
+        new ConfigureNamedOptions<RabbitMQMessagingOptions>(Options.DefaultName, options =>
+        {
+          if (provisioningModeIsConfigured)
+            return;
+
+          var environment = serviceProvider.GetService<IHostEnvironment>();
+          options.ProvisioningMode = environment?.IsDevelopment() == true
+              ? ProvisioningMode.Create
+              : ProvisioningMode.Verify;
+        }));
 
     return services;
   }
@@ -153,6 +179,44 @@ public static class ServiceCollectionExtensions
         .AddNoDuplicateScoped<IMessagingTransaction, RabbitMQMessagingTransaction>();
 
     return services;
+  }
+
+  private static void ValidateMessagingManifest(IServiceCollection services)
+  {
+    var registeredHandlers = services
+        .Where(static descriptor => descriptor.ServiceType.IsGenericType &&
+            descriptor.ServiceType.GetGenericTypeDefinition().Name.StartsWith("INotificationHandler", StringComparison.Ordinal))
+        .Select(static descriptor => descriptor.ServiceType.GenericTypeArguments[0])
+        .Where(static type => typeof(IIntegrationEvent).IsAssignableFrom(type)).ToHashSet();
+
+    var manifests = MessagingManifestRegistry.GetAll();
+    if (manifests.Count == 0 && registeredHandlers.Count > 0)
+      throw new InvalidOperationException(
+          "Integration event handlers are registered but no generated messaging manifest is available. Ensure the Franz mediator source generator runs in every handler assembly.");
+
+    var manifestSubscriptions = manifests.SelectMany(static manifest => manifest.Subscriptions)
+        .Where(static type => typeof(IIntegrationEvent).IsAssignableFrom(type)).ToHashSet();
+    var missingFromManifest = registeredHandlers.Except(manifestSubscriptions).ToArray();
+    var missingHandlers = manifestSubscriptions.Except(registeredHandlers).ToArray();
+    if (missingFromManifest.Length > 0 || missingHandlers.Length > 0)
+      throw new InvalidOperationException(
+          $"Generated messaging manifest and registered integration event handlers disagree. Missing from manifest: {string.Join(", ", missingFromManifest.Select(static type => type.FullName))}. Missing registered handlers: {string.Join(", ", missingHandlers.Select(static type => type.FullName))}.");
+  }
+
+  private sealed class RabbitMQMessagingManifestValidationHostedService : IHostedService
+  {
+    private readonly IServiceCollection _services;
+
+    public RabbitMQMessagingManifestValidationHostedService(IServiceCollection services)
+        => _services = services;
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+      ValidateMessagingManifest(_services);
+      return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
   }
 
   public static IServiceCollection AddOnlyHighLifetimeModelProvider(this IServiceCollection services, ServiceLifetime serviceLifetime)
@@ -180,6 +244,8 @@ public static class ServiceCollectionExtensions
 
   public static IServiceCollection AddRabbitMQMessagingConsumer(this IServiceCollection services, IConfiguration configuration)
   {
+    services.TryAddSingleton<IServiceCollection>(services);
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, RabbitMQMessagingManifestValidationHostedService>());
     services.AddOnlyHighLifetimeModelProvider(ServiceLifetime.Singleton)
             .AddRabbitMQMessagingConfiguration(configuration)
             .AddNoDuplicateScoped<MessageContextAccessor>()
@@ -192,7 +258,7 @@ public static class ServiceCollectionExtensions
               var accessor = sp.GetRequiredService<IAssemblyAccessor>();
               var rabbitOptions = sp.GetRequiredService<IOptions<RabbitMQMessagingOptions>>();
 
-              return string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase)
+              return options.ReplayStrategy == RabbitMQReplayStrategy.ProgressiveFourStep
                   ? new ProgressiveFourStepReplayStrategy(confirmChannelPool, accessor, rabbitOptions)
                   : new NoReplayStrategy(confirmChannelPool, accessor, rabbitOptions);
             });

@@ -1,5 +1,6 @@
 #nullable enable
 using Franz.Common.Messaging.Delegating;
+using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.RabbitMQ.Transactions;
@@ -14,27 +15,18 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
   private readonly Connections.IChannelPool _channelPool;
   private readonly IMessageHandler _handler;
   private readonly IMessagingTransaction? _transaction;
-  private readonly IOptions<RabbitMQMessagingOptions>? _options;
-
-  // Preserve the original public constructor for source and binary compatibility.
-  public RabbitMQMessagingSender(
-      Connections.IChannelPool channelPool,
-      IMessageHandler handler,
-      IMessagingTransaction? transaction = null)
-      : this(channelPool, handler, transaction, null)
-  {
-  }
+  private readonly IOptions<RabbitMQMessagingOptions> _options;
 
   public RabbitMQMessagingSender(
       Connections.IChannelPool channelPool,
       IMessageHandler handler,
       IMessagingTransaction? transaction,
-      IOptions<RabbitMQMessagingOptions>? options)
+      IOptions<RabbitMQMessagingOptions> options)
   {
     _channelPool = channelPool ?? throw new ArgumentNullException(nameof(channelPool));
     _handler = handler ?? throw new ArgumentNullException(nameof(handler));
     _transaction = transaction;
-    _options = options;
+    _options = options ?? throw new ArgumentNullException(nameof(options));
   }
 
   public void Dispose() => GC.SuppressFinalize(this);
@@ -48,7 +40,8 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
   public async ValueTask SendAsync(Message message, CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(message);
-    ArgumentNullException.ThrowIfNull(message.Body);
+    if (message.Body is null)
+      throw new PermanentMessagingException($"RabbitMQ message {message.Id} has no body; retrying the same payload cannot resolve this failure.");
 
     await _handler.ProcessAsync(message, cancellationToken).ConfigureAwait(false);
     var queue = RabbitMQQueueNamer.GetQueueName(message.Kind);
@@ -62,7 +55,7 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
             : await _channelPool.GetAsync(cancellationToken).ConfigureAwait(false);
 
     using var confirmationTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-    confirmationTimeout.CancelAfter(TimeSpan.FromSeconds(_options?.Value.PublisherConfirmTimeoutSeconds ?? 5));
+    confirmationTimeout.CancelAfter(TimeSpan.FromSeconds(_options.Value.PublisherConfirmTimeoutSeconds));
     var publishCompleted = false;
 
     try
@@ -123,8 +116,10 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
         else
           await DisposeChannelAsync(channel).ConfigureAwait(false);
       }
-      else
+      else if (publishCompleted)
         _channelPool.Return(channel);
+      else
+        await DisposeChannelAsync(channel).ConfigureAwait(false);
     }
   }
 

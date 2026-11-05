@@ -2,8 +2,10 @@
 using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.Manifest;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
@@ -20,8 +22,8 @@ public static class MessageDeserializerExtensions
   };
 
   // Cache reflected property setters to avoid runtime reflection overhead per message deserialization
-  private static readonly ConcurrentDictionary<Type, Action<object, Guid>?> PropertySetterCache = new();
-  private static readonly ConcurrentDictionary<string, Type?> TypeResolutionCache = new();
+  private static readonly ConcurrentDictionary<Type, Lazy<Action<object, Guid>?>> PropertySetterCache = new();
+  private static readonly ConcurrentDictionary<string, Lazy<Type?>> TypeResolutionCache = new();
 
   public static ICommand? ToCommand(this Message message)
   {
@@ -61,31 +63,40 @@ public static class MessageDeserializerExtensions
       return null;
 
     var cacheKey = $"{typeName}:{expectedBase.FullName}";
-    return TypeResolutionCache.GetOrAdd(cacheKey, _ =>
+    var resolution = TypeResolutionCache.GetOrAdd(cacheKey, _ => new Lazy<Type?>(
+        () => ResolveTypeFromManifest(typeName, expectedBase),
+        LazyThreadSafetyMode.ExecutionAndPublication));
+    var resolvedType = resolution.Value;
+
+    // A manifest may be registered after an earlier lookup (for example during
+    // modular application startup). Do not retain negative results permanently.
+    if (resolvedType is null)
     {
-      var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+      ((ICollection<KeyValuePair<string, Lazy<Type?>>>)TypeResolutionCache)
+          .Remove(new KeyValuePair<string, Lazy<Type?>>(cacheKey, resolution));
+    }
 
-      for (int i = 0; i < assemblies.Length; i++)
-      {
-        var type = assemblies[i].GetType(typeName, throwOnError: false);
-        if (type != null && expectedBase.IsAssignableFrom(type))
-          return type;
-      }
+    return resolvedType;
+  }
 
-      // Fallback: search by FullName
-      for (int i = 0; i < assemblies.Length; i++)
-      {
-        var types = assemblies[i].GetTypes();
-        for (int j = 0; j < types.Length; j++)
-        {
-          var t = types[j];
-          if (t.FullName == typeName && expectedBase.IsAssignableFrom(t))
-            return t;
-        }
-      }
+  private static Type? ResolveTypeFromManifest(string typeName, Type expectedBase)
+  {
+    var matches = MessagingManifestRegistry.GetAll()
+        .SelectMany(manifest => expectedBase == typeof(IEvent)
+            ? manifest.Subscriptions
+            : manifest.KnownTypes)
+        .Where(type =>
+            expectedBase.IsAssignableFrom(type) &&
+            (string.Equals(type.FullName, typeName, StringComparison.Ordinal) ||
+             string.Equals(type.AssemblyQualifiedName, typeName, StringComparison.Ordinal)))
+        .Distinct()
+        .ToArray();
 
-      return null;
-    });
+    if (matches.Length > 1)
+      throw new InvalidOperationException(
+          $"Message type '{typeName}' is ambiguous in the generated messaging manifests.");
+
+    return matches.Length == 1 ? matches[0] : null;
   }
 
   // =====================================================
@@ -102,7 +113,11 @@ public static class MessageDeserializerExtensions
 
     // 2. Hydrate Domain Property on the Message Payload (Cached Setter)
     var targetType = target.GetType();
-    var setter = PropertySetterCache.GetOrAdd(targetType, static type => CompileCorrelationSetter(type));
+    var setter = PropertySetterCache.GetOrAdd(
+        targetType,
+        static type => new Lazy<Action<object, Guid>?>(
+            () => CompileCorrelationSetter(type),
+            LazyThreadSafetyMode.ExecutionAndPublication)).Value;
 
     setter?.Invoke(target, targetCorrelation);
   }

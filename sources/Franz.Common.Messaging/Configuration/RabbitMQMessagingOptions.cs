@@ -11,8 +11,8 @@ public sealed class RabbitMQMessagingOptions : MessagingOptions
   public string? DeadLetterExchangeName { get; set; }
   public string? DeadLetterQueueName { get; set; }
   public string? DefaultRoutingKey { get; set; }
-  /// <summary>Replay strategy: "NoReplay" or "ProgressiveFourStep".</summary>
-  public string ReplayStrategy { get; set; } = "NoReplay";
+  /// <summary>Controls whether failed deliveries are dead-lettered immediately or routed through progressive retry queues.</summary>
+  public RabbitMQReplayStrategy ReplayStrategy { get; set; } = RabbitMQReplayStrategy.NoReplay;
 
   /// <summary>
   /// Maximum number of deliveries processed concurrently by each RabbitMQ listener.
@@ -35,6 +35,20 @@ public sealed class RabbitMQMessagingOptions : MessagingOptions
   public long? MaxLength { get; set; }
   public long? MaxLengthBytes { get; set; }
   public int? DeliveryLimit { get; set; }
+
+  /// <summary>
+  /// RabbitMQ Management HTTP API base URI, required when ProvisioningMode is Verify
+  /// so the initializer can inspect bindings (AMQP has no passive binding-query operation).
+  /// </summary>
+  public string? ManagementApiUrl { get; set; }
+
+  /// <summary>Optional Management API credentials. When omitted, AMQP connection credentials are reused.</summary>
+  public string? ManagementApiUsername { get; set; }
+  public string? ManagementApiPassword { get; set; }
+
+  /// <summary>Management API virtual host. When omitted, the AMQP virtual host is used.</summary>
+  public string? ManagementApiVirtualHost { get; set; }
+
   // --- Connectivity ---
   public string? BootStrapServers { get; set; }   // URI-based
 
@@ -50,4 +64,11 @@ public enum RabbitMQQueueType
 {
   Quorum,
   Classic
+}
+
+
+public enum RabbitMQReplayStrategy
+{
+  NoReplay = 0,
+  ProgressiveFourStep = 1
 }

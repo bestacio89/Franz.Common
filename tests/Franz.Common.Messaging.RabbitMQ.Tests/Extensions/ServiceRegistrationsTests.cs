@@ -30,7 +30,8 @@ public sealed class ServiceRegistrationTests
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
           ["Messaging:RabbitMQ:BootStrapServers"] = _fixture.ConnectionString,
-          ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = "5"
+          ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = "5",
+          ["Messaging:RabbitMQ:ProvisioningMode"] = "Create"
         })
         .Build();
   }

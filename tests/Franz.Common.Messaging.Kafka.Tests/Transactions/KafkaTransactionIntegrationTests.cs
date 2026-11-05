@@ -38,7 +38,7 @@ public sealed class KafkaTransactionIntegrationTests : IClassFixture<KafkaContai
 
     var accessor = scope.ServiceProvider.GetRequiredService<IAssemblyAccessor>();
     var serializer = scope.ServiceProvider.GetRequiredService<IMessageSerializer>();
-    var topic = TopicNamer.GetTopicName(accessor.GetEntryAssembly());
+    var topic = scope.ServiceProvider.GetRequiredService<KafkaTopicNames>().TopicName;
     var messageId = Guid.CreateVersion7();
     var context = new KafkaTransactionContext();
 
@@ -101,7 +101,7 @@ public sealed class KafkaTransactionIntegrationTests : IClassFixture<KafkaContai
       => new(
           Mock.Of<IProducer<string, byte[]>>(),
           serializer,
-          accessor,
+          new KafkaTopicNames(accessor, Options.Create(options)),
           Options.Create(options),
           NullLogger<KafkaSender>.Instance,
           context);

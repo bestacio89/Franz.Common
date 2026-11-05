@@ -6,6 +6,7 @@ using Franz.Common.Mediator;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Kafka;
 using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Tests.Fixtures;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
@@ -16,14 +17,22 @@ using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests;
 
-[Collection("Kafka")]
-public sealed class KafkaMessagingInitializerIntegrationTests
+public sealed class KafkaMessagingInitializerIntegrationTests : IAsyncLifetime
 {
-  private readonly KafkaContainerFixture _fixture;
+  private KafkaContainerFixture _fixture = null!;
 
-  public KafkaMessagingInitializerIntegrationTests(KafkaContainerFixture fixture)
+  public async Task InitializeAsync()
   {
-    _fixture = fixture ?? throw new ArgumentNullException(nameof(fixture));
+    // Every test needs a clean broker because manifest-derived destinations are
+    // intentionally stable names while individual tests vary their topic contract.
+    _fixture = new KafkaContainerFixture();
+    await _fixture.InitializeAsync();
+  }
+
+  public async Task DisposeAsync()
+  {
+    if (_fixture is not null)
+      await _fixture.DisposeAsync();
   }
 
   // =========================================================
@@ -40,7 +49,7 @@ public sealed class KafkaMessagingInitializerIntegrationTests
       GroupId = "test-group",
       BootstrapServers = _fixture.BootstrapServers,
       TopicName = "main-topic",
-      Failure = { DeadLetterTopic = "dead-letter-topic" }
+      DeadLetterTopic = "dead-letter-topic"
     });
 
     var adminClient = new AdminClientBuilder(new AdminClientConfig
@@ -50,7 +59,7 @@ public sealed class KafkaMessagingInitializerIntegrationTests
 
     return new KafkaMessagingInitializer(
         adminClient,
-        accessor ?? BuildDefaultAccessor(),
+        new KafkaTopicNames(accessor ?? BuildDefaultAccessor(), opts),
         opts,
         perEvent);
   }
@@ -96,6 +105,7 @@ public sealed class KafkaMessagingInitializerIntegrationTests
       }).Build();
 
 
+
   [Fact]
   public async Task InitializeAsync_ShouldApplyConfiguredPartitionCountAndReplicationFactor()
   {
@@ -104,7 +114,7 @@ public sealed class KafkaMessagingInitializerIntegrationTests
       GroupId = "test-group",
       BootstrapServers = _fixture.BootstrapServers,
       TopicName = "configured-topic",
-      Failure = { DeadLetterTopic = "configured-topic-dlt" },
+      DeadLetterTopic = "configured-topic-dlt",
       Topic = new KafkaTopicOptions
       {
         NumPartitions = 3,
@@ -141,7 +151,7 @@ public sealed class KafkaMessagingInitializerIntegrationTests
       GroupId = "test-group",
       BootstrapServers = _fixture.BootstrapServers,
       TopicName = topicName,
-      Failure = { DeadLetterTopic = deadLetterTopicName }
+      DeadLetterTopic = deadLetterTopicName
     });
     using var cancellation = new CancellationTokenSource();
     cancellation.Cancel();
@@ -152,6 +162,150 @@ public sealed class KafkaMessagingInitializerIntegrationTests
     using var admin = BuildAdminClient();
     admin.GetMetadata(TimeSpan.FromSeconds(10)).Topics
         .Should().NotContain(topic => topic.Topic == topicName);
+  }
+
+
+  [Fact]
+  public async Task InitializeAsync_VerifyMode_ShouldAcceptMorePartitionsThanConfiguredMinimum()
+  {
+    var topicName = $"verify-partitions-{Guid.NewGuid():N}";
+    var deadLetterTopicName = $"{topicName}-dlt";
+    var create = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      Topic = new KafkaTopicOptions { NumPartitions = 3, ReplicationFactor = 1 }
+    });
+    await create.InitializeAsync();
+
+    var verify = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      ProvisioningMode = ProvisioningMode.Verify,
+      Topic = new KafkaTopicOptions { NumPartitions = 2, ReplicationFactor = 1 },
+      EventTopicOptions = new Dictionary<string, KafkaTopicOptions>(StringComparer.Ordinal)
+      {
+        ["common-in"] = new KafkaTopicOptions { NumPartitions = 1, ReplicationFactor = 1 }
+      }
+    });
+
+    await verify.InitializeAsync();
+  }
+
+  [Fact]
+  public async Task InitializeAsync_VerifyMode_ShouldRejectTopicConfigurationDrift()
+  {
+    var topicName = $"verify-config-{Guid.CreateVersion7():N}";
+    var deadLetterTopicName = $"{topicName}-dlt";
+    var create = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      Topic = new KafkaTopicOptions
+      {
+        NumPartitions = 1,
+        ReplicationFactor = 1,
+        Configurations = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+          ["cleanup.policy"] = "compact"
+        }
+      }
+    });
+    await create.InitializeAsync();
+
+    var verify = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      ProvisioningMode = ProvisioningMode.Verify,
+      Topic = new KafkaTopicOptions
+      {
+        NumPartitions = 1,
+        ReplicationFactor = 1,
+        Configurations = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+          ["cleanup.policy"] = "delete"
+        }
+      }
+    });
+
+    var act = () => verify.InitializeAsync().AsTask();
+
+    await act.Should().ThrowAsync<InvalidOperationException>()
+        .WithMessage("*cleanup.policy*compact*delete*");
+  }
+
+  [Fact]
+  public async Task InitializeAsync_CreateMode_ShouldRejectConfigurationDriftWhenAnotherInstanceCreatedTheTopic()
+  {
+    var topicName = $"create-race-config-{Guid.CreateVersion7():N}";
+    var deadLetterTopicName = $"{topicName}-dlt";
+    var initial = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      Topic = new KafkaTopicOptions
+      {
+        NumPartitions = 1,
+        ReplicationFactor = 1,
+        Configurations = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+          ["cleanup.policy"] = "compact"
+        }
+      }
+    });
+    await initial.InitializeAsync();
+
+    var concurrentInstance = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      Topic = new KafkaTopicOptions
+      {
+        NumPartitions = 1,
+        ReplicationFactor = 1,
+        Configurations = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+          ["cleanup.policy"] = "delete"
+        }
+      }
+    });
+
+    var act = () => concurrentInstance.InitializeAsync().AsTask();
+
+    await act.Should().ThrowAsync<InvalidOperationException>()
+        .WithMessage("*cleanup.policy*compact*delete*");
+  }
+
+  [Fact]
+  public async Task InitializeAsync_ShouldRejectReplicationFactorAboveBrokerCount()
+  {
+    var sut = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = $"replication-factor-{Guid.NewGuid():N}",
+      DeadLetterTopic = $"replication-factor-{Guid.NewGuid():N}-dlt",
+      Topic = new KafkaTopicOptions { ReplicationFactor = 2 }
+    });
+
+    var act = () => sut.InitializeAsync().AsTask();
+
+    await act.Should().ThrowAsync<InvalidOperationException>()
+        .WithMessage("*exceeds the available broker count*");
   }
 
   // =========================================================
@@ -205,6 +359,63 @@ public sealed class KafkaMessagingInitializerIntegrationTests
     var metadata = admin.GetMetadata(TimeSpan.FromSeconds(10));
 
     metadata.Topics.Should().Contain(t => t.Topic == expectedTopic);
+  }
+
+
+  [Fact]
+  public async Task InitializeAsync_ShouldApplyDeadLetterSpecificTopicOptions()
+  {
+    var topicName = $"topic-options-{Guid.CreateVersion7():N}";
+    var deadLetterTopicName = $"{topicName}-dlt";
+    var sut = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      Topic = new KafkaTopicOptions { NumPartitions = 1, ReplicationFactor = 1 },
+      DeadLetterTopicOptions = new KafkaTopicOptions { NumPartitions = 2, ReplicationFactor = 1 }
+    });
+
+    await sut.InitializeAsync();
+
+    using var admin = BuildAdminClient();
+    var metadata = admin.GetMetadata(deadLetterTopicName, TimeSpan.FromSeconds(10));
+    metadata.Topics.Single(topic => topic.Topic == deadLetterTopicName).Partitions.Should().HaveCount(2);
+  }
+
+  [Fact]
+  public async Task InitializeAsync_EventMode_ShouldApplyPerEventTopicOptions()
+  {
+    var eventType = typeof(KafkaMessagingRegistrationIntegrationTests.AnotherIntegrationEvent);
+    var eventTopic = TopicNamer.GetTopicName(eventType);
+    var options = new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = $"event-options-{Guid.CreateVersion7():N}",
+      DeadLetterTopic = $"event-options-{Guid.CreateVersion7():N}-dlt",
+      Topic = new KafkaTopicOptions { NumPartitions = 1, ReplicationFactor = 1 },
+      EventTopicOptions = new Dictionary<string, KafkaTopicOptions>(StringComparer.Ordinal)
+      {
+        [eventTopic] = new KafkaTopicOptions { NumPartitions = 3, ReplicationFactor = 1 }
+      }
+    };
+    var configuredOptions = Options.Create(options);
+    using var admin = new AdminClientBuilder(new AdminClientConfig
+    {
+      BootstrapServers = _fixture.BootstrapServers
+    }).Build();
+    var sut = new KafkaMessagingInitializer(
+        admin,
+        new KafkaTopicNames(BuildIntegrationAccessor(), configuredOptions),
+        configuredOptions,
+        perEvent: true);
+
+    await sut.InitializeAsync();
+
+    var metadata = admin.GetMetadata(eventTopic, TimeSpan.FromSeconds(10));
+    metadata.Topics.Single(topic => topic.Topic == eventTopic).Partitions.Should().HaveCount(3);
   }
 
   // =========================================================

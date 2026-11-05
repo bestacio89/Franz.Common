@@ -4,6 +4,7 @@ using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Messaging.Adapters;
 using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.Manifest;
 using System.Text.Json;
 using Xunit;
 
@@ -11,6 +12,15 @@ namespace Franz.Common.Messaging.Tests.Adapters;
 
 public class MessageDeserializerExtensionsTests
 {
+  static MessageDeserializerExtensionsTests()
+  {
+    var assembly = typeof(MessageDeserializerExtensionsTests).Assembly;
+    var existing = MessagingManifestRegistry.Get(assembly);
+    MessagingManifestRegistry.Register(assembly, new MessagingManifest(
+        existing.Destinations,
+        existing.Subscriptions.Concat(new[] { typeof(TestEvent), typeof(NoCorrelationTestEvent) }),
+        existing.KnownTypes.Concat(new[] { typeof(TestCommand), typeof(TestEvent), typeof(UnsubscribedTestEvent), typeof(NoCorrelationTestEvent) })));
+  }
   // Define concrete types for testing reflection logic
   public record TestCommand(string Data) : ICommand
   {
@@ -21,6 +31,65 @@ public class MessageDeserializerExtensionsTests
   {
     public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
     public Guid CorrelationId { get; set; }
+  }
+
+  public record UnsubscribedTestEvent(string Info) : IEvent
+  {
+    public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
+  }
+
+  public record LateRegisteredTestEvent(string Info) : IEvent
+  {
+    public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
+  }
+
+  public record NoCorrelationTestEvent(string Info) : IEvent
+  {
+    public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
+  }
+
+  [Fact]
+  public void ToEvent_WhenTypeIsKnownButNotSubscribed_ShouldReturnNull()
+  {
+    var message = new Message("{}") { MessageType = typeof(UnsubscribedTestEvent).FullName };
+    message.ToEvent().Should().BeNull();
+  }
+
+  [Fact]
+  public void ToEvent_WhenManifestIsRegisteredAfterAnInitialMiss_ShouldResolveOnTheNextLookup()
+  {
+    var message = new Message(JsonSerializer.Serialize(new LateRegisteredTestEvent("late"), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }))
+    {
+      MessageType = typeof(LateRegisteredTestEvent).FullName
+    };
+
+    message.ToEvent().Should().BeNull();
+
+    var assembly = typeof(MessageDeserializerExtensionsTests).Assembly;
+    var existing = MessagingManifestRegistry.Get(assembly);
+    MessagingManifestRegistry.Register(assembly, new MessagingManifest(
+        existing.Destinations,
+        existing.Subscriptions.Concat(new[] { typeof(LateRegisteredTestEvent) }),
+        existing.KnownTypes.Concat(new[] { typeof(LateRegisteredTestEvent) })));
+
+    var result = message.ToEvent();
+
+    result.Should().BeOfType<LateRegisteredTestEvent>()
+        .Which.Info.Should().Be("late");
+  }
+
+  [Fact]
+  public void ToEvent_WithoutCorrelationProperty_ShouldDeserializeWithoutCachingANullDictionaryValue()
+  {
+    var message = new Message(JsonSerializer.Serialize(new NoCorrelationTestEvent("no-correlation"), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }))
+    {
+      MessageType = typeof(NoCorrelationTestEvent).FullName
+    };
+
+    var result = message.ToEvent();
+
+    result.Should().BeOfType<NoCorrelationTestEvent>()
+        .Which.Info.Should().Be("no-correlation");
   }
 
   [Fact]
@@ -85,6 +154,13 @@ public class MessageDeserializerExtensionsTests
 
     // Assert
     result.Should().BeNull();
+  }
+
+  [Fact]
+  public void ToCommand_WhenTypeIsNotInManifest_ShouldReturnNull()
+  {
+    var message = new Message("{}") { MessageType = "Unregistered.Namespace.Command" };
+    message.ToCommand().Should().BeNull();
   }
 
   [Fact]

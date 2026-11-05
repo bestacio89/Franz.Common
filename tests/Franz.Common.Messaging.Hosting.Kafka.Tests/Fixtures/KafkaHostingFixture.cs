@@ -13,6 +13,7 @@ using Franz.Common.Messaging.Hosting.Kafka.Tests.Handlers;
 using Franz.Common.Messaging.Hosting.Kafka.Tests.Probes;
 using Franz.Common.Messaging.Hosting.Listeners;
 using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Kafka;
 using Franz.Common.Messaging.Kafka.Extensions;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.MongoDB.Extensions;
@@ -98,9 +99,9 @@ public sealed class KafkaHostingFixture : IAsyncLifetime
         ["Messaging:Kafka:BootstrapServers"] = BootstrapServers,
         ["Messaging:Kafka:GroupId"] = groupId,
         ["Messaging:Kafka:Security:AllowInsecureTransport"] = "true",
-        ["Messaging:Kafka:Failure:DeadLetterTopic"] = "hero-test-dlt",
-        ["Messaging:Kafka:Failure:MaxRetryAttempts"] = "1",
-        ["Messaging:Kafka:Failure:RetryBackoffMs"] = "0",
+        ["Messaging:Kafka:DeadLetterTopic"] = "hero-test-dlt",
+        ["Messaging:Kafka:FailurePolicy:MaxRetryAttempts"] = "1",
+        ["Messaging:Kafka:FailurePolicy:RetryBackoff"] = "0",
         ["Mongo:ConnectionString"] = MongoConnectionString,
         ["Mongo:Database"] = MongoDatabaseName
       })
@@ -139,7 +140,8 @@ public sealed class KafkaHostingFixture : IAsyncLifetime
               sp.GetRequiredService<IMessageSerializer>(),
               sp.GetRequiredService<ILogger<KafkaMessageListener>>(),
               sp.GetRequiredService<IProducer<string, byte[]>>(),
-              sp.GetRequiredService<IOptions<KafkaMessagingOptions>>()));
+              sp.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
+              sp.GetRequiredService<KafkaRebalanceCoordinator>()));
 
         services.AddSingleton<IListener>(sp => sp.GetRequiredService<KafkaMessageListener>());
         services.AddScoped<IMessagingStrategyExecuter, TestMessagingStrategyExecuter>();

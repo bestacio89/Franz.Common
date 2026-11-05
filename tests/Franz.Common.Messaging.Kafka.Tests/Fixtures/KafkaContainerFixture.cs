@@ -123,7 +123,7 @@ public sealed class KafkaContainerFixture : IAsyncLifetime
   {
     services.AddSingleton<IConfiguration>(configuration);
     services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
-    services.AddNoDuplicateScoped<IAssemblyAccessor, AssemblyAccessorWrapper>();
+    services.AddNoDuplicateSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
     services.AddDefaultMessageSerializer();
   }
 

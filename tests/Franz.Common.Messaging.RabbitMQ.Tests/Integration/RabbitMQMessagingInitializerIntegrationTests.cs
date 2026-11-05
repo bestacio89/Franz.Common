@@ -14,6 +14,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
+using DotNet.Testcontainers.Builders;
+using Testcontainers.RabbitMq;
 
 namespace Franz.Common.Messaging.RabbitMQ.Tests.Infrastructure;
 
@@ -46,12 +48,12 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       QueueName = $"manifest-consumer-{queueSuffix}",
       DeadLetterQueueName = $"manifest-consumer-{queueSuffix}-dlq",
       DeadLetterExchangeName = $"manifest-consumer-{queueSuffix}-dead-letter",
-      ReplayStrategy = "NoReplay"
+      ReplayStrategy = RabbitMQReplayStrategy.NoReplay
     });
 
     await using var modelProvider = new ModelProvider(
         _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
-    var initializer = new RabbitMQMessagingInitializer(modelProvider, accessor.Object, options);
+    var initializer = new RabbitMQMessagingInitializer(modelProvider, _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(), accessor.Object, options);
 
     await initializer.InitializeAsync();
 
@@ -79,7 +81,10 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       ExchangeName = $"{queueName}-exchange",
       DeadLetterQueueName = $"{queueName}-dlq",
       DeadLetterExchangeName = $"{queueName}-dead-letter",
-      ReplayStrategy = "ProgressiveFourStep",
+      ManagementApiUrl = _fixture.ManagementApiUrl,
+      ManagementApiUsername = RabbitMqContainerFixture.ManagementApiUsername,
+      ManagementApiPassword = RabbitMqContainerFixture.ManagementApiPassword,
+      ReplayStrategy = RabbitMQReplayStrategy.ProgressiveFourStep,
       FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 5, retryBackoff: TimeSpan.FromSeconds(30))
     };
 
@@ -88,7 +93,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
     {
       var createOptions = Options.Create(options);
       var createAccessor = CreateAssemblyAccessor();
-      await new RabbitMQMessagingInitializer(createModelProvider, createAccessor.Object, createOptions)
+      await new RabbitMQMessagingInitializer(createModelProvider, _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(), createAccessor.Object, createOptions)
           .InitializeAsync();
     }
 
@@ -99,11 +104,65 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
 
     await new RabbitMQMessagingInitializer(
         verifyModelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
         verifyAccessor.Object,
         Options.Create(options)).InitializeAsync();
 
     RabbitMQMessagingCapabilities.Descriptor.Supports(MessagingCapability.ProvisioningVerification)
         .Should().BeTrue();
+  }
+
+  [Fact]
+  public async Task VerifyMode_ShouldRejectMissingDeadLetterBinding()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"verify-binding-{suffix}";
+    var deadLetterExchange = $"{queueName}-dead-letter";
+    var deadLetterQueue = $"{queueName}-dlq";
+    var options = new RabbitMQMessagingOptions
+    {
+      QueueName = queueName,
+      ExchangeName = $"{queueName}-exchange",
+      DeadLetterExchangeName = deadLetterExchange,
+      DeadLetterQueueName = deadLetterQueue,
+      ManagementApiUrl = _fixture.ManagementApiUrl,
+      ManagementApiUsername = RabbitMqContainerFixture.ManagementApiUsername,
+      ManagementApiPassword = RabbitMqContainerFixture.ManagementApiPassword,
+      ReplayStrategy = RabbitMQReplayStrategy.NoReplay
+    };
+
+    await using (var createModelProvider = new ModelProvider(
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>()))
+    {
+      await new RabbitMQMessagingInitializer(
+          createModelProvider,
+          _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
+          CreateAssemblyAccessor().Object,
+          Options.Create(options)).InitializeAsync();
+    }
+
+    var connection = await _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>().GetConnectionAsync();
+    await using (var channel = await connection.CreateChannelAsync())
+    {
+      await channel.QueueUnbindAsync(
+          queue: deadLetterQueue,
+          exchange: deadLetterExchange,
+          routingKey: deadLetterQueue);
+    }
+
+    options.ProvisioningMode = ProvisioningMode.Verify;
+    await using var verifyModelProvider = new ModelProvider(
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    var verify = new RabbitMQMessagingInitializer(
+        verifyModelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
+        CreateAssemblyAccessor().Object,
+        Options.Create(options));
+
+    var act = () => verify.InitializeAsync().AsTask();
+
+    await act.Should().ThrowAsync<InvalidOperationException>()
+        .WithMessage("*required binding*");
   }
 
   [Fact]
@@ -123,13 +182,14 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       MessageTtlMilliseconds = 5_000,
       MaxLength = 100,
       MaxLengthBytes = 10_000,
-      ReplayStrategy = "NoReplay"
+      ReplayStrategy = RabbitMQReplayStrategy.NoReplay
     };
 
     await using var modelProvider = new ModelProvider(
         _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
     await new RabbitMQMessagingInitializer(
         modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
         CreateAssemblyAccessor().Object,
         Options.Create(options)).InitializeAsync();
 
@@ -192,6 +252,214 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
     }
   }
 
+
+  [Fact]
+  public async Task VerifyMode_ShouldAggregateMissingTopologyAndReportQueueArgumentDrift()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"verify-drift-{suffix}";
+    var exchangeName = $"{queueName}-exchange";
+    var deadLetterExchange = $"{queueName}-dead-letter";
+    var deadLetterQueue = $"{queueName}-dlq";
+
+    var connection = await _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>().GetConnectionAsync();
+    await using (var legacyChannel = await connection.CreateChannelAsync())
+    {
+      await legacyChannel.QueueDeclareAsync(queueName, durable: true, exclusive: false, autoDelete: false,
+          arguments: new Dictionary<string, object?> { ["x-queue-type"] = "classic" });
+    }
+
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      ProvisioningMode = ProvisioningMode.Verify,
+      QueueName = queueName,
+      ExchangeName = exchangeName,
+      DeadLetterExchangeName = deadLetterExchange,
+      DeadLetterQueueName = deadLetterQueue,
+      ManagementApiUrl = _fixture.ManagementApiUrl,
+      ManagementApiUsername = RabbitMqContainerFixture.ManagementApiUsername,
+      ManagementApiPassword = RabbitMqContainerFixture.ManagementApiPassword,
+      QueueType = RabbitMQQueueType.Quorum
+    });
+
+    await using var modelProvider = new ModelProvider(_fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    var initializer = new RabbitMQMessagingInitializer(
+        modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
+        CreateAssemblyAccessor().Object,
+        options);
+
+    var act = () => initializer.InitializeAsync().AsTask();
+
+    var error = await act.Should().ThrowAsync<InvalidOperationException>();
+    error.Which.Message.Should().Contain(queueName)
+        .And.Contain(exchangeName)
+        .And.Contain(deadLetterExchange)
+        .And.Contain(deadLetterQueue);
+  }
+
+  [Fact]
+  public async Task CreateMode_ShouldExplainIncompatibleQueueCreatedByVersion234()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"legacy-234-{suffix}";
+    var deadLetterExchange = $"{queueName}-dead-letter";
+    var deadLetterQueue = $"{queueName}-dlq";
+    var connection = await _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>().GetConnectionAsync();
+
+    // Version 2.3.4 declared the dead-letter arguments but relied on the broker's
+    // default queue type. The default RabbitMQ 4.0 broker uses classic.
+    await using (var legacyChannel = await connection.CreateChannelAsync())
+    {
+      await legacyChannel.QueueDeclareAsync(
+          queueName,
+          durable: true,
+          exclusive: false,
+          autoDelete: false,
+          arguments: new Dictionary<string, object?>
+          {
+            ["x-dead-letter-exchange"] = deadLetterExchange,
+            ["x-dead-letter-routing-key"] = deadLetterQueue
+          });
+    }
+
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      QueueName = queueName,
+      ExchangeName = $"{queueName}-exchange",
+      DeadLetterExchangeName = deadLetterExchange,
+      DeadLetterQueueName = deadLetterQueue,
+      QueueType = RabbitMQQueueType.Quorum
+    });
+
+    await using var modelProvider = new ModelProvider(_fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    var initializer = new RabbitMQMessagingInitializer(
+        modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
+        CreateAssemblyAccessor().Object,
+        options);
+
+    var act = () => initializer.InitializeAsync().AsTask();
+
+    var error = await act.Should().ThrowAsync<InvalidOperationException>();
+    error.Which.Message.Should().Contain(queueName)
+        .And.Contain("incompatible");
+  }
+
+  [Fact]
+  public async Task CreateMode_ShouldMatchExplicitQueueTypeWithBrokerDefaultQuorum()
+  {
+    await using var container = new RabbitMqBuilder(RabbitMqContainerFixture.Image)
+        .WithCleanUp(true)
+        .WithWaitStrategy(Wait.ForUnixContainer()
+            .UntilInternalTcpPortIsAvailable(5672)
+            .UntilCommandIsCompleted("rabbitmq-diagnostics -q ping"))
+        .Build();
+    await container.StartAsync();
+
+    // The default vhost metadata takes precedence over the node-wide setting.
+    // Configure the broker's effective default explicitly so this test verifies
+    // declarations that omit x-queue-type against a known quorum default.
+    var defaultQueueType = await container.ExecAsync(
+        ["rabbitmqctl", "update_vhost_metadata", "/", "--default-queue-type", "quorum"]);
+    defaultQueueType.ExitCode.Should().Be(0,
+        $"RabbitMQ must accept the quorum default queue type. stdout: {defaultQueueType.Stdout}; stderr: {defaultQueueType.Stderr}");
+
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"broker-default-quorum-{suffix}";
+    var deadLetterExchange = $"{queueName}-dead-letter";
+    var deadLetterQueue = $"{queueName}-dlq";
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      BootStrapServers = container.GetConnectionString(),
+      QueueName = queueName,
+      ExchangeName = $"{queueName}-exchange",
+      DeadLetterExchangeName = deadLetterExchange,
+      DeadLetterQueueName = deadLetterQueue,
+      QueueType = RabbitMQQueueType.Quorum,
+      ReplayStrategy = RabbitMQReplayStrategy.NoReplay
+    });
+
+    var services = new ServiceCollection();
+    services.AddSingleton(options);
+    services.AddSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
+    services.AddSingleton<IConnectionFactoryProvider, ConnectionFactoryProvider>();
+    services.AddSingleton<IConnectionProvider, ConnectionProvider>();
+    await using var serviceProvider = services.BuildServiceProvider();
+    var connectionProvider = serviceProvider.GetRequiredService<IConnectionProvider>();
+
+    var connection = await connectionProvider.GetConnectionAsync();
+    await using (var legacyChannel = await connection.CreateChannelAsync())
+    {
+      // Simulate a queue declared without x-queue-type on a quorum-default broker.
+      // Its other immutable arguments match the initializer's expected topology.
+      await legacyChannel.QueueDeclareAsync(
+          queueName,
+          durable: true,
+          exclusive: false,
+          autoDelete: false,
+          arguments: new Dictionary<string, object?>
+          {
+            ["x-dead-letter-exchange"] = deadLetterExchange,
+            ["x-dead-letter-routing-key"] = deadLetterQueue
+          });
+    }
+
+    await using var modelProvider = new ModelProvider(connectionProvider);
+    var initializer = new RabbitMQMessagingInitializer(
+        modelProvider,
+        connectionProvider,
+        serviceProvider.GetRequiredService<IAssemblyAccessor>(),
+        options);
+
+    await initializer.InitializeAsync();
+  }
+
+  [Fact]
+  public async Task CreateMode_ShouldPreserveMatchingLegacyQuorumTopology()
+  {
+    var suffix = Guid.CreateVersion7().ToString("N");
+    var queueName = $"legacy-quorum-{suffix}";
+    var exchangeName = $"{queueName}-exchange";
+    var deadLetterExchange = $"{queueName}-dead-letter";
+    var deadLetterQueue = $"{queueName}-dlq";
+
+    var connection = await _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>().GetConnectionAsync();
+    await using (var legacyChannel = await connection.CreateChannelAsync())
+    {
+      await legacyChannel.ExchangeDeclareAsync(exchangeName, ExchangeType.Headers, durable: true);
+      await legacyChannel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Direct, durable: true);
+      await legacyChannel.QueueDeclareAsync(queueName, durable: true, exclusive: false, autoDelete: false,
+          arguments: new Dictionary<string, object?>
+          {
+            ["x-queue-type"] = "quorum",
+            ["x-dead-letter-exchange"] = deadLetterExchange,
+            ["x-dead-letter-routing-key"] = deadLetterQueue
+          });
+      await legacyChannel.QueueDeclareAsync(deadLetterQueue, durable: true, exclusive: false, autoDelete: false,
+          arguments: new Dictionary<string, object?> { ["x-queue-type"] = "quorum" });
+    }
+
+    var options = Options.Create(new RabbitMQMessagingOptions
+    {
+      QueueName = queueName,
+      ExchangeName = exchangeName,
+      DeadLetterExchangeName = deadLetterExchange,
+      DeadLetterQueueName = deadLetterQueue,
+      QueueType = RabbitMQQueueType.Quorum,
+      ReplayStrategy = RabbitMQReplayStrategy.NoReplay
+    });
+
+    await using var modelProvider = new ModelProvider(_fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
+    var initializer = new RabbitMQMessagingInitializer(
+        modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
+        CreateAssemblyAccessor().Object,
+        options);
+
+    await initializer.InitializeAsync();
+  }
+
   [Fact]
   public async Task InitializeAsync_WhenProvisioningIsOff_ShouldNotAccessBroker()
   {
@@ -204,6 +472,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
 
     var initializer = new RabbitMQMessagingInitializer(
         modelProvider.Object,
+        Mock.Of<IConnectionProvider>(),
         CreateAssemblyAccessor().Object,
         options);
 
@@ -226,7 +495,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       ExchangeName = $"{queueName}-exchange",
       DeadLetterQueueName = deadLetterQueue,
       DeadLetterExchangeName = $"{queueName}-dead-letter",
-      ReplayStrategy = "ProgressiveFourStep",
+      ReplayStrategy = RabbitMQReplayStrategy.ProgressiveFourStep,
       FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 5, retryBackoff: TimeSpan.FromSeconds(30))
     };
 
@@ -234,6 +503,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
         _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
     await new RabbitMQMessagingInitializer(
         modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
         CreateAssemblyAccessor().Object,
         Options.Create(options)).InitializeAsync();
 
@@ -318,13 +588,14 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       ExchangeName = $"{queueName}-exchange",
       DeadLetterQueueName = $"{queueName}-dlq",
       DeadLetterExchangeName = $"{queueName}-dead-letter",
-      ReplayStrategy = "NoReplay"
+      ReplayStrategy = RabbitMQReplayStrategy.NoReplay
     };
 
     await using var modelProvider = new ModelProvider(
         _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>());
     await new RabbitMQMessagingInitializer(
         modelProvider,
+        _fixture.ServiceProvider.GetRequiredService<IConnectionProvider>(),
         CreateAssemblyAccessor().Object,
         Options.Create(options)).InitializeAsync();
 

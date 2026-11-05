@@ -19,12 +19,18 @@ public class KafkaMessagingOptions
   public KafkaSecurityOptions Security { get; set; } = new();
   [Required] public KafkaConsumerOptions Consumer { get; set; } = new();
   [Required] public KafkaProducerOptions Producer { get; set; } = new();
-  public KafkaFailureOptions Failure { get; set; } = new();
   public KafkaObservabilityOptions Observability { get; set; } = new();
   public KafkaTopicOptions Topic { get; set; } = new();
+
+  /// <summary>Optional topic specification applied to all dead-letter topics.</summary>
+  public KafkaTopicOptions? DeadLetterTopicOptions { get; set; }
+
+  /// <summary>Optional topic specifications keyed by generated source topic name.</summary>
+  public Dictionary<string, KafkaTopicOptions> EventTopicOptions { get; set; } = new(StringComparer.Ordinal);
   public ProvisioningMode ProvisioningMode { get; set; } = ProvisioningMode.Create;
-  public MessageFailurePolicy? FailurePolicy { get; set; }
-  public MessageOrderingStrategy? OrderingStrategy { get; set; }
+  public string? DeadLetterTopic { get; set; }
+  public MessageFailurePolicy FailurePolicy { get; set; } = MessageFailurePolicy.Default;
+  public MessageOrderingStrategy OrderingStrategy { get; set; } = MessageOrderingStrategy.MessageId;
 }
 
 public class KafkaSecurityOptions
@@ -59,6 +65,9 @@ public class KafkaConsumerOptions
   [Range(1, 10000)]
   public int MaxPollRecords { get; set; } = 500;
 
+  /// <summary>Opt in to Kafka's cooperative-sticky partition assignor.</summary>
+  public bool EnableCooperativeStickyAssignor { get; set; } = false;
+
   [Range(1, int.MaxValue)]
   public int FetchMinBytes { get; set; } = 1;
 
@@ -92,7 +101,6 @@ public class KafkaProducerOptions
 
   /// <summary>Optional prefix for unique transaction producer identities. A unique suffix is generated per transaction.</summary>
   public string? TransactionalIdPrefix { get; set; }
-  public KafkaMessageKeyStrategy MessageKeyStrategy { get; set; } = KafkaMessageKeyStrategy.MessageId;
 
   [Range(0, 1000)]
   public int MessageSendMaxRetries { get; set; } = 3;
@@ -107,37 +115,10 @@ public class KafkaProducerOptions
   [Range(1, 900000)]
   public int TransactionTimeoutMs { get; set; } = 120000;
 
-  public string? DefaultKey { get; set; }
-}
-
-public enum KafkaMessageKeyStrategy
-{
-  MessageId,
-  CorrelationId,
-  AggregateId,
-  None
 }
 
 public enum KafkaAcks { None, Leader, All }
 public enum KafkaCompressionType { None, Gzip, Snappy, Lz4, Zstd }
-
-public class KafkaFailureOptions
-{
-  public bool EnableDeadLetter { get; set; } = true;
-  public string? DeadLetterTopic { get; set; }
-
-  [Range(0, 100)]
-  public int MaxRetryAttempts { get; set; } = 3;
-
-  [Range(0, 60000)]
-  public int RetryBackoffMs { get; set; } = 500;
-
-  public bool UseOriginalMessageKey { get; set; } = true;
-
-  /// <summary>Optional cooperative handler timeout in milliseconds; zero disables it.</summary>
-  [Range(0, 900000)]
-  public int HandlerTimeoutMs { get; set; }
-}
 
 public class KafkaObservabilityOptions
 {

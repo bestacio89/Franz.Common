@@ -1,5 +1,6 @@
 ﻿#nullable enable
 using Franz.Common.Messaging.Storage;
+using Franz.Common.Messaging.Exceptions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -117,6 +118,17 @@ public sealed class OutboxPublisherService : BackgroundService
       // Host/request cancellation is control flow, not a delivery failure.
       // Leave the message pending so a later run can safely resume delivery.
       throw;
+    }
+    catch (PermanentMessagingException ex)
+    {
+      stored.LastError = ex.Message;
+      stored.LastTriedOn = DateTime.UtcNow;
+      await _messageStore.MoveToDeadLetterAsync(stored, ct);
+
+      _logger.LogError(
+          ex,
+          "Message {MessageId} failed permanently and was moved to dead-letter storage without retrying.",
+          stored.Id);
     }
     catch (Exception ex)
     {

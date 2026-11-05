@@ -75,7 +75,7 @@ jobs:
           fi
 
       - name: Build solution
-        run: dotnet build Franz.Common.slnx --configuration Release --no-restore
+        run: dotnet build Franz.Common.slnx --configuration Release --no-restore -p:ApiCompatGenerateSuppressionFile=true
 
       - name: Verify mediator package includes its source generator
         shell: bash
@@ -189,5 +189,6 @@ jobs:
           path: |
             restore-audit.log
             **/TestResults/*.trx
+            **/CompatibilitySuppressions.xml
             container-diagnostics/**
           if-no-files-found: warn

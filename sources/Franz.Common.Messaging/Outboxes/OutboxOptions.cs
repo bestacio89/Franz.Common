@@ -21,7 +21,8 @@ public class OutboxOptions
   public int MaxRetries { get; set; } = 3;
 
   /// <summary>
-  /// Enable dead-letter queue for failed messages.
+  /// Enables dead-lettering after transient retry exhaustion. Deterministic failures
+  /// represented by PermanentMessagingException are always dead-lettered immediately.
   /// Default = false.
   /// </summary>
   public bool DeadLetterEnabled { get; set; } = false;

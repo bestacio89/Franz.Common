@@ -1,13 +1,10 @@
 #nullable enable
-using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Connections;
-using Franz.Common.Messaging.RabbitMQ.Modeling;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using Franz.Common.Messaging;
 
 namespace Franz.Common.Messaging.RabbitMQ.Replay;
 
@@ -18,8 +15,7 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
   public const string ExceptionMessageHeader = "x-exception-message";
   public const string ExceptionStackTraceHeader = "x-exception-stacktrace";
   private const int MaxHeaderTextLength = 4_096;
-  private readonly IModelProvider? _legacyProvider;
-  private readonly IConfirmChannelPool? _confirmChannelPool;
+  private readonly IConfirmChannelPool _confirmChannelPool;
   private readonly int _publisherConfirmTimeoutSeconds;
   private readonly string _queueName;
   private readonly string _replayExchange;
@@ -27,22 +23,6 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
   private readonly int _maxRetryAttempts = 3;
   private readonly int? _retryBackoffMilliseconds;
   private readonly bool _deadLetterOnExhaustion = true;
-
-  // Compatibility constructor for existing consumers. Framework DI uses the confirmed-channel overload.
-  public ProgressiveFourStepReplayStrategy(IModelProvider provider, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
-  {
-    _legacyProvider = provider ?? throw new ArgumentNullException(nameof(provider));
-    (_queueName, _replayExchange, _deadLetterQueue) = ResolveTopology(accessor, options);
-    _publisherConfirmTimeoutSeconds = options.Value.PublisherConfirmTimeoutSeconds;
-  }
-
-  public ProgressiveFourStepReplayStrategy(IConfirmChannelPool confirmChannelPool, IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
-  {
-    _confirmChannelPool = confirmChannelPool ?? throw new ArgumentNullException(nameof(confirmChannelPool));
-    (_queueName, _replayExchange, _deadLetterQueue) = ResolveTopology(accessor, options);
-    _publisherConfirmTimeoutSeconds = options.Value.PublisherConfirmTimeoutSeconds;
-  }
-
 
   public ProgressiveFourStepReplayStrategy(
       IConfirmChannelPool confirmChannelPool,
@@ -64,16 +44,6 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
       _retryBackoffMilliseconds = checked((int)Math.Ceiling(policy.RetryBackoff.TotalMilliseconds));
       _deadLetterOnExhaustion = policy.DeadLetterOnExhaustion;
     }
-  }
-
-  private static (string Queue, string ReplayExchange, string DeadLetterQueue) ResolveTopology(
-      IAssemblyAccessor accessor, IOptions<MessagingOptions> options)
-  {
-    ArgumentNullException.ThrowIfNull(accessor);
-    ArgumentNullException.ThrowIfNull(options);
-    var entry = accessor.GetEntryAssembly() ?? throw new InvalidOperationException("Entry assembly cannot be null.");
-    return (RabbitMQQueueNamer.GetQueueName(entry), RabbitMQExchangeNamer.GetReplayExchangeName(entry),
-        RabbitMQQueueNamer.GetDeadLetterQueueName(entry));
   }
 
   public async Task ReplayAsync(BasicDeliverEventArgs e, Exception ex)
@@ -110,11 +80,7 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
       routingKey = GetRetryRoutingKey(_queueName, Math.Min(replayCount, 3));
     }
 
-    IChannel channel;
-    var confirmed = _confirmChannelPool is not null;
-    channel = confirmed
-        ? await _confirmChannelPool!.GetPublisherConfirmChannelAsync().ConfigureAwait(false)
-        : await _legacyProvider!.GetChannelAsync().ConfigureAwait(false);
+    var channel = await _confirmChannelPool.GetPublisherConfirmChannelAsync().ConfigureAwait(false);
 
     var published = false;
     using var confirmationTimeout = new CancellationTokenSource(
@@ -125,18 +91,15 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
       // publisher confirmation and raises PublishException for mandatory unroutable messages.
       await channel.BasicPublishAsync(exchange, routingKey, mandatory: true,
           basicProperties: properties, body: e.Body,
-          cancellationToken: confirmed ? confirmationTimeout.Token : CancellationToken.None).ConfigureAwait(false);
+          cancellationToken: confirmationTimeout.Token).ConfigureAwait(false);
       published = true;
     }
     finally
     {
-      if (confirmed)
-      {
-        if (published)
-          _confirmChannelPool!.ReturnPublisherConfirmChannel(channel);
-        else
-          await DisposeChannelAsync(channel).ConfigureAwait(false);
-      }
+      if (published)
+        _confirmChannelPool.ReturnPublisherConfirmChannel(channel);
+      else
+        await DisposeChannelAsync(channel).ConfigureAwait(false);
     }
   }
 

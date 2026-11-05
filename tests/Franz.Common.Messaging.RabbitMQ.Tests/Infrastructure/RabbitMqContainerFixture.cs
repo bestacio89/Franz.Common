@@ -27,14 +27,21 @@ public sealed class RabbitMqTestCollection : ICollectionFixture<RabbitMqContaine
 public sealed class RabbitMqContainerFixture : IAsyncLifetime
 {
   public const string Image = "rabbitmq:4.0-management";
+  public const string ManagementApiUsername = "franz-test";
+  public const string ManagementApiPassword = "franz-test-management-password";
 
   public RabbitMqContainer Container { get; } = new RabbitMqBuilder(Image)
+      .WithUsername(ManagementApiUsername)
+      .WithPassword(ManagementApiPassword)
       .WithCleanUp(true)
+      .WithPortBinding(15672, true)
       .WithWaitStrategy(Wait.ForUnixContainer()
-          .UntilInternalTcpPortIsAvailable(5672))
+          .UntilInternalTcpPortIsAvailable(5672)
+          .UntilInternalTcpPortIsAvailable(15672))
             .Build();
 
   public string ConnectionString { get; private set; } = default!;
+  public string ManagementApiUrl => $"http://{Container.Hostname}:{Container.GetMappedPublicPort(15672)}";
   public ServiceProvider ServiceProvider { get; private set; } = default!;
 
   public Task InitializeAsync() => InitializeAsyncInternal();
@@ -50,8 +57,9 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
       services.AddSingleton(Options.Create(new RabbitMQMessagingOptions
     {
       BootStrapServers = ConnectionString,
-      UserName = "guest",
-      Password = "guest",
+      ManagementApiUrl = ManagementApiUrl,
+      UserName = ManagementApiUsername,
+      Password = ManagementApiPassword,
       PublisherConfirmTimeoutSeconds = 5
     }));
 

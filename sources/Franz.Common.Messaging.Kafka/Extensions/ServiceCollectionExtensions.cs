@@ -10,6 +10,7 @@ using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Hosting;
+using Franz.Common.Messaging.Manifest;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Connections;
 using Franz.Common.Messaging.Kafka.Modeling;
@@ -19,7 +20,10 @@ using Franz.Common.Messaging.Serialization;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Franz.Common.Messaging.Kafka.Validation;
 
 namespace Franz.Common.Messaging.Kafka.Extensions;
@@ -55,7 +59,7 @@ public static class ServiceCollectionExtensions
   // inside MessagingPublisher construction.
   //
   // AddFranzMediator MUST be called before this method so that
-  // DiscoverHandledEventTypes() finds registered handlers.
+  // the generated manifest supplies the registered handler set.
   // =========================================================
 
   public static IServiceCollection AddEventBasedKafkaMessaging(
@@ -100,6 +104,7 @@ public static class ServiceCollectionExtensions
           nameof(eventTypes));
     }
 
+    ValidateConfiguredSubscriptions(eventTypes);
     return AddEventBasedKafkaMessagingCore(
         services,
         configuration,
@@ -124,7 +129,7 @@ public static class ServiceCollectionExtensions
       var serviceKey = eventType.Name;
 
       services
-          .AddKafkaProducerLayer(serviceKey, sharedInitializer: true)
+          .AddKafkaProducerLayer(serviceKey, sharedInitializer: true, eventType: eventType)
           .AddKafkaMessagingConsumer(serviceKey);
     }
 
@@ -139,12 +144,28 @@ public static class ServiceCollectionExtensions
       this IServiceCollection services,
       IConfiguration configuration)
   {
+    services.TryAddSingleton<IConfiguration>(configuration);
     services.AddSingleton<IValidateOptions<KafkaMessagingOptions>, KafkaMessagingOptionsValidator>();
 
+    var section = configuration.GetSection(KafkaMessagingOptions.SectionName);
+    var provisioningModeIsConfigured = section["ProvisioningMode"] is not null;
+
     services.AddOptions<KafkaMessagingOptions>()
-        .BindConfiguration(KafkaMessagingOptions.SectionName)
+        .Bind(section)
         .ValidateDataAnnotations()
         .ValidateOnStart();
+
+    services.AddSingleton<IConfigureOptions<KafkaMessagingOptions>>(serviceProvider =>
+        new ConfigureNamedOptions<KafkaMessagingOptions>(Options.DefaultName, options =>
+        {
+          if (provisioningModeIsConfigured)
+            return;
+
+          var environment = serviceProvider.GetService<IHostEnvironment>();
+          options.ProvisioningMode = environment?.IsDevelopment() == true
+              ? Franz.Common.Messaging.Configuration.ProvisioningMode.Create
+              : Franz.Common.Messaging.Configuration.ProvisioningMode.Verify;
+        }));
 
     return services;
   }
@@ -159,7 +180,11 @@ public static class ServiceCollectionExtensions
       object? serviceKey,
       bool perEvent)
   {
-    services.AddNoDuplicateScoped<IAssemblyAccessor, AssemblyAccessorWrapper>();
+    services.AddNoDuplicateSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
+    services.AddNoDuplicateSingleton<KafkaTopicNames>();
+    services.AddNoDuplicateSingleton<KafkaRebalanceCoordinator>();
+    services.TryAddSingleton<IServiceCollection>(services);
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, KafkaMessagingManifestValidationHostedService>());
 
     services.AddKafkaProducer(configuration, serviceKey);
     services.AddKafkaAdmin(configuration, serviceKey, perEvent);
@@ -270,7 +295,7 @@ public static class ServiceCollectionExtensions
         var admin = sp.GetRequiredKeyedService<IAdminClient>(key);
         return new KafkaMessagingInitializer(
             admin,
-            sp.GetRequiredService<IAssemblyAccessor>(),
+            sp.GetRequiredService<KafkaTopicNames>(),
             sp.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
             perEvent);
       });
@@ -284,7 +309,7 @@ public static class ServiceCollectionExtensions
       services.AddNoDuplicateScoped<IMessagingInitializer>(sp =>
           new KafkaMessagingInitializer(
               sp.GetRequiredService<IAdminClient>(),
-              sp.GetRequiredService<IAssemblyAccessor>(),
+              sp.GetRequiredService<KafkaTopicNames>(),
               sp.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
               perEvent));
     }
@@ -307,11 +332,22 @@ public static class ServiceCollectionExtensions
   private static IServiceCollection AddKafkaProducerLayer(
       this IServiceCollection services,
       object? serviceKey,
-      bool sharedInitializer = false)
+      bool sharedInitializer = false,
+      Type? eventType = null)
   {
     if (serviceKey != null)
     {
-      services.AddKeyedScoped<IMessagingSender, KafkaSender>(serviceKey);
+      services.AddKeyedScoped<IMessagingSender>(serviceKey, (sp, key) =>
+          new KafkaSender(
+              sharedInitializer
+                  ? sp.GetRequiredService<IProducer<string, byte[]>>()
+                  : sp.GetRequiredKeyedService<IProducer<string, byte[]>>(key),
+              sp.GetRequiredService<IMessageSerializer>(),
+              sp.GetRequiredService<KafkaTopicNames>(),
+              sp.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
+              sp.GetRequiredService<ILogger<KafkaSender>>(),
+              sp.GetRequiredService<KafkaTransactionContext>(),
+              eventType is null ? null : TopicNamer.GetTopicName(eventType)));
 
       services.AddKeyedScoped<IMessagingPublisher>(serviceKey, (sp, key) =>
           new MessagingPublisher(
@@ -380,19 +416,67 @@ public static class ServiceCollectionExtensions
   // =========================================================
 
   private static IEnumerable<Type> DiscoverHandledEventTypes()
-      => AppDomain.CurrentDomain
-          .GetAssemblies()
-          .SelectMany(a =>
-          {
-            try { return a.ExportedTypes; }
-            catch { return Array.Empty<Type>(); }
-          })
-          .SelectMany(t => t.GetInterfaces())
-          .Where(i => i.IsGenericType &&
-                      i.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
-          .SelectMany(i => i.GenericTypeArguments)
-          .Where(t => typeof(IIntegrationEvent).IsAssignableFrom(t))
-          .Distinct();
+      => GetManifestSubscriptions().OrderBy(static type => type.FullName, StringComparer.Ordinal);
+
+  private static void ValidateConfiguredSubscriptions(IEnumerable<Type> configuredTypes)
+  {
+    var manifestSubscriptions = GetManifestSubscriptions();
+    var unhandled = configuredTypes
+        .Except(manifestSubscriptions)
+        .OrderBy(static type => type.FullName, StringComparer.Ordinal)
+        .ToArray();
+
+    if (unhandled.Length > 0)
+      throw new InvalidOperationException(
+          $"Kafka configured subscriptions do not have generated handlers. Unhandled configured subscriptions: {string.Join(", ", unhandled.Select(static type => type.FullName))}.");
+  }
+
+  private static HashSet<Type> GetManifestSubscriptions()
+      => MessagingManifestRegistry.GetAll()
+          .SelectMany(static manifest => manifest.Subscriptions)
+          .Where(static type => typeof(IIntegrationEvent).IsAssignableFrom(type))
+          .ToHashSet();
+
+  private static HashSet<Type> GetRegisteredIntegrationEventHandlers(IServiceCollection services)
+      => services.Where(static descriptor => descriptor.ServiceType.IsGenericType &&
+              descriptor.ServiceType.GetGenericTypeDefinition() == typeof(INotificationHandler<>))
+          .Select(static descriptor => descriptor.ServiceType.GenericTypeArguments[0])
+          .Where(static type => typeof(IIntegrationEvent).IsAssignableFrom(type)).ToHashSet();
+
+  private static void ValidateManifestSubscriptions(
+      IReadOnlySet<Type> registeredHandlers,
+      IReadOnlySet<Type> manifestSubscriptions)
+  {
+    var missingFromManifest = registeredHandlers.Except(manifestSubscriptions).ToArray();
+    var missingHandlers = manifestSubscriptions.Except(registeredHandlers).ToArray();
+    if (missingFromManifest.Length > 0 || missingHandlers.Length > 0)
+      throw new InvalidOperationException(
+          $"Generated messaging manifest and registered integration event handlers disagree. Missing from manifest: {string.Join(", ", missingFromManifest.Select(static type => type.FullName))}. Missing registered handlers: {string.Join(", ", missingHandlers.Select(static type => type.FullName))}.");
+  }
+
+  private sealed class KafkaMessagingManifestValidationHostedService : IHostedService
+  {
+    private readonly IServiceCollection _services;
+
+    public KafkaMessagingManifestValidationHostedService(IServiceCollection services)
+        => _services = services;
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+      var registeredHandlers = GetRegisteredIntegrationEventHandlers(_services);
+      var manifests = MessagingManifestRegistry.GetAll();
+      var manifestSubscriptions = GetManifestSubscriptions();
+
+      if (manifests.Count == 0 && registeredHandlers.Count > 0)
+        throw new InvalidOperationException(
+            "Integration event handlers are registered but no generated messaging manifest is available. Ensure the Franz mediator source generator runs in every handler assembly.");
+
+      ValidateManifestSubscriptions(registeredHandlers, manifestSubscriptions);
+      return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+  }
 
   // =========================================================
   // MODEL PROVIDER (unchanged)

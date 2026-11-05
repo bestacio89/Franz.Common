@@ -19,6 +19,7 @@ public sealed class MessagingManifestTests
         .Should().Equal(typeof(string).FullName, typeof(Uri).FullName);
     manifest.Subscriptions.Select(static type => type.FullName)
         .Should().Equal(typeof(Guid).FullName, typeof(int).FullName);
+    manifest.KnownTypes.Should().Contain(new[] { typeof(Uri), typeof(string), typeof(Guid), typeof(int) });
   }
 
   [Fact]
@@ -30,6 +31,7 @@ public sealed class MessagingManifestTests
 
     manifest.Destinations.Should().NotBeNull().And.BeEmpty();
     manifest.Subscriptions.Should().NotBeNull().And.BeEmpty();
+    manifest.KnownTypes.Should().NotBeNull().And.BeEmpty();
   }
 
   [Fact]
