@@ -53,15 +53,16 @@ public sealed class KafkaMessageListener : IListener
 
   public async Task Listen(CancellationToken stoppingToken = default)
   {
-    if (OnMessageReceivedAsync is null)
-      throw new InvalidOperationException("A message handler must be configured before the Kafka listener starts.");
-    if (_topics.Length == 0 || _topics.Any(string.IsNullOrWhiteSpace))
-      throw new InvalidOperationException("At least one non-empty Kafka topic must be configured.");
-
-    _consumer.Subscribe(_topics);
-    _logger.LogInformation("Kafka listener subscribed to {Topics}", string.Join(", ", _topics));
     try
     {
+      if (OnMessageReceivedAsync is null)
+        throw new InvalidOperationException("A message handler must be configured before the Kafka listener starts.");
+      if (_topics.Length == 0 || _topics.Any(string.IsNullOrWhiteSpace))
+        throw new InvalidOperationException("At least one non-empty Kafka topic must be configured.");
+
+      _consumer.Subscribe(_topics);
+      _logger.LogInformation("Kafka listener subscribed to {Topics}", string.Join(", ", _topics));
+
       while (!stoppingToken.IsCancellationRequested)
       {
         ConsumeResult<string, string>? result;
