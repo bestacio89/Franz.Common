@@ -1,10 +1,10 @@
 # Franz.Common.Hosting
 
-> Provides Hosting integration and reusable abstractions for .NET applications built with Franz.Common.
+> Host lifecycle and background-service utilities for composing and managing long-running .NET application components.
 
 ## Overview
 
-Provides Hosting integration and reusable abstractions for .NET applications built with Franz.Common.
+Host lifecycle and background-service utilities for composing and managing long-running .NET application components.
 
 ## Installation
 

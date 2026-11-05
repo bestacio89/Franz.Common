@@ -1,10 +1,10 @@
 # Franz.Common.Http.Client
 
-> Provides Http Client integration and reusable abstractions for .NET applications built with Franz.Common.
+> Typed HttpClient registration and configuration extensions for reliable outbound HTTP integrations.
 
 ## Overview
 
-Provides Http Client integration and reusable abstractions for .NET applications built with Franz.Common.
+Typed HttpClient registration and configuration extensions for reliable outbound HTTP integrations.
 
 ## Installation
 

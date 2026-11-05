@@ -1,10 +1,10 @@
 # Franz.Common.Http.Bootstrap
 
-> ASP.NET Core application composition for authentication, headers, API documentation, health checks, multitenancy, and optional typed Refit clients.
+> ASP.NET Core application composition for authentication, headers, API documentation, health checks, multitenancy, and typed clients.
 
 ## Overview
 
-ASP.NET Core application composition for authentication, headers, API documentation, health checks, multitenancy, and optional typed Refit clients.
+ASP.NET Core application composition for authentication, headers, API documentation, health checks, multitenancy, and typed clients.
 
 ## Installation
 

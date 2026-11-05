@@ -1,10 +1,10 @@
 # Franz.Common.Http.Documentation
 
-> Provides Http Documentation integration and reusable abstractions for .NET applications built with Franz.Common.
+> OpenAPI and endpoint-documentation conventions for consistent ASP.NET Core API descriptions.
 
 ## Overview
 
-Provides Http Documentation integration and reusable abstractions for .NET applications built with Franz.Common.
+OpenAPI and endpoint-documentation conventions for consistent ASP.NET Core API descriptions.
 
 ## Installation
 

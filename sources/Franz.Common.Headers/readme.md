@@ -1,10 +1,10 @@
 # Franz.Common.Headers
 
-> Provides Headers integration and reusable abstractions for .NET applications built with Franz.Common.
+> Typed header contracts and accessors for propagating correlation, identity, tenant, and application metadata.
 
 ## Overview
 
-Provides Headers integration and reusable abstractions for .NET applications built with Franz.Common.
+Typed header contracts and accessors for propagating correlation, identity, tenant, and application metadata.
 
 ## Installation
 

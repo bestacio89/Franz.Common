@@ -1,10 +1,10 @@
 # Franz.Common.Grpc
 
-> Provides Grpc integration and reusable abstractions for .NET applications built with Franz.Common.
+> gRPC client and server integration for Franz.Common services, including shared execution context and tenant-aware request handling.
 
 ## Overview
 
-Provides Grpc integration and reusable abstractions for .NET applications built with Franz.Common.
+gRPC client and server integration for Franz.Common services, including shared execution context and tenant-aware request handling.
 
 ## Installation
 
