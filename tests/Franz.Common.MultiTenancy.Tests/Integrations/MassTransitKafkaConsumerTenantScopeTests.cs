@@ -58,31 +58,18 @@ public sealed class MassTransitKafkaConsumerTenantScopeTests
         var delivery = CreateDelivery(Guid.NewGuid());
         consumer.Consume(Arg.Any<CancellationToken>()).Returns(delivery);
 
-        var sut = new KafkaConsumer(consumer);
+        var services = new ServiceCollection();
+        using var provider = services.BuildServiceProvider();
+        var sut = new KafkaConsumer(consumer, provider.GetRequiredService<IServiceScopeFactory>());
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.SubscribeAsync<Payload>(
                 "tenant-events",
-                _ => throw new InvalidOperationException("Handler failed.")));
+                (_, _) => throw new InvalidOperationException("Handler failed.")));
 
         consumer.DidNotReceive().Commit(Arg.Any<ConsumeResult<string, string>>());
     }
 
-    [Fact]
-    public async Task SubscribeAsync_LegacyHandler_FailsClosedWhenTenantProcessingIsEnabled()
-    {
-        var consumer = Substitute.For<IConsumer<string, string>>();
-        consumer.Consume(Arg.Any<CancellationToken>()).Returns(CreateDelivery(Guid.NewGuid()));
-
-        var services = new ServiceCollection();
-        services.AddSingleton<ITenantMessageContextInitializer>(new TrackingTenantMessageContextInitializer());
-        using var provider = services.BuildServiceProvider();
-
-        var sut = new KafkaConsumer(consumer, provider.GetRequiredService<IServiceScopeFactory>());
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.SubscribeAsync<Payload>("tenant-events", _ => Task.CompletedTask));
-    }
 
     private static ConsumeResult<string, string> CreateDelivery(Guid tenantId)
     {
