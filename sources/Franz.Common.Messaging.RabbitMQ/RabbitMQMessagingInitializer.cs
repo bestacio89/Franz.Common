@@ -114,6 +114,10 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       await VerifyExchangeAsync(destinationExchange, ExchangeType.Headers, durable: true, failures, cancellationToken)
           .ConfigureAwait(false);
 
+    foreach (var subscriptionExchange in GetSubscriptionExchangeNames())
+      await VerifyExchangeAsync(subscriptionExchange, ExchangeType.Headers, durable: true, failures, cancellationToken)
+          .ConfigureAwait(false);
+
     await VerifyQueueAsync(_queueName, _options.QueueDurable, CreateMainQueueArguments(), failures, cancellationToken)
         .ConfigureAwait(false);
 
@@ -273,11 +277,7 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
       }
     }
 
-    var integrationEvents = Franz.Common.Messaging.Manifest.MessagingManifestRegistry.GetAll()
-        .SelectMany(static manifest => manifest.Subscriptions)
-        .Distinct();
-
-    foreach (var eventType in integrationEvents)
+    foreach (var eventType in GetSubscriptionEventTypes())
     {
       var sourceExchange = RabbitMQExchangeNamer.GetEventExchangeName(eventType.Assembly);
       var eventName = HeaderNamer.GetEventClassName(eventType);
@@ -583,6 +583,16 @@ public sealed class RabbitMQMessagingInitializer : IMessagingInitializer
           .ConfigureAwait(false);
     }
   }
+
+  private static IEnumerable<Type> GetSubscriptionEventTypes()
+      => Franz.Common.Messaging.Manifest.MessagingManifestRegistry.GetAll()
+          .SelectMany(static manifest => manifest.Subscriptions)
+          .Distinct();
+
+  private IEnumerable<string> GetSubscriptionExchangeNames()
+      => GetSubscriptionEventTypes()
+          .Select(static eventType => RabbitMQExchangeNamer.GetEventExchangeName(eventType.Assembly))
+          .Distinct(StringComparer.Ordinal);
 
   private async ValueTask InitializeExchangeForSubscriptionAsync(
       IChannel channel,
