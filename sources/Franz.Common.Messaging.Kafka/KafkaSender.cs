@@ -1,6 +1,7 @@
 #nullable enable
 using Confluent.Kafka;
 using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Transactions;
 using Franz.Common.Messaging.Messages;

@@ -2,6 +2,7 @@
 using Confluent.Kafka;
 using FluentAssertions;
 using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Senders;
@@ -133,7 +134,7 @@ public sealed class KafkaSenderUnitTests
     var (sender, producer) = BuildSender(KafkaMessageKeyStrategy.AggregateId);
     Func<Task> act = async () => await sender.SendAsync(new Message());
 
-    await act.Should().ThrowAsync<InvalidOperationException>()
+    await act.Should().ThrowAsync<PermanentMessagingException>()
       .WithMessage("*no AggregateId*");
     producer.Verify(p => p.ProduceAsync(
         It.IsAny<string>(),
@@ -148,7 +149,7 @@ public sealed class KafkaSenderUnitTests
     var message = new Message { CorrelationId = null };
     Func<Task> act = async () => await sender.SendAsync(message);
 
-    await act.Should().ThrowAsync<InvalidOperationException>()
+    await act.Should().ThrowAsync<PermanentMessagingException>()
       .WithMessage("*no CorrelationId*");
     producer.Verify(p => p.ProduceAsync(
         It.IsAny<string>(),
