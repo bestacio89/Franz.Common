@@ -3,7 +3,6 @@ using Confluent.Kafka;
 using FluentAssertions;
 using Franz.Common.Messaging.Kafka.Transactions;
 using Moq;
-using Moq;
 using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Transactions;
@@ -12,12 +11,15 @@ namespace Franz.Common.Messaging.Kafka.Tests.Transactions;
 public class MessagingTransactionTests
 {
   private readonly Mock<IProducer<string, byte[]>> _producerMock;
+  private readonly Mock<IKafkaTransactionProducerFactory> _factoryMock;
   private readonly MessagingTransaction _sut;
 
   public MessagingTransactionTests()
   {
     _producerMock = new Mock<IProducer<string, byte[]>>();
-    _sut = new MessagingTransaction(_producerMock.Object);
+    _factoryMock = new Mock<IKafkaTransactionProducerFactory>();
+    _factoryMock.Setup(factory => factory.Create()).Returns(_producerMock.Object);
+    _sut = new MessagingTransaction(_factoryMock.Object, new KafkaTransactionContext());
   }
 
   [Fact]

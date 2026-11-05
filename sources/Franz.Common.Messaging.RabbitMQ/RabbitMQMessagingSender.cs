@@ -14,27 +14,18 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
   private readonly Connections.IChannelPool _channelPool;
   private readonly IMessageHandler _handler;
   private readonly IMessagingTransaction? _transaction;
-  private readonly IOptions<RabbitMQMessagingOptions>? _options;
-
-  // Preserve the original public constructor for source and binary compatibility.
-  public RabbitMQMessagingSender(
-      Connections.IChannelPool channelPool,
-      IMessageHandler handler,
-      IMessagingTransaction? transaction = null)
-      : this(channelPool, handler, transaction, null)
-  {
-  }
+  private readonly IOptions<RabbitMQMessagingOptions> _options;
 
   public RabbitMQMessagingSender(
       Connections.IChannelPool channelPool,
       IMessageHandler handler,
       IMessagingTransaction? transaction,
-      IOptions<RabbitMQMessagingOptions>? options)
+      IOptions<RabbitMQMessagingOptions> options)
   {
     _channelPool = channelPool ?? throw new ArgumentNullException(nameof(channelPool));
     _handler = handler ?? throw new ArgumentNullException(nameof(handler));
     _transaction = transaction;
-    _options = options;
+    _options = options ?? throw new ArgumentNullException(nameof(options));
   }
 
   public void Dispose() => GC.SuppressFinalize(this);
@@ -62,7 +53,7 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
             : await _channelPool.GetAsync(cancellationToken).ConfigureAwait(false);
 
     using var confirmationTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-    confirmationTimeout.CancelAfter(TimeSpan.FromSeconds(_options?.Value.PublisherConfirmTimeoutSeconds ?? 5));
+    confirmationTimeout.CancelAfter(TimeSpan.FromSeconds(_options.Value.PublisherConfirmTimeoutSeconds));
     var publishCompleted = false;
 
     try

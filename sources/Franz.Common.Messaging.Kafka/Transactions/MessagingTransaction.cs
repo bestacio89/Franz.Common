@@ -12,19 +12,12 @@ namespace Franz.Common.Messaging.Kafka.Transactions;
 /// </summary>
 public sealed class MessagingTransaction : IMessagingTransaction
 {
-  private readonly IKafkaTransactionProducerFactory? _producerFactory;
-  private readonly KafkaTransactionContext? _context;
+  private readonly IKafkaTransactionProducerFactory _producerFactory;
+  private readonly KafkaTransactionContext _context;
   private IProducer<string, byte[]>? _producer;
-  private readonly IProducer<string, byte[]>? _legacyProducer;
   private bool _isActive;
   private bool _disposed;
   private readonly SemaphoreSlim _gate = new(1, 1);
-
-  /// <summary>Compatibility constructor for direct callers; DI uses the isolated-producer constructor.</summary>
-  public MessagingTransaction(IProducer<string, byte[]> producer)
-  {
-    _legacyProducer = producer ?? throw new ArgumentNullException(nameof(producer));
-  }
 
   public MessagingTransaction(
       IKafkaTransactionProducerFactory producerFactory,
@@ -43,19 +36,18 @@ public sealed class MessagingTransaction : IMessagingTransaction
       if (_isActive)
         throw new InvalidOperationException("A Kafka transaction is already active.");
 
-      var producer = _producerFactory?.Create() ?? _legacyProducer!;
+      var producer = _producerFactory.Create();
       _producer = producer;
       try
       {
-        _context?.SetProducer(producer);
+        _context.SetProducer(producer);
         producer.BeginTransaction();
         _isActive = true;
       }
       catch
       {
-        _context?.ClearProducer(producer);
-        if (_producerFactory is not null)
-          producer.Dispose();
+        _context.ClearProducer(producer);
+        producer.Dispose();
         _producer = null;
         throw;
       }
@@ -71,6 +63,7 @@ public sealed class MessagingTransaction : IMessagingTransaction
     await _gate.WaitAsync(ct).ConfigureAwait(false);
     try
     {
+      ThrowIfDisposed();
       if (!_isActive)
         return;
 
@@ -131,9 +124,8 @@ public sealed class MessagingTransaction : IMessagingTransaction
 
   private void ReleaseProducer(IProducer<string, byte[]> producer)
   {
-    _context?.ClearProducer(producer);
-    if (_producerFactory is not null)
-      producer.Dispose();
+    _context.ClearProducer(producer);
+    producer.Dispose();
     _producer = null;
   }
 
