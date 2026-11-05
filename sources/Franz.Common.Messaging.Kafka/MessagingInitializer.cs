@@ -15,38 +15,17 @@ using System.Threading.Tasks;
 namespace Franz.Common.Messaging.Kafka;
 
 /// <summary>
-/// Kafka infrastructure initializer.
-///
-/// Supports two topic discovery modes:
-///
-/// SYSTEM MODE (perEvent: false) — default
-///   One topic per service assembly. SkillService consuming HeroCreatedEvent
-///   ensures "hero-in" exists (the source service topic).
-///   Topic name derived from the event type's source assembly.
-///
-/// EVENT MODE (perEvent: true)
-///   One topic per event type. HeroCreatedEvent → "hero-created-in".
-///   Topic name derived from the event type name via kebab-case conversion.
-///   Used when AddEventBasedKafkaMessaging is registered.
-///
-/// CRITICAL: _initialized is instance-level (not static) so that system mode
-/// and event mode initializers are independent and both run correctly when
-/// both modes are registered in the same process.
+/// Provisions service, event and dead-letter topics from the generated messaging manifest.
 /// </summary>
 public sealed class KafkaMessagingInitializer : IMessagingInitializer
 {
-  // Instance-level — NOT static.
-  // Static would cause the second initializer (event mode) to be skipped
-  // because the first (system mode) already set the flag.
-  private int _initialized;
   private readonly SemaphoreSlim _initializationGate = new(1, 1);
-
   private readonly IAdminClient _adminClient;
   private readonly KafkaMessagingOptions _options;
   private readonly bool _perEvent;
-
   private readonly string _topicName;
   private readonly string _deadLetterTopicName;
+  private int _initialized;
 
   public KafkaMessagingInitializer(
       IAdminClient adminClient,
@@ -58,7 +37,6 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
     ArgumentNullException.ThrowIfNull(topicNames);
     _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     _perEvent = perEvent;
-
     _topicName = topicNames.TopicName;
     _deadLetterTopicName = topicNames.DeadLetterTopicName;
   }
@@ -74,14 +52,20 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
       if (Volatile.Read(ref _initialized) == 1)
         return;
 
-      ValidateReplicationFactorAgainstBrokerCount();
-      await EnsureTopicAsync(_topicName, cancellationToken).ConfigureAwait(false);
-      await EnsureTopicAsync(_deadLetterTopicName, cancellationToken).ConfigureAwait(false);
+      var topicPlans = new Dictionary<string, KafkaTopicOptions>(StringComparer.Ordinal)
+      {
+        [_topicName] = _options.Topic,
+        [_deadLetterTopicName] = _options.DeadLetterTopicOptions ?? _options.Topic
+      };
 
       foreach (var topic in DiscoverIntegrationEventTopics())
-        await EnsureTopicAsync(topic, cancellationToken).ConfigureAwait(false);
+        topicPlans.TryAdd(topic.Name, topic.Options);
 
-      // Publish the initialized state only after every destination has been provisioned.
+      ValidateReplicationFactorAgainstBrokerCount(topicPlans);
+      foreach (var (topicName, topicOptions) in topicPlans)
+        await EnsureTopicAsync(topicName, topicOptions, cancellationToken).ConfigureAwait(false);
+
+      // Publish initialized state only after every destination has been provisioned.
       // Failed and cancelled attempts remain retryable.
       Volatile.Write(ref _initialized, 1);
     }
@@ -91,45 +75,64 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
     }
   }
 
-  private IReadOnlyCollection<string> DiscoverIntegrationEventTopics()
+  private IReadOnlyCollection<TopicPlan> DiscoverIntegrationEventTopics()
   {
     var eventTypes = Franz.Common.Messaging.Manifest.MessagingManifestRegistry.GetAll()
         .SelectMany(static manifest => manifest.Destinations)
         .Distinct()
         .ToArray();
 
-    var topics = new HashSet<string>(StringComparer.Ordinal);
+    var topics = new Dictionary<string, KafkaTopicOptions>(StringComparer.Ordinal);
     foreach (var eventType in eventTypes)
     {
-      var topic = _perEvent
+      var topicName = _perEvent
           ? TopicNamer.GetTopicName(eventType)
           : TopicNamer.GetTopicName(new AssemblyWrapper(eventType.Assembly));
-      var deadLetterTopic = _perEvent
+      var deadLetterTopicName = _perEvent
           ? TopicNamer.GetDeadLetterTopicName(eventType)
           : TopicNamer.GetDeadLetterTopicName(new AssemblyWrapper(eventType.Assembly));
 
-      if (!string.IsNullOrWhiteSpace(topic)) topics.Add(topic);
-      if (!string.IsNullOrWhiteSpace(deadLetterTopic)) topics.Add(deadLetterTopic);
+      if (string.IsNullOrWhiteSpace(topicName))
+        continue;
+
+      var eventTopicOptions = ResolveEventTopicOptions(topicName);
+      topics.TryAdd(topicName, eventTopicOptions);
+
+      if (!string.IsNullOrWhiteSpace(deadLetterTopicName))
+        topics.TryAdd(deadLetterTopicName, _options.DeadLetterTopicOptions ?? eventTopicOptions);
     }
 
-    return topics.ToArray();
+    return topics.Select(static pair => new TopicPlan(pair.Key, pair.Value)).ToArray();
   }
 
-  private void ValidateReplicationFactorAgainstBrokerCount()
+  private KafkaTopicOptions ResolveEventTopicOptions(string topicName)
+      => _options.EventTopicOptions.TryGetValue(topicName, out var topicOptions)
+          ? topicOptions
+          : _options.Topic;
+
+  private void ValidateReplicationFactorAgainstBrokerCount(
+      IReadOnlyDictionary<string, KafkaTopicOptions> topicPlans)
   {
-    var timeout = TimeSpan.FromMilliseconds(_options.Topic.CreationTimeoutMs);
-    var brokerCount = _adminClient.GetMetadata(timeout).Brokers.Count;
-    if (brokerCount < _options.Topic.ReplicationFactor)
+    var timeoutMilliseconds = topicPlans.Values.Max(static topic => topic.CreationTimeoutMs);
+    var brokerCount = _adminClient.GetMetadata(TimeSpan.FromMilliseconds(timeoutMilliseconds)).Brokers.Count;
+    var invalidTopics = topicPlans
+        .Where(pair => pair.Value.ReplicationFactor > brokerCount)
+        .Select(pair => $"'{pair.Key}' requests replication factor {pair.Value.ReplicationFactor}")
+        .ToArray();
+
+    if (invalidTopics.Length > 0)
       throw new InvalidOperationException(
-          $"Kafka replication factor {_options.Topic.ReplicationFactor} exceeds the available broker count ({brokerCount}).");
+          $"Kafka topic replication factors exceed the available broker count ({brokerCount}): {string.Join(", ", invalidTopics)}.");
   }
 
-  private async ValueTask EnsureTopicAsync(string name, CancellationToken cancellationToken)
+  private async ValueTask EnsureTopicAsync(
+      string name,
+      KafkaTopicOptions topicOptions,
+      CancellationToken cancellationToken)
   {
     if (string.IsNullOrWhiteSpace(name))
       return;
 
-    var topicOptions = _options.Topic;
     var timeout = TimeSpan.FromMilliseconds(topicOptions.CreationTimeoutMs);
     var specification = new TopicSpecification
     {
@@ -184,10 +187,5 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
     }
   }
 
-  private static string GetCompanyPrefix(IAssembly entryAssembly)
-  {
-    var name = entryAssembly.Name ?? string.Empty;
-    var first = name.Split('.', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-    return string.IsNullOrWhiteSpace(first) ? name : first;
-  }
+  private sealed record TopicPlan(string Name, KafkaTopicOptions Options);
 }
