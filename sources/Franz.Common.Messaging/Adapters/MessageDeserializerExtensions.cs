@@ -22,7 +22,7 @@ public static class MessageDeserializerExtensions
   };
 
   // Cache reflected property setters to avoid runtime reflection overhead per message deserialization
-  private static readonly ConcurrentDictionary<Type, Action<object, Guid>?> PropertySetterCache = new();
+  private static readonly ConcurrentDictionary<Type, Lazy<Action<object, Guid>?>> PropertySetterCache = new();
   private static readonly ConcurrentDictionary<string, Lazy<Type?>> TypeResolutionCache = new();
 
   public static ICommand? ToCommand(this Message message)
@@ -113,7 +113,11 @@ public static class MessageDeserializerExtensions
 
     // 2. Hydrate Domain Property on the Message Payload (Cached Setter)
     var targetType = target.GetType();
-    var setter = PropertySetterCache.GetOrAdd(targetType, static type => CompileCorrelationSetter(type));
+    var setter = PropertySetterCache.GetOrAdd(
+        targetType,
+        static type => new Lazy<Action<object, Guid>?>(
+            () => CompileCorrelationSetter(type),
+            LazyThreadSafetyMode.ExecutionAndPublication)).Value;
 
     setter?.Invoke(target, targetCorrelation);
   }
