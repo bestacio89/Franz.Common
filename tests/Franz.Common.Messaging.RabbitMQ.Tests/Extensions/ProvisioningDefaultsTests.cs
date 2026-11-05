@@ -13,9 +13,9 @@ namespace Franz.Common.Messaging.RabbitMQ.Tests.Extensions;
 public sealed class RabbitMqProvisioningDefaultsTests
 {
   [Theory]
-  [InlineData("Development", ProvisioningMode.Create)]
-  [InlineData("Production", ProvisioningMode.Verify)]
-  [InlineData("Staging", ProvisioningMode.Verify)]
+  [InlineData(Environments.Development, ProvisioningMode.Create)]
+  [InlineData(Environments.Production, ProvisioningMode.Verify)]
+  [InlineData(Environments.Staging, ProvisioningMode.Verify)]
   public void UnspecifiedProvisioningMode_UsesEnvironmentSafeDefault(string environment, ProvisioningMode expected)
   {
     var configuration = CreateConfiguration();

@@ -22,7 +22,8 @@ namespace Franz.Common.Messaging.Kafka.Tests.Senders;
 public sealed class KafkaSenderUnitTests
 {
   private static (KafkaSender Sender, Mock<IProducer<string, byte[]>> Producer) BuildSender(
-      MessageOrderingStrategy strategy = MessageOrderingStrategy.MessageId)
+      MessageOrderingStrategy strategy = MessageOrderingStrategy.MessageId,
+      string? topicName = null)
   {
     var mockAssembly = new Mock<IAssembly>();
     mockAssembly.Setup(a => a.Name).Returns("Company.Test.Api");
@@ -57,8 +58,30 @@ public sealed class KafkaSenderUnitTests
 
     return (
       new KafkaSender(mockProducer.Object, mockSerializer.Object, topicNames,
-          options, NullLogger<KafkaSender>.Instance, new Franz.Common.Messaging.Kafka.Transactions.KafkaTransactionContext()),
+          options, NullLogger<KafkaSender>.Instance, new Franz.Common.Messaging.Kafka.Transactions.KafkaTransactionContext(), topicName),
       mockProducer);
+  }
+
+  [Fact]
+  public async Task SendAsync_ShouldUseExplicitEventTopic_WhenConfigured()
+  {
+    var (sender, producer) = BuildSender(topicName: "hero-created-in");
+    string? actualTopic = null;
+    producer.Setup(value => value.ProduceAsync(
+        It.IsAny<string>(),
+        It.IsAny<Confluent.Kafka.Message<string, byte[]>>(),
+        It.IsAny<CancellationToken>()))
+      .Callback<string, Confluent.Kafka.Message<string, byte[]>, CancellationToken>(
+          (topic, _, _) => actualTopic = topic)
+      .ReturnsAsync(new DeliveryResult<string, byte[]>
+      {
+        TopicPartitionOffset = new TopicPartitionOffset(
+            new TopicPartition("hero-created-in", new Partition(0)), new Offset(1))
+      });
+
+    await sender.SendAsync(new Message());
+
+    actualTopic.Should().Be("hero-created-in");
   }
 
   [Fact]

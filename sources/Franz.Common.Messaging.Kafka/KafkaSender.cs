@@ -17,7 +17,7 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
 {
   private readonly IProducer<string, byte[]> _producer;
   private readonly IMessageSerializer _serializer;
-  private readonly KafkaTopicNames _topicNames;
+  private readonly string _topicName;
   private readonly ILogger<KafkaSender> _logger;
   private readonly MessageOrderingStrategy _orderingStrategy;
   private readonly KafkaTransactionContext _transactionContext;
@@ -25,11 +25,14 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
 
   public KafkaSender(IProducer<string, byte[]> producer, IMessageSerializer serializer,
       KafkaTopicNames topicNames, IOptions<KafkaMessagingOptions> options,
-      ILogger<KafkaSender> logger, KafkaTransactionContext transactionContext)
+      ILogger<KafkaSender> logger, KafkaTransactionContext transactionContext,
+      string? topicName = null)
   {
     _producer = producer ?? throw new ArgumentNullException(nameof(producer));
     _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
-    _topicNames = topicNames ?? throw new ArgumentNullException(nameof(topicNames));
+    ArgumentNullException.ThrowIfNull(topicNames);
+    _topicName = topicName ?? topicNames.TopicName;
+    ArgumentException.ThrowIfNullOrWhiteSpace(_topicName);
     _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     _orderingStrategy = (options ?? throw new ArgumentNullException(nameof(options))).Value.OrderingStrategy;
     _transactionContext = transactionContext ?? throw new ArgumentNullException(nameof(transactionContext));
@@ -50,7 +53,7 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
         Headers = BuildHeaders(message)
       };
       var producer = _transactionContext.Producer ?? _producer;
-      var result = await producer.ProduceAsync(_topicNames.TopicName, kafkaMessage, ct).ConfigureAwait(false);
+      var result = await producer.ProduceAsync(_topicName, kafkaMessage, ct).ConfigureAwait(false);
       _logger.LogDebug("[Kafka] Delivered {MessageId} to {Topic} [Partition: {Partition}, Offset: {Offset}]",
           message.Id, result.Topic, result.Partition.Value, result.Offset.Value);
     }

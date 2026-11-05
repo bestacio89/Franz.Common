@@ -23,6 +23,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Franz.Common.Messaging.Kafka.Validation;
 
 namespace Franz.Common.Messaging.Kafka.Extensions;
@@ -128,7 +129,7 @@ public static class ServiceCollectionExtensions
       var serviceKey = eventType.Name;
 
       services
-          .AddKafkaProducerLayer(serviceKey, sharedInitializer: true)
+          .AddKafkaProducerLayer(serviceKey, sharedInitializer: true, eventType: eventType)
           .AddKafkaMessagingConsumer(serviceKey);
     }
 
@@ -330,11 +331,22 @@ public static class ServiceCollectionExtensions
   private static IServiceCollection AddKafkaProducerLayer(
       this IServiceCollection services,
       object? serviceKey,
-      bool sharedInitializer = false)
+      bool sharedInitializer = false,
+      Type? eventType = null)
   {
     if (serviceKey != null)
     {
-      services.AddKeyedScoped<IMessagingSender, KafkaSender>(serviceKey);
+      services.AddKeyedScoped<IMessagingSender>(serviceKey, (sp, key) =>
+          new KafkaSender(
+              sharedInitializer
+                  ? sp.GetRequiredService<IProducer<string, byte[]>>()
+                  : sp.GetRequiredKeyedService<IProducer<string, byte[]>>(key),
+              sp.GetRequiredService<IMessageSerializer>(),
+              sp.GetRequiredService<KafkaTopicNames>(),
+              sp.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
+              sp.GetRequiredService<ILogger<KafkaSender>>(),
+              sp.GetRequiredService<KafkaTransactionContext>(),
+              eventType is null ? null : TopicNamer.GetTopicName(eventType)));
 
       services.AddKeyedScoped<IMessagingPublisher>(serviceKey, (sp, key) =>
           new MessagingPublisher(

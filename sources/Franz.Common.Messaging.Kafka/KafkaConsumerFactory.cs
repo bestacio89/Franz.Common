@@ -92,7 +92,7 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
           if (partitions.Count == 0)
             return;
 
-          _rebalanceCoordinator.OnPartitionsRevoked(groupId, partitions.Select(static partition => partition.TopicPartition));
+          _rebalanceCoordinator.OnPartitionsRevoked(groupId, partitions);
 
           _logger.LogInformation(
               "Kafka partitions revoked for group {GroupId}: {Partitions}.",
@@ -104,7 +104,7 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
           if (partitions.Count == 0)
             return;
 
-          _rebalanceCoordinator.OnPartitionsLost(groupId, partitions.Select(static partition => partition.TopicPartition));
+          _rebalanceCoordinator.OnPartitionsLost(groupId, partitions);
 
           _logger.LogWarning(
               "Kafka partitions lost for group {GroupId}: {Partitions}. Offsets may be redelivered; handlers must be idempotent.",
