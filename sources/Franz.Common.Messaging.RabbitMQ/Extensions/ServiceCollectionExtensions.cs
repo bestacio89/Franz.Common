@@ -108,6 +108,15 @@ public static class ServiceCollectionExtensions
             Enum.IsDefined(options.ReplayStrategy),
             "Messaging:RabbitMQ:ReplayStrategy must be a defined RabbitMQReplayStrategy value.")
         .Validate(options =>
+            options.ProvisioningMode != ProvisioningMode.Verify ||
+            !string.IsNullOrWhiteSpace(options.ManagementApiUrl),
+            "Messaging:RabbitMQ:ManagementApiUrl is required when ProvisioningMode is Verify so bindings can be inspected.")
+        .Validate(options =>
+            string.IsNullOrWhiteSpace(options.ManagementApiUrl) ||
+            (Uri.TryCreate(options.ManagementApiUrl, UriKind.Absolute, out var managementUri) &&
+             (managementUri.Scheme == Uri.UriSchemeHttp || managementUri.Scheme == Uri.UriSchemeHttps)),
+            "Messaging:RabbitMQ:ManagementApiUrl must be an absolute http:// or https:// URI.")
+        .Validate(options =>
             options.PublisherConfirmTimeoutSeconds > 0,
             "Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds must be greater than zero.")
         .Validate(options =>
