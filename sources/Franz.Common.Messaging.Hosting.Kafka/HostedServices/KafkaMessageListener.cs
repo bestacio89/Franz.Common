@@ -21,38 +21,28 @@ public sealed class KafkaMessageListener : IListener
   private readonly IProducer<string, byte[]>? _deadLetterProducer;
   private readonly MessageFailurePolicy _failurePolicy;
   private readonly string? _deadLetterTopic;
-  private readonly KafkaRebalanceCoordinator? _rebalanceCoordinator;
-  private readonly string? _groupId;
+  private readonly KafkaRebalanceCoordinator _rebalanceCoordinator;
+  private readonly string _groupId;
   private readonly ConcurrentQueue<ConsumeResult<string, string>> _pendingResults = new();
 
-  public KafkaMessageListener(IConsumer<string, string> consumer, IEnumerable<string> topics,
-      IMessageSerializer serializer, ILogger<KafkaMessageListener> logger)
+  public KafkaMessageListener(
+      IConsumer<string, string> consumer,
+      IEnumerable<string> topics,
+      IMessageSerializer serializer,
+      ILogger<KafkaMessageListener> logger,
+      IProducer<string, byte[]> deadLetterProducer,
+      IOptions<KafkaMessagingOptions> options,
+      KafkaRebalanceCoordinator rebalanceCoordinator)
   {
     _consumer = consumer ?? throw new ArgumentNullException(nameof(consumer));
     _topics = topics?.ToArray() ?? throw new ArgumentNullException(nameof(topics));
     _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
     _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    _failurePolicy = MessageFailurePolicy.Default;
-  }
-
-  public KafkaMessageListener(IConsumer<string, string> consumer, IEnumerable<string> topics,
-      IMessageSerializer serializer, ILogger<KafkaMessageListener> logger,
-      IProducer<string, byte[]> deadLetterProducer, IOptions<KafkaMessagingOptions> options)
-      : this(consumer, topics, serializer, logger)
-  {
     ArgumentNullException.ThrowIfNull(options);
     _deadLetterProducer = deadLetterProducer ?? throw new ArgumentNullException(nameof(deadLetterProducer));
+    _rebalanceCoordinator = rebalanceCoordinator ?? throw new ArgumentNullException(nameof(rebalanceCoordinator));
     _failurePolicy = options.Value.FailurePolicy ?? MessageFailurePolicy.Default;
     _deadLetterTopic = options.Value.DeadLetterTopic;
-  }
-
-  public KafkaMessageListener(IConsumer<string, string> consumer, IEnumerable<string> topics,
-      IMessageSerializer serializer, ILogger<KafkaMessageListener> logger,
-      IProducer<string, byte[]> deadLetterProducer, IOptions<KafkaMessagingOptions> options,
-      KafkaRebalanceCoordinator rebalanceCoordinator)
-      : this(consumer, topics, serializer, logger, deadLetterProducer, options)
-  {
-    _rebalanceCoordinator = rebalanceCoordinator ?? throw new ArgumentNullException(nameof(rebalanceCoordinator));
     _groupId = options.Value.GroupId ?? throw new InvalidOperationException("Kafka GroupId is required for rebalance coordination.");
   }
 
@@ -111,16 +101,13 @@ public sealed class KafkaMessageListener : IListener
         Exception? processingFailure = null;
         var succeeded = false;
         var rebalanceInterrupted = false;
-        var groupId = _groupId ?? string.Empty;
-        var rebalanceToken = _rebalanceCoordinator is not null
-            ? _rebalanceCoordinator.GetRebalanceToken(groupId)
-            : CancellationToken.None;
+        var groupId = _groupId;
+        var rebalanceToken = _rebalanceCoordinator.GetRebalanceToken(groupId);
 
-        _rebalanceCoordinator?.BeginHandlerExecution(groupId);
+        _rebalanceCoordinator.BeginHandlerExecution(groupId);
         try
         {
-          if (_rebalanceCoordinator is not null)
-            PauseAssignedPartitions();
+          PauseAssignedPartitions();
 
           for (var attempt = 0; attempt <= _failurePolicy.MaxRetryAttempts; attempt++)
           {
@@ -140,10 +127,7 @@ public sealed class KafkaMessageListener : IListener
 
               try
               {
-                if (_rebalanceCoordinator is null)
-                  await OnMessageReceivedAsync(new MessageEventArgs(transport, handlerTimeout.Token));
-                else
-                  await InvokeHandlerWhilePollingAsync(transport, handlerTimeout.Token);
+                await InvokeHandlerWhilePollingAsync(transport, handlerTimeout.Token);
               }
               catch (OperationCanceledException ex)
                   when (handlerTimeout.IsCancellationRequested &&
@@ -175,29 +159,23 @@ public sealed class KafkaMessageListener : IListener
 
               if (attempt < _failurePolicy.MaxRetryAttempts && _failurePolicy.RetryBackoff > TimeSpan.Zero)
               {
-                if (_rebalanceCoordinator is null)
-                  await Task.Delay(_failurePolicy.RetryBackoff, stoppingToken);
-                else
-                  try
-                  {
-                    await DelayWhilePollingAsync(_failurePolicy.RetryBackoff, rebalanceToken, stoppingToken);
-                  }
-                  catch (OperationCanceledException) when (rebalanceToken.IsCancellationRequested)
-                  {
-                    rebalanceInterrupted = true;
-                    break;
-                  }
+                try
+                {
+                  await DelayWhilePollingAsync(_failurePolicy.RetryBackoff, rebalanceToken, stoppingToken);
+                }
+                catch (OperationCanceledException) when (rebalanceToken.IsCancellationRequested)
+                {
+                  rebalanceInterrupted = true;
+                  break;
+                }
               }
             }
           }
         }
         finally
         {
-          if (_rebalanceCoordinator is not null)
-          {
-            _rebalanceCoordinator.EndHandlerExecution(groupId);
-            ResumeAssignedPartitions();
-          }
+          _rebalanceCoordinator.EndHandlerExecution(groupId);
+          ResumeAssignedPartitions();
         }
 
         if (rebalanceToken.IsCancellationRequested)

@@ -41,14 +41,14 @@ public class KafkaConsumerFactoryTests
   public void Constructor_ShouldThrow_OnNullOptions()
   {
     var logger = Mock.Of<ILogger<KafkaConsumerFactory>>();
-    Assert.Throws<ArgumentNullException>(() => new KafkaConsumerFactory(null!, logger));
+    Assert.Throws<ArgumentNullException>(() => new KafkaConsumerFactory(null!, logger, new KafkaRebalanceCoordinator()));
   }
 
   [Fact]
   public void Constructor_ShouldThrow_OnNullLogger()
   {
     var options = Options.Create(GetDefaultOptions());
-    Assert.Throws<ArgumentNullException>(() => new KafkaConsumerFactory(options, null!));
+    Assert.Throws<ArgumentNullException>(() => new KafkaConsumerFactory(options, null!, new KafkaRebalanceCoordinator()));
   }
 
 
@@ -77,7 +77,7 @@ public class KafkaConsumerFactoryTests
     // Arrange
     var options = Options.Create(GetDefaultOptions());
     var logger = Mock.Of<ILogger<KafkaConsumerFactory>>();
-    var factory = new KafkaConsumerFactory(options, logger);
+    var factory = new KafkaConsumerFactory(options, logger, new KafkaRebalanceCoordinator());
 
     // Act
     var consumer = factory.Build();
@@ -93,7 +93,7 @@ public class KafkaConsumerFactoryTests
     // Arrange
     var options = Options.Create(GetDefaultOptions());
     var loggerMock = new Mock<ILogger<KafkaConsumerFactory>>();
-    var factory = new KafkaConsumerFactory(options, loggerMock.Object);
+    var factory = new KafkaConsumerFactory(options, loggerMock.Object, new KafkaRebalanceCoordinator());
 
     // Act
     var consumer = factory.Build();
