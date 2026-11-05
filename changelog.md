@@ -26,6 +26,7 @@
 - Scope server/client behavior providers to prevent scoped behavior instances from being cached across requests.
 
 ### Public API boundary corrections
+- Split the MassTransit Kafka producer and consumer contracts; remove the combined `IMessagingClient`, the producer's unsupported subscribe stub, the consumer's unsupported publish stub, and the unscoped captured-handler overload. Kafka consumer handlers now always receive the per-delivery service provider.
 - Move `TestDispatcher` out of the production Mediator package into `Franz.Common.Testing`.
 - Remove the unsupported `ICacheProvider.RemoveByTagAsync` contract and its provider stubs; key-based invalidation is the supported cache API.
 - Remove the `FranzSagaOptions.EnableValidation` alias; use `ValidateMappings`.
