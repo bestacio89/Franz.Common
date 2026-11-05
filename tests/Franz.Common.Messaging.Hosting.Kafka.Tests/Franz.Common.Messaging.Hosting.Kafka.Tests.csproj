@@ -41,7 +41,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Collections\\" />
+    <Folder Include="Collections\" />
   </ItemGroup>
 
   <ItemGroup>
