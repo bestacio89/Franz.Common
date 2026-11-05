@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>M:Franz.Common.Messaging.Kafka.Modeling.KafkaModel.Dispose</Target>
+    <Left>lib/net10.0/Franz.Common.Messaging.Kafka.dll</Left>
+    <Right>lib/net10.0/Franz.Common.Messaging.Kafka.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>
