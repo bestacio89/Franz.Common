@@ -117,6 +117,24 @@ public sealed class KafkaRebalanceCoordinatorTests
   }
 
   [Fact]
+  public void Dispose_WithActiveHandler_CancelsButDefersTokenSourceDisposalUntilHandlerEnds()
+  {
+    var coordinator = new KafkaRebalanceCoordinator();
+    var registration = coordinator.CreateRegistration("orders");
+    var partition = new TopicPartition("orders", new Partition(0));
+    var token = coordinator.GetRebalanceToken(registration, partition);
+
+    coordinator.BeginHandlerExecution(registration);
+    coordinator.Dispose();
+
+    token.IsCancellationRequested.Should().BeTrue();
+
+    var act = () => coordinator.EndHandlerExecution(registration);
+
+    act.Should().NotThrow();
+  }
+
+  [Fact]
   public void RevokedPartitionTokens_AreDisposedAfterActiveHandlersFinish()
   {
     using var coordinator = new KafkaRebalanceCoordinator();
