@@ -61,11 +61,16 @@ public sealed class RabbitMQHostedService : BackgroundService
             ?? throw new InvalidOperationException("Entry assembly cannot be null."));
   }
 
-  protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+  public override Task StartAsync(CancellationToken cancellationToken)
   {
     if (_serviceProvider is not null)
       TenantMessagingStartupValidation.Validate(_serviceProvider);
 
+    return base.StartAsync(cancellationToken);
+  }
+
+  protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+  {
     _logger.LogInformation("RabbitMQ hosted consumer starting");
 
     if (_provisioner is not null)
