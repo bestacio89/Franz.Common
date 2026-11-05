@@ -271,6 +271,52 @@ public sealed class KafkaMessagingInitializerIntegrationTests
   }
 
   [Fact]
+  public async Task InitializeAsync_CreateMode_ShouldRejectConfigurationDriftWhenAnotherInstanceCreatedTheTopic()
+  {
+    var topicName = $"create-race-config-{Guid.CreateVersion7():N}";
+    var deadLetterTopicName = $"{topicName}-dlt";
+    var initial = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      Topic = new KafkaTopicOptions
+      {
+        NumPartitions = 1,
+        ReplicationFactor = 1,
+        Configurations = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+          ["cleanup.policy"] = "compact"
+        }
+      }
+    });
+    await initial.InitializeAsync();
+
+    var concurrentInstance = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      Topic = new KafkaTopicOptions
+      {
+        NumPartitions = 1,
+        ReplicationFactor = 1,
+        Configurations = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+          ["cleanup.policy"] = "delete"
+        }
+      }
+    });
+
+    var act = () => concurrentInstance.InitializeAsync().AsTask();
+
+    await act.Should().ThrowAsync<InvalidOperationException>()
+        .WithMessage("*cleanup.policy*compact*delete*");
+  }
+
+  [Fact]
   public async Task InitializeAsync_ShouldRejectReplicationFactorAboveBrokerCount()
   {
     var sut = CreateSut(options: new KafkaMessagingOptions
