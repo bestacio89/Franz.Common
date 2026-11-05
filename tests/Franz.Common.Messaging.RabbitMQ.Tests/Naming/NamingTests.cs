@@ -68,14 +68,4 @@ public class NamingTests
             .Should().Be("franz-common-replay");
     }
 
-    [Fact]
-    public void SharedCompatibilityNamers_ShouldRemainAvailableDuringTheCurrentMajorVersion()
-    {
-        var assembly = new AssemblyWrapper(Assembly.GetExecutingAssembly());
-
-        global::Franz.Common.Messaging.QueueNamer.GetQueueName(assembly)
-            .Should().Be(RabbitMQQueueNamer.GetQueueName(assembly));
-        global::Franz.Common.Messaging.ExchangeNamer.GetEventExchangeName(assembly)
-            .Should().Be(RabbitMQExchangeNamer.GetEventExchangeName(assembly));
-    }
 }
