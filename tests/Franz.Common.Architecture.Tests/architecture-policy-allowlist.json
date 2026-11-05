@@ -214,17 +214,5 @@
     "path": "sources/Franz.Common.Identity/Testing/FakeIdentityContextAccessor.cs",
     "reason": "Existing testing helper shipped under a runtime package. Relocation is a public package surface change and must be reviewed before moving or removing it.",
     "ruleId": "GOV-002"
-  },
-  {
-    "rule": "TEST_HELPER_IN_RUNTIME",
-    "path": "sources/Franz.Common.Mediator/Testing/TestDispatcher.cs",
-    "reason": "Existing testing helper shipped under a runtime package. Relocation is a public package surface change and must be reviewed before moving or removing it.",
-    "ruleId": "GOV-002"
-  },
-  {
-    "rule": "TEST_PROJECT_IN_SOURCES",
-    "path": "sources/Franz.Common.SSO.Tests/Franz.Common.SSO.Tests.csproj",
-    "reason": "Existing SSO test project is misplaced under sources; relocation to tests is tracked by H1.",
-    "ruleId": "GOV-001"
   }
 ]
