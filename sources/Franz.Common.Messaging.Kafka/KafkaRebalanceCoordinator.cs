@@ -80,6 +80,9 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
     var state = GetActiveRegistration(registration);
     lock (state.Sync)
     {
+      if (state.RevokedTokens.TryGetValue(partition, out var revokedToken))
+        return revokedToken;
+
       if (!state.PartitionTokens.TryGetValue(partition, out var source))
       {
         source = new CancellationTokenSource();
@@ -102,17 +105,17 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
     {
       foreach (var partition in partitions)
       {
-        if (!state.PartitionTokens.TryGetValue(partition, out var previous))
+        state.RevokedTokens.Remove(partition);
+
+        if (state.PartitionTokens.TryGetValue(partition, out var previous))
         {
-          state.PartitionTokens.Add(partition, new CancellationTokenSource());
-          continue;
+          if (!previous.IsCancellationRequested)
+            continue;
+
+          RetireToken(state, previous, ref toDispose);
         }
 
-        if (!previous.IsCancellationRequested)
-          continue;
-
         state.PartitionTokens[partition] = new CancellationTokenSource();
-        RetireToken(state, previous, ref toDispose);
       }
     }
 
@@ -197,6 +200,7 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
           .Distinct()
           .ToList();
       state.PartitionTokens.Clear();
+      state.RevokedTokens.Clear();
       state.RetiredTokens.Clear();
       state.ActiveHandlers = 0;
     }
@@ -220,6 +224,7 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
         if (!state.PartitionTokens.Remove(partition, out var source))
           continue;
 
+        state.RevokedTokens[partition] = source.Token;
         if (!source.IsCancellationRequested)
           sources.Add(source);
 
@@ -313,6 +318,7 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
             .Distinct()
             .ToList();
         registration.PartitionTokens.Clear();
+        registration.RevokedTokens.Clear();
         registration.RetiredTokens.Clear();
         registration.ActiveHandlers = 0;
       }
@@ -333,6 +339,7 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
     public string GroupId { get; }
     internal object Sync { get; } = new();
     internal Dictionary<TopicPartition, CancellationTokenSource> PartitionTokens { get; } = new();
+    internal Dictionary<TopicPartition, CancellationToken> RevokedTokens { get; } = new();
     internal List<CancellationTokenSource> RetiredTokens { get; } = new();
     internal int ActiveHandlers;
   }
