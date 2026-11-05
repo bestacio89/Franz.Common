@@ -60,12 +60,6 @@ public sealed class RedisCacheProvider : ICacheProvider
     await _db.KeyDeleteAsync(ApplyPrefix(key, settings.KeyPrefix));
   }
 
-  /// <summary>
-  /// Intentionally unsupported to maintain O(1) performance and lean Redis state.
-  /// </summary>
-  public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
-      => throw new NotSupportedException("Tag-based invalidation is disabled for performance reasons.");
-
   #region Helpers
 
   private static string ApplyPrefix(string key, string prefix) => $"{prefix}{key}";
