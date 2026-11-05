@@ -25,6 +25,13 @@
 - Propagate client tenant metadata only from a validated execution context.
 - Scope server/client behavior providers to prevent scoped behavior instances from being cached across requests.
 
+### Public API boundary corrections
+- Move `TestDispatcher` out of the production Mediator package into `Franz.Common.Testing`.
+- Remove the unsupported `ICacheProvider.RemoveByTagAsync` contract and its provider stubs; key-based invalidation is the supported cache API.
+- Remove the `FranzSagaOptions.EnableValidation` alias; use `ValidateMappings`.
+- Make `ITenantValidator.IsValidAsync(Guid, CancellationToken)` the sole validation contract; implementations must accept and honor cancellation.
+- Remove redundant `GetCurrentId`/`SetCurrentId` aliases from messaging tenant/domain accessors and the synchronous `KafkaModel.Dispose()` entry point; the model is asynchronously disposable.
+
 ### Release boundary
 - No changes to relational EF provider behavior, messaging transports, cache strategy, or database routing.
 - Set the shared package version to 2.3.5 and file version to 2.3.5.0; retain assembly version 2.3.0.0.
