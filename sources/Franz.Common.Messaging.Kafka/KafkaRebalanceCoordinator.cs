@@ -80,6 +80,7 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
     var state = GetActiveRegistration(registration);
     lock (state.Sync)
     {
+      EnsureActiveRegistration(state);
       if (state.RevokedTokens.TryGetValue(partition, out var revokedToken))
         return revokedToken;
 
@@ -103,6 +104,7 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
 
     lock (state.Sync)
     {
+      EnsureActiveRegistration(state);
       foreach (var partition in partitions)
       {
         state.RevokedTokens.Remove(partition);
@@ -136,7 +138,10 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
   {
     var state = GetActiveRegistration(registration);
     lock (state.Sync)
+    {
+      EnsureActiveRegistration(state);
       state.ActiveHandlers++;
+    }
   }
 
   public void EndHandlerExecution(ConsumerRegistration registration)
@@ -244,6 +249,7 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
 
     lock (state.Sync)
     {
+      EnsureActiveRegistration(state);
       foreach (var partition in partitions)
       {
         if (!state.PartitionTokens.Remove(partition, out var source))
@@ -295,6 +301,14 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
       throw new InvalidOperationException("The Kafka consumer registration is no longer active.");
 
     return state;
+  }
+
+  private void EnsureActiveRegistration(ConsumerRegistration registration)
+  {
+    ThrowIfDisposed();
+    if (!_activeRegistrations.TryGetValue(registration.Id, out var state) ||
+        !ReferenceEquals(state, registration))
+      throw new InvalidOperationException("The Kafka consumer registration is no longer active.");
   }
 
   private static void DisposeSources(IEnumerable<CancellationTokenSource>? sources)
