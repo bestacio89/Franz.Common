@@ -50,7 +50,7 @@ public sealed class KafkaMessagingInitializerIntegrationTests
 
     return new KafkaMessagingInitializer(
         adminClient,
-        accessor ?? BuildDefaultAccessor(),
+        new KafkaTopicNames(accessor ?? BuildDefaultAccessor(), opts),
         opts,
         perEvent);
   }

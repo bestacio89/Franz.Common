@@ -42,7 +42,6 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
   private readonly SemaphoreSlim _initializationGate = new(1, 1);
 
   private readonly IAdminClient _adminClient;
-  private readonly IAssemblyAccessor _assemblyAccessor;
   private readonly KafkaMessagingOptions _options;
   private readonly bool _perEvent;
 
@@ -51,24 +50,17 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
 
   public KafkaMessagingInitializer(
       IAdminClient adminClient,
-      IAssemblyAccessor assemblyAccessor,
+      KafkaTopicNames topicNames,
       IOptions<KafkaMessagingOptions> options,
       bool perEvent = false)
   {
     _adminClient = adminClient ?? throw new ArgumentNullException(nameof(adminClient));
-    _assemblyAccessor = assemblyAccessor ?? throw new ArgumentNullException(nameof(assemblyAccessor));
+    ArgumentNullException.ThrowIfNull(topicNames);
     _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     _perEvent = perEvent;
 
-    var entryAssembly = _assemblyAccessor.GetEntryAssembly();
-
-    _topicName = !string.IsNullOrWhiteSpace(_options.TopicName)
-        ? _options.TopicName
-        : TopicNamer.GetTopicName(entryAssembly);
-
-    _deadLetterTopicName = !string.IsNullOrWhiteSpace(_options.Failure.DeadLetterTopic)
-        ? _options.Failure.DeadLetterTopic
-        : TopicNamer.GetDeadLetterTopicName(entryAssembly);
+    _topicName = topicNames.TopicName;
+    _deadLetterTopicName = topicNames.DeadLetterTopicName;
   }
 
   public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)

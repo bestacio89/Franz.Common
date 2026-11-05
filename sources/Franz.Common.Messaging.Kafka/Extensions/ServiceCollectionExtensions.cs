@@ -175,7 +175,8 @@ public static class ServiceCollectionExtensions
       object? serviceKey,
       bool perEvent)
   {
-    services.AddNoDuplicateScoped<IAssemblyAccessor, AssemblyAccessorWrapper>();
+    services.AddNoDuplicateSingleton<IAssemblyAccessor, AssemblyAccessorWrapper>();
+    services.AddNoDuplicateSingleton<KafkaTopicNames>();
 
     services.AddKafkaProducer(configuration, serviceKey);
     services.AddKafkaAdmin(configuration, serviceKey, perEvent);
@@ -286,7 +287,7 @@ public static class ServiceCollectionExtensions
         var admin = sp.GetRequiredKeyedService<IAdminClient>(key);
         return new KafkaMessagingInitializer(
             admin,
-            sp.GetRequiredService<IAssemblyAccessor>(),
+            sp.GetRequiredService<KafkaTopicNames>(),
             sp.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
             perEvent);
       });
@@ -300,7 +301,7 @@ public static class ServiceCollectionExtensions
       services.AddNoDuplicateScoped<IMessagingInitializer>(sp =>
           new KafkaMessagingInitializer(
               sp.GetRequiredService<IAdminClient>(),
-              sp.GetRequiredService<IAssemblyAccessor>(),
+              sp.GetRequiredService<KafkaTopicNames>(),
               sp.GetRequiredService<IOptions<KafkaMessagingOptions>>(),
               perEvent));
     }

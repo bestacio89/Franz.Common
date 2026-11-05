@@ -53,9 +53,11 @@ public sealed class KafkaSenderUnitTests
       Producer = new KafkaProducerOptions { MessageKeyStrategy = strategy }
     });
 
+    var topicNames = new KafkaTopicNames(mockAccessor.Object, options);
+
     return (
-      new KafkaSender(mockProducer.Object, mockSerializer.Object, mockAccessor.Object,
-          options, NullLogger<KafkaSender>.Instance),
+      new KafkaSender(mockProducer.Object, mockSerializer.Object, topicNames,
+          options, NullLogger<KafkaSender>.Instance, new Franz.Common.Messaging.Kafka.Transactions.KafkaTransactionContext()),
       mockProducer);
   }
 
