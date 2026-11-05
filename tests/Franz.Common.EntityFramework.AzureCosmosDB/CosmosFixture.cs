@@ -65,11 +65,6 @@ public sealed class CosmosFixture : IAsyncLifetime
 
     services.AddSingleton<IDispatcher>(Substitute.For<IDispatcher>());
 
-    services.AddFranzCosmosDbContext<TestCosmosDbContext>(
-      configuration,
-      validateOnStart: false
-    );
-
     services.AddCosmosInfrastructure<TestCosmosDbContext>(configuration);
     services.AddCosmosTenantRepository<CosmosSdkTenantDocument>("TenantDocuments");
 
