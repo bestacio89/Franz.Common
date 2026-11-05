@@ -1,42 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:ICacheProvider.RemoveByTagAsync(System.String,System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Caching.dll</Left>
     <Right>lib/net10.0/Franz.Common.Caching.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Franz.Common.Caching.Providers.MemoryCacheProvider.RemoveByTagAsync(System.String,System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Caching.dll</Left>
     <Right>lib/net10.0/Franz.Common.Caching.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Franz.Common.Caching.Providers.RedisCacheProvider.RemoveByTagAsync(System.String,System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Caching.dll</Left>
     <Right>lib/net10.0/Franz.Common.Caching.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Franz.Common.Caching.Distributed.DistributedCacheProvider.RemoveByTagAsync(System.String,System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Caching.dll</Left>
     <Right>lib/net10.0/Franz.Common.Caching.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Franz.Common.Caching.Hybrid.HybridCacheProvider.RemoveByTagAsync(System.String,System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Caching.dll</Left>
     <Right>lib/net10.0/Franz.Common.Caching.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Franz.Common.Caching.Observability.ObservableCacheProvider.RemoveByTagAsync(System.String,System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Caching.dll</Left>
     <Right>lib/net10.0/Franz.Common.Caching.dll</Right>
