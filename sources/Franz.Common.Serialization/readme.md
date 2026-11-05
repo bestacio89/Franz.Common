@@ -1,10 +1,10 @@
 # Franz.Common.Serialization
 
-> Provides Serialization integration and reusable abstractions for .NET applications built with Franz.Common.
+> JSON serialization contracts and reusable serializer configuration for consistent application and messaging payloads.
 
 ## Overview
 
-Provides Serialization integration and reusable abstractions for .NET applications built with Franz.Common.
+JSON serialization contracts and reusable serializer configuration for consistent application and messaging payloads.
 
 ## Installation
 

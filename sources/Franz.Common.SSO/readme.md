@@ -1,10 +1,10 @@
 # Franz.Common.SSO
 
-> Provides SSO integration and reusable abstractions for .NET applications built with Franz.Common.
+> Single sign-on provider abstractions and identity-management helpers for user lookup, credential checks, and sign-in workflows.
 
 ## Overview
 
-Provides SSO integration and reusable abstractions for .NET applications built with Franz.Common.
+Single sign-on provider abstractions and identity-management helpers for user lookup, credential checks, and sign-in workflows.
 
 ## Installation
 

@@ -1,10 +1,10 @@
 # Franz.Common.Reflection
 
-> Provides Reflection integration and reusable abstractions for .NET applications built with Franz.Common.
+> Assembly discovery, type scanning, and reflection utilities for deterministic application composition and infrastructure registration.
 
 ## Overview
 
-Provides Reflection integration and reusable abstractions for .NET applications built with Franz.Common.
+Assembly discovery, type scanning, and reflection utilities for deterministic application composition and infrastructure registration.
 
 ## Installation
 

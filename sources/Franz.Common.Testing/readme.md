@@ -1,10 +1,10 @@
 # Franz.Common.Testing
 
-> Provides Testing integration and reusable abstractions for .NET applications built with Franz.Common.
+> Reusable test dispatchers, fixtures, and test-support utilities for verifying Franz.Common application components.
 
 ## Overview
 
-Provides Testing integration and reusable abstractions for .NET applications built with Franz.Common.
+Reusable test dispatchers, fixtures, and test-support utilities for verifying Franz.Common application components.
 
 ## Installation
 

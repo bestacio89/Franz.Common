@@ -1,10 +1,10 @@
 # Franz.Common
 
-> Provides Franz Common integration and reusable abstractions for .NET applications built with Franz.Common.
+> Shared .NET application foundations for domain modeling, mediator dispatch, messaging, persistence, resilience, and observability.
 
 ## Overview
 
-Provides Franz Common integration and reusable abstractions for .NET applications built with Franz.Common.
+Shared .NET application foundations for domain modeling, mediator dispatch, messaging, persistence, resilience, and observability.
 
 ## Installation
 
