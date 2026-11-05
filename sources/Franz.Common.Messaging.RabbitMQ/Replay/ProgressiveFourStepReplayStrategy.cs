@@ -1,6 +1,7 @@
 #nullable enable
 using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Connections;
+using Franz.Common.Reflection;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
