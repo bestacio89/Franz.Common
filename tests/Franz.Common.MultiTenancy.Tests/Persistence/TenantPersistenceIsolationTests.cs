@@ -202,6 +202,7 @@ public sealed class TenantPersistenceIsolationTests
         Assert.Single(filters);
         Assert.True(filters.Single().IsAnonymous);
         Assert.Contains(nameof(ITenantEntity.TenantId), filters.Single().Expression.ToString());
+        Assert.False(entityType.FindProperty(nameof(ITenantEntity.TenantId))!.IsConcurrencyToken);
     }
 
     [Fact]
