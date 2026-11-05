@@ -27,6 +27,7 @@ public sealed class KafkaMessageListener : IListener
   private readonly KafkaRebalanceCoordinator.ConsumerRegistration _registration;
   private readonly ConcurrentQueue<PendingKafkaResult> _pendingResults = new();
   private int _deferredConsumerRelease;
+  private readonly CancellationTokenSource _stopCts = new();
 
   public KafkaMessageListener(
       IConsumer<string, string> consumer,
@@ -54,6 +55,9 @@ public sealed class KafkaMessageListener : IListener
 
   public async Task Listen(CancellationToken stoppingToken = default)
   {
+    using var linkedStopping = CancellationTokenSource.CreateLinkedTokenSource(listenerToken, _stopCts.Token);
+    var listenerToken = linkedStopping.Token;
+
     try
     {
       if (OnMessageReceivedAsync is null)
@@ -64,7 +68,7 @@ public sealed class KafkaMessageListener : IListener
       _consumer.Subscribe(_topics);
       _logger.LogInformation("Kafka listener subscribed to {Topics}", string.Join(", ", _topics));
 
-      while (!stoppingToken.IsCancellationRequested)
+      while (!listenerToken.IsCancellationRequested)
       {
         ConsumeResult<string, string>? result;
         try
@@ -78,10 +82,10 @@ public sealed class KafkaMessageListener : IListener
           }
           else
           {
-            result = _consumer.Consume(stoppingToken);
+            result = _consumer.Consume(listenerToken);
           }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+        catch (OperationCanceledException) when (listenerToken.IsCancellationRequested) { break; }
         catch (ConsumeException ex)
         {
           _logger.LogError(ex, "Kafka consume failed; the listener will continue polling.");
@@ -113,10 +117,10 @@ public sealed class KafkaMessageListener : IListener
               result.Topic, result.Partition.Value, result.Offset.Value);
           try
           {
-            await DeadLetterAndCommitAsync(result, ex, resultRebalanceToken, stoppingToken);
+            await DeadLetterAndCommitAsync(result, ex, resultRebalanceToken, listenerToken);
           }
           catch (OperationCanceledException) when (
-              resultRebalanceToken.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+              resultRebalanceToken.IsCancellationRequested && !listenerToken.IsCancellationRequested)
           {
             _logger.LogInformation(
                 "Skipping dead-letter offset commit for {Topic}[{Partition}] offset {Offset} because its partition was revoked or lost.",
@@ -137,7 +141,7 @@ public sealed class KafkaMessageListener : IListener
 
           for (var attempt = 0; attempt <= _failurePolicy.MaxRetryAttempts; attempt++)
           {
-            stoppingToken.ThrowIfCancellationRequested();
+            listenerToken.ThrowIfCancellationRequested();
             if (rebalanceToken.IsCancellationRequested)
             {
               rebalanceInterrupted = true;
@@ -146,18 +150,18 @@ public sealed class KafkaMessageListener : IListener
 
             try
             {
-              using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, rebalanceToken);
+              using var linked = CancellationTokenSource.CreateLinkedTokenSource(listenerToken, rebalanceToken);
               using var handlerTimeout = CancellationTokenSource.CreateLinkedTokenSource(linked.Token);
               if (_failurePolicy.HandlerTimeout is { } timeout)
                 handlerTimeout.CancelAfter(timeout);
 
               try
               {
-                await InvokeHandlerWhilePollingAsync(transport, handlerTimeout.Token, rebalanceToken, stoppingToken);
+                await InvokeHandlerWhilePollingAsync(transport, handlerTimeout.Token, rebalanceToken, listenerToken);
               }
               catch (OperationCanceledException ex)
                   when (handlerTimeout.IsCancellationRequested &&
-                        !stoppingToken.IsCancellationRequested &&
+                        !listenerToken.IsCancellationRequested &&
                         !rebalanceToken.IsCancellationRequested)
               {
                 throw new TimeoutException($"Kafka handler exceeded cooperative timeout {_failurePolicy.HandlerTimeout}.", ex);
@@ -166,7 +170,7 @@ public sealed class KafkaMessageListener : IListener
               succeeded = true;
               break;
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (listenerToken.IsCancellationRequested)
             {
               throw;
             }
@@ -194,7 +198,7 @@ public sealed class KafkaMessageListener : IListener
               {
                 try
                 {
-                  await DelayWhilePollingAsync(_failurePolicy.RetryBackoff, rebalanceToken, stoppingToken);
+                  await DelayWhilePollingAsync(_failurePolicy.RetryBackoff, rebalanceToken, listenerToken);
                 }
                 catch (OperationCanceledException) when (rebalanceToken.IsCancellationRequested)
                 {
@@ -230,10 +234,10 @@ public sealed class KafkaMessageListener : IListener
             await DeadLetterAndCommitAsync(result,
                 processingFailure ?? new InvalidOperationException("Kafka message processing failed."),
                 rebalanceToken,
-                stoppingToken);
+                listenerToken);
           }
           catch (OperationCanceledException) when (
-              rebalanceToken.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+              rebalanceToken.IsCancellationRequested && !listenerToken.IsCancellationRequested)
           {
             _logger.LogInformation(
                 "Skipping dead-letter offset commit for {Topic}[{Partition}] offset {Offset} because its partition was revoked or lost.",
@@ -486,10 +490,11 @@ public sealed class KafkaMessageListener : IListener
 
   public Task StopListenAsync(CancellationToken cancellationToken = default)
   {
-    // The consumer is polled by the listener thread only. Unsubscribe from a
-    // host shutdown thread would violate Confluent.Kafka consumer thread safety;
-    // BackgroundService cancellation releases the blocking Consume call.
+    // Cancel the listener token instead of invoking consumer APIs from a host
+    // shutdown thread; Confluent.Kafka consumers are single-thread-affine.
     _logger.LogInformation("Kafka listener shutdown requested.");
+    try { _stopCts.Cancel(); }
+    catch (ObjectDisposedException) { }
     return Task.CompletedTask;
   }
 }
