@@ -257,7 +257,7 @@ public sealed class TenantPersistenceIsolationTests
         string databaseName,
         Guid? tenantId,
         bool multiTenancyEnabled = false,
-        DatabaseIsolationMode isolationMode = DatabaseIsolationMode.SharedDatabase)
+        DatabaseIsolationMode isolationMode = DatabaseIsolationMode.TenantDatabase)
     {
         var options = new DbContextOptionsBuilder<TestDbContext>()
             .UseInMemoryDatabase(databaseName)
