@@ -9,55 +9,15 @@ using System.Text.Json;
 
 namespace Franz.Common.Messaging.MassTransit;
 
-public class KafkaConsumer : IKafkaConsumer
+public sealed class KafkaConsumer : IKafkaConsumer
 {
   private readonly IConsumer<string, string> _consumer;
-  private readonly IServiceScopeFactory? _scopeFactory;
+  private readonly IServiceScopeFactory _scopeFactory;
 
-  public KafkaConsumer(
-      IConsumer<string, string> consumer,
-      IServiceScopeFactory? scopeFactory = null)
+  public KafkaConsumer(IConsumer<string, string> consumer, IServiceScopeFactory scopeFactory)
   {
     _consumer = consumer ?? throw new ArgumentNullException(nameof(consumer));
-    _scopeFactory = scopeFactory;
-  }
-
-  public Task PublishAsync<T>(T message, string topic, CancellationToken cancellationToken = default)
-  {
-    throw new NotImplementedException("Consumer cannot publish.");
-  }
-
-  public async Task SubscribeAsync<T>(
-      string topic,
-      Func<T, Task> handler,
-      CancellationToken cancellationToken = default)
-  {
-    ArgumentNullException.ThrowIfNull(handler);
-    _consumer.Subscribe(topic);
-
-    while (!cancellationToken.IsCancellationRequested)
-    {
-      var result = ConsumeRequired(topic, cancellationToken);
-      var message = DeserializeRequired<T>(result, topic);
-
-      if (_scopeFactory is null)
-      {
-        await handler(message).ConfigureAwait(false);
-        _consumer.Commit(result);
-        continue;
-      }
-
-      await using var scope = _scopeFactory.CreateAsyncScope();
-      if (scope.ServiceProvider.GetService<ITenantMessageContextInitializer>() is not null)
-      {
-        throw new InvalidOperationException(
-            "Tenant-aware Kafka processing requires the scoped handler overload: " +
-            "SubscribeAsync<T>(topic, Func<IServiceProvider, T, Task>, cancellationToken).");
-      }
-
-      await handler(message).ConfigureAwait(false);
-      _consumer.Commit(result);
-    }
+    _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
   }
 
   public async Task SubscribeAsync<T>(
@@ -65,12 +25,8 @@ public class KafkaConsumer : IKafkaConsumer
       Func<IServiceProvider, T, Task> handler,
       CancellationToken cancellationToken = default)
   {
+    ArgumentException.ThrowIfNullOrWhiteSpace(topic);
     ArgumentNullException.ThrowIfNull(handler);
-
-    if (_scopeFactory is null)
-      throw new InvalidOperationException(
-          "The scoped Kafka handler overload requires an IServiceScopeFactory.");
-
     _consumer.Subscribe(topic);
 
     while (!cancellationToken.IsCancellationRequested)
@@ -81,18 +37,19 @@ public class KafkaConsumer : IKafkaConsumer
       await using var scope = _scopeFactory.CreateAsyncScope();
       var tenantInitializer = scope.ServiceProvider.GetService<ITenantMessageContextInitializer>();
 
-      if (tenantInitializer is null)
+      if (tenantInitializer is not null)
+      {
+        var tenantMessage = CreateTenantMessage(result);
+        await using var tenantExecutionScope = await tenantInitializer
+            .BeginAsync(tenantMessage, cancellationToken).ConfigureAwait(false);
+
+        await handler(scope.ServiceProvider, payload).ConfigureAwait(false);
+      }
+      else
       {
         await handler(scope.ServiceProvider, payload).ConfigureAwait(false);
-        _consumer.Commit(result);
-        continue;
       }
 
-      var tenantMessage = CreateTenantMessage(result);
-      await using var tenantExecutionScope = await tenantInitializer
-          .BeginAsync(tenantMessage, cancellationToken).ConfigureAwait(false);
-
-      await handler(scope.ServiceProvider, payload).ConfigureAwait(false);
       _consumer.Commit(result);
     }
   }
