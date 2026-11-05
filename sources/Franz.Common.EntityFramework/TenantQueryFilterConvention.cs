@@ -1,6 +1,7 @@
 using Franz.Common.Business.Domain;
 using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using System.Linq.Expressions;
@@ -45,7 +46,7 @@ internal sealed class TenantQueryFilterConvention(DbContextBase dbContext) : IMo
                 var tenantId = Expression.Call(
                     typeof(EF),
                     nameof(EF.Property),
-                    [typeof(Guid)],
+                    new[] { typeof(Guid) },
                     parameter,
                     Expression.Constant(nameof(ITenantEntity.TenantId)));
                 var currentTenantId = Expression.Property(
