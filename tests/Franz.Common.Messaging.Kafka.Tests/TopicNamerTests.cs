@@ -91,7 +91,7 @@ public sealed class TopicNamerTests
     TopicNamer.GetTopicName(typeof(HeroCreatedEvent)).Should().Be("hero-created-in");
   }
 
-  private sealed record TopicNameGoldenCase(string TopicName, string DeadLetterTopicName);
+  public sealed record TopicNameGoldenCase(string TopicName, string DeadLetterTopicName);
 
   private sealed class HeroCreatedEvent { }
   private sealed class SkillAssignedEvent { }
