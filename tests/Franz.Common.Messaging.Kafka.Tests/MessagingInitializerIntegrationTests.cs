@@ -108,16 +108,13 @@ public sealed class KafkaMessagingInitializerIntegrationTests
 
     existingTopic.Error.Code.Should().Be(ErrorCode.NoError);
 
-    var results = await admin.DeleteTopicsAsync(
+    await admin.DeleteTopicsAsync(
         new[] { topicName },
         new DeleteTopicsOptions
         {
           OperationTimeout = TimeSpan.FromSeconds(10),
           RequestTimeout = TimeSpan.FromSeconds(10)
         });
-
-    results.Should().ContainSingle(result =>
-        result.Topic == topicName && result.Error.Code == ErrorCode.NoError);
 
     var deadline = DateTime.UtcNow.AddSeconds(10);
     while (DateTime.UtcNow < deadline)
