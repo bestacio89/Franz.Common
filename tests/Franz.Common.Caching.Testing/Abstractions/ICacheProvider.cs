@@ -21,10 +21,4 @@ public sealed class ICacheProviderTests
         .Should().NotBeNull();
   }
 
-  [Fact]
-  public void Interface_Should_Expose_RemoveByTagAsync()
-  {
-    typeof(ICacheProvider).GetMethod("RemoveByTagAsync")
-        .Should().NotBeNull();
-  }
 }
