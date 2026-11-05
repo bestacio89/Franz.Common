@@ -292,7 +292,9 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
   {
     await using var container = new RabbitMqBuilder(RabbitMqContainerFixture.Image)
         .WithCleanUp(true)
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(5672))
+        .WithWaitStrategy(Wait.ForUnixContainer()
+            .UntilInternalTcpPortIsAvailable(5672)
+            .UntilCommandIsCompleted("rabbitmq-diagnostics -q ping"))
         .Build();
     await container.StartAsync();
 
