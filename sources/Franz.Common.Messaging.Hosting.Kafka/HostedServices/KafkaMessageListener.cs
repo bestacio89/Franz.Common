@@ -414,6 +414,14 @@ public sealed class KafkaMessageListener : IListener
       CancellationToken rebalanceToken,
       CancellationToken cancellationToken)
   {
+    if (rebalanceToken.IsCancellationRequested)
+    {
+      _logger.LogDebug(
+          "Skipping dead-letter publication for {Topic}[{Partition}] offset {Offset} because its partition is no longer assigned.",
+          result.Topic, result.Partition.Value, result.Offset.Value);
+      return;
+    }
+
     if (!_failurePolicy.DeadLetterOnExhaustion)
       throw new InvalidOperationException($"Kafka message at {result.Topic}[{result.Partition.Value}] offset {result.Offset.Value} failed and dead-lettering is disabled. Its offset was not committed.", failure);
 
