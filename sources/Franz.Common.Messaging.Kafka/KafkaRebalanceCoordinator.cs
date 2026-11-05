@@ -141,23 +141,36 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
 
   public void EndHandlerExecution(ConsumerRegistration registration)
   {
-    if (Volatile.Read(ref _disposed) == 1 ||
-        !_activeRegistrations.TryGetValue(registration.Id, out var state) ||
+    ArgumentNullException.ThrowIfNull(registration);
+    if (!_activeRegistrations.TryGetValue(registration.Id, out var state) ||
         !ReferenceEquals(state, registration))
       return;
 
     List<CancellationTokenSource>? toDispose = null;
+    var removeRegistration = false;
     lock (state.Sync)
     {
       if (state.ActiveHandlers > 0)
         state.ActiveHandlers--;
 
-      if (state.ActiveHandlers == 0 && state.RetiredTokens.Count > 0)
+      if (state.ActiveHandlers == 0)
       {
         toDispose = state.RetiredTokens.ToList();
         state.RetiredTokens.Clear();
+
+        if (state.DisposeWhenIdle)
+        {
+          (toDispose ??= new List<CancellationTokenSource>())
+              .AddRange(state.PartitionTokens.Values);
+          state.PartitionTokens.Clear();
+          state.RevokedTokens.Clear();
+          removeRegistration = true;
+        }
       }
     }
+
+    if (removeRegistration)
+      _activeRegistrations.TryRemove(registration.Id, out _);
 
     DisposeSources(toDispose);
   }
@@ -188,24 +201,36 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
   public void ReleaseRegistration(ConsumerRegistration registration)
   {
     ArgumentNullException.ThrowIfNull(registration);
-    if (!_activeRegistrations.TryRemove(registration.Id, out var state) ||
+    if (!_activeRegistrations.TryGetValue(registration.Id, out var state) ||
         !ReferenceEquals(state, registration))
       return;
 
     List<CancellationTokenSource> sources;
+    var disposeImmediately = false;
     lock (state.Sync)
     {
+      state.DisposeWhenIdle = true;
       sources = state.PartitionTokens.Values
           .Concat(state.RetiredTokens)
           .Distinct()
           .ToList();
-      state.PartitionTokens.Clear();
-      state.RevokedTokens.Clear();
-      state.RetiredTokens.Clear();
-      state.ActiveHandlers = 0;
+
+      if (state.ActiveHandlers == 0)
+      {
+        state.PartitionTokens.Clear();
+        state.RevokedTokens.Clear();
+        state.RetiredTokens.Clear();
+        disposeImmediately = true;
+      }
     }
 
-    CancelAndDisposeSources(sources);
+    if (disposeImmediately)
+      _activeRegistrations.TryRemove(registration.Id, out _);
+
+    if (disposeImmediately)
+      CancelAndDisposeSources(sources);
+    else
+      CancelSources(sources);
   }
 
   private void CancelPartitions(
@@ -294,6 +319,18 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
     }
   }
 
+  private void CancelSources(IEnumerable<CancellationTokenSource> sources)
+  {
+    foreach (var source in sources)
+    {
+      try { source.Cancel(); }
+      catch (AggregateException ex)
+      {
+        _logger?.LogError(ex, "A handler cancellation callback failed while releasing active Kafka consumer state.");
+      }
+    }
+  }
+
   private void ThrowIfDisposed()
   {
     if (Volatile.Read(ref _disposed) == 1)
@@ -305,25 +342,36 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
     if (Interlocked.Exchange(ref _disposed, 1) == 1)
       return;
 
-    var registrations = _activeRegistrations.Values.ToArray();
-    _activeRegistrations.Clear();
-
-    foreach (var registration in registrations)
+    foreach (var registration in _activeRegistrations.Values.ToArray())
     {
       List<CancellationTokenSource> sources;
+      var disposeImmediately = false;
       lock (registration.Sync)
       {
+        registration.DisposeWhenIdle = true;
         sources = registration.PartitionTokens.Values
             .Concat(registration.RetiredTokens)
             .Distinct()
             .ToList();
-        registration.PartitionTokens.Clear();
-        registration.RevokedTokens.Clear();
-        registration.RetiredTokens.Clear();
-        registration.ActiveHandlers = 0;
+
+        if (registration.ActiveHandlers == 0)
+        {
+          registration.PartitionTokens.Clear();
+          registration.RevokedTokens.Clear();
+          registration.RetiredTokens.Clear();
+          disposeImmediately = true;
+        }
       }
 
-      CancelAndDisposeSources(sources);
+      if (disposeImmediately)
+      {
+        _activeRegistrations.TryRemove(registration.Id, out _);
+        CancelAndDisposeSources(sources);
+      }
+      else
+      {
+        CancelSources(sources);
+      }
     }
   }
 
@@ -342,5 +390,6 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
     internal Dictionary<TopicPartition, CancellationToken> RevokedTokens { get; } = new();
     internal List<CancellationTokenSource> RetiredTokens { get; } = new();
     internal int ActiveHandlers;
+    internal bool DisposeWhenIdle;
   }
 }
