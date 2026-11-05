@@ -50,6 +50,23 @@ public sealed class KafkaRebalanceCoordinatorTests
   }
 
   [Fact]
+  public void RevokedPartition_RemainsCancelledUntilReassignment()
+  {
+    using var coordinator = new KafkaRebalanceCoordinator();
+    var registration = coordinator.CreateRegistration("orders");
+    var partition = new TopicPartition("orders", new Partition(0));
+
+    _ = coordinator.GetRebalanceToken(registration, partition);
+    coordinator.OnPartitionsRevoked(registration, new[] { partition });
+
+    coordinator.GetRebalanceToken(registration, partition).IsCancellationRequested.Should().BeTrue();
+
+    coordinator.OnPartitionsAssigned(registration, new[] { partition });
+
+    coordinator.GetRebalanceToken(registration, partition).IsCancellationRequested.Should().BeFalse();
+  }
+
+  [Fact]
   public void RevokingOnePartition_DoesNotCancelOtherPartitionWork()
   {
     using var coordinator = new KafkaRebalanceCoordinator();
