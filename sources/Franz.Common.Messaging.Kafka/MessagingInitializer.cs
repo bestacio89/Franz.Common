@@ -169,6 +169,10 @@ public sealed class KafkaMessagingInitializer : IMessagingInitializer
     {
       if (ex.Results.Any(result => result.Error.Code != ErrorCode.TopicAlreadyExists))
         throw;
+
+      // Another application instance may have won the create race. Existing
+      // resources must still satisfy this initializer's declared topology.
+      await VerifyTopicAsync(name, topicOptions, timeout, cancellationToken).ConfigureAwait(false);
     }
   }
 
