@@ -198,7 +198,9 @@ public sealed class TenantPersistenceIsolationTests
 
         var entityType = context.Model.FindEntityType(typeof(TestEntity));
         Assert.NotNull(entityType);
-        Assert.NotNull(entityType.GetQueryFilter());
+        var filters = entityType.GetDeclaredQueryFilters();
+        Assert.Single(filters);
+        Assert.True(filters.Single().IsAnonymous);
     }
 
     [Fact]
