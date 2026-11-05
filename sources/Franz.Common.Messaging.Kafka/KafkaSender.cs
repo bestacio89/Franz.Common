@@ -44,7 +44,8 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
     {
       var kafkaMessage = new Message<string, byte[]>
       {
-        Key = ResolveMessageKey(message, _orderingStrategy),
+        // Kafka's null key is intentional when ordering is disabled.
+        Key = ResolveMessageKey(message, _orderingStrategy)!,
         Value = Serialize(message),
         Headers = BuildHeaders(message)
       };

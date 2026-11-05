@@ -1,4 +1,5 @@
 ﻿using Franz.Common.DependencyInjection.Extensions;
+using Franz.Common.Mediator;
 using Franz.Common.Errors;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Configuration;

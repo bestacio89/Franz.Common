@@ -14,9 +14,9 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration;
 public sealed class KafkaProvisioningDefaultsTests
 {
   [Theory]
-  [InlineData(Environments.Development, ProvisioningMode.Create)]
-  [InlineData(Environments.Production, ProvisioningMode.Verify)]
-  [InlineData(Environments.Staging, ProvisioningMode.Verify)]
+  [InlineData("Development", ProvisioningMode.Create)]
+  [InlineData("Production", ProvisioningMode.Verify)]
+  [InlineData("Staging", ProvisioningMode.Verify)]
   public void UnspecifiedProvisioningMode_UsesEnvironmentSafeDefault(string environment, ProvisioningMode expected)
   {
     var configuration = new ConfigurationBuilder()
@@ -51,7 +51,7 @@ public sealed class KafkaProvisioningDefaultsTests
         .Build();
 
     using var host = new HostBuilder()
-        .UseEnvironment(Environments.Production)
+        .UseEnvironment("Production")
         .ConfigureServices((_, services) => services.AddKafkaMessagingOptions(configuration))
         .Build();
 
