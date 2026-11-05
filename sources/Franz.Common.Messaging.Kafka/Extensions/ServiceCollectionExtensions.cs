@@ -421,12 +421,14 @@ public static class ServiceCollectionExtensions
   private static void ValidateConfiguredSubscriptions(IEnumerable<Type> configuredTypes)
   {
     var manifestSubscriptions = GetManifestSubscriptions();
-    var configured = configuredTypes.ToHashSet();
-    var missing = manifestSubscriptions.Except(configured).ToArray();
-    var unhandled = configured.Except(manifestSubscriptions).ToArray();
-    if (missing.Length > 0 || unhandled.Length > 0)
+    var unhandled = configuredTypes
+        .Except(manifestSubscriptions)
+        .OrderBy(static type => type.FullName, StringComparer.Ordinal)
+        .ToArray();
+
+    if (unhandled.Length > 0)
       throw new InvalidOperationException(
-          $"Kafka configured subscriptions do not match generated handlers. Missing configured subscriptions: {string.Join(", ", missing.Select(static type => type.FullName))}. Unhandled configured subscriptions: {string.Join(", ", unhandled.Select(static type => type.FullName))}.");
+          $"Kafka configured subscriptions do not have generated handlers. Unhandled configured subscriptions: {string.Join(", ", unhandled.Select(static type => type.FullName))}.");
   }
 
   private static HashSet<Type> GetManifestSubscriptions()
