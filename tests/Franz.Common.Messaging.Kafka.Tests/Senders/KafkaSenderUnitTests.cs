@@ -14,6 +14,8 @@ using Moq;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using System.IO;
+using System.Text.Json;
 using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests.Senders;
@@ -23,7 +25,8 @@ public sealed class KafkaSenderUnitTests
 {
   private static (KafkaSender Sender, Mock<IProducer<string, byte[]>> Producer) BuildSender(
       MessageOrderingStrategy strategy = MessageOrderingStrategy.MessageId,
-      string? topicName = null)
+      string? topicName = null,
+      Action<Mock<IMessageSerializer>>? configureSerializer = null)
   {
     var mockAssembly = new Mock<IAssembly>();
     mockAssembly.Setup(a => a.Name).Returns("Company.Test.Api");
@@ -46,6 +49,7 @@ public sealed class KafkaSenderUnitTests
 
     var mockSerializer = new Mock<IMessageSerializer>();
     mockSerializer.Setup(s => s.Serialize(It.IsAny<object>())).Returns("{}");
+    configureSerializer?.Invoke(mockSerializer);
 
     var options = Options.Create(new KafkaMessagingOptions
     {
@@ -82,6 +86,40 @@ public sealed class KafkaSenderUnitTests
     await sender.SendAsync(new Message());
 
     actualTopic.Should().Be("hero-created-in");
+  }
+
+  [Fact]
+  public async Task SendAsync_WhenSerializerReportsInvalidPayload_ShouldClassifyFailureAsPermanent()
+  {
+    var (sender, producer) = BuildSender(configureSerializer: serializer =>
+        serializer.Setup(value => value.Serialize(It.IsAny<object>()))
+            .Throws(new JsonException("Invalid payload shape.")));
+
+    var act = () => sender.SendAsync(new Message());
+
+    await act.Should().ThrowAsync<PermanentMessagingException>()
+        .WithMessage("*could not be serialized*");
+    producer.Verify(value => value.ProduceAsync(
+        It.IsAny<string>(),
+        It.IsAny<Confluent.Kafka.Message<string, byte[]>>(),
+        It.IsAny<CancellationToken>()), Times.Never);
+  }
+
+  [Fact]
+  public async Task SendAsync_WhenSerializerFailsTransiently_ShouldPreserveRetryableFailure()
+  {
+    var (sender, producer) = BuildSender(configureSerializer: serializer =>
+        serializer.Setup(value => value.Serialize(It.IsAny<object>()))
+            .Throws(new IOException("Temporary schema service outage.")));
+
+    var act = () => sender.SendAsync(new Message());
+
+    await act.Should().ThrowAsync<IOException>()
+        .WithMessage("*Temporary schema service outage*");
+    producer.Verify(value => value.ProduceAsync(
+        It.IsAny<string>(),
+        It.IsAny<Confluent.Kafka.Message<string, byte[]>>(),
+        It.IsAny<CancellationToken>()), Times.Never);
   }
 
   [Fact]
