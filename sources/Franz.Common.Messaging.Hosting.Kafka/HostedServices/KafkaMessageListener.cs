@@ -178,7 +178,15 @@ public sealed class KafkaMessageListener : IListener
                 if (_rebalanceCoordinator is null)
                   await Task.Delay(_failurePolicy.RetryBackoff, stoppingToken);
                 else
-                  await DelayWhilePollingAsync(_failurePolicy.RetryBackoff, rebalanceToken, stoppingToken);
+                  try
+                  {
+                    await DelayWhilePollingAsync(_failurePolicy.RetryBackoff, rebalanceToken, stoppingToken);
+                  }
+                  catch (OperationCanceledException) when (rebalanceToken.IsCancellationRequested)
+                  {
+                    rebalanceInterrupted = true;
+                    break;
+                  }
               }
             }
           }
@@ -251,9 +259,16 @@ public sealed class KafkaMessageListener : IListener
       var interval = remaining > TimeSpan.FromMilliseconds(100)
           ? TimeSpan.FromMilliseconds(100)
           : remaining;
-      var polled = _consumer.Consume(interval);
-      if (polled is not null)
-        _pendingResults.Enqueue(polled);
+      try
+      {
+        var polled = _consumer.Consume(interval);
+        if (polled is not null)
+          _pendingResults.Enqueue(polled);
+      }
+      catch (ConsumeException ex)
+      {
+        _logger.LogWarning(ex, "Kafka poll failed during retry backoff.");
+      }
       remaining -= interval;
     }
     await Task.CompletedTask;

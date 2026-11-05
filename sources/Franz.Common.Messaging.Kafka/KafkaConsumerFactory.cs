@@ -16,11 +16,11 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
   public KafkaConsumerFactory(
       IOptions<KafkaMessagingOptions> options,
       ILogger<KafkaConsumerFactory> logger,
-      KafkaRebalanceCoordinator rebalanceCoordinator)
+      KafkaRebalanceCoordinator? rebalanceCoordinator = null)
   {
     _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    _rebalanceCoordinator = rebalanceCoordinator ?? throw new ArgumentNullException(nameof(rebalanceCoordinator));
+    _rebalanceCoordinator = rebalanceCoordinator;
   }
 
   public IConsumer<string, string> Build()
@@ -72,11 +72,12 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
           : PartitionAssignmentStrategy.Range
     };
 
-    var groupId = config.GroupId;
+    var groupId = _options.GroupId;
 
     return new ConsumerBuilder<string, string>(config)
         .SetPartitionsAssignedHandler((consumer, partitions) =>
         {
+          if (_rebalanceCoordinator is null) return;
           _rebalanceCoordinator.OnPartitionsAssigned(groupId);
           if (_rebalanceCoordinator.IsHandlerExecutionActive(groupId) && partitions.Count > 0)
           {
@@ -92,7 +93,7 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
           if (partitions.Count == 0)
             return;
 
-          _rebalanceCoordinator.OnPartitionsRevoked(groupId);
+          _rebalanceCoordinator?.OnPartitionsRevoked(groupId);
 
           _logger.LogInformation(
               "Kafka partitions revoked for group {GroupId}: {Partitions}.",
@@ -104,7 +105,7 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
           if (partitions.Count == 0)
             return;
 
-          _rebalanceCoordinator.OnPartitionsLost(groupId);
+          _rebalanceCoordinator?.OnPartitionsLost(groupId);
 
           _logger.LogWarning(
               "Kafka partitions lost for group {GroupId}: {Partitions}. Offsets may be redelivered; handlers must be idempotent.",
