@@ -25,7 +25,7 @@ public sealed class RabbitMqProvisioningDefaultsTests
         .ConfigureServices((_, services) => services.AddRabbitMqMessagingOptions(configuration))
         .Build();
 
-    host.Services.GetRequiredService<IOptions<Franz.Common.Messaging.RabbitMQ.RabbitMQMessagingOptions>>()
+    host.Services.GetRequiredService<IOptions<RabbitMQMessagingOptions>>()
         .Value.ProvisioningMode.Should().Be(expected);
   }
 
@@ -45,7 +45,7 @@ public sealed class RabbitMqProvisioningDefaultsTests
         .ConfigureServices((_, services) => services.AddRabbitMqMessagingOptions(configuration))
         .Build();
 
-    host.Services.GetRequiredService<IOptions<Franz.Common.Messaging.RabbitMQ.RabbitMQMessagingOptions>>()
+    host.Services.GetRequiredService<IOptions<RabbitMQMessagingOptions>>()
         .Value.ProvisioningMode.Should().Be(ProvisioningMode.Off);
   }
 
@@ -54,7 +54,8 @@ public sealed class RabbitMqProvisioningDefaultsTests
           .AddInMemoryCollection(new Dictionary<string, string?>
           {
             ["Messaging:RabbitMQ:BootStrapServers"] = "amqp://service:secret@localhost:5672/",
-            ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = "5"
+            ["Messaging:RabbitMQ:PublisherConfirmTimeoutSeconds"] = "5",
+            ["Messaging:RabbitMQ:SslEnabled"] = "false"
           })
           .Build();
 }
