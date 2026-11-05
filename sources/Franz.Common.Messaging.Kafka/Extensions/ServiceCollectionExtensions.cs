@@ -144,6 +144,7 @@ public static class ServiceCollectionExtensions
       this IServiceCollection services,
       IConfiguration configuration)
   {
+    services.TryAddSingleton<IConfiguration>(configuration);
     services.AddSingleton<IValidateOptions<KafkaMessagingOptions>, KafkaMessagingOptionsValidator>();
 
     var section = configuration.GetSection(KafkaMessagingOptions.SectionName);

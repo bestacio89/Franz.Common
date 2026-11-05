@@ -4,6 +4,8 @@ using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Validation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Franz.Common.Messaging.Kafka.Extensions;
 using Moq;
 using Xunit;
 
@@ -11,6 +13,31 @@ namespace Franz.Common.Messaging.Kafka.Tests.Configuration;
 
 public sealed class KafkaLegacyConfigurationWarningTests
 {
+  [Fact]
+  public void AddKafkaMessagingOptions_ShouldRegisterTheConfigurationForLegacyWarnings()
+  {
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+          ["Messaging:Kafka:BootstrapServers"] = "localhost:9092",
+          ["Messaging:Kafka:GroupId"] = "legacy-config-test"
+        })
+        .Build();
+    var services = new ServiceCollection();
+    services.AddKafkaMessagingOptions(configuration);
+
+    using var provider = services.BuildServiceProvider();
+
+    provider.GetRequiredService<IConfiguration>().Should().BeSameAs(configuration);
+    provider.GetRequiredService<IValidateOptions<KafkaMessagingOptions>>()
+        .Validate(Microsoft.Extensions.Options.Options.DefaultName, new KafkaMessagingOptions
+        {
+          BootstrapServers = "localhost:9092",
+          GroupId = "legacy-config-test",
+          Security = new KafkaSecurityOptions { SecurityProtocol = KafkaSecurityProtocol.Ssl }
+        });
+  }
+
   [Fact]
   public void Validate_WhenLegacyAndCanonicalFailurePoliciesDisagree_ShouldLogWarning()
   {
