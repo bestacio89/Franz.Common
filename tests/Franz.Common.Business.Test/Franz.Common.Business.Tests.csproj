@@ -7,7 +7,6 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
@@ -30,7 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.Business\Franz.Common.Business.csproj" />
     <ProjectReference
-      Include="..\..\sources\Microsoft.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj"
+      Include="..\..\sources\Franz.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj"
       OutputItemType="Analyzer"
       ReferenceOutputAssembly="false" />
   </ItemGroup>
