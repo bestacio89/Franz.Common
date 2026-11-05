@@ -34,7 +34,7 @@
 - Remove redundant `GetCurrentId`/`SetCurrentId` aliases from messaging tenant/domain accessors and the synchronous `KafkaModel.Dispose()` entry point; the model is asynchronously disposable.
 
 ### Release boundary
-- No changes to relational EF provider behavior, messaging transports, cache strategy, or database routing.
+- No changes to relational EF provider behavior or database routing. Messaging and cache API boundary corrections are listed above; they remove obsolete contracts without changing the underlying transport or cache execution strategies.
 - Set the shared package version to 2.3.5 and file version to 2.3.5.0; retain assembly version 2.3.0.0.
 - NuGet publication remains gated on successful Release build, full tests, and release checks.
 
