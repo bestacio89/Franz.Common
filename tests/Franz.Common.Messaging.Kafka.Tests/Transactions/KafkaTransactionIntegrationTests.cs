@@ -101,7 +101,7 @@ public sealed class KafkaTransactionIntegrationTests : IClassFixture<KafkaContai
       => new(
           Mock.Of<IProducer<string, byte[]>>(),
           serializer,
-          accessor,
+          new KafkaTopicNames(accessor, Options.Create(options)),
           Options.Create(options),
           NullLogger<KafkaSender>.Instance,
           context);
