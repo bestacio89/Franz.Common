@@ -17,7 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common\Franz.Common.csproj" />
     <ProjectReference
-      Include="..\Microsoft.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj"
+      Include="..\Franz.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj"
       OutputItemType="Analyzer"
       ReferenceOutputAssembly="false"
       GlobalPropertiesToRemove="PublishAot;PublishTrimmed;TrimMode" />
@@ -27,7 +27,7 @@
        downstream projects receive generated module registrations transitively. -->
   <Target Name="IncludeMediatorSourceGeneratorInPackage" BeforeTargets="_GetPackageFiles">
     <ItemGroup>
-      <None Include="$(MSBuildThisFileDirectory)..\Microsoft.Common.Mediator.SourceGenerator\bin\$(Configuration)\netstandard2.0\*.dll"
+      <None Include="$(MSBuildThisFileDirectory)..\Franz.Common.Mediator.SourceGenerator\bin\$(Configuration)\netstandard2.0\*.dll"
             Pack="true"
             PackagePath="analyzers/dotnet/cs"
             Visible="false" />

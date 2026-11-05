@@ -23,7 +23,7 @@ This maintenance change establishes a supported dependency baseline before the p
 - Update Microsoft.Azure.Cosmos to 3.63.1 to satisfy the minimum version required by Microsoft.EntityFrameworkCore.Cosmos 10.0.14 and remove the package-downgrade error. Pin System.Security.Cryptography.Pkcs to 10.0.13 where required. The current stable System.Security.Cryptography.Xml package line has no 10.0.13/10.0.14 release; explicit references were removed from projects that consume it through the ASP.NET Core shared framework rather than inventing a nonexistent package version.
 - Pin Snappier to a patched release in projects where the dependency graph resolved a vulnerable version.
 - Update SSH.NET in affected test projects to the patched 2026 release.
-- Fix the Mediator test project's source-generator reference: the source generator lives under `sources/Microsoft.Common.Mediator.SourceGenerator`, not the stale `sources/Franz.Common.Mediator.SourceGenerator` path. The stale reference caused restore to skip a missing project and could prevent generated registrations from being tested.
+- Fix the Mediator test project's source-generator reference to the canonical `sources/Franz.Common.Mediator.SourceGenerator` path. The previous `sources/Microsoft.Common.Mediator.SourceGenerator` directory name was inconsistent with the generator's assembly and package identity.
 
 ## Security findings and verification
 
