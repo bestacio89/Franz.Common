@@ -1,0 +1,18 @@
+{
+  "HeroCreatedEvent": {
+    "TopicName": "hero-created-in",
+    "DeadLetterTopicName": "hero-created-in-dlt"
+  },
+  "SkillAssignedEvent": {
+    "TopicName": "skill-assigned-in",
+    "DeadLetterTopicName": "skill-assigned-in-dlt"
+  },
+  "OrderPlaced": {
+    "TopicName": "order-placed-in",
+    "DeadLetterTopicName": "order-placed-in-dlt"
+  },
+  "UserRegisteredEvent": {
+    "TopicName": "user-registered-in",
+    "DeadLetterTopicName": "user-registered-in-dlt"
+  }
+}

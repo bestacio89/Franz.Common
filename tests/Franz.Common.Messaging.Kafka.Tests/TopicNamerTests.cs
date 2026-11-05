@@ -2,6 +2,7 @@
 using FluentAssertions;
 using Franz.Common.Reflection;
 using Moq;
+using System.Text.Json;
 using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests;
@@ -51,6 +52,30 @@ public sealed class TopicNamerTests
       => TopicNamer.GetDeadLetterTopicName(eventType).Should().Be(expected);
 
   [Fact]
+  public void TopicNames_MatchGoldenFile()
+  {
+    var goldenFile = Path.Combine(AppContext.BaseDirectory, "GoldenFiles", "topic-names.json");
+    var expected = JsonSerializer.Deserialize<Dictionary<string, TopicNameGoldenCase>>(
+        File.ReadAllText(goldenFile))!;
+
+    var eventTypes = new Dictionary<string, Type>(StringComparer.Ordinal)
+    {
+      [nameof(HeroCreatedEvent)] = typeof(HeroCreatedEvent),
+      [nameof(SkillAssignedEvent)] = typeof(SkillAssignedEvent),
+      [nameof(OrderPlaced)] = typeof(OrderPlaced),
+      [nameof(UserRegisteredEvent)] = typeof(UserRegisteredEvent)
+    };
+
+    expected.Keys.Should().BeEquivalentTo(eventTypes.Keys);
+    foreach (var (eventName, golden) in expected)
+    {
+      var eventType = eventTypes[eventName];
+      TopicNamer.GetTopicName(eventType).Should().Be(golden.TopicName, eventName);
+      TopicNamer.GetDeadLetterTopicName(eventType).Should().Be(golden.DeadLetterTopicName, eventName);
+    }
+  }
+
+  [Fact]
   public void GetTopicName_FromEventType_RejectsNull()
   {
     var act = () => TopicNamer.GetTopicName((Type)null!);
@@ -65,6 +90,8 @@ public sealed class TopicNamerTests
     TopicNamer.GetTopicName(assembly.Object).Should().Be("heroservice-in");
     TopicNamer.GetTopicName(typeof(HeroCreatedEvent)).Should().Be("hero-created-in");
   }
+
+  private sealed record TopicNameGoldenCase(string TopicName, string DeadLetterTopicName);
 
   private sealed class HeroCreatedEvent { }
   private sealed class SkillAssignedEvent { }
