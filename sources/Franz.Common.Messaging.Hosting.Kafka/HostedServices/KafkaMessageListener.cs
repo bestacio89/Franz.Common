@@ -293,7 +293,7 @@ public sealed class KafkaMessageListener : IListener
       {
         var polled = _consumer.Consume(interval);
         if (polled is not null)
-          _pendingResults.Enqueue(new PendingKafkaResult(polled, _rebalanceCoordinator.GetRebalanceToken(_groupId, polled.TopicPartition)));
+          _pendingResults.Enqueue(new PendingKafkaResult(polled, _rebalanceCoordinator.GetRebalanceToken(_registration, polled.TopicPartition)));
       }
       catch (ConsumeException ex)
       {
