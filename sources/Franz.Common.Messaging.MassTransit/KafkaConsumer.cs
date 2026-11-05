@@ -9,7 +9,7 @@ using System.Text.Json;
 
 namespace Franz.Common.Messaging.MassTransit;
 
-public sealed class KafkaConsumer : IKafkaConsumer
+public class KafkaConsumer : IKafkaConsumer
 {
   private readonly IConsumer<string, string> _consumer;
   private readonly IServiceScopeFactory _scopeFactory;
