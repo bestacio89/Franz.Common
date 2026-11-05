@@ -37,23 +37,30 @@ public sealed class KafkaModel(IConnectionFactoryProvider connectionFactoryProvi
         return JsonSerializer.SerializeToUtf8Bytes(message!, typeof(TMessage), KafkaJsonSerializerContext.Default);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        // Flush ensures all messages in the internal Kafka queue are sent before closing.
-        // We use Task.Run because Confluent.Kafka's Flush is blocking.
-        await Task.Run(() => 
-        {
-            _producer.Flush(TimeSpan.FromSeconds(10));
-            _producer.Dispose();
-        });
-        
-        GC.SuppressFinalize(this);
-    }
-
+    public ValueTask DisposeAsync()
+  {
+    // Flush is blocking; keep it off the caller's asynchronous execution path.
+    return new ValueTask(Task.Run(DisposeProducer));
+  }
 
   public void Dispose()
   {
-    _producer.Flush(TimeSpan.FromSeconds(10));
-    _producer.Dispose();
+    DisposeProducer();
+    GC.SuppressFinalize(this);
+  }
+
+  private void DisposeProducer()
+  {
+    if (Interlocked.Exchange(ref _disposed, 1) != 0)
+      return;
+
+    try
+    {
+      _producer.Flush(TimeSpan.FromSeconds(10));
+    }
+    finally
+    {
+      _producer.Dispose();
+    }
   }
 }
