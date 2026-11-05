@@ -1,10 +1,10 @@
 # Franz.Common.Logging
 
-> A comprehensive logging library within the Franz Framework , designed to enhance application monitoring and diagnostics using Serilog and Elastic APM . This package provides tools for centralized logging, tracing, and seamless integration with .NET applications.
+> Structured logging conventions and integrations for consistent scopes, correlation metadata, and application diagnostics.
 
 ## Overview
 
-A comprehensive logging library within the Franz Framework , designed to enhance application monitoring and diagnostics using Serilog and Elastic APM . This package provides tools for centralized logging, tracing, and seamless integration with .NET applications.
+Structured logging conventions and integrations for consistent scopes, correlation metadata, and application diagnostics.
 
 ## Installation
 

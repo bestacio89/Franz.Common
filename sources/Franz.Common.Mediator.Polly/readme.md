@@ -1,10 +1,10 @@
 # Franz.Common.Mediator.Polly
 
-> Franz.Common.Mediator.Polly extends [Franz.Common.Mediator](https://www.nuget.org/packages/Franz.Common.Mediator/) with Polly-based resilience pipelines . It gives you retry, circuit breaker, advanced circuit breaker, timeout, and bulkhead isolation for Mediator requests — all with enriched Serilog logging, context-awa
+> Polly resilience integration for Mediator request pipelines, including retry, timeout, and circuit-breaker policies.
 
 ## Overview
 
-Franz.Common.Mediator.Polly extends [Franz.Common.Mediator](https://www.nuget.org/packages/Franz.Common.Mediator/) with Polly-based resilience pipelines . It gives you retry, circuit breaker, advanced circuit breaker, timeout, and bulkhead isolation for Mediator requests — all with enriched Serilog logging, context-awa
+Polly resilience integration for Mediator request pipelines, including retry, timeout, and circuit-breaker policies.
 
 ## Installation
 

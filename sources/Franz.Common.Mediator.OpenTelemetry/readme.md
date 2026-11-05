@@ -1,10 +1,10 @@
 # Franz.Common.Mediator.OpenTelemetry
 
-> OpenTelemetry integration for the Franz Framework . This package provides automatic distributed tracing across applications using the Franz ecosystem, including Mediator pipelines, HTTP calls, and custom instrumentation.
+> OpenTelemetry instrumentation for Mediator dispatch, including activity creation and request-pipeline diagnostics.
 
 ## Overview
 
-OpenTelemetry integration for the Franz Framework . This package provides automatic distributed tracing across applications using the Franz ecosystem, including Mediator pipelines, HTTP calls, and custom instrumentation.
+OpenTelemetry instrumentation for Mediator dispatch, including activity creation and request-pipeline diagnostics.
 
 ## Installation
 

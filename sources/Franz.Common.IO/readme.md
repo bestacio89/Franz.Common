@@ -1,10 +1,10 @@
 # Franz.Common.IO
 
-> Provides IO integration and reusable abstractions for .NET applications built with Franz.Common.
+> Asynchronous file, stream, and filesystem utilities with consistent resource handling for .NET applications.
 
 ## Overview
 
-Provides IO integration and reusable abstractions for .NET applications built with Franz.Common.
+Asynchronous file, stream, and filesystem utilities with consistent resource handling for .NET applications.
 
 ## Installation
 

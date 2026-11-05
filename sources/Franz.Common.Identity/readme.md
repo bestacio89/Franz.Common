@@ -1,10 +1,10 @@
 # Franz.Common.Identity
 
-> Provides Identity integration and reusable abstractions for .NET applications built with Franz.Common.
+> Identity execution-context abstractions for accessing the current authenticated principal and its claims across application services.
 
 ## Overview
 
-Provides Identity integration and reusable abstractions for .NET applications built with Franz.Common.
+Identity execution-context abstractions for accessing the current authenticated principal and its claims across application services.
 
 ## Installation
 

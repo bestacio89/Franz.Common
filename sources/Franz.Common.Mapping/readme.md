@@ -1,10 +1,10 @@
 # Franz.Common.Mapping
 
-> A deterministic, high-performance object mapping engine for the Franz Framework. --- Franz.Common.Mapping is a deterministic object mapping engine , designed to replace traditional “magic mappers” with a strict, explicit execution model .
+> Strongly typed mapping contracts and deterministic object-mapping utilities for application and domain models.
 
 ## Overview
 
-A deterministic, high-performance object mapping engine for the Franz Framework. --- Franz.Common.Mapping is a deterministic object mapping engine , designed to replace traditional “magic mappers” with a strict, explicit execution model .
+Strongly typed mapping contracts and deterministic object-mapping utilities for application and domain models.
 
 ## Installation
 
