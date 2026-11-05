@@ -2,26 +2,82 @@
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 
 namespace Franz.Common.Messaging.Kafka;
 
 /// <summary>
-/// Tracks rebalance cancellation per assigned partition, so revoking one partition
-/// never aborts work for partitions that remain assigned to this consumer.
+/// Tracks rebalance cancellation and active handler execution per Kafka consumer instance.
+/// Consumer group identifiers are diagnostic metadata only; they are not state ownership keys.
 /// </summary>
 public sealed class KafkaRebalanceCoordinator : IDisposable
 {
-  private readonly ConcurrentDictionary<string, GroupState> _groups = new(StringComparer.Ordinal);
+  private readonly ConditionalWeakTable<IConsumer<string, string>, ConsumerRegistration> _registrations = new();
+  private readonly ConcurrentDictionary<Guid, ConsumerRegistration> _activeRegistrations = new();
   private readonly ILogger<KafkaRebalanceCoordinator>? _logger;
   private int _disposed;
 
   public KafkaRebalanceCoordinator(ILogger<KafkaRebalanceCoordinator>? logger = null)
       => _logger = logger;
 
-  public CancellationToken GetRebalanceToken(string groupId, TopicPartition partition)
+  /// <summary>Creates isolated rebalance state for one Kafka consumer.</summary>
+  public ConsumerRegistration CreateRegistration(string groupId)
   {
     ThrowIfDisposed();
-    var state = GetState(groupId);
+    ArgumentException.ThrowIfNullOrWhiteSpace(groupId);
+
+    var registration = new ConsumerRegistration(Guid.CreateVersion7(), groupId);
+    if (!_activeRegistrations.TryAdd(registration.Id, registration))
+      throw new InvalidOperationException("A duplicate Kafka consumer registration identifier was generated.");
+
+    return registration;
+  }
+
+  /// <summary>Associates the consumer returned by the factory with its isolated rebalance state.</summary>
+  public void RegisterConsumer(
+      IConsumer<string, string> consumer,
+      ConsumerRegistration registration)
+  {
+    ThrowIfDisposed();
+    ArgumentNullException.ThrowIfNull(consumer);
+    ArgumentNullException.ThrowIfNull(registration);
+
+    if (!_activeRegistrations.TryGetValue(registration.Id, out var active) ||
+        !ReferenceEquals(active, registration))
+      throw new InvalidOperationException("The Kafka consumer registration is not active.");
+
+    _registrations.Add(consumer, registration);
+  }
+
+  /// <summary>Gets the existing registration or creates one for externally constructed consumers.</summary>
+  public ConsumerRegistration GetOrCreateRegistration(
+      IConsumer<string, string> consumer,
+      string groupId)
+  {
+    ThrowIfDisposed();
+    ArgumentNullException.ThrowIfNull(consumer);
+
+    if (_registrations.TryGetValue(consumer, out var existing))
+      return existing;
+
+    var registration = CreateRegistration(groupId);
+    try
+    {
+      RegisterConsumer(consumer, registration);
+      return registration;
+    }
+    catch
+    {
+      ReleaseRegistration(registration);
+      throw;
+    }
+  }
+
+  public CancellationToken GetRebalanceToken(
+      ConsumerRegistration registration,
+      TopicPartition partition)
+  {
+    var state = GetActiveRegistration(registration);
     lock (state.Sync)
     {
       if (!state.PartitionTokens.TryGetValue(partition, out var source))
@@ -34,11 +90,12 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
     }
   }
 
-  public void OnPartitionsAssigned(string groupId, IEnumerable<TopicPartition> partitions)
+  public void OnPartitionsAssigned(
+      ConsumerRegistration registration,
+      IEnumerable<TopicPartition> partitions)
   {
-    ThrowIfDisposed();
+    var state = GetActiveRegistration(registration);
     ArgumentNullException.ThrowIfNull(partitions);
-    var state = GetState(groupId);
     List<CancellationTokenSource>? toDispose = null;
 
     lock (state.Sync)
@@ -55,36 +112,37 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
           continue;
 
         state.PartitionTokens[partition] = new CancellationTokenSource();
-        if (state.ActiveHandlers == 0)
-          (toDispose ??= new List<CancellationTokenSource>()).Add(previous);
-        else
-          state.RetiredTokens.Add(previous);
+        RetireToken(state, previous, ref toDispose);
       }
     }
 
     DisposeSources(toDispose);
   }
 
-  public void OnPartitionsRevoked(string groupId, IEnumerable<TopicPartition> partitions)
-      => CancelPartitions(groupId, partitions);
+  public void OnPartitionsRevoked(
+      ConsumerRegistration registration,
+      IEnumerable<TopicPartition> partitions)
+      => CancelPartitions(registration, partitions);
 
-  public void OnPartitionsLost(string groupId, IEnumerable<TopicPartition> partitions)
-      => CancelPartitions(groupId, partitions);
+  public void OnPartitionsLost(
+      ConsumerRegistration registration,
+      IEnumerable<TopicPartition> partitions)
+      => CancelPartitions(registration, partitions);
 
-  public void BeginHandlerExecution(string groupId)
+  public void BeginHandlerExecution(ConsumerRegistration registration)
   {
-    ThrowIfDisposed();
-    var state = GetState(groupId);
+    var state = GetActiveRegistration(registration);
     lock (state.Sync)
       state.ActiveHandlers++;
   }
 
-  public void EndHandlerExecution(string groupId)
+  public void EndHandlerExecution(ConsumerRegistration registration)
   {
-    if (Volatile.Read(ref _disposed) == 1)
+    if (Volatile.Read(ref _disposed) == 1 ||
+        !_activeRegistrations.TryGetValue(registration.Id, out var state) ||
+        !ReferenceEquals(state, registration))
       return;
 
-    var state = GetState(groupId);
     List<CancellationTokenSource>? toDispose = null;
     lock (state.Sync)
     {
@@ -101,29 +159,72 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
     DisposeSources(toDispose);
   }
 
-  public bool IsHandlerExecutionActive(string groupId)
+  public bool IsHandlerExecutionActive(ConsumerRegistration registration)
   {
-    if (Volatile.Read(ref _disposed) == 1)
+    if (Volatile.Read(ref _disposed) == 1 ||
+        !_activeRegistrations.TryGetValue(registration.Id, out var state) ||
+        !ReferenceEquals(state, registration))
       return false;
 
-    var state = GetState(groupId);
     lock (state.Sync)
       return state.ActiveHandlers > 0;
   }
 
-  private void CancelPartitions(string groupId, IEnumerable<TopicPartition> partitions)
+  /// <summary>Releases all state associated with a consumer after its listener has stopped.</summary>
+  public void ReleaseConsumer(IConsumer<string, string> consumer)
   {
-    ThrowIfDisposed();
+    ArgumentNullException.ThrowIfNull(consumer);
+    if (_registrations.TryGetValue(consumer, out var registration))
+    {
+      _registrations.Remove(consumer);
+      ReleaseRegistration(registration);
+    }
+  }
+
+  /// <summary>Releases a registration when consumer construction fails.</summary>
+  public void ReleaseRegistration(ConsumerRegistration registration)
+  {
+    ArgumentNullException.ThrowIfNull(registration);
+    if (!_activeRegistrations.TryRemove(registration.Id, out var state) ||
+        !ReferenceEquals(state, registration))
+      return;
+
+    List<CancellationTokenSource> sources;
+    lock (state.Sync)
+    {
+      sources = state.PartitionTokens.Values
+          .Concat(state.RetiredTokens)
+          .Distinct()
+          .ToList();
+      state.PartitionTokens.Clear();
+      state.RetiredTokens.Clear();
+      state.ActiveHandlers = 0;
+    }
+
+    CancelAndDisposeSources(sources);
+  }
+
+  private void CancelPartitions(
+      ConsumerRegistration registration,
+      IEnumerable<TopicPartition> partitions)
+  {
+    var state = GetActiveRegistration(registration);
     ArgumentNullException.ThrowIfNull(partitions);
-    var state = GetState(groupId);
     List<CancellationTokenSource> sources = new();
+    List<CancellationTokenSource>? toDispose = null;
 
     lock (state.Sync)
     {
       foreach (var partition in partitions)
-        if (state.PartitionTokens.TryGetValue(partition, out var source) &&
-            !source.IsCancellationRequested)
+      {
+        if (!state.PartitionTokens.Remove(partition, out var source))
+          continue;
+
+        if (!source.IsCancellationRequested)
           sources.Add(source);
+
+        RetireToken(state, source, ref toDispose);
+      }
     }
 
     foreach (var source in sources)
@@ -134,17 +235,36 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
       }
       catch (AggregateException ex)
       {
-        // Cancellation callbacks belong to handlers; they must not break Kafka's
-        // rebalance callback and prevent the consumer from completing the rebalance.
-        _logger?.LogError(ex, "A handler cancellation callback failed during Kafka partition revocation.");
+        _logger?.LogError(ex,
+            "A handler cancellation callback failed while revoking Kafka partitions for consumer {ConsumerId}.",
+            registration.Id);
       }
     }
+
+    DisposeSources(toDispose);
   }
 
-  private GroupState GetState(string groupId)
+  private static void RetireToken(
+      ConsumerRegistration state,
+      CancellationTokenSource source,
+      ref List<CancellationTokenSource>? toDispose)
   {
-    ArgumentException.ThrowIfNullOrWhiteSpace(groupId);
-    return _groups.GetOrAdd(groupId, static _ => new GroupState());
+    if (state.ActiveHandlers == 0)
+      (toDispose ??= new List<CancellationTokenSource>()).Add(source);
+    else
+      state.RetiredTokens.Add(source);
+  }
+
+  private ConsumerRegistration GetActiveRegistration(ConsumerRegistration registration)
+  {
+    ThrowIfDisposed();
+    ArgumentNullException.ThrowIfNull(registration);
+
+    if (!_activeRegistrations.TryGetValue(registration.Id, out var state) ||
+        !ReferenceEquals(state, registration))
+      throw new InvalidOperationException("The Kafka consumer registration is no longer active.");
+
+    return state;
   }
 
   private static void DisposeSources(IEnumerable<CancellationTokenSource>? sources)
@@ -154,6 +274,19 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
 
     foreach (var source in sources)
       source.Dispose();
+  }
+
+  private void CancelAndDisposeSources(IEnumerable<CancellationTokenSource> sources)
+  {
+    foreach (var source in sources)
+    {
+      try { source.Cancel(); }
+      catch (AggregateException ex)
+      {
+        _logger?.LogError(ex, "A handler cancellation callback failed while releasing Kafka consumer state.");
+      }
+      finally { source.Dispose(); }
+    }
   }
 
   private void ThrowIfDisposed()
@@ -167,36 +300,40 @@ public sealed class KafkaRebalanceCoordinator : IDisposable
     if (Interlocked.Exchange(ref _disposed, 1) == 1)
       return;
 
-    foreach (var state in _groups.Values)
+    var registrations = _activeRegistrations.Values.ToArray();
+    _activeRegistrations.Clear();
+
+    foreach (var registration in registrations)
     {
       List<CancellationTokenSource> sources;
-      lock (state.Sync)
+      lock (registration.Sync)
       {
-        sources = state.PartitionTokens.Values.Concat(state.RetiredTokens).Distinct().ToList();
-        state.PartitionTokens.Clear();
-        state.RetiredTokens.Clear();
-        state.ActiveHandlers = 0;
+        sources = registration.PartitionTokens.Values
+            .Concat(registration.RetiredTokens)
+            .Distinct()
+            .ToList();
+        registration.PartitionTokens.Clear();
+        registration.RetiredTokens.Clear();
+        registration.ActiveHandlers = 0;
       }
 
-      foreach (var source in sources)
-      {
-        try { source.Cancel(); }
-        catch (AggregateException ex)
-        {
-          _logger?.LogError(ex, "A handler cancellation callback failed while disposing Kafka rebalance coordination.");
-        }
-        finally { source.Dispose(); }
-      }
+      CancelAndDisposeSources(sources);
     }
-
-    _groups.Clear();
   }
 
-  private sealed class GroupState
+  public sealed class ConsumerRegistration
   {
-    public object Sync { get; } = new();
-    public Dictionary<TopicPartition, CancellationTokenSource> PartitionTokens { get; } = new();
-    public List<CancellationTokenSource> RetiredTokens { get; } = new();
-    public int ActiveHandlers;
+    internal ConsumerRegistration(Guid id, string groupId)
+    {
+      Id = id;
+      GroupId = groupId;
+    }
+
+    public Guid Id { get; }
+    public string GroupId { get; }
+    internal object Sync { get; } = new();
+    internal Dictionary<TopicPartition, CancellationTokenSource> PartitionTokens { get; } = new();
+    internal List<CancellationTokenSource> RetiredTokens { get; } = new();
+    internal int ActiveHandlers;
   }
 }
