@@ -21,6 +21,12 @@ public class KafkaMessagingOptions
   [Required] public KafkaProducerOptions Producer { get; set; } = new();
   public KafkaObservabilityOptions Observability { get; set; } = new();
   public KafkaTopicOptions Topic { get; set; } = new();
+
+  /// <summary>Optional topic specification applied to all dead-letter topics.</summary>
+  public KafkaTopicOptions? DeadLetterTopicOptions { get; set; }
+
+  /// <summary>Optional topic specifications keyed by generated source topic name.</summary>
+  public Dictionary<string, KafkaTopicOptions> EventTopicOptions { get; set; } = new(StringComparer.Ordinal);
   public ProvisioningMode ProvisioningMode { get; set; } = ProvisioningMode.Create;
   public string? DeadLetterTopic { get; set; }
   public MessageFailurePolicy FailurePolicy { get; set; } = MessageFailurePolicy.Default;

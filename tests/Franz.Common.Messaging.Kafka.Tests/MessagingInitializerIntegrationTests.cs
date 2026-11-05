@@ -255,6 +255,56 @@ public sealed class KafkaMessagingInitializerIntegrationTests
     metadata.Topics.Should().Contain(t => t.Topic == expectedTopic);
   }
 
+
+  [Fact]
+  public async Task InitializeAsync_ShouldApplyDeadLetterSpecificTopicOptions()
+  {
+    var topicName = $"topic-options-{Guid.CreateVersion7():N}";
+    var deadLetterTopicName = $"{topicName}-dlt";
+    var sut = CreateSut(options: new KafkaMessagingOptions
+    {
+      GroupId = "test-group",
+      BootstrapServers = _fixture.BootstrapServers,
+      TopicName = topicName,
+      DeadLetterTopic = deadLetterTopicName,
+      Topic = new KafkaTopicOptions { NumPartitions = 1, ReplicationFactor = 1 },
+      DeadLetterTopicOptions = new KafkaTopicOptions { NumPartitions = 2, ReplicationFactor = 1 }
+    });
+
+    await sut.InitializeAsync();
+
+    using var admin = BuildAdminClient();
+    var metadata = admin.GetMetadata(deadLetterTopicName, TimeSpan.FromSeconds(10));
+    metadata.Topics.Single(topic => topic.Topic == deadLetterTopicName).Partitions.Should().HaveCount(2);
+  }
+
+  [Fact]
+  public async Task InitializeAsync_EventMode_ShouldApplyPerEventTopicOptions()
+  {
+    var eventTopic = TopicNamer.GetTopicName(typeof(TestIntegrationEvent));
+    var sut = CreateSut(
+        BuildIntegrationAccessor(),
+        new KafkaMessagingOptions
+        {
+          GroupId = "test-group",
+          BootstrapServers = _fixture.BootstrapServers,
+          TopicName = $"event-options-{Guid.CreateVersion7():N}",
+          DeadLetterTopic = $"event-options-{Guid.CreateVersion7():N}-dlt",
+          Topic = new KafkaTopicOptions { NumPartitions = 1, ReplicationFactor = 1 },
+          EventTopicOptions = new Dictionary<string, KafkaTopicOptions>(StringComparer.Ordinal)
+          {
+            [eventTopic] = new KafkaTopicOptions { NumPartitions = 3, ReplicationFactor = 1 }
+          }
+        },
+        perEvent: true);
+
+    await sut.InitializeAsync();
+
+    using var admin = BuildAdminClient();
+    var metadata = admin.GetMetadata(eventTopic, TimeSpan.FromSeconds(10));
+    metadata.Topics.Single(topic => topic.Topic == eventTopic).Partitions.Should().HaveCount(3);
+  }
+
   // =========================================================
   // EVENT MODE TESTS
   // =========================================================

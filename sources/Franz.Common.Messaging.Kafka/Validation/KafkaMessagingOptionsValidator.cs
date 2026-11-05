@@ -74,21 +74,20 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
     if (options.Producer is null)
       failures.Add("Producer options must be configured.");
 
-    if (options.Topic is null)
-      failures.Add("Topic options must be configured.");
+    ValidateTopicOptions("Topic", options.Topic, failures);
+    if (options.DeadLetterTopicOptions is not null)
+      ValidateTopicOptions("DeadLetterTopicOptions", options.DeadLetterTopicOptions, failures);
+
+    if (options.EventTopicOptions is null)
+      failures.Add("EventTopicOptions cannot be null.");
     else
     {
-      if (options.Topic.NumPartitions < 1)
-        failures.Add("Topic:NumPartitions must be greater than zero.");
-      if (options.Topic.ReplicationFactor < 1)
-        failures.Add("Topic:ReplicationFactor must be greater than zero.");
-      if (options.Topic.CreationTimeoutMs < 100 || options.Topic.CreationTimeoutMs > 300000)
-        failures.Add("Topic:CreationTimeoutMs must be between 100 and 300000 milliseconds.");
-      if (options.Topic.Configurations is null)
-        failures.Add("Topic:Configurations cannot be null.");
-      else if (options.Topic.Configurations.Any(pair =>
-          string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
-        failures.Add("Topic:Configurations must contain non-empty keys and non-null values.");
+      foreach (var (topicName, topicOptions) in options.EventTopicOptions)
+      {
+        if (string.IsNullOrWhiteSpace(topicName))
+          failures.Add("EventTopicOptions keys must be non-empty generated topic names.");
+        ValidateTopicOptions($"EventTopicOptions:{topicName}", topicOptions, failures);
+      }
     }
 
     if (options.Consumer is null || options.Producer is null)
