@@ -46,7 +46,7 @@ public sealed class TenantPersistenceIsolationTests
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
 
-        await using (var context = CreateContext(databaseName, tenantA))
+        await using (var context = CreateContext(databaseName, tenantA, multiTenancyEnabled: true))
         {
             context.Entities.AddRange(
                 new TestEntity { Name = "published", IsPublished = true },
@@ -59,13 +59,13 @@ public sealed class TenantPersistenceIsolationTests
             await context.SaveChangesAsync();
         }
 
-        await using (var context = CreateContext(databaseName, tenantB))
+        await using (var context = CreateContext(databaseName, tenantB, multiTenancyEnabled: true))
         {
             context.Entities.Add(new TestEntity { Name = "other-tenant", IsPublished = true });
             await context.SaveChangesAsync();
         }
 
-        await using var tenantAContext = CreateContext(databaseName, tenantA);
+        await using var tenantAContext = CreateContext(databaseName, tenantA, multiTenancyEnabled: true);
         var rows = await tenantAContext.Entities.ToListAsync();
 
         Assert.Single(rows);
@@ -157,6 +157,26 @@ public sealed class TenantPersistenceIsolationTests
         var exception = Assert.Throws<InvalidOperationException>(() => _ = sharedDatabase.Model);
         Assert.Contains("SharedDatabase entity classification failed", exception.Message);
         Assert.Contains(nameof(UnclassifiedTestEntity), exception.Message);
+    }
+
+    [Fact]
+    public void CosmosProvider_BuildsModelWithComposedQueryFilters()
+    {
+        var tenantId = Guid.NewGuid();
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseCosmos("https://localhost:8081", "local-test-key", "filter-tests")
+            .Options;
+
+        using var context = new TestDbContext(
+            options,
+            CreateAccessor(tenantId),
+            Substitute.For<IDispatcher>(),
+            multiTenancyEnabled: true,
+            isolationMode: DatabaseIsolationMode.TenantDatabase);
+
+        var entityType = context.Model.FindEntityType(typeof(TestEntity));
+        Assert.NotNull(entityType);
+        Assert.NotNull(entityType.GetQueryFilter());
     }
 
     [Fact]
