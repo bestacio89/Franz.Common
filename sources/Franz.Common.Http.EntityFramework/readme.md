@@ -1,10 +1,10 @@
 # Franz.Common.Http.EntityFramework
 
-> Persistence and infrastructure integration for the Franz.Common framework on .NET 10.
+> A specialized library within the Franz Framework that integrates Entity Framework Core with ASP.NET Core applications. This package simplifies transactional handling, dependency injection, and middleware configurations, enhancing database operations in HTTP-based services.
 
 ## Overview
 
-The `Franz.Common.Http.EntityFramework` package provides persistence and infrastructure integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+A specialized library within the Franz Framework that integrates Entity Framework Core with ASP.NET Core applications. This package simplifies transactional handling, dependency injection, and middleware configurations, enhancing database operations in HTTP-based services.
 
 ## Installation
 
@@ -67,7 +67,7 @@ This package simplifies transactional handling, dependency injection, and middle
 
 * **Current Version:** v2.3.4
   → Adds **environment-aware validation**, stronger governance for multi-database setups, and provider-context alignment.
-* Part of the private **Franz Framework** ecosystem.
+* Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -90,14 +90,12 @@ This package relies on:
 
 ## **Installation**
 
-### **From Private Azure Feed**
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.Http.EntityFramework
+```
+
 ```
 
 Install the package:
@@ -242,3 +240,8 @@ The **Franz.Common.Http.EntityFramework** package integrates seamlessly with:
 ## Dependency maintenance — October 2026
 
 This package now uses `Microsoft.AspNetCore.App` for ASP.NET Core APIs and patched cryptography dependencies. EF Core package versions are aligned with the .NET 10 servicing baseline. The MariaDB provider still has a known compatibility warning because Pomelo 9.x declares EF Core 9 support; review the [dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md) before relying on MariaDB with EF Core 10.
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

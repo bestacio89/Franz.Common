@@ -1,10 +1,10 @@
 # Franz.Common.Http.Refit
 
-> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+> Package : Franz.Common.Http.Refit Refit integration for the Franz Framework — production-oriented, small-surface, and highly modular. Provides typed Refit clients pre-wired with correlation and tenant propagation , optional authentication , resilience with Polly , Serilog-friendly logging , and OpenTelemetry-friendly i
 
 ## Overview
 
-The `Franz.Common.Http.Refit` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Package : Franz.Common.Http.Refit Refit integration for the Franz Framework — production-oriented, small-surface, and highly modular. Provides typed Refit clients pre-wired with correlation and tenant propagation , optional authentication , resilience with Polly , Serilog-friendly logging , and OpenTelemetry-friendly i
 
 ## Installation
 
@@ -33,7 +33,7 @@ Provides **typed Refit clients** pre-wired with **correlation and tenant propaga
 ---
 
 * **Current Version:** v2.3.4
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 ---
 
 ## **Goals**
@@ -89,14 +89,12 @@ Provides **typed Refit clients** pre-wired with **correlation and tenant propaga
 
 ## **Installation**
 
-### From Private Azure Feed
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.Http.Refit
+```
+
 ```
 
 Install the package:
@@ -275,7 +273,6 @@ Refit clients can be registered automatically from configuration:
 ## **Changelog**
 
 
-
 ### **Franz 1.6.17 — Refit Overhaul & Self-Healing Auth**
 
 🔹 **Highlights**
@@ -338,11 +335,9 @@ If you have repository access:
 
 ---
 
-## **License**
+## License
 
-Licensed under the **MIT License** (see `LICENSE` file).
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Best Practices**
 

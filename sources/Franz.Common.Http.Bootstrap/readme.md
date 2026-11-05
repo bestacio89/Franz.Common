@@ -1,10 +1,10 @@
 # Franz.Common.Http.Bootstrap
 
-> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+> ASP.NET Core application composition for authentication, headers, API documentation, health checks, multitenancy, and optional typed Refit clients.
 
 ## Overview
 
-The `Franz.Common.Http.Bootstrap` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+ASP.NET Core application composition for authentication, headers, API documentation, health checks, multitenancy, and optional typed Refit clients.
 
 ## Installation
 
@@ -44,17 +44,10 @@ Centralizes common ASP.NET Core HTTP wiring (controllers, auth, headers, docs, s
 
 ## Quickstart
 
-### Install (private feed)
+### Install from NuGet.org
 
 ```bash
-# Example: add private feed (adjust your feed credentials)
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "<user>" \
-  --password "<pass>" \
-  --store-password-in-clear-text
-
-dotnet add package Franz.Common.Http.Bootstrap --version 1.4.1
+dotnet add package Franz.Common.Http.Bootstrap
 ```
 
 ### Minimal wiring (Program.cs)
@@ -197,11 +190,13 @@ For full changelog/history see the repository `CHANGELOG.md`.
 - Exceution context is now enriched with correlation and tenant information for better traceability in logs and monitoring systems.
 ---
 
-## Contributing & License
+## Contributing
 
-This package is part of the private Franz Framework. Contributions are internal; follow your team’s contribution guidelines. Licensed under MIT.
+Contributions are welcome via pull request.
 
----
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## Dependency maintenance — October 2026
 
@@ -245,3 +240,8 @@ Forwarded headers are processed only when the immediate sender is in ASP.NET Cor
 Register `ITenantRequestAuthorizer` for authenticated tenant membership. The tenant middleware returns 403 if the authorizer is missing or denies access. Tenant IDs from headers or claims are resolution inputs, not membership proof.
 
 See [the authentication and HTTP trust model](../../Docs/security/authentication-model.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
