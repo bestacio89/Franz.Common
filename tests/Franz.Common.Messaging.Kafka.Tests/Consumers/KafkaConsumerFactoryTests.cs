@@ -66,7 +66,8 @@ public class KafkaConsumerFactoryTests
 
     var factory = new KafkaConsumerFactory(
         Options.Create(options),
-        Mock.Of<ILogger<KafkaConsumerFactory>>());
+        Mock.Of<ILogger<KafkaConsumerFactory>>(),
+        new KafkaRebalanceCoordinator());
 
     Assert.Throws<InvalidOperationException>(() => factory.Build());
   }
