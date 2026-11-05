@@ -27,8 +27,12 @@ public sealed class RabbitMqTestCollection : ICollectionFixture<RabbitMqContaine
 public sealed class RabbitMqContainerFixture : IAsyncLifetime
 {
   public const string Image = "rabbitmq:4.0-management";
+  public const string ManagementApiUsername = "franz-test";
+  public const string ManagementApiPassword = "franz-test-management-password";
 
   public RabbitMqContainer Container { get; } = new RabbitMqBuilder(Image)
+      .WithUsername(ManagementApiUsername)
+      .WithPassword(ManagementApiPassword)
       .WithCleanUp(true)
       .WithPortBinding(15672, true)
       .WithWaitStrategy(Wait.ForUnixContainer()
@@ -54,8 +58,8 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
     {
       BootStrapServers = ConnectionString,
       ManagementApiUrl = ManagementApiUrl,
-      UserName = "guest",
-      Password = "guest",
+      UserName = ManagementApiUsername,
+      Password = ManagementApiPassword,
       PublisherConfirmTimeoutSeconds = 5
     }));
 
