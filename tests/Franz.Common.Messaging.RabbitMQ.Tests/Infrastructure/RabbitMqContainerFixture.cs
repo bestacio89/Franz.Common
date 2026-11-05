@@ -32,7 +32,8 @@ public sealed class RabbitMqContainerFixture : IAsyncLifetime
       .WithCleanUp(true)
       .WithPortBinding(15672, true)
       .WithWaitStrategy(Wait.ForUnixContainer()
-          .UntilInternalTcpPortIsAvailable(5672))
+          .UntilInternalTcpPortIsAvailable(5672)
+          .UntilInternalTcpPortIsAvailable(15672))
             .Build();
 
   public string ConnectionString { get; private set; } = default!;
