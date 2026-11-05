@@ -50,10 +50,5 @@ public sealed class KafkaModel(IConnectionFactoryProvider connectionFactoryProvi
         GC.SuppressFinalize(this);
     }
 
-    // Standard Dispose for backward compatibility if IModel requires it
-    public void Dispose()
-    {
-        _producer.Flush(TimeSpan.FromSeconds(10));
-        _producer.Dispose();
-    }
+
 }
