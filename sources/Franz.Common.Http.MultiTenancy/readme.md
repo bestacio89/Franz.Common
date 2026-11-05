@@ -222,7 +222,7 @@ Tenant and domain accessors read server-established values from `HttpContext.Ite
 
 The JWT claim resolver ignores unauthenticated principals. Register only the resolution strategies appropriate to the application. Query-string and header selection must not be treated as authorization: applications must still authorize the authenticated principal's membership in the resolved tenant.
 
-**Compatibility note:** HTTP accessors no longer read tenant/domain IDs from request headers. Consumers that previously used caller-supplied headers as ambient state must use a trusted resolver and the execution context accessor. `ITenantValidator.IsValidAsync` now accepts a cancellation token.
+**Compatibility note:** HTTP accessors no longer read tenant/domain IDs from request headers. Consumers that previously used caller-supplied headers as ambient state must use a trusted resolver and the execution context accessor. `ITenantValidator` requires the cancellation-aware `IsValidAsync(Guid, CancellationToken)` contract; implementations must be updated accordingly.
 
 
 ## Authenticated tenant membership
