@@ -86,7 +86,7 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
 
             if (_rebalanceCoordinator.IsHandlerExecutionActive(registration) && partitions.Count > 0)
             {
-              try { client.Pause(partitions.Select(static partition => partition.TopicPartition)); }
+              try { client.Pause(partitions); }
               catch (KafkaException ex)
               {
                 _logger.LogWarning(ex,
