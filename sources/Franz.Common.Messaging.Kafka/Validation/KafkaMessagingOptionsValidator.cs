@@ -141,4 +141,25 @@ public sealed class KafkaMessagingOptionsValidator : IValidateOptions<KafkaMessa
         ? ValidateOptionsResult.Success
         : ValidateOptionsResult.Fail(failures);
   }
+  private static void ValidateTopicOptions(string name, KafkaTopicOptions? topicOptions, ICollection<string> failures)
+  {
+    if (topicOptions is null)
+    {
+      failures.Add($"{name} must be configured.");
+      return;
+    }
+
+    if (topicOptions.NumPartitions < 1)
+      failures.Add($"{name}:NumPartitions must be greater than zero.");
+    if (topicOptions.ReplicationFactor < 1)
+      failures.Add($"{name}:ReplicationFactor must be greater than zero.");
+    if (topicOptions.CreationTimeoutMs < 100 || topicOptions.CreationTimeoutMs > 300000)
+      failures.Add($"{name}:CreationTimeoutMs must be between 100 and 300000 milliseconds.");
+    if (topicOptions.Configurations is null)
+      failures.Add($"{name}:Configurations cannot be null.");
+    else if (topicOptions.Configurations.Any(pair =>
+        string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
+      failures.Add($"{name}:Configurations must contain non-empty keys and non-null values.");
+  }
+
 }
