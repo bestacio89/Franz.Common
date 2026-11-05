@@ -58,7 +58,7 @@ public class MessageDeserializerExtensionsTests
   [Fact]
   public void ToEvent_WhenManifestIsRegisteredAfterAnInitialMiss_ShouldResolveOnTheNextLookup()
   {
-    var message = new Message(JsonSerializer.Serialize(new LateRegisteredTestEvent("late")))
+    var message = new Message(JsonSerializer.Serialize(new LateRegisteredTestEvent("late"), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }))
     {
       MessageType = typeof(LateRegisteredTestEvent).FullName
     };
@@ -81,7 +81,7 @@ public class MessageDeserializerExtensionsTests
   [Fact]
   public void ToEvent_WithoutCorrelationProperty_ShouldDeserializeWithoutCachingANullDictionaryValue()
   {
-    var message = new Message(JsonSerializer.Serialize(new NoCorrelationTestEvent("no-correlation")))
+    var message = new Message(JsonSerializer.Serialize(new NoCorrelationTestEvent("no-correlation"), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }))
     {
       MessageType = typeof(NoCorrelationTestEvent).FullName
     };
