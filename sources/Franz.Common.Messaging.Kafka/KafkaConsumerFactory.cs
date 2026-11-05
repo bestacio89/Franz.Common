@@ -11,7 +11,7 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
 {
   private readonly KafkaMessagingOptions _options;
   private readonly ILogger<KafkaConsumerFactory> _logger;
-  private readonly KafkaRebalanceCoordinator _rebalanceCoordinator;
+  private readonly KafkaRebalanceCoordinator? _rebalanceCoordinator;
 
   public KafkaConsumerFactory(
       IOptions<KafkaMessagingOptions> options,
@@ -72,7 +72,7 @@ public sealed class KafkaConsumerFactory : IKafkaConsumerFactory
           : PartitionAssignmentStrategy.Range
     };
 
-    var groupId = _options.GroupId;
+    var groupId = _options.GroupId ?? throw new InvalidOperationException("Kafka GroupId is required.");
 
     return new ConsumerBuilder<string, string>(config)
         .SetPartitionsAssignedHandler((consumer, partitions) =>

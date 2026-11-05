@@ -53,7 +53,7 @@ public sealed class KafkaMessageListener : IListener
       : this(consumer, topics, serializer, logger, deadLetterProducer, options)
   {
     _rebalanceCoordinator = rebalanceCoordinator ?? throw new ArgumentNullException(nameof(rebalanceCoordinator));
-    _groupId = options.Value.GroupId;
+    _groupId = options.Value.GroupId ?? throw new InvalidOperationException("Kafka GroupId is required for rebalance coordination.");
   }
 
   public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
