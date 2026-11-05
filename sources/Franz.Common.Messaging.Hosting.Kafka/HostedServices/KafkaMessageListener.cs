@@ -55,7 +55,7 @@ public sealed class KafkaMessageListener : IListener
 
   public async Task Listen(CancellationToken stoppingToken = default)
   {
-    using var linkedStopping = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, _stopCts.Token);
+    var linkedStopping = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, _stopCts.Token);
     var listenerToken = linkedStopping.Token;
 
     try
@@ -259,6 +259,7 @@ public sealed class KafkaMessageListener : IListener
         if (Volatile.Read(ref _deferredConsumerRelease) == 0)
           _rebalanceCoordinator.ReleaseConsumer(_consumer);
         _logger.LogInformation("Kafka listener stopped.");
+        linkedStopping.Dispose();
         _stopCts.Dispose();
       }
     }
