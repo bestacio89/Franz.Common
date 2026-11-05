@@ -201,6 +201,7 @@ public sealed class TenantPersistenceIsolationTests
         var filters = entityType.GetDeclaredQueryFilters();
         Assert.Single(filters);
         Assert.True(filters.Single().IsAnonymous);
+        Assert.Contains(nameof(ITenantEntity.TenantId), filters.Single().Expression.ToString());
     }
 
     [Fact]
