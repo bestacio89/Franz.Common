@@ -116,7 +116,6 @@ public sealed class KafkaMessageListener : IListener
         Exception? processingFailure = null;
         var succeeded = false;
         var rebalanceInterrupted = false;
-        var groupId = _groupId;
         var rebalanceToken = resultRebalanceToken;
 
         _rebalanceCoordinator.BeginHandlerExecution(_registration);
