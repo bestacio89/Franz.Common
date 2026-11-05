@@ -1,10 +1,10 @@
 # Franz.Common.AutoMapper
 
-> Dependency-injection integration for discovering and registering AutoMapper profiles.
+> Dependency-injection extensions that discover and register AutoMapper profiles from application assemblies.
 
 ## Overview
 
-Dependency-injection integration for discovering and registering AutoMapper profiles.
+Dependency-injection extensions that discover and register AutoMapper profiles from application assemblies.
 
 ## Installation
 

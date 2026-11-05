@@ -1,10 +1,10 @@
 # Franz.Common.Annotations
 
-> Attribute-based validation metadata for Kafka topic configuration and other application contracts.
+> Attribute contracts for validating Kafka topic names and other configuration metadata in Franz.Common applications.
 
 ## Overview
 
-Attribute-based validation metadata for Kafka topic configuration and other application contracts.
+Attribute contracts for validating Kafka topic names and other configuration metadata in Franz.Common applications.
 
 ## Installation
 

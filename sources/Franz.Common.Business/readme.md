@@ -1,10 +1,10 @@
 # Franz.Common.Business
 
-> A core infrastructure library of the Franz Framework , designed to support Domain-Driven Design (DDD) , CQRS , and Event-Sourcing-ready architectures in modern .NET applications. It provides a clean, deterministic, and production-grade foundation for building scalable business systems with strong separation of concerns
+> Domain and application-layer building blocks for DDD and CQRS, including business abstractions, contracts, and execution helpers.
 
 ## Overview
 
-A core infrastructure library of the Franz Framework , designed to support Domain-Driven Design (DDD) , CQRS , and Event-Sourcing-ready architectures in modern .NET applications. It provides a clean, deterministic, and production-grade foundation for building scalable business systems with strong separation of concerns
+Domain and application-layer building blocks for DDD and CQRS, including business abstractions, contracts, and execution helpers.
 
 ## Installation
 

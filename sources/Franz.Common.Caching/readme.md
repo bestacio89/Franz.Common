@@ -1,10 +1,10 @@
 # Franz.Common.Caching
 
-> Here’s an updated README for version 1.7.8 , including all the observability improvements, metrics observer, logging + metrics observer, and Excel/export-ready observer you’ve just implemented: --- A full-featured caching module for the Franz Framework . Provides unified cache abstractions , hybrid caching (L1 + L2) ,
+> Caching abstractions and provider integrations for in-memory and distributed caching, including hybrid L1/L2 strategies and observability.
 
 ## Overview
 
-Here’s an updated README for version 1.7.8 , including all the observability improvements, metrics observer, logging + metrics observer, and Excel/export-ready observer you’ve just implemented: --- A full-featured caching module for the Franz Framework . Provides unified cache abstractions , hybrid caching (L1 + L2) ,
+Caching abstractions and provider integrations for in-memory and distributed caching, including hybrid L1/L2 strategies and observability.
 
 ## Installation
 

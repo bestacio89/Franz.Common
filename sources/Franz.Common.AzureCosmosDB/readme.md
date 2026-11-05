@@ -1,10 +1,10 @@
 # Franz.Common.AzureCosmosDB
 
-> Azure Cosmos DB persistence integration for EF Core, tenant-partitioned documents, and messaging stores.
+> Azure Cosmos DB persistence integration for EF Core and tenant-partitioned documents, including repository and message-store support.
 
 ## Overview
 
-Azure Cosmos DB persistence integration for EF Core, tenant-partitioned documents, and messaging stores.
+Azure Cosmos DB persistence integration for EF Core and tenant-partitioned documents, including repository and message-store support.
 
 ## Installation
 

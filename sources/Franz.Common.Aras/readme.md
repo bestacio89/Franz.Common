@@ -1,10 +1,10 @@
 # Franz.Common.Aras
 
-> ARAS Innovator integration for domain entities, aggregates, repositories, unit-of-work commits, snapshots, and diagnostics.
+> ARAS Innovator persistence integration for domain entities and aggregates, including mapping, unit-of-work commits, snapshots, and diagnostics.
 
 ## Overview
 
-ARAS Innovator integration for domain entities, aggregates, repositories, unit-of-work commits, snapshots, and diagnostics.
+ARAS Innovator persistence integration for domain entities and aggregates, including mapping, unit-of-work commits, snapshots, and diagnostics.
 
 ## Installation
 

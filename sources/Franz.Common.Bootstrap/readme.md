@@ -1,10 +1,10 @@
 # Franz.Common.Bootstrap
 
-> Application startup and dependency-injection composition for reusable Franz.Common capabilities.
+> Application composition and dependency-injection bootstrap extensions for registering Franz.Common services and infrastructure.
 
 ## Overview
 
-Application startup and dependency-injection composition for reusable Franz.Common capabilities.
+Application composition and dependency-injection bootstrap extensions for registering Franz.Common services and infrastructure.
 
 ## Installation
 
