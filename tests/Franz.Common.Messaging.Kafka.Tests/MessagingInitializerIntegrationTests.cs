@@ -17,14 +17,22 @@ using Xunit;
 
 namespace Franz.Common.Messaging.Kafka.Tests;
 
-[Collection("Kafka")]
-public sealed class KafkaMessagingInitializerIntegrationTests
+public sealed class KafkaMessagingInitializerIntegrationTests : IAsyncLifetime
 {
-  private readonly KafkaContainerFixture _fixture;
+  private KafkaContainerFixture _fixture = null!;
 
-  public KafkaMessagingInitializerIntegrationTests(KafkaContainerFixture fixture)
+  public async Task InitializeAsync()
   {
-    _fixture = fixture ?? throw new ArgumentNullException(nameof(fixture));
+    // Every test needs a clean broker because manifest-derived destinations are
+    // intentionally stable names while individual tests vary their topic contract.
+    _fixture = new KafkaContainerFixture();
+    await _fixture.InitializeAsync();
+  }
+
+  public async Task DisposeAsync()
+  {
+    if (_fixture is not null)
+      await _fixture.DisposeAsync();
   }
 
   // =========================================================
