@@ -38,4 +38,8 @@
     <Folder Include="Modeling\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Infrastructure\\rabbitmq-quorum.conf" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
