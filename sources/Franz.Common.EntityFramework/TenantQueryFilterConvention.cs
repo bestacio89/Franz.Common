@@ -24,6 +24,10 @@ internal sealed class TenantQueryFilterConvention(DbContextBase dbContext) : IMo
     {
         foreach (var entityType in modelBuilder.Metadata.GetEntityTypes())
         {
+            // EF Core query filters are defined on the root of an inheritance hierarchy.
+            if (entityType.BaseType is not null)
+                continue;
+
             var clrType = entityType.ClrType;
             var isDomainEntity = ImplementsIEntity(clrType);
             var isTenantEntity = typeof(ITenantEntity).IsAssignableFrom(clrType);
