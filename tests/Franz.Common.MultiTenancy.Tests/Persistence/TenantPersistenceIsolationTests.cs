@@ -5,6 +5,7 @@ using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
