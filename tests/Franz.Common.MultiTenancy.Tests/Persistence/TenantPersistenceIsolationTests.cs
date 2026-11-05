@@ -103,6 +103,36 @@ public sealed class TenantPersistenceIsolationTests
     }
 
     [Fact]
+    public void ModelCacheKey_IncludesDatabaseIsolationMode()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        using (var tenantDatabase = new TestDbContext(
+            options,
+            CreateAccessor(Guid.NewGuid()),
+            Substitute.For<IDispatcher>(),
+            multiTenancyEnabled: true,
+            isolationMode: DatabaseIsolationMode.TenantDatabase))
+        {
+            _ = tenantDatabase.Model;
+        }
+
+        using var sharedDatabase = new TestDbContext(
+            options,
+            CreateAccessor(Guid.NewGuid()),
+            Substitute.For<IDispatcher>(),
+            multiTenancyEnabled: true,
+            isolationMode: DatabaseIsolationMode.SharedDatabase);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => _ = sharedDatabase.Model);
+        Assert.Contains("SharedDatabase entity classification failed", exception.Message);
+        Assert.Contains(nameof(UnclassifiedTestEntity), exception.Message);
+    }
+
+    [Fact]
     public async Task SaveChanges_StampsNewEntityWithCurrentTenant()
     {
         await using var context = CreateContext(Guid.NewGuid().ToString(), Guid.NewGuid());
