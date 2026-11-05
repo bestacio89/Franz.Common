@@ -11,9 +11,10 @@ public sealed class KafkaRebalanceCoordinatorTests
   public void PartitionsRevoked_CancelsCurrentHandlerToken()
   {
     using var coordinator = new KafkaRebalanceCoordinator();
-    var token = coordinator.GetRebalanceToken("orders");
+    var partition = new TopicPartition("orders", new Partition(0));
+    var token = coordinator.GetRebalanceToken("orders", partition);
 
-    coordinator.OnPartitionsRevoked("orders");
+    coordinator.OnPartitionsRevoked("orders", new[] { partition });
 
     token.IsCancellationRequested.Should().BeTrue();
   }
@@ -22,9 +23,10 @@ public sealed class KafkaRebalanceCoordinatorTests
   public void PartitionsLost_CancelsCurrentHandlerToken()
   {
     using var coordinator = new KafkaRebalanceCoordinator();
-    var token = coordinator.GetRebalanceToken("orders");
+    var partition = new TopicPartition("orders", new Partition(0));
+    var token = coordinator.GetRebalanceToken("orders", partition);
 
-    coordinator.OnPartitionsLost("orders");
+    coordinator.OnPartitionsLost("orders", new[] { partition });
 
     token.IsCancellationRequested.Should().BeTrue();
   }
@@ -34,9 +36,9 @@ public sealed class KafkaRebalanceCoordinatorTests
   {
     using var coordinator = new KafkaRebalanceCoordinator();
     var previous = coordinator.GetRebalanceToken("orders");
-    coordinator.OnPartitionsRevoked("orders");
+    coordinator.OnPartitionsRevoked("orders", new[] { partition });
 
-    coordinator.OnPartitionsAssigned("orders");
+    coordinator.OnPartitionsAssigned("orders", new[] { partition });
 
     previous.IsCancellationRequested.Should().BeTrue();
     coordinator.GetRebalanceToken("orders").IsCancellationRequested.Should().BeFalse();

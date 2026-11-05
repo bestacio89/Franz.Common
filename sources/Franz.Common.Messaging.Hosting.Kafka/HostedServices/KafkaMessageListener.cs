@@ -23,7 +23,7 @@ public sealed class KafkaMessageListener : IListener
   private readonly string? _deadLetterTopic;
   private readonly KafkaRebalanceCoordinator _rebalanceCoordinator;
   private readonly string _groupId;
-  private readonly ConcurrentQueue<ConsumeResult<string, string>> _pendingResults = new();
+  private readonly ConcurrentQueue<PendingKafkaResult> _pendingResults = new();
 
   public KafkaMessageListener(
       IConsumer<string, string> consumer,
@@ -64,9 +64,17 @@ public sealed class KafkaMessageListener : IListener
         ConsumeResult<string, string>? result;
         try
         {
-          result = _pendingResults.TryDequeue(out var pending)
-              ? pending
-              : _consumer.Consume(stoppingToken);
+          if (_pendingResults.TryDequeue(out var pending))
+          {
+            if (pending.RebalanceToken.IsCancellationRequested)
+              continue;
+
+            result = pending.Result;
+          }
+          else
+          {
+            result = _consumer.Consume(stoppingToken);
+          }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
         catch (ConsumeException ex)
@@ -102,7 +110,7 @@ public sealed class KafkaMessageListener : IListener
         var succeeded = false;
         var rebalanceInterrupted = false;
         var groupId = _groupId;
-        var rebalanceToken = _rebalanceCoordinator.GetRebalanceToken(groupId);
+        var rebalanceToken = _rebalanceCoordinator.GetRebalanceToken(groupId, result.TopicPartition);
 
         _rebalanceCoordinator.BeginHandlerExecution(groupId);
         try
@@ -218,7 +226,7 @@ public sealed class KafkaMessageListener : IListener
       {
         var polled = _consumer.Consume(TimeSpan.FromMilliseconds(100));
         if (polled is not null)
-          _pendingResults.Enqueue(polled);
+          _pendingResults.Enqueue(new PendingKafkaResult(polled, _rebalanceCoordinator.GetRebalanceToken(_groupId, polled.TopicPartition)));
       }
       catch (ConsumeException ex)
       {
@@ -255,6 +263,8 @@ public sealed class KafkaMessageListener : IListener
     }
     return Task.CompletedTask;
   }
+
+  private sealed record PendingKafkaResult(ConsumeResult<string, string> Result, CancellationToken RebalanceToken);
 
   private void PauseAssignedPartitions()
   {
