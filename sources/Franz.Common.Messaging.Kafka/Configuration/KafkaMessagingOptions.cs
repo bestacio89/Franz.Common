@@ -115,7 +115,6 @@ public class KafkaProducerOptions
   [Range(1, 900000)]
   public int TransactionTimeoutMs { get; set; } = 120000;
 
-  public string? DefaultKey { get; set; }
 }
 
 public enum KafkaAcks { None, Leader, All }
