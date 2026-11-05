@@ -1,10 +1,10 @@
 # Franz.Common.Errors
 
-> Shared framework capability for the Franz.Common framework on .NET 10.
+> Provides Errors integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Overview
 
-The `Franz.Common.Errors` package provides shared framework capability within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Provides Errors integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Installation
 
@@ -29,7 +29,7 @@ A library for handling and standardizing errors and exceptions in .NET applicati
 
 ---
 **Current Version:** v2.3.4
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 ---
 
 ## **Features**
@@ -117,7 +117,7 @@ public class CustomException : ExceptionBase
 | Exception Type                | Description                                                   |
 |-------------------------------|---------------------------------------------------------------|
 | `ForbiddenException`          | Use for actions the user is not permitted to perform.         |
-| `FunctionalException`         | Represents a domain or business logic error.                  | 
+| `FunctionalException`         | Represents a domain or business logic error.                  |
 | `NotFoundException`           | Indicates that a requested resource could not be found.       |
 | `PreconditionFailedException` | Indicates a failed precondition for the request.              |
 | `TechnicalException`          | Represents an unexpected technical error.                     |
@@ -134,11 +134,9 @@ We welcome contributions! Please follow these steps:
 
 ---
 
-## **License**
+## License
 
-This library is licensed under the MIT License. See the LICENSE file for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 
@@ -152,15 +150,15 @@ This library is licensed under the MIT License. See the LICENSE file for more de
 - Now compatible with both the **in-house mediator** and **MediatR**
 
 ### Version 1.4.1
-- ?? Introduced **TestExceptions** for chaos engineering & demos  
-  - `BananaRepublicException` (EN/FR)  
-  - `MonsterException` (EN/FR)  
-  - `VodkaCoffeePotException` (EN/FR)  
-  - `FriendlyReminderException` (EN/FR)  
-- ?? **Bilingual Support**: every test exception available in **English & French**  
-- ?? **Consistent API**: wrapped under `TestExceptions` static class  
-- ?? Purpose: make resilience demos, test failures, and dev workshops **fun & obvious**  
-- ?? No impact on production code — these are **opt-in chaos exceptions**  
+- ?? Introduced **TestExceptions** for chaos engineering & demos
+  - `BananaRepublicException` (EN/FR)
+  - `MonsterException` (EN/FR)
+  - `VodkaCoffeePotException` (EN/FR)
+  - `FriendlyReminderException` (EN/FR)
+- ?? **Bilingual Support**: every test exception available in **English & French**
+- ?? **Consistent API**: wrapped under `TestExceptions` static class
+- ?? Purpose: make resilience demos, test failures, and dev workshops **fun & obvious**
+- ?? No impact on production code — these are **opt-in chaos exceptions**
 
 ### Version 1.6.20
 - Updated to **.NET 10.0**

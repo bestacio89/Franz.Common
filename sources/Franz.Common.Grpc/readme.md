@@ -1,10 +1,10 @@
 # Franz.Common.Grpc
 
-> HTTP, identity, and service integration for the Franz.Common framework on .NET 10.
+> Provides Grpc integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Overview
 
-The `Franz.Common.Grpc` package provides HTTP, identity, and service integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Provides Grpc integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Installation
 
@@ -361,3 +361,8 @@ The server and client behavior providers are scoped so behavior instances cannot
 ## Tenant identity trust boundary
 
 Server-side tenant behavior removes caller-supplied `x-tenant-id` metadata before invoking `IFranzTenantResolver`. The resolver must derive the tenant from authenticated server-side identity or another trusted transport signal. Client-side tenant behavior implements `IGrpcClientBehavior<TRequest,TResponse>` and enriches outgoing calls using the client pipeline contract. A tenant ID in metadata is propagation data, not proof of authorization.
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

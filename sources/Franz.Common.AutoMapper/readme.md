@@ -1,10 +1,10 @@
 # Franz.Common.AutoMapper
 
-> Object mapping for the Franz.Common framework on .NET 10.
+> Dependency-injection integration for discovering and registering AutoMapper profiles.
 
 ## Overview
 
-The `Franz.Common.AutoMapper` package provides the object mapping capability within Franz.Common. It is designed to be composed with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Dependency-injection integration for discovering and registering AutoMapper profiles.
 
 ## Installation
 
@@ -41,27 +41,25 @@ A utility library within the **Franz Framework** designed to streamline the inte
 ## **Version Information**
 
 - **Current Version**: 2.3.4
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 
 ---
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.AutoMapper
+```
+
+
 ```
 
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.AutoMapper  
+dotnet add package Franz.Common.AutoMapper
 ```
 
 ---
@@ -114,18 +112,16 @@ This package depends on:
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
+Contributions are welcome under the MIT License. To propose a change:
 1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
 ---
 
-## **License**
+## License
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 

@@ -1,10 +1,10 @@
 # Franz.Common.DependencyInjection
 
-> Shared framework capability for the Franz.Common framework on .NET 10.
+> A core library within the Franz Framework , designed to simplify and enhance the usage of dependency injection in .NET applications. This package provides utilities and extensions for efficient registration of services, managing lifetimes, and ensuring clean dependency resolution.
 
 ## Overview
 
-The `Franz.Common.DependencyInjection` package provides shared framework capability within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+A core library within the Franz Framework , designed to simplify and enhance the usage of dependency injection in .NET applications. This package provides utilities and extensions for efficient registration of services, managing lifetimes, and ensuring clean dependency resolution.
 
 ## Installation
 
@@ -54,7 +54,7 @@ A core library within the **Franz Framework**, designed to simplify and enhance 
 ## **Version Information**
 
 **Current Version:** v2.3.4
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -74,21 +74,18 @@ This package relies on:
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.DependencyInjection
+```
+
 ```
 
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.DependencyInjection  
+dotnet add package Franz.Common.DependencyInjection
 ```
 
 ---
@@ -183,18 +180,16 @@ The **Franz.Common.DependencyInjection** package integrates seamlessly with:
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you are authorized to contribute:
+This package is part of the open-source Franz.Common ecosystem. Contributions are limited to the internal development team. If you are authorized to contribute:
 1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
 ---
 
-## **License**
+## License
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 

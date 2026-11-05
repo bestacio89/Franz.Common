@@ -1,10 +1,10 @@
 # Franz.Common.EntityFramework.SQLServer
 
-> Persistence and infrastructure integration for the Franz.Common framework on .NET 10.
+> Provides EntityFramework SQLServer integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Overview
 
-The `Franz.Common.EntityFramework.SQLServer` package provides persistence and infrastructure integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Provides EntityFramework SQLServer integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Installation
 
@@ -25,7 +25,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 
 ## Package-specific guide
 
-A private utility library for seamless integration of **Entity Framework Core** with **SQL Server**, designed as part of the **Franz Framework** ecosystem. This package is versioned as `1.2.65` and is hosted exclusively on a private Azure NuGet feed.
+A private utility library for seamless integration of **Entity Framework Core** with **SQL Server**, designed as part of the **Franz Framework** ecosystem. This package is versioned as `1.2.65` and is hosted exclusively on a NuGet.org.
 
 ---
 
@@ -53,24 +53,21 @@ A private utility library for seamless integration of **Entity Framework Core** 
 
 ## **Installation**
 
-Since this package is hosted on a private Azure NuGet feed, configure your NuGet client to access the feed before installing.
+Since this package is hosted on a NuGet.org, configure your NuGet client to access the feed before installing.
 
-### **Step 1: Add the Private Azure Feed**
-Add the private feed to your NuGet configuration by running:
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.EntityFramework.SQLServer
+```
+
 ```
 
 ### **Step 2: Install the Package**
 Install the package via the .NET CLI:
 
 ```bash
-dotnet add package Franz.Common.EntityFramework.SQLServer  
+dotnet add package Franz.Common.EntityFramework.SQLServer
 ```
 
 ---
@@ -113,13 +110,13 @@ This package is built to work with the following Franz Framework packages (all v
 - `Franz.Common.EntityFramework`
 - `Franz.Common.MultiTenancy`
 
-Make sure to install them from your private Azure feed as needed.
+Make sure to install them from your NuGet.org as needed.
 
 ---
 
 ## **Development Note**
 
-This library is part of the **Franz Framework**, a privately developed and maintained suite of libraries. It is currently **not available on NuGet.org** but is hosted on a private Azure feed for internal use and development purposes.
+This library is part of the **Franz Framework**, a privately developed and maintained suite of libraries. It is currently **not available on NuGet.org** but is hosted on a NuGet.org for internal use and development purposes.
 
 ---
 
@@ -132,11 +129,9 @@ Contributions are restricted to the internal development team. If you have acces
 
 ---
 
-## **License**
+## License
 
-This library is part of a private framework and subject to internal licensing terms. Contact the author for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 

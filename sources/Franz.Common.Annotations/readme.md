@@ -1,10 +1,10 @@
 # Franz.Common.Annotations
 
-> Shared framework capability for the Franz.Common framework on .NET 10.
+> Attribute-based validation metadata for Kafka topic configuration and other application contracts.
 
 ## Overview
 
-The `Franz.Common.Annotations` package provides the shared framework capability capability within Franz.Common. It is designed to be composed with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Attribute-based validation metadata for Kafka topic configuration and other application contracts.
 
 ## Installation
 
@@ -39,27 +39,25 @@ A lightweight library within the **Franz Framework** designed to provide custom 
 ## **Version Information**
 
 **Current Version:** v2.3.4
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 
 ---
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.Annotations
+```
+
+
 ```
 
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Annotations  
+dotnet add package Franz.Common.Annotations
 ```
 
 ---
@@ -123,18 +121,16 @@ This package has no external dependencies but integrates seamlessly with other *
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
+Contributions are welcome under the MIT License. To propose a change:
 1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
 ---
 
-## **License**
+## License
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 

@@ -1,10 +1,10 @@
 # Franz.Common.Caching
 
-> Caching and performance for the Franz.Common framework on .NET 10.
+> Here’s an updated README for version 1.7.8 , including all the observability improvements, metrics observer, logging + metrics observer, and Excel/export-ready observer you’ve just implemented: --- A full-featured caching module for the Franz Framework . Provides unified cache abstractions , hybrid caching (L1 + L2) ,
 
 ## Overview
 
-The `Franz.Common.Caching` package provides the caching and performance capability within Franz.Common. It is designed to be composed with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Here’s an updated README for version 1.7.8 , including all the observability improvements, metrics observer, logging + metrics observer, and Excel/export-ready observer you’ve just implemented: --- A full-featured caching module for the Franz Framework . Provides unified cache abstractions , hybrid caching (L1 + L2) ,
 
 ## Installation
 
@@ -187,7 +187,7 @@ Exports relevant stats only (hits/misses/size) to Excel for **offline analysis**
 ---
 
 ## 📝 Changelog
-### V2.2.14 - Enhanced Configuration 
+### V2.2.14 - Enhanced Configuration
 - Configuration section is now Caching instea "Franz:Caching" for clarity and consistency.
 
 ### v2.0.1 – Internal Modernization
@@ -281,3 +281,8 @@ services.AddTenantScopedCacheKeys();
 ```
 
 Keys are prefixed with `tenant:{tenantId}:` when a validated tenant context exists and `global:` otherwise. This prevents identical requests from sharing cache entries across tenants. The tenant context accessor must be registered by the HTTP, messaging, or application execution adapter before the cache strategy is resolved. Do not use the global namespace for data that is logically tenant-owned.
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

@@ -1,10 +1,10 @@
 # Franz.Common.Business
 
-> Domain and application building blocks for the Franz.Common framework on .NET 10.
+> A core infrastructure library of the Franz Framework , designed to support Domain-Driven Design (DDD) , CQRS , and Event-Sourcing-ready architectures in modern .NET applications. It provides a clean, deterministic, and production-grade foundation for building scalable business systems with strong separation of concerns
 
 ## Overview
 
-The `Franz.Common.Business` package provides the domain and application building blocks capability within Franz.Common. It is designed to be composed with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+A core infrastructure library of the Franz Framework , designed to support Domain-Driven Design (DDD) , CQRS , and Event-Sourcing-ready architectures in modern .NET applications. It provides a clean, deterministic, and production-grade foundation for building scalable business systems with strong separation of concerns
 
 ## Installation
 
@@ -444,3 +444,8 @@ It ensures that:
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

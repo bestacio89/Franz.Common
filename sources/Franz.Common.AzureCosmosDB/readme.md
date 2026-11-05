@@ -1,10 +1,10 @@
 # Franz.Common.AzureCosmosDB
 
-> Persistence and infrastructure integration for the Franz.Common framework on .NET 10.
+> Azure Cosmos DB persistence integration for EF Core, tenant-partitioned documents, and messaging stores.
 
 ## Overview
 
-The `Franz.Common.AzureCosmosDB` package provides the persistence and infrastructure integration capability within Franz.Common. It is designed to be composed with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Azure Cosmos DB persistence integration for EF Core, tenant-partitioned documents, and messaging stores.
 
 ## Installation
 
@@ -136,14 +136,12 @@ This makes CosmosDB a first-class citizen in the event-sourced pipeline.
 
 ## **Installation**
 
-### **From Private Azure Feed**
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.AzureCosmosDB
+```
+
 ```
 
 Install:
@@ -240,17 +238,13 @@ await messageStore.SaveAsync(msg);
 
 ## **Contributing**
 
-Internal to Franz Framework development team.
+Contributions are welcome via pull request.
 
 ---
 
-## **License**
+## License
 
-MIT
-
----
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## Dependency maintenance — October 2026
 

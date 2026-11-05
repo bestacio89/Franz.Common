@@ -1,10 +1,10 @@
 # Franz.Common.Aras
 
-> Shared framework capability for the Franz.Common framework on .NET 10.
+> ARAS Innovator integration for domain entities, aggregates, repositories, unit-of-work commits, snapshots, and diagnostics.
 
 ## Overview
 
-The `Franz.Common.Aras` package provides the shared framework capability capability within Franz.Common. It is designed to be composed with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+ARAS Innovator integration for domain entities, aggregates, repositories, unit-of-work commits, snapshots, and diagnostics.
 
 ## Installation
 
@@ -28,25 +28,25 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 ````markdown
 # Franz.Common.Aras – v1.5.0 ??
 
-**Franz.Common.Aras** integrates **ARAS Innovator** into the **Franz Framework** with clean, DDD-driven abstractions.  
+**Franz.Common.Aras** integrates **ARAS Innovator** into the **Franz Framework** with clean, DDD-driven abstractions.
 It lets you treat ARAS as just another persistence provider — with **Entities**, **Aggregates**, **Unit of Work**, **Snapshots**, **Diagnostics**, and an **InMemory provider for testing**.
 
 ---
 
 ## ?? What’s New in v1.5.0
 
-- ? **Concrete ARAS Innovator provider** (REST API)  
-- ? **Fluent mapping layer** (field ? property, ignores, conversions)  
-- ? **Unit of Work** (commit entities + aggregates atomically)  
-- ? **Snapshotting** (optimize large aggregates, replay only post-snapshot events)  
-- ? **Diagnostics decorators** (logging + OpenTelemetry tracing)  
-- ? **InMemory provider** (unit testing without ARAS)  
-- ? **AddArasInnovator bootstrapper** (EF-style DI registration)  
-- ? **Full samples** for Entities, Aggregates, UoW, Testing, and Snapshots  
+- ? **Concrete ARAS Innovator provider** (REST API)
+- ? **Fluent mapping layer** (field ? property, ignores, conversions)
+- ? **Unit of Work** (commit entities + aggregates atomically)
+- ? **Snapshotting** (optimize large aggregates, replay only post-snapshot events)
+- ? **Diagnostics decorators** (logging + OpenTelemetry tracing)
+- ? **InMemory provider** (unit testing without ARAS)
+- ? **AddArasInnovator bootstrapper** (EF-style DI registration)
+- ? **Full samples** for Entities, Aggregates, UoW, Testing, and Snapshots
 ````
 ---
 **Current Version:** v2.3.4
---- 
+---
 ## ?? Installation
 
 ```bash
@@ -321,3 +321,8 @@ Franz.Common.Aras v1.5.0 — **bringing ARAS into the DDD world.**
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
