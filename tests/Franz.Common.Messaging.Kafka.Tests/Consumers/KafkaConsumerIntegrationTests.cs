@@ -39,7 +39,8 @@ public sealed class KafkaConsumerFactoryIntegrationTests : IClassFixture<KafkaCo
               MaxPollIntervalMs = 30_000
             }
           }),
-          NullLogger<KafkaConsumerFactory>.Instance);
+          NullLogger<KafkaConsumerFactory>.Instance,
+          new KafkaRebalanceCoordinator());
 
   private static Task DriveUntilAssigned(IConsumer<string, string> consumer,
       TaskCompletionSource assignedTcs,
