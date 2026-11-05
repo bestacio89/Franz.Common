@@ -272,6 +272,7 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       ExchangeName = exchangeName,
       DeadLetterExchangeName = deadLetterExchange,
       DeadLetterQueueName = deadLetterQueue,
+      ManagementApiUrl = _fixture.ManagementApiUrl,
       QueueType = RabbitMQQueueType.Quorum
     });
 
