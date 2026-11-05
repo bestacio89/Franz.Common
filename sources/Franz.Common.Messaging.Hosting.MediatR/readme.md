@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Hosting.MediatR
 
-> Provides Messaging Hosting MediatR integration and reusable abstractions for .NET applications built with Franz.Common.
+> Hosting integration that connects MediatR application dispatch with Franz.Common messaging workers.
 
 ## Overview
 
-Provides Messaging Hosting MediatR integration and reusable abstractions for .NET applications built with Franz.Common.
+Hosting integration that connects MediatR application dispatch with Franz.Common messaging workers.
 
 ## Installation
 

@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Kafka
 
-> A Kafka transport integration for the Franz Framework , designed to provide clean, deterministic, and production-grade interaction with Kafka topics, producers, and consumers. This package focuses exclusively on Kafka transport concerns : configuration, producers, consumers, serialization, and transactions.
+> Kafka transport adapter for Franz.Common messaging, including topic provisioning, consumer groups, acknowledgements, and delivery lifecycle.
 
 ## Overview
 
-A Kafka transport integration for the Franz Framework , designed to provide clean, deterministic, and production-grade interaction with Kafka topics, producers, and consumers. This package focuses exclusively on Kafka transport concerns : configuration, producers, consumers, serialization, and transactions.
+Kafka transport adapter for Franz.Common messaging, including topic provisioning, consumer groups, acknowledgements, and delivery lifecycle.
 
 ## Installation
 

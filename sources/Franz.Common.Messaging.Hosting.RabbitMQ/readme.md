@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Hosting.RabbitMQ
 
-> A dedicated hosting library within the Franz Framework that provides RabbitMQ-specific hosted services and dependency injection extensions . This package bridges the RabbitMQ transport layer ( Franz.Common.Messaging.RabbitMQ ) with the .NET hosting infrastructure ( Microsoft.Extensions.Hosting ).
+> Hosted-service integration for RabbitMQ consumers and publishers, including graceful startup and shutdown.
 
 ## Overview
 
-A dedicated hosting library within the Franz Framework that provides RabbitMQ-specific hosted services and dependency injection extensions . This package bridges the RabbitMQ transport layer ( Franz.Common.Messaging.RabbitMQ ) with the .NET hosting infrastructure ( Microsoft.Extensions.Hosting ).
+Hosted-service integration for RabbitMQ consumers and publishers, including graceful startup and shutdown.
 
 ## Installation
 

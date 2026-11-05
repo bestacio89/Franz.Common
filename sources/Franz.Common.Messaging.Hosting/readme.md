@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Hosting
 
-> A foundational library within the Franz Framework designed to enable and manage hosted messaging services in distributed applications. This package provides hosting utilities, message execution strategies, delegation, transaction management, and seamless integration with Microsoft.Extensions.Hosting .
+> Background-service lifecycle and dependency-injection integration for Franz.Common messaging components.
 
 ## Overview
 
-A foundational library within the Franz Framework designed to enable and manage hosted messaging services in distributed applications. This package provides hosting utilities, message execution strategies, delegation, transaction management, and seamless integration with Microsoft.Extensions.Hosting .
+Background-service lifecycle and dependency-injection integration for Franz.Common messaging components.
 
 ## Installation
 

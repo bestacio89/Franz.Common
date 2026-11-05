@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Identity
 
-> Provides Messaging Identity integration and reusable abstractions for .NET applications built with Franz.Common.
+> Identity metadata propagation across message publishing and consumption, preserving authenticated execution context.
 
 ## Overview
 
-Provides Messaging Identity integration and reusable abstractions for .NET applications built with Franz.Common.
+Identity metadata propagation across message publishing and consumption, preserving authenticated execution context.
 
 ## Installation
 

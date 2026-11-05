@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Hosting.Kafka
 
-> A Kafka hosting integration for the Franz Framework that connects the Kafka transport layer ( Franz.Common.Messaging.Kafka ) to the .NET hosting runtime ( Microsoft.Extensions.Hosting ). This package is responsible only for: > 🧱 Kafka transport, producers, consumers, and configuration live in > Franz.Common.Messaging.
+> Hosted-service integration for Kafka consumers and producers, including startup, shutdown, and consumer lifecycle management.
 
 ## Overview
 
-A Kafka hosting integration for the Franz Framework that connects the Kafka transport layer ( Franz.Common.Messaging.Kafka ) to the .NET hosting runtime ( Microsoft.Extensions.Hosting ). This package is responsible only for: > 🧱 Kafka transport, producers, consumers, and configuration live in > Franz.Common.Messaging.
+Hosted-service integration for Kafka consumers and producers, including startup, shutdown, and consumer lifecycle management.
 
 ## Installation
 

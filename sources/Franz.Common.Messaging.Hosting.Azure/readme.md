@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Hosting.Azure
 
-> Franz.Common.Messaging.Hosting.Azure is the Azure hosting orchestration layer for the Franz Framework messaging stack . It provides an opinionated, batteries-included runtime that wires Azure messaging transports into the .NET Generic Host , while preserving Franz’s core principles: This package does not implement mess
+> Hosted-service lifecycle integration for Azure messaging consumers and publishers in .NET worker applications.
 
 ## Overview
 
-Franz.Common.Messaging.Hosting.Azure is the Azure hosting orchestration layer for the Franz Framework messaging stack . It provides an opinionated, batteries-included runtime that wires Azure messaging transports into the .NET Generic Host , while preserving Franz’s core principles: This package does not implement mess
+Hosted-service lifecycle integration for Azure messaging consumers and publishers in .NET worker applications.
 
 ## Installation
 
