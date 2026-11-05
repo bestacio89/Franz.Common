@@ -82,6 +82,8 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       DeadLetterQueueName = $"{queueName}-dlq",
       DeadLetterExchangeName = $"{queueName}-dead-letter",
       ManagementApiUrl = _fixture.ManagementApiUrl,
+      ManagementApiUsername = "guest",
+      ManagementApiPassword = "guest",
       ReplayStrategy = RabbitMQReplayStrategy.ProgressiveFourStep,
       FailurePolicy = new MessageFailurePolicy(maxRetryAttempts: 5, retryBackoff: TimeSpan.FromSeconds(30))
     };
@@ -124,6 +126,8 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       DeadLetterExchangeName = deadLetterExchange,
       DeadLetterQueueName = deadLetterQueue,
       ManagementApiUrl = _fixture.ManagementApiUrl,
+      ManagementApiUsername = "guest",
+      ManagementApiPassword = "guest",
       ReplayStrategy = RabbitMQReplayStrategy.NoReplay
     };
 
@@ -273,6 +277,8 @@ public sealed class RabbitMQMessagingInitializerIntegrationTests
       DeadLetterExchangeName = deadLetterExchange,
       DeadLetterQueueName = deadLetterQueue,
       ManagementApiUrl = _fixture.ManagementApiUrl,
+      ManagementApiUsername = "guest",
+      ManagementApiPassword = "guest",
       QueueType = RabbitMQQueueType.Quorum
     });
 
