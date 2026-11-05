@@ -207,7 +207,11 @@ public sealed class KafkaMessageListener : IListener
 
   private async Task InvokeHandlerWhilePollingAsync(Message message, CancellationToken handlerToken)
   {
-    var handlerTask = OnMessageReceivedAsync!(new MessageEventArgs(message, handlerToken));
+    // Run handler invocation off the consumer thread so synchronous handler work cannot
+    // starve Consume() and trigger MaxPollIntervalMs while the handler is in flight.
+    var handlerTask = Task.Run(
+        () => OnMessageReceivedAsync!(new MessageEventArgs(message, handlerToken)),
+        CancellationToken.None);
     while (!handlerTask.IsCompleted)
     {
       try
@@ -224,7 +228,7 @@ public sealed class KafkaMessageListener : IListener
     await handlerTask.ConfigureAwait(false);
   }
 
-  private async Task DelayWhilePollingAsync(
+  private Task DelayWhilePollingAsync(
       TimeSpan delay,
       CancellationToken rebalanceToken,
       CancellationToken stoppingToken)
@@ -249,7 +253,7 @@ public sealed class KafkaMessageListener : IListener
       }
       remaining -= interval;
     }
-    await Task.CompletedTask;
+    return Task.CompletedTask;
   }
 
   private void PauseAssignedPartitions()
