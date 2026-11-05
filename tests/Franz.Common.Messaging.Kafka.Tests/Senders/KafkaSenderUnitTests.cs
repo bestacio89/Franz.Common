@@ -95,7 +95,7 @@ public sealed class KafkaSenderUnitTests
         serializer.Setup(value => value.Serialize(It.IsAny<object>()))
             .Throws(new JsonException("Invalid payload shape.")));
 
-    var act = () => sender.SendAsync(new Message());
+    var act = async () => await sender.SendAsync(new Message());
 
     await act.Should().ThrowAsync<PermanentMessagingException>()
         .WithMessage("*could not be serialized*");
