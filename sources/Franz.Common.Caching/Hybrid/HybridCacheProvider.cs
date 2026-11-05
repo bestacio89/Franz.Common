@@ -62,16 +62,6 @@ public sealed class HybridCacheProvider : ICacheProvider
     return _cache.RemoveAsync(effectiveKey, ct).AsTask();
   }
 
-  /// <summary>
-  /// Note: RemoveByTagAsync is deprecated in this provider to maintain 
-  /// high-performance deterministic invalidation.
-  /// </summary>
-  [Obsolete("Tag-based invalidation is disabled for performance consistency. Use key-based removal.")]
-  public Task RemoveByTagAsync(string tag, CancellationToken ct = default)
-  {
-    throw new NotSupportedException("Tag-based invalidation is highly inefficient in distributed contexts and has been removed from Franz.Common.Caching.");
-  }
-
   private static HybridCacheEntryOptions CreateEntryOptions(CacheOptions options)
       => new()
       {
