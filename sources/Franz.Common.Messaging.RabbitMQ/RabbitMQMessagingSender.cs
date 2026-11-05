@@ -1,5 +1,6 @@
 #nullable enable
 using Franz.Common.Messaging.Delegating;
+using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Franz.Common.Messaging.RabbitMQ.Transactions;
@@ -39,7 +40,8 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
   public async ValueTask SendAsync(Message message, CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(message);
-    ArgumentNullException.ThrowIfNull(message.Body);
+    if (message.Body is null)
+      throw new PermanentMessagingException($"RabbitMQ message {message.Id} has no body; retrying the same payload cannot resolve this failure.");
 
     await _handler.ProcessAsync(message, cancellationToken).ConfigureAwait(false);
     var queue = RabbitMQQueueNamer.GetQueueName(message.Kind);
