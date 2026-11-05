@@ -161,6 +161,27 @@ public sealed class TenantPersistenceIsolationTests
     }
 
     [Fact]
+    public void QueryFilter_PreservesNamedApplicationFiltersWithoutMixingFilterStyles()
+    {
+        var options = new DbContextOptionsBuilder<NamedFilterTestDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        using var context = new NamedFilterTestDbContext(
+            options,
+            CreateAccessor(Guid.NewGuid()),
+            Substitute.For<IDispatcher>());
+
+        var entityType = context.Model.FindEntityType(typeof(TestEntity));
+        Assert.NotNull(entityType);
+
+        var filters = entityType.GetDeclaredQueryFilters();
+        Assert.Contains(filters, filter => filter.Key == "Application.Enabled" && !filter.IsAnonymous);
+        Assert.Contains(filters, filter => filter.Key == "Franz.Common.Persistence" && !filter.IsAnonymous);
+        Assert.DoesNotContain(filters, filter => filter.IsAnonymous);
+    }
+
+    [Fact]
     public void CosmosProvider_BuildsModelWithComposedQueryFilters()
     {
         var tenantId = Guid.NewGuid();
@@ -260,6 +281,28 @@ public sealed class TenantPersistenceIsolationTests
         public TenantExecutionContext? Current { get; private set; } = current;
         public void Initialize(TenantExecutionContext context) => Current = context;
         public void Clear() => Current = null;
+    }
+
+    private sealed class NamedFilterTestDbContext(
+        DbContextOptions<NamedFilterTestDbContext> options,
+        ITenantExecutionContextAccessor tenantAccessor,
+        IDispatcher dispatcher)
+        : DbContextBase(
+            options,
+            dispatcher,
+            currentUser: null,
+            tenantContextAccessor: tenantAccessor,
+            databaseOptions: Options.Create(new DatabaseOptions { IsolationMode = DatabaseIsolationMode.SharedDatabase }),
+            multiTenancyOptions: Options.Create(new MultiTenancyOptions { Enabled = true }))
+    {
+        public DbSet<TestEntity> Entities => Set<TestEntity>();
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<TestEntity>()
+                .HasQueryFilter("Application.Enabled", entity => entity.IsPublished);
+        }
     }
 
     private sealed class TestDbContext(
