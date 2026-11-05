@@ -219,7 +219,7 @@ public sealed class TenantPersistenceIsolationTests
         public Guid TenantId { get; set; }
         public string Name { get; set; } = string.Empty;
         public bool IsDeleted { get; private set; }
-        public bool IsPublished { get; set; }
+        public bool IsPublished { get; set; } = true;
         public DateTimeOffset DateCreated { get; private set; }
         public object GetId() => Id;
         public void MarkCreated(string createdBy) => DateCreated = DateTimeOffset.UtcNow;

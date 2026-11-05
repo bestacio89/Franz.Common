@@ -11,12 +11,19 @@ public sealed class AzureEventHubsHostedService : IHostedService
 {
   private readonly AzureEventHubsProcessor _processor;
   private readonly ILogger<AzureEventHubsHostedService> _logger;
-  private readonly IServiceProvider _serviceProvider;
+  private readonly IServiceProvider? _serviceProvider;
+
+  public AzureEventHubsHostedService(
+      AzureEventHubsProcessor processor,
+      ILogger<AzureEventHubsHostedService> logger)
+      : this(processor, logger, serviceProvider: null)
+  {
+  }
 
   public AzureEventHubsHostedService(
       AzureEventHubsProcessor processor,
       ILogger<AzureEventHubsHostedService> logger,
-      IServiceProvider serviceProvider)
+      IServiceProvider? serviceProvider)
   {
     _processor = processor;
     _logger = logger;
@@ -25,7 +32,8 @@ public sealed class AzureEventHubsHostedService : IHostedService
 
   public async Task StartAsync(CancellationToken cancellationToken)
   {
-    TenantMessagingStartupValidation.Validate(_serviceProvider);
+    if (_serviceProvider is not null)
+      TenantMessagingStartupValidation.Validate(_serviceProvider);
     _logger.LogInformation("🚀 Starting Azure Event Hubs listener");
     await _processor.StartAsync(cancellationToken);
   }
