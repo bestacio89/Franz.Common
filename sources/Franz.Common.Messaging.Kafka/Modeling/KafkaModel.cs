@@ -13,7 +13,7 @@ namespace Franz.Common.Messaging.Kafka.Modeling;
 [JsonSerializable(typeof(Message))] // Assuming 'Message' is your base messaging type
 internal partial class KafkaJsonSerializerContext : JsonSerializerContext { }
 
-public sealed class KafkaModel(IConnectionFactoryProvider connectionFactoryProvider) : IModel, IAsyncDisposable
+public sealed class KafkaModel(IConnectionFactoryProvider connectionFactoryProvider) : IModel
 {
     private readonly IProducer<string, byte[]> _producer = new ProducerBuilder<string, byte[]>(new ProducerConfig
     {
