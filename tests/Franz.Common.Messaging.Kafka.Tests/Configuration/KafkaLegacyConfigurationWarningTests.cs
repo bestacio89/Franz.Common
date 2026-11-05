@@ -4,6 +4,7 @@ using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka.Validation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Franz.Common.Messaging.Kafka.Extensions;
 using Moq;
