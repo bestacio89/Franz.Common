@@ -9,6 +9,8 @@ using Franz.Common.Messaging.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text;
+using System.Text.Json;
+using System.Runtime.Serialization;
 using System.Threading;
 
 namespace Franz.Common.Messaging.Kafka.Senders;
@@ -88,7 +90,13 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
       var value = _serializer.Serialize(message.Body);
       return string.IsNullOrEmpty(value) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(value);
     }
-    catch (Exception ex) when (ex is not OperationCanceledException)
+    catch (Exception ex) when (
+        ex is JsonException or
+        NotSupportedException or
+        InvalidOperationException or
+        ArgumentException or
+        FormatException or
+        SerializationException)
     {
       throw new PermanentMessagingException(
           $"Kafka message {message.Id} could not be serialized; retrying the same payload cannot resolve this failure.",
