@@ -16,6 +16,7 @@ using Franz.Common.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 using System.Linq;
 
 namespace Franz.Common.Messaging.RabbitMQ.Extensions;
@@ -67,6 +68,8 @@ public static class ServiceCollectionExtensions
     var section = configuration.GetSection("Messaging:RabbitMQ");
     if (!section.Exists())
       throw new TechnicalException("RabbitMQ messaging configuration missing");
+
+    var provisioningModeIsConfigured = section["ProvisioningMode"] is not null;
 
     services.AddOptions<RabbitMQMessagingOptions>()
         .Bind(section)
@@ -129,6 +132,18 @@ public static class ServiceCollectionExtensions
             string.Equals(options.ReplayStrategy, "ProgressiveFourStep", StringComparison.OrdinalIgnoreCase),
             "RabbitMQ FailurePolicy retries require ReplayStrategy=ProgressiveFourStep.")
         .ValidateOnStart();
+
+    services.AddSingleton<IConfigureOptions<RabbitMQMessagingOptions>>(serviceProvider =>
+        new ConfigureNamedOptions<RabbitMQMessagingOptions>(Options.DefaultName, options =>
+        {
+          if (provisioningModeIsConfigured)
+            return;
+
+          var environment = serviceProvider.GetService<IHostEnvironment>();
+          options.ProvisioningMode = environment?.IsDevelopment() == true
+              ? ProvisioningMode.Create
+              : ProvisioningMode.Verify;
+        }));
 
     return services;
   }

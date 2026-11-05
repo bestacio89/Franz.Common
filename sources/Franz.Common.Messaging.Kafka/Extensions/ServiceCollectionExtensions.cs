@@ -20,6 +20,7 @@ using Franz.Common.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 using Franz.Common.Messaging.Kafka.Validation;
 
 namespace Franz.Common.Messaging.Kafka.Extensions;
@@ -141,10 +142,25 @@ public static class ServiceCollectionExtensions
   {
     services.AddSingleton<IValidateOptions<KafkaMessagingOptions>, KafkaMessagingOptionsValidator>();
 
+    var section = configuration.GetSection(KafkaMessagingOptions.SectionName);
+    var provisioningModeIsConfigured = section["ProvisioningMode"] is not null;
+
     services.AddOptions<KafkaMessagingOptions>()
-        .BindConfiguration(KafkaMessagingOptions.SectionName)
+        .Bind(section)
         .ValidateDataAnnotations()
         .ValidateOnStart();
+
+    services.AddSingleton<IConfigureOptions<KafkaMessagingOptions>>(serviceProvider =>
+        new ConfigureNamedOptions<KafkaMessagingOptions>(Options.DefaultName, options =>
+        {
+          if (provisioningModeIsConfigured)
+            return;
+
+          var environment = serviceProvider.GetService<IHostEnvironment>();
+          options.ProvisioningMode = environment?.IsDevelopment() == true
+              ? Franz.Common.Messaging.Configuration.ProvisioningMode.Create
+              : Franz.Common.Messaging.Configuration.ProvisioningMode.Verify;
+        }));
 
     return services;
   }
