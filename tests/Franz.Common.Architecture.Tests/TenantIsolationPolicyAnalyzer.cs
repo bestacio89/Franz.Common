@@ -88,9 +88,10 @@ internal static class TenantIsolationPolicyAnalyzer
             && method.DescendantNodes()
                 .OfType<IdentifierNameSyntax>()
                 .Any(identifier => identifier.Identifier.ValueText == "TenantId")
-            && invocations.Any(invocation =>
-                GetInvokedMethodName(invocation.Expression) == "Property"
-                && invocation.ToString().Contains("TenantId", StringComparison.Ordinal));
+            && method.DescendantNodes()
+                .OfType<IdentifierNameSyntax>()
+                .Any(identifier => identifier.Identifier.ValueText == "Property")
+            && method.ToString().Contains("EF.Property", StringComparison.Ordinal);
 
         return identifiesTenantEntities && appliesQueryFilter && scopesFilterToCurrentTenant;
     }
