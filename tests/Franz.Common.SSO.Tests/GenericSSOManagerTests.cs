@@ -37,13 +37,13 @@ public sealed class GenericSSOManagerTests
     var signInManager = CreateSignInManager(userManager.Object);
     signInManager.Setup(x => x.CheckPasswordSignInAsync(user, string.Empty, false))
       .ReturnsAsync(SignInResult.Success);
-    signInManager.Setup(x => x.SignInAsync(user, false, null)).Returns(Task.CompletedTask);
+    signInManager.Setup(x => x.SignInAsync(user, false)).Returns(Task.CompletedTask);
     var sut = new GenericSSOManager(provider.Object, userManager.Object, signInManager.Object);
 
     var result = await sut.Login(user.Email!);
 
     Assert.True(result);
-    signInManager.Verify(x => x.SignInAsync(user, false, null), Times.Once);
+    signInManager.Verify(x => x.SignInAsync(user, false), Times.Once);
   }
 
   [Fact]
