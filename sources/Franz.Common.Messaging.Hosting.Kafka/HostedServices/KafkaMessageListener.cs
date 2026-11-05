@@ -283,7 +283,10 @@ public sealed class KafkaMessageListener : IListener
       if (handlerToken.IsCancellationRequested)
       {
         if (stoppingToken.IsCancellationRequested)
+        {
+          DeferConsumerReleaseUntilHandlerCompletes(handlerTask);
           throw new OperationCanceledException("Kafka listener is stopping while a handler is still running.", stoppingToken);
+        }
 
         var reason = rebalanceToken.IsCancellationRequested
             ? "the Kafka partition was revoked or lost"
