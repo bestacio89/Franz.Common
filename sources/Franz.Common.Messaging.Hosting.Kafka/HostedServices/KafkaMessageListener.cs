@@ -434,7 +434,7 @@ public sealed class KafkaMessageListener : IListener
 
       try
       {
-        await AwaitWhilePollingAsync(deliveryTask, rebalanceToken, cancellationToken).ConfigureAwait(false);
+        await AwaitWhilePollingAsync(deliveryTask, cancellationToken).ConfigureAwait(false);
       }
       catch (OperationCanceledException)
       {
@@ -460,7 +460,6 @@ public sealed class KafkaMessageListener : IListener
 
   private async Task AwaitWhilePollingAsync(
       Task deliveryTask,
-      CancellationToken rebalanceToken,
       CancellationToken cancellationToken)
   {
     while (!deliveryTask.IsCompleted)
@@ -481,9 +480,8 @@ public sealed class KafkaMessageListener : IListener
 
     await deliveryTask.ConfigureAwait(false);
     cancellationToken.ThrowIfCancellationRequested();
-    // A successful dead-letter publication after revocation is intentionally
-    // not acknowledged on the source partition; redelivery remains safe. 
-    _ = rebalanceToken;
+    // CommitAfterProcessing checks the captured partition token before acknowledging
+    // the source offset, so a publication completed after revocation is not committed.
   }
 
   public Task StopListenAsync(CancellationToken cancellationToken = default)
