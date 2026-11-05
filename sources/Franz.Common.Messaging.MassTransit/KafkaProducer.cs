@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace Franz.Common.Messaging.MassTransit;
 
-public sealed class KafkaProducer : IKafkaProducer
+public class KafkaProducer : IKafkaProducer
 {
   private readonly IProducer<string, string> _producer;
 
