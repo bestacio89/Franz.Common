@@ -19,19 +19,19 @@ public sealed class TenantPersistenceIsolationTests
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
 
-        await using (var context = CreateContext(databaseName, tenantA))
+        await using (var context = CreateContext(databaseName, tenantA, multiTenancyEnabled: true))
         {
             context.Entities.Add(new TestEntity { Name = "A" });
             await context.SaveChangesAsync();
         }
 
-        await using (var context = CreateContext(databaseName, tenantB))
+        await using (var context = CreateContext(databaseName, tenantB, multiTenancyEnabled: true))
         {
             context.Entities.Add(new TestEntity { Name = "B" });
             await context.SaveChangesAsync();
         }
 
-        await using var tenantAContext = CreateContext(databaseName, tenantA);
+        await using var tenantAContext = CreateContext(databaseName, tenantA, multiTenancyEnabled: true);
         var rows = await tenantAContext.Entities.ToListAsync();
 
         Assert.Single(rows);
@@ -70,6 +70,33 @@ public sealed class TenantPersistenceIsolationTests
 
         Assert.Single(rows);
         Assert.Equal("published", rows[0].Name);
+    }
+
+    [Fact]
+    public async Task QueryFilter_DoesNotApplyTenantIsolationWhenMultiTenancyIsDisabled()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+
+        await using (var context = CreateContext(databaseName, tenantA, multiTenancyEnabled: true))
+        {
+            context.Entities.Add(new TestEntity { Name = "A" });
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = CreateContext(databaseName, tenantB, multiTenancyEnabled: true))
+        {
+            context.Entities.Add(new TestEntity { Name = "B" });
+            await context.SaveChangesAsync();
+        }
+
+        await using var nonMultiTenantContext = CreateContext(databaseName, tenantA, multiTenancyEnabled: false);
+        var rows = await nonMultiTenantContext.Entities.ToListAsync();
+
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, entity => entity.Name == "A");
+        Assert.Contains(rows, entity => entity.Name == "B");
     }
 
     [Fact]
