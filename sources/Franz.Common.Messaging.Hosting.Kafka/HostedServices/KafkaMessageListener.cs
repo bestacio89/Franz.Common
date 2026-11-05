@@ -3,6 +3,8 @@ using System.Text;
 using Confluent.Kafka;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Configuration;
+using Franz.Common.Messaging.Kafka;
+using System.Collections.Concurrent;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Microsoft.Extensions.Logging;
@@ -19,6 +21,9 @@ public sealed class KafkaMessageListener : IListener
   private readonly IProducer<string, byte[]>? _deadLetterProducer;
   private readonly MessageFailurePolicy _failurePolicy;
   private readonly string? _deadLetterTopic;
+  private readonly KafkaRebalanceCoordinator? _rebalanceCoordinator;
+  private readonly string? _groupId;
+  private readonly ConcurrentQueue<ConsumeResult<string, string>> _pendingResults = new();
 
   public KafkaMessageListener(IConsumer<string, string> consumer, IEnumerable<string> topics,
       IMessageSerializer serializer, ILogger<KafkaMessageListener> logger)
@@ -41,6 +46,16 @@ public sealed class KafkaMessageListener : IListener
     _deadLetterTopic = options.Value.DeadLetterTopic;
   }
 
+  public KafkaMessageListener(IConsumer<string, string> consumer, IEnumerable<string> topics,
+      IMessageSerializer serializer, ILogger<KafkaMessageListener> logger,
+      IProducer<string, byte[]> deadLetterProducer, IOptions<KafkaMessagingOptions> options,
+      KafkaRebalanceCoordinator rebalanceCoordinator)
+      : this(consumer, topics, serializer, logger, deadLetterProducer, options)
+  {
+    _rebalanceCoordinator = rebalanceCoordinator ?? throw new ArgumentNullException(nameof(rebalanceCoordinator));
+    _groupId = options.Value.GroupId;
+  }
+
   public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
 
   public async Task Listen(CancellationToken stoppingToken = default)
@@ -57,7 +72,12 @@ public sealed class KafkaMessageListener : IListener
       while (!stoppingToken.IsCancellationRequested)
       {
         ConsumeResult<string, string>? result;
-        try { result = _consumer.Consume(stoppingToken); }
+        try
+        {
+          result = _pendingResults.TryDequeue(out var pending)
+              ? pending
+              : _consumer.Consume(stoppingToken);
+        }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
         catch (ConsumeException ex)
         {
@@ -90,36 +110,97 @@ public sealed class KafkaMessageListener : IListener
 
         Exception? processingFailure = null;
         var succeeded = false;
-        for (var attempt = 0; attempt <= _failurePolicy.MaxRetryAttempts; attempt++)
+        var rebalanceInterrupted = false;
+        var groupId = _groupId ?? string.Empty;
+        var rebalanceToken = _rebalanceCoordinator is not null
+            ? _rebalanceCoordinator.GetRebalanceToken(groupId)
+            : CancellationToken.None;
+
+        _rebalanceCoordinator?.BeginHandlerExecution(groupId);
+        try
         {
-          stoppingToken.ThrowIfCancellationRequested();
-          try
+          if (_rebalanceCoordinator is not null)
+            PauseAssignedPartitions();
+
+          for (var attempt = 0; attempt <= _failurePolicy.MaxRetryAttempts; attempt++)
           {
-            using var handlerTimeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-            if (_failurePolicy.HandlerTimeout is { } timeout) handlerTimeout.CancelAfter(timeout);
+            stoppingToken.ThrowIfCancellationRequested();
+            if (rebalanceToken.IsCancellationRequested)
+            {
+              rebalanceInterrupted = true;
+              break;
+            }
+
             try
             {
-              await OnMessageReceivedAsync(new MessageEventArgs(transport, handlerTimeout.Token));
+              using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, rebalanceToken);
+              using var handlerTimeout = CancellationTokenSource.CreateLinkedTokenSource(linked.Token);
+              if (_failurePolicy.HandlerTimeout is { } timeout)
+                handlerTimeout.CancelAfter(timeout);
+
+              try
+              {
+                if (_rebalanceCoordinator is null)
+                  await OnMessageReceivedAsync(new MessageEventArgs(transport, handlerTimeout.Token));
+                else
+                  await InvokeHandlerWhilePollingAsync(transport, handlerTimeout.Token);
+              }
+              catch (OperationCanceledException ex)
+                  when (handlerTimeout.IsCancellationRequested &&
+                        !stoppingToken.IsCancellationRequested &&
+                        !rebalanceToken.IsCancellationRequested)
+              {
+                throw new TimeoutException($"Kafka handler exceeded cooperative timeout {_failurePolicy.HandlerTimeout}.", ex);
+              }
+
+              succeeded = true;
+              break;
             }
-            catch (OperationCanceledException ex)
-                when (handlerTimeout.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-              throw new TimeoutException($"Kafka handler exceeded cooperative timeout {_failurePolicy.HandlerTimeout}.", ex);
+              throw;
             }
-            succeeded = true;
-            break;
+            catch (OperationCanceledException) when (rebalanceToken.IsCancellationRequested)
+            {
+              rebalanceInterrupted = true;
+              break;
+            }
+            catch (Exception ex)
+            {
+              processingFailure = ex;
+              _logger.LogWarning(ex,
+                  "Kafka handler failed for message {MessageId} at {Topic}[{Partition}] offset {Offset}; attempt {Attempt} of {TotalAttempts}.",
+                  transport.Id, result.Topic, result.Partition.Value, result.Offset.Value,
+                  attempt + 1, _failurePolicy.MaxRetryAttempts + 1);
+
+              if (attempt < _failurePolicy.MaxRetryAttempts && _failurePolicy.RetryBackoff > TimeSpan.Zero)
+              {
+                if (_rebalanceCoordinator is null)
+                  await Task.Delay(_failurePolicy.RetryBackoff, stoppingToken);
+                else
+                  await DelayWhilePollingAsync(_failurePolicy.RetryBackoff, rebalanceToken, stoppingToken);
+              }
+            }
           }
-          catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { throw; }
-          catch (Exception ex)
+        }
+        finally
+        {
+          if (_rebalanceCoordinator is not null)
           {
-            processingFailure = ex;
-            _logger.LogWarning(ex,
-                "Kafka handler failed for message {MessageId} at {Topic}[{Partition}] offset {Offset}; attempt {Attempt} of {TotalAttempts}.",
-                transport.Id, result.Topic, result.Partition.Value, result.Offset.Value,
-                attempt + 1, _failurePolicy.MaxRetryAttempts + 1);
-            if (attempt < _failurePolicy.MaxRetryAttempts && _failurePolicy.RetryBackoff > TimeSpan.Zero)
-              await Task.Delay(_failurePolicy.RetryBackoff, stoppingToken);
+            _rebalanceCoordinator.EndHandlerExecution(groupId);
+            ResumeAssignedPartitions();
           }
+        }
+
+        if (rebalanceToken.IsCancellationRequested)
+          rebalanceInterrupted = true;
+
+        if (rebalanceInterrupted)
+        {
+          _logger.LogInformation(
+              "Skipping retry and offset commit for message {MessageId} because its Kafka partition was revoked or lost. The record may be redelivered.",
+              transport.Id);
+          continue;
         }
 
         if (!succeeded)
@@ -135,6 +216,70 @@ public sealed class KafkaMessageListener : IListener
     {
       _consumer.Close();
       _logger.LogInformation("Kafka listener stopped.");
+    }
+  }
+
+  private async Task InvokeHandlerWhilePollingAsync(Message message, CancellationToken handlerToken)
+  {
+    var handlerTask = OnMessageReceivedAsync!(new MessageEventArgs(message, handlerToken));
+    while (!handlerTask.IsCompleted)
+    {
+      try
+      {
+        var polled = _consumer.Consume(TimeSpan.FromMilliseconds(100));
+        if (polled is not null)
+          _pendingResults.Enqueue(polled);
+      }
+      catch (ConsumeException ex)
+      {
+        _logger.LogWarning(ex, "Kafka poll failed while a handler was in flight.");
+      }
+    }
+    await handlerTask.ConfigureAwait(false);
+  }
+
+  private async Task DelayWhilePollingAsync(
+      TimeSpan delay,
+      CancellationToken rebalanceToken,
+      CancellationToken stoppingToken)
+  {
+    var remaining = delay;
+    while (remaining > TimeSpan.Zero)
+    {
+      stoppingToken.ThrowIfCancellationRequested();
+      rebalanceToken.ThrowIfCancellationRequested();
+      var interval = remaining > TimeSpan.FromMilliseconds(100)
+          ? TimeSpan.FromMilliseconds(100)
+          : remaining;
+      var polled = _consumer.Consume(interval);
+      if (polled is not null)
+        _pendingResults.Enqueue(polled);
+      remaining -= interval;
+    }
+    await Task.CompletedTask;
+  }
+
+  private void PauseAssignedPartitions()
+  {
+    var assignment = _consumer.Assignment;
+    if (assignment.Count == 0)
+      return;
+    try { _consumer.Pause(assignment); }
+    catch (KafkaException ex)
+    {
+      _logger.LogWarning(ex, "Could not pause Kafka partitions while a handler is in flight.");
+    }
+  }
+
+  private void ResumeAssignedPartitions()
+  {
+    var assignment = _consumer.Assignment;
+    if (assignment.Count == 0)
+      return;
+    try { _consumer.Resume(assignment); }
+    catch (KafkaException ex)
+    {
+      _logger.LogWarning(ex, "Could not resume Kafka partitions after handler completion.");
     }
   }
 
