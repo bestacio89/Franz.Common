@@ -220,8 +220,6 @@ public abstract class DbContextBase : DbContext
                 modelBuilder.Entity(clrType)
                     .Property<long>(nameof(IConcurrencyTrackedEntity.ConcurrencyVersion))
                     .IsConcurrencyToken();
-
-
         }
     }
 }
