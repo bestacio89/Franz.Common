@@ -25,6 +25,7 @@ public sealed class KafkaRebalanceCoordinatorTests
   public void PartitionsLost_CancelsCurrentHandlerToken()
   {
     using var coordinator = new KafkaRebalanceCoordinator();
+    var registration = coordinator.CreateRegistration("orders");
     var partition = new TopicPartition("orders", new Partition(0));
     var token = coordinator.GetRebalanceToken(registration, partition);
 
@@ -45,7 +46,7 @@ public sealed class KafkaRebalanceCoordinatorTests
     coordinator.OnPartitionsAssigned(registration, new[] { partition });
 
     previous.IsCancellationRequested.Should().BeTrue();
-    coordinator.GetRebalanceToken("orders", partition).IsCancellationRequested.Should().BeFalse();
+    coordinator.GetRebalanceToken(registration, partition).IsCancellationRequested.Should().BeFalse();
   }
 
   [Fact]
@@ -68,14 +69,15 @@ public sealed class KafkaRebalanceCoordinatorTests
   public void HandlerExecutionState_TracksActiveHandler()
   {
     using var coordinator = new KafkaRebalanceCoordinator();
-
     var registration = coordinator.CreateRegistration("orders");
+
     coordinator.BeginHandlerExecution(registration);
     coordinator.IsHandlerExecutionActive(registration).Should().BeTrue();
 
     coordinator.EndHandlerExecution(registration);
     coordinator.IsHandlerExecutionActive(registration).Should().BeFalse();
   }
+
   [Fact]
   public void ConsumersInSameGroup_HaveIndependentPartitionAndHandlerState()
   {
@@ -95,5 +97,23 @@ public sealed class KafkaRebalanceCoordinatorTests
     coordinator.IsHandlerExecutionActive(secondConsumer).Should().BeFalse();
 
     coordinator.EndHandlerExecution(firstConsumer);
+  }
+
+  [Fact]
+  public void RevokedPartitionTokens_AreDisposedAfterActiveHandlersFinish()
+  {
+    using var coordinator = new KafkaRebalanceCoordinator();
+    var registration = coordinator.CreateRegistration("orders");
+    var partition = new TopicPartition("orders", new Partition(0));
+    var token = coordinator.GetRebalanceToken(registration, partition);
+
+    coordinator.BeginHandlerExecution(registration);
+    coordinator.OnPartitionsRevoked(registration, new[] { partition });
+
+    token.IsCancellationRequested.Should().BeTrue();
+    coordinator.EndHandlerExecution(registration);
+
+    // The old token remains observable after its source has been retired.
+    token.IsCancellationRequested.Should().BeTrue();
   }
 }
