@@ -7,6 +7,7 @@ using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Franz.Common.MultiTenancy.Stores;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace Franz.Common.MultiTenancy.Tests.Integrations;
 
@@ -46,6 +47,27 @@ public sealed class TenantMessageContextInitializerTests
         }
 
         Assert.Null(executionAccessor.Current);
+    }
+
+    [Fact]
+    public async Task BeginAsync_ForwardsCancellationTokenToTenantStore()
+    {
+        var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
+        var message = CreateMessage(tenant.Id);
+        var store = Substitute.For<ITenantStore>();
+        using var cancellation = new CancellationTokenSource();
+        store.FindByIdAsync(tenant.Id, cancellation.Token)
+            .Returns(Task.FromResult<TenantInfo?>(tenant));
+
+        var initializer = new TenantMessageContextInitializer(
+            store,
+            new MessagingTenantExecutionContextAccessor(),
+            new StubAuthorizer(authorized: true),
+            new ServiceCollection().BuildServiceProvider());
+
+        await using var executionScope = await initializer.BeginAsync(message, cancellation.Token);
+
+        await store.Received(1).FindByIdAsync(tenant.Id, cancellation.Token);
     }
 
     [Fact]

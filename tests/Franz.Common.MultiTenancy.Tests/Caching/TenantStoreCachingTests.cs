@@ -198,6 +198,38 @@ public sealed class TenantStoreCachingTests
     }
 
     [Fact]
+    public async Task ExistsAsync_DoesNotCacheNegativeResults()
+    {
+        var store = new MutableTenantStore();
+        var tenantId = Guid.NewGuid();
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
+
+        Assert.False(await cached.ExistsAsync(tenantId));
+
+        store.Set(new TenantInfo(tenantId, "created"));
+
+        Assert.True(await cached.ExistsAsync(tenantId));
+        Assert.Equal(2, store.ExistsCalls);
+    }
+
+    [Fact]
+    public async Task ExistsAsync_CachesPositiveResultsUntilInvalidated()
+    {
+        var store = new MutableTenantStore();
+        var tenant = new TenantInfo(Guid.NewGuid(), "tenant");
+        store.Set(tenant);
+        using var provider = CreateCachedStore(store);
+        var cached = provider.GetRequiredService<ITenantStore>();
+
+        Assert.True(await cached.ExistsAsync(tenant.Id));
+        store.Remove(tenant.Id);
+
+        Assert.True(await cached.ExistsAsync(tenant.Id));
+        Assert.Equal(1, store.ExistsCalls);
+    }
+
+    [Fact]
     public async Task CancellationAwareLookup_ForwardsTokenToUnderlyingStore()
     {
         var store = new MutableTenantStore();
@@ -243,6 +275,7 @@ public sealed class TenantStoreCachingTests
 
         public int FindByIdCalls { get; private set; }
         public int FindByHostCalls { get; private set; }
+        public int ExistsCalls { get; private set; }
         public CancellationToken? LastCancellationToken { get; private set; }
         public TaskCompletionSource<bool>? LookupGate { get; set; }
         public TaskCompletionSource<bool>? HostLookupGate { get; set; }
@@ -289,6 +322,9 @@ public sealed class TenantStoreCachingTests
             => Task.FromResult<IEnumerable<TenantInfo>>(_tenants.Values.ToArray());
 
         public Task<bool> ExistsAsync(Guid id)
-            => Task.FromResult(_tenants.ContainsKey(id));
+        {
+            ExistsCalls++;
+            return Task.FromResult(_tenants.ContainsKey(id));
+        }
     }
 }
