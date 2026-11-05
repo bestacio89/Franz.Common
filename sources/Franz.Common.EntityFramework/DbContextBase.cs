@@ -5,6 +5,7 @@ using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Options;
 using System.Linq.Expressions;
 
@@ -17,6 +18,12 @@ public abstract class DbContextBase : DbContext
     private readonly ITenantExecutionContextAccessor? _tenantContextAccessor;
     private readonly DatabaseOptions? _databaseOptions;
     private readonly bool _multiTenancyEnabled;
+
+    public const string SoftDeletionQueryFilterName = "Franz.Common.SoftDeletion";
+    public const string TenantIsolationQueryFilterName = "Franz.Common.TenantIsolation";
+
+    internal bool MultiTenancyEnabledForModel => _multiTenancyEnabled;
+    internal DatabaseIsolationMode? DatabaseIsolationModeForModel => _databaseOptions?.IsolationMode;
 
     protected DbContextBase(
         DbContextOptions options,
@@ -184,6 +191,12 @@ public abstract class DbContextBase : DbContext
         }
     }
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.ReplaceService<IModelCacheKeyFactory, TenantModelCacheKeyFactory>();
+        base.OnConfiguring(optionsBuilder);
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -207,12 +220,15 @@ public abstract class DbContextBase : DbContext
                     .IsConcurrencyToken();
 
             var parameter = Expression.Parameter(clrType, "entity");
-            Expression? filterBody = null;
+            var entityBuilder = modelBuilder.Entity(clrType);
 
             if (isDomainEntity)
             {
                 var isDeleted = Expression.Property(parameter, nameof(IEntity<object>.IsDeleted));
-                filterBody = Expression.Equal(isDeleted, Expression.Constant(false));
+                var softDeletionFilter = Expression.Lambda(
+                    Expression.Equal(isDeleted, Expression.Constant(false)),
+                    parameter);
+                entityBuilder.HasQueryFilter(SoftDeletionQueryFilterName, softDeletionFilter);
             }
 
             if (isTenantEntity)
@@ -224,12 +240,9 @@ public abstract class DbContextBase : DbContext
                     parameter,
                     Expression.Constant(nameof(ITenantEntity.TenantId)));
                 var currentTenantId = Expression.Property(Expression.Constant(this), nameof(CurrentTenantId));
-                var tenantFilter = Expression.Equal(tenantId, currentTenantId);
-                filterBody = filterBody is null ? tenantFilter : Expression.AndAlso(filterBody, tenantFilter);
+                var tenantFilter = Expression.Lambda(Expression.Equal(tenantId, currentTenantId), parameter);
+                entityBuilder.HasQueryFilter(TenantIsolationQueryFilterName, tenantFilter);
             }
-
-            if (filterBody is not null)
-                modelBuilder.Entity(clrType).HasQueryFilter(Expression.Lambda(filterBody, parameter));
         }
     }
 }

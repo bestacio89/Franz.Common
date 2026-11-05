@@ -1,9 +1,11 @@
 using Franz.Common.Business.Domain;
 using Franz.Common.EntityFramework;
+using Franz.Common.EntityFramework.Configuration;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Franz.Common.MultiTenancy.Tests.Persistence;
@@ -35,6 +37,68 @@ public sealed class TenantPersistenceIsolationTests
         Assert.Single(rows);
         Assert.Equal("A", rows[0].Name);
         Assert.All(rows, row => Assert.Equal(tenantA, row.TenantId));
+    }
+
+    [Fact]
+    public async Task QueryFilter_ComposesTenantSoftDeletionAndApplicationFilters()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+
+        await using (var context = CreateContext(databaseName, tenantA))
+        {
+            context.Entities.AddRange(
+                new TestEntity { Name = "published", IsPublished = true },
+                new TestEntity { Name = "unpublished", IsPublished = false },
+                new TestEntity { Name = "deleted", IsPublished = true });
+            await context.SaveChangesAsync();
+
+            var deleted = context.Entities.IgnoreQueryFilters().Single(entity => entity.Name == "deleted");
+            context.Entities.Remove(deleted);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = CreateContext(databaseName, tenantB))
+        {
+            context.Entities.Add(new TestEntity { Name = "other-tenant", IsPublished = true });
+            await context.SaveChangesAsync();
+        }
+
+        await using var tenantAContext = CreateContext(databaseName, tenantA);
+        var rows = await tenantAContext.Entities.ToListAsync();
+
+        Assert.Equal(["published"], rows.Select(row => row.Name));
+    }
+
+    [Fact]
+    public void ModelCacheKey_IncludesMultiTenancyAndDatabaseIsolationSettings()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        using (var nonMultiTenant = new TestDbContext(
+            options,
+            CreateAccessor(Guid.NewGuid()),
+            Substitute.For<IDispatcher>(),
+            multiTenancyEnabled: false,
+            isolationMode: DatabaseIsolationMode.SharedDatabase))
+        {
+            _ = nonMultiTenant.Model;
+        }
+
+        using var multiTenant = new TestDbContext(
+            options,
+            CreateAccessor(Guid.NewGuid()),
+            Substitute.For<IDispatcher>(),
+            multiTenancyEnabled: true,
+            isolationMode: DatabaseIsolationMode.SharedDatabase);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => _ = multiTenant.Model);
+        Assert.Contains("SharedDatabase entity classification failed", exception.Message);
+        Assert.Contains(nameof(UnclassifiedTestEntity), exception.Message);
     }
 
     [Fact]
@@ -87,12 +151,21 @@ public sealed class TenantPersistenceIsolationTests
         await Assert.ThrowsAsync<TenantIsolationException>(() => context.SaveChangesAsync());
     }
 
-    private static TestDbContext CreateContext(string databaseName, Guid? tenantId)
+    private static TestDbContext CreateContext(
+        string databaseName,
+        Guid? tenantId,
+        bool multiTenancyEnabled = false,
+        DatabaseIsolationMode isolationMode = DatabaseIsolationMode.SharedDatabase)
     {
         var options = new DbContextOptionsBuilder<TestDbContext>()
             .UseInMemoryDatabase(databaseName)
             .Options;
-        return new TestDbContext(options, CreateAccessor(tenantId), Substitute.For<IDispatcher>());
+        return new TestDbContext(
+            options,
+            CreateAccessor(tenantId),
+            Substitute.For<IDispatcher>(),
+            multiTenancyEnabled,
+            isolationMode);
     }
 
     private static ITenantExecutionContextAccessor CreateAccessor(Guid? tenantId)
@@ -113,9 +186,30 @@ public sealed class TenantPersistenceIsolationTests
     private sealed class TestDbContext(
         DbContextOptions<TestDbContext> options,
         ITenantExecutionContextAccessor tenantAccessor,
-        IDispatcher dispatcher) : DbContextBase(options, dispatcher, tenantContextAccessor: tenantAccessor)
+        IDispatcher dispatcher,
+        bool multiTenancyEnabled = false,
+        DatabaseIsolationMode isolationMode = DatabaseIsolationMode.SharedDatabase)
+        : DbContextBase(
+            options,
+            dispatcher,
+            currentUser: null,
+            tenantContextAccessor: tenantAccessor,
+            databaseOptions: Options.Create(new DatabaseOptions { IsolationMode = isolationMode }),
+            multiTenancyOptions: Options.Create(new MultiTenancyOptions { Enabled = multiTenancyEnabled }))
     {
         public DbSet<TestEntity> Entities => Set<TestEntity>();
+        public DbSet<UnclassifiedTestEntity> UnclassifiedEntities => Set<UnclassifiedTestEntity>();
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<TestEntity>().HasQueryFilter(entity => entity.IsPublished);
+        }
+    }
+ 
+    public sealed class UnclassifiedTestEntity : Entity<Guid>
+    {
+        public string Name { get; set; } = string.Empty;
     }
 
     public sealed class TestEntity : IEntity<Guid>, ITenantEntity
@@ -124,6 +218,7 @@ public sealed class TenantPersistenceIsolationTests
         public Guid TenantId { get; set; }
         public string Name { get; set; } = string.Empty;
         public bool IsDeleted { get; private set; }
+        public bool IsPublished { get; set; }
         public DateTimeOffset DateCreated { get; private set; }
         public object GetId() => Id;
         public void MarkCreated(string createdBy) => DateCreated = DateTimeOffset.UtcNow;
