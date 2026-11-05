@@ -16,14 +16,28 @@ public sealed class MessagingManifest
   public MessagingManifest(
       IEnumerable<Type>? destinations = null,
       IEnumerable<Type>? subscriptions = null)
+      : this(destinations, subscriptions, knownTypes: null)
+  {
+  }
+
+  public MessagingManifest(
+      IEnumerable<Type>? destinations,
+      IEnumerable<Type>? subscriptions,
+      IEnumerable<Type>? knownTypes)
   {
     Destinations = Normalize(destinations);
     Subscriptions = Normalize(subscriptions);
+    KnownTypes = Normalize((knownTypes ?? Array.Empty<Type>())
+        .Concat(Destinations)
+        .Concat(Subscriptions));
   }
 
   public IReadOnlyList<Type> Destinations { get; }
 
   public IReadOnlyList<Type> Subscriptions { get; }
+
+  /// <summary>All statically known request and message types emitted by the mediator generator.</summary>
+  public IReadOnlyList<Type> KnownTypes { get; }
 
   private static IReadOnlyList<Type> Normalize(IEnumerable<Type>? types)
   {

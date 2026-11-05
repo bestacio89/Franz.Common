@@ -2,10 +2,10 @@
 using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.Manifest;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -21,7 +21,7 @@ public static class MessageDeserializerExtensions
 
   // Cache reflected property setters to avoid runtime reflection overhead per message deserialization
   private static readonly ConcurrentDictionary<Type, Action<object, Guid>?> PropertySetterCache = new();
-  private static readonly ConcurrentDictionary<string, Type?> TypeResolutionCache = new();
+  private static readonly ConcurrentDictionary<string, Lazy<Type?>> TypeResolutionCache = new();
 
   public static ICommand? ToCommand(this Message message)
   {
@@ -61,31 +61,27 @@ public static class MessageDeserializerExtensions
       return null;
 
     var cacheKey = $"{typeName}:{expectedBase.FullName}";
-    return TypeResolutionCache.GetOrAdd(cacheKey, _ =>
-    {
-      var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+    return TypeResolutionCache.GetOrAdd(cacheKey, _ => new Lazy<Type?>(
+        () => ResolveTypeFromManifest(typeName, expectedBase),
+        LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+  }
 
-      for (int i = 0; i < assemblies.Length; i++)
-      {
-        var type = assemblies[i].GetType(typeName, throwOnError: false);
-        if (type != null && expectedBase.IsAssignableFrom(type))
-          return type;
-      }
+  private static Type? ResolveTypeFromManifest(string typeName, Type expectedBase)
+  {
+    var matches = MessagingManifestRegistry.GetAll()
+        .SelectMany(static manifest => manifest.KnownTypes)
+        .Where(type =>
+            expectedBase.IsAssignableFrom(type) &&
+            (string.Equals(type.FullName, typeName, StringComparison.Ordinal) ||
+             string.Equals(type.AssemblyQualifiedName, typeName, StringComparison.Ordinal)))
+        .Distinct()
+        .ToArray();
 
-      // Fallback: search by FullName
-      for (int i = 0; i < assemblies.Length; i++)
-      {
-        var types = assemblies[i].GetTypes();
-        for (int j = 0; j < types.Length; j++)
-        {
-          var t = types[j];
-          if (t.FullName == typeName && expectedBase.IsAssignableFrom(t))
-            return t;
-        }
-      }
+    if (matches.Length > 1)
+      throw new InvalidOperationException(
+          $"Message type '{typeName}' is ambiguous in the generated messaging manifests.");
 
-      return null;
-    });
+    return matches.Length == 1 ? matches[0] : null;
   }
 
   // =====================================================

@@ -4,6 +4,7 @@ using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Messaging.Adapters;
 using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.Manifest;
 using System.Text.Json;
 using Xunit;
 
@@ -11,6 +12,15 @@ namespace Franz.Common.Messaging.Tests.Adapters;
 
 public class MessageDeserializerExtensionsTests
 {
+  static MessageDeserializerExtensionsTests()
+  {
+    var assembly = typeof(MessageDeserializerExtensionsTests).Assembly;
+    var existing = MessagingManifestRegistry.Get(assembly);
+    MessagingManifestRegistry.Register(assembly, new MessagingManifest(
+        existing.Destinations,
+        existing.Subscriptions,
+        existing.KnownTypes.Concat(new[] { typeof(TestCommand), typeof(TestEvent) })));
+  }
   // Define concrete types for testing reflection logic
   public record TestCommand(string Data) : ICommand
   {
@@ -85,6 +95,13 @@ public class MessageDeserializerExtensionsTests
 
     // Assert
     result.Should().BeNull();
+  }
+
+  [Fact]
+  public void ToCommand_WhenTypeIsNotInManifest_ShouldReturnNull()
+  {
+    var message = new Message("{}") { MessageType = "Unregistered.Namespace.Command" };
+    message.ToCommand().Should().BeNull();
   }
 
   [Fact]

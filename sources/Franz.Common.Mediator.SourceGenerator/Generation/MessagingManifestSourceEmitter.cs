@@ -10,13 +10,20 @@ internal static class MessagingManifestSourceEmitter
 {
   public static string Generate(IEnumerable<string> destinations, IEnumerable<HandlerInfo> handlers)
   {
+    var handlerArray = handlers.ToArray();
     var destinationTypes = destinations
         .Distinct(StringComparer.Ordinal)
         .OrderBy(static type => type, StringComparer.Ordinal)
         .ToArray();
-    var subscriptionTypes = handlers
+    var subscriptionTypes = handlerArray
         .Where(static handler => handler.HandlerKind == "Notification" && handler.IsIntegrationEvent)
         .Select(static handler => handler.RequestType)
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(static type => type, StringComparer.Ordinal)
+        .ToArray();
+    var knownTypes = handlerArray
+        .Select(static handler => handler.RequestType)
+        .Concat(destinationTypes)
         .Distinct(StringComparer.Ordinal)
         .OrderBy(static type => type, StringComparer.Ordinal)
         .ToArray();
@@ -38,12 +45,18 @@ internal static class FranzMessagingGeneratedManifest
             new MessagingManifest(
                 new Type[]
                 {");
+
     foreach (var type in destinationTypes)
       builder.Append("                    typeof(").Append(type).AppendLine("),");
     builder.AppendLine(@"                },
                 new Type[]
                 {");
     foreach (var type in subscriptionTypes)
+      builder.Append("                    typeof(").Append(type).AppendLine("),");
+    builder.AppendLine(@"                },
+                new Type[]
+                {");
+    foreach (var type in knownTypes)
       builder.Append("                    typeof(").Append(type).AppendLine("),");
     builder.AppendLine(@"                }));
     }
