@@ -432,17 +432,17 @@ public sealed class KafkaMessageListener : IListener
     try
     {
       PauseAssignedPartitions();
-      var deliveryTask = _deadLetterProducer.ProduceAsync(deadLetterTopic,
-          new Confluent.Kafka.Message<string, byte[]>
-          {
-            Key = result.Message.Key,
-            Value = Encoding.UTF8.GetBytes(result.Message.Value),
-            Headers = headers,
-            Timestamp = result.Message.Timestamp
-          }, cancellationToken);
-
       try
       {
+        var deliveryTask = _deadLetterProducer.ProduceAsync(deadLetterTopic,
+            new Confluent.Kafka.Message<string, byte[]>
+            {
+              Key = result.Message.Key,
+              Value = Encoding.UTF8.GetBytes(result.Message.Value),
+              Headers = headers,
+              Timestamp = result.Message.Timestamp
+            }, cancellationToken);
+
         await AwaitWhilePollingAsync(deliveryTask, cancellationToken).ConfigureAwait(false);
       }
       catch (OperationCanceledException)
