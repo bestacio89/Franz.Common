@@ -8,42 +8,42 @@
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Franz.Common.Messaging.MassTransit.Contracts.IKafkaProducer.SubscribeAsync``1(System.String,System.Func{``0,System.Threading.Tasks.Task},System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Left>
     <Right>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Franz.Common.Messaging.MassTransit.Contracts.IKafkaConsumer.PublishAsync``1(``0,System.String,System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Left>
     <Right>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Franz.Common.Messaging.MassTransit.Contracts.IKafkaConsumer.SubscribeAsync``1(System.String,System.Func{``0,System.Threading.Tasks.Task},System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Left>
     <Right>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Franz.Common.Messaging.MassTransit.KafkaProducer.SubscribeAsync``1(System.String,System.Func{``0,System.Threading.Tasks.Task},System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Left>
     <Right>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Franz.Common.Messaging.MassTransit.KafkaConsumer.PublishAsync``1(``0,System.String,System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Left>
     <Right>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
-    <DiagnosticId>CP0001</DiagnosticId>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Franz.Common.Messaging.MassTransit.KafkaConsumer.SubscribeAsync``1(System.String,System.Func{``0,System.Threading.Tasks.Task},System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Left>
     <Right>lib/net10.0/Franz.Common.Messaging.MassTransit.dll</Right>
