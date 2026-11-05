@@ -1,10 +1,10 @@
 # Franz.Common.Serialization
 
-> Shared framework capability for the Franz.Common framework on .NET 10.
+> Provides Serialization integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Overview
 
-The `Franz.Common.Serialization` package provides shared framework capability within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Provides Serialization integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Installation
 
@@ -46,7 +46,7 @@ A serialization utility library within the **Franz Framework** that simplifies J
 ## **Version Information**
 
 **Current Version:** v2.3.4
-- Part of the private **Franz Framework** ecosystem.
+- Part of the open-source Franz.Common ecosystem.
 
 ---
 
@@ -58,21 +58,18 @@ This package is lightweight and has no external dependencies beyond the .NET run
 
 ## **Installation**
 
-### **From Private Azure Feed**
-Since this package is hosted privately, configure your NuGet client:
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common.Serialization
+```
+
 ```
 
 Install the package:
 
 ```bash
-dotnet add package Franz.Common.Serialization  
+dotnet add package Franz.Common.Serialization
 ```
 
 ---
@@ -142,18 +139,16 @@ The **Franz.Common.Serialization** package integrates seamlessly with the **Fran
 
 ## **Contributing**
 
-This package is part of a private framework. Contributions are limited to the internal development team. If you have access, follow these steps:
+Contributions are welcome under the MIT License. To propose a change:
 1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
 2. Create a feature branch.
 3. Submit a pull request for review.
 
 ---
 
-## **License**
+## License
 
-This library is licensed under the MIT License. See the `LICENSE` file for more details.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 

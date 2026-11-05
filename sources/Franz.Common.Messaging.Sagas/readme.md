@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Sagas
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> Franz.Common.Messaging.Sagas provides long-running workflow orchestration , distributed coordination , and deterministic state machines fully integrated into the Franz architecture. Sagas in Franz unify: They operate transport-agnostically and integrate seamlessly with: --- --- New persistence providers added: Both sup
 
 ## Overview
 
-The `Franz.Common.Messaging.Sagas` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Franz.Common.Messaging.Sagas provides long-running workflow orchestration , distributed coordination , and deterministic state machines fully integrated into the Franz architecture. Sagas in Franz unify: They operate transport-agnostically and integrate seamlessly with: --- --- New persistence providers added: Both sup
 
 ## Installation
 
@@ -329,7 +329,6 @@ The Saga engine adheres to Franz’s core principles:
 ---
 
 
-
 ### v2.0.1 – Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
@@ -341,3 +340,8 @@ The Saga engine adheres to Franz’s core principles:
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

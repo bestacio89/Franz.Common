@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Kafka
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> A Kafka transport integration for the Franz Framework , designed to provide clean, deterministic, and production-grade interaction with Kafka topics, producers, and consumers. This package focuses exclusively on Kafka transport concerns : configuration, producers, consumers, serialization, and transactions.
 
 ## Overview
 
-The `Franz.Common.Messaging.Kafka` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+A Kafka transport integration for the Franz Framework , designed to provide clean, deterministic, and production-grade interaction with Kafka topics, producers, and consumers. This package focuses exclusively on Kafka transport concerns : configuration, producers, consumers, serialization, and transactions.
 
 ## Installation
 
@@ -101,13 +101,13 @@ This separation ensures:
 
 This package depends on:
 
-- **Confluent.Kafka** (2.3.0)  
+- **Confluent.Kafka** (2.3.0)
   Core Kafka client implementation
 
-- **Franz.Common.Messaging**  
+- **Franz.Common.Messaging**
   Core messaging abstractions and contracts
 
-- **Franz.Common.Annotations**  
+- **Franz.Common.Annotations**
   Messaging and modeling annotations
 
 > ⚠️ Hosting integration is intentionally excluded.
@@ -297,3 +297,8 @@ That separation is what makes Franz:
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.RabbitMQ
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> Provides Messaging RabbitMQ integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Overview
 
-The `Franz.Common.Messaging.RabbitMQ` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Provides Messaging RabbitMQ integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Installation
 
@@ -25,7 +25,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 
 ## Package-specific guide
 
-Franz now speaks **RabbitMQ**.  
+Franz now speaks **RabbitMQ**.
 The same architectural contract used for Kafka applies here — **one pipeline, one model, zero spaghetti**.
 
 RabbitMQ is just a transport. Franz does the rest.
@@ -70,10 +70,10 @@ Kafka and RabbitMQ share the **exact same messaging semantics** in Franz.
 
 ## ⚖️ Philosophy
 
-> *“We don’t care about MQ.  
+> *“We don’t care about MQ.
 > We make it behave.”*
 
-Franz removes broker-specific complexity.  
+Franz removes broker-specific complexity.
 Choose **Kafka** or **RabbitMQ** — your application code does not change.
 
 ---
@@ -127,3 +127,8 @@ This release finalizes RabbitMQ as a **first-class transport** in Franz.
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

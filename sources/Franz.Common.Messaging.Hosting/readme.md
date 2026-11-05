@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Hosting
 
-> Messaging and distributed integration for the Franz.Common framework on .NET 10.
+> A foundational library within the Franz Framework designed to enable and manage hosted messaging services in distributed applications. This package provides hosting utilities, message execution strategies, delegation, transaction management, and seamless integration with Microsoft.Extensions.Hosting .
 
 ## Overview
 
-The `Franz.Common.Messaging.Hosting` package provides messaging and distributed integration within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+A foundational library within the Franz Framework designed to enable and manage hosted messaging services in distributed applications. This package provides hosting utilities, message execution strategies, delegation, transaction management, and seamless integration with Microsoft.Extensions.Hosting .
 
 ## Installation
 
@@ -25,7 +25,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 
 ## Package-specific guide
 
-A foundational library within the **Franz Framework** designed to enable and manage hosted messaging services in distributed applications.  
+A foundational library within the **Franz Framework** designed to enable and manage hosted messaging services in distributed applications.
 This package provides hosting utilities, message execution strategies, delegation, transaction management, and seamless integration with **Microsoft.Extensions.Hosting**.
 
 ---
@@ -92,11 +92,11 @@ Franz.Common.Messaging.Hosting/
 
 ## ⚙️ Dependencies
 
-- **Microsoft.Extensions.DependencyInjection.Abstractions** (10.0.14)  
-- **Microsoft.Extensions.Hosting** (10.0.14)  
-- **Franz.Common.Hosting** – general hosting utilities  
-- **Franz.Common.Logging** – centralized structured logging  
-- **Franz.Common.Messaging** – core messaging abstractions  
+- **Microsoft.Extensions.DependencyInjection.Abstractions** (10.0.14)
+- **Microsoft.Extensions.Hosting** (10.0.14)
+- **Franz.Common.Hosting** – general hosting utilities
+- **Franz.Common.Logging** – centralized structured logging
+- **Franz.Common.Messaging** – core messaging abstractions
 
 ---
 
@@ -166,7 +166,7 @@ public class CustomMessagingStrategyExecuter : IMessagingStrategyExecuter
 ## 📝 Version Information
 
 * **Current Version:** v2.3.4
-* Part of the private **Franz Framework** ecosystem.
+* Part of the open-source Franz.Common ecosystem.
 ---
 
 ## 📜 License
@@ -205,7 +205,6 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 - Updated to **.NET 10.0**
 
 
-
 ### v2.0.1 – Internal Modernization
 
 - Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
@@ -217,3 +216,8 @@ This library is licensed under the MIT License. See the `LICENSE` file for detai
 ## Dependency maintenance — October 2026
 
 This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+
+
+## License
+
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.

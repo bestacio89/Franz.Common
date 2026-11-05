@@ -1,10 +1,10 @@
 # Franz.Common
 
-> Shared framework capability for the Franz.Common framework on .NET 10.
+> Provides Franz Common integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Overview
 
-The `Franz.Common` package provides shared framework capability within Franz.Common. It is designed to compose with the rest of the framework rather than imposing unrelated infrastructure choices on every application.
+Provides Franz Common integration and reusable abstractions for .NET applications built with Franz.Common.
 
 ## Installation
 
@@ -25,11 +25,11 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 
 ## Package-specific guide
 
-A foundational library in the **Franz Framework** designed to provide core utilities, dependency injection abstractions, and common extensions for .NET applications. This library is part of the private Franz Framework ecosystem, versioned as `1.2.65`, and hosted on a private Azure NuGet feed.
+A foundational library in the **Franz Framework** designed to provide core utilities, dependency injection abstractions, and common extensions for .NET applications. This library is part of the open-source Franz.Common ecosystem ecosystem, versioned as `1.2.65`, and hosted on a NuGet.org.
 
 ---
 **Current Version:** v2.3.4
---- 
+---
 ## **Features**
 
 ### **Dependency Injection Interfaces**
@@ -67,28 +67,26 @@ A foundational library in the **Franz Framework** designed to provide core utili
 ## **Version Information**
 
 - **Current Version**: 2.3.4
-- Part of the private Franz Framework suite, hosted on a private Azure NuGet feed.
+- Part of the open-source Franz.Common ecosystem suite, hosted on a NuGet.org.
 
 ---
 
 ## **Installation**
 
-### **Step 1: Add the Private Azure Feed**
-Configure your NuGet client to access the private Azure feed:
+### Install from NuGet.org
 
 ```bash
-dotnet nuget add source "https://your-private-feed-url" \
-  --name "AzurePrivateFeed" \
-  --username "YourAzureUsername" \
-  --password "YourAzurePassword" \
-  --store-password-in-clear-text
+dotnet add package Franz.Common
 ```
+
+zure feed:
+
 
 ### **Step 2: Install the Package**
 Use the .NET CLI to install:
 
 ```bash
-dotnet add package Franz.Common  
+dotnet add package Franz.Common
 ```
 
 ---
@@ -209,13 +207,13 @@ else if (hostEnvironment.IsPreProduction())
 
 ## **Dependencies**
 
-This library is fully self-contained and serves as a core building block for the private Franz Framework.
+This library is fully self-contained and serves as a core building block for the open-source Franz.Common ecosystem.
 
 ---
 
 ## **Development Notes**
 
-This library is part of the private Franz Framework and is not publicly available. It is distributed exclusively through a private Azure NuGet feed.
+This package is publicly available on NuGet.org and distributed under the MIT License.
 
 ### **Contributing**
 Contributions are restricted to the Franz Framework development team. If you are authorized to contribute:
@@ -225,11 +223,9 @@ Contributions are restricted to the Franz Framework development team. If you are
 
 ---
 
-## **License**
+## License
 
-This library is private and governed by the Franz Framework's internal licensing terms. For licensing inquiries, please contact the framework's maintainers.
-
----
+Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
 
 ## **Changelog**
 
