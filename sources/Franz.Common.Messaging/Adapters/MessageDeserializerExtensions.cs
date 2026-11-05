@@ -5,6 +5,7 @@ using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Manifest;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
@@ -62,9 +63,20 @@ public static class MessageDeserializerExtensions
       return null;
 
     var cacheKey = $"{typeName}:{expectedBase.FullName}";
-    return TypeResolutionCache.GetOrAdd(cacheKey, _ => new Lazy<Type?>(
+    var resolution = TypeResolutionCache.GetOrAdd(cacheKey, _ => new Lazy<Type?>(
         () => ResolveTypeFromManifest(typeName, expectedBase),
-        LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+        LazyThreadSafetyMode.ExecutionAndPublication));
+    var resolvedType = resolution.Value;
+
+    // A manifest may be registered after an earlier lookup (for example during
+    // modular application startup). Do not retain negative results permanently.
+    if (resolvedType is null)
+    {
+      ((ICollection<KeyValuePair<string, Lazy<Type?>>>)TypeResolutionCache)
+          .Remove(new KeyValuePair<string, Lazy<Type?>>(cacheKey, resolution));
+    }
+
+    return resolvedType;
   }
 
   private static Type? ResolveTypeFromManifest(string typeName, Type expectedBase)
