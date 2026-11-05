@@ -16,6 +16,7 @@ using Franz.Common.Messaging.RabbitMQ.Transactions;
 using Franz.Common.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
 using System.Linq;
@@ -192,6 +193,22 @@ public static class ServiceCollectionExtensions
           $"Generated messaging manifest and registered integration event handlers disagree. Missing from manifest: {string.Join(", ", missingFromManifest.Select(static type => type.FullName))}. Missing registered handlers: {string.Join(", ", missingHandlers.Select(static type => type.FullName))}.");
   }
 
+  private sealed class RabbitMQMessagingManifestValidationHostedService : IHostedService
+  {
+    private readonly IServiceCollection _services;
+
+    public RabbitMQMessagingManifestValidationHostedService(IServiceCollection services)
+        => _services = services;
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+      ValidateMessagingManifest(_services);
+      return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+  }
+
   public static IServiceCollection AddOnlyHighLifetimeModelProvider(this IServiceCollection services, ServiceLifetime serviceLifetime)
   {
     var serviceType = typeof(IModelProvider);
@@ -217,7 +234,8 @@ public static class ServiceCollectionExtensions
 
   public static IServiceCollection AddRabbitMQMessagingConsumer(this IServiceCollection services, IConfiguration configuration)
   {
-    ValidateMessagingManifest(services);
+    services.TryAddSingleton<IServiceCollection>(services);
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, RabbitMQMessagingManifestValidationHostedService>());
     services.AddOnlyHighLifetimeModelProvider(ServiceLifetime.Singleton)
             .AddRabbitMQMessagingConfiguration(configuration)
             .AddNoDuplicateScoped<MessageContextAccessor>()
