@@ -48,7 +48,7 @@ Provides **unified cache abstractions**, **hybrid caching (L1 + L2)**, Mediator 
   * `ICacheProvider`
   * `ICacheKeyStrategy`
   * `ISettingsCache`
-  * **Single cache options model** (TTL, sliding, priority, tags)
+  * **Single cache options model** (TTL, sliding, priority)
 
 * ⚡ **Hybrid caching support**
 
@@ -209,6 +209,7 @@ Exports relevant stats only (hits/misses/size) to Excel for **offline analysis**
 ### **1.7.7**
 
 * Unified cache options across all providers
+* Key-based invalidation is the supported cache removal contract; tag invalidation is not exposed
 * Hybrid cache provider stabilized (L1 + L2)
 * Removed legacy entry options
 * Provider internals aligned with Mediator pipeline
