@@ -68,7 +68,8 @@ public sealed class TenantPersistenceIsolationTests
         await using var tenantAContext = CreateContext(databaseName, tenantA);
         var rows = await tenantAContext.Entities.ToListAsync();
 
-        Assert.Equal(["published"], rows.Select(row => row.Name));
+        Assert.Single(rows);
+        Assert.Equal("published", rows[0].Name);
     }
 
     [Fact]

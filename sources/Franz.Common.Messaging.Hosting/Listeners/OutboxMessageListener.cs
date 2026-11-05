@@ -54,6 +54,9 @@ public sealed class OutboxMessageListener : IListener
 
   public async Task Listen(CancellationToken stoppingToken = default)
   {
+    using (var startupScope = _scopeFactory.CreateScope())
+      TenantMessagingStartupValidation.Validate(startupScope.ServiceProvider);
+
     _logger.LogInformation("Outbox message listener started.");
 
     while (!stoppingToken.IsCancellationRequested)

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Franz.Common.EntityFramework.Configuration;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Franz.Common.EntityFramework;
