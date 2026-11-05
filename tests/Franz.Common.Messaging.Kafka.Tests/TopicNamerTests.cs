@@ -33,7 +33,7 @@ public sealed class TopicNamerTests
   {
     var assembly = new Mock<IAssembly>();
     assembly.Setup(value => value.Name).Returns("Company.Identity.Api");
-    TopicNamer.GetDeadLetterTopicName(assembly.Object).Should().Be("identity-in-in-dlt");
+    TopicNamer.GetDeadLetterTopicName(assembly.Object).Should().Be("identity-in-dlt");
   }
 
   [Theory]

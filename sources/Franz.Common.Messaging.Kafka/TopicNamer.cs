@@ -22,7 +22,10 @@ public static class TopicNamer
   public static string GetDeadLetterTopicName(IAssembly assembly)
   {
     ArgumentNullException.ThrowIfNull(assembly);
-    return GetTopicName(assembly) + DeadLetterTopicSuffixName;
+    var assemblyName = assembly.Name;
+    if (string.IsNullOrWhiteSpace(assemblyName))
+      throw new InvalidOperationException("The entry assembly has no valid name.");
+    return GetServiceName(assemblyName) + DeadLetterTopicSuffixName;
   }
 
   public static string GetTopicName(Type eventType)
