@@ -107,6 +107,51 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
     result.IsHit.Should().BeFalse();
   }
 
+  [Fact]
+  public async Task SetAsync_Should_Preserve_Null_As_A_Cached_Value()
+  {
+    var key = Guid.NewGuid().ToString();
+    await _provider.SetAsync<string?>(key, null);
+
+    var factoryCalls = 0;
+    var result = await _provider.GetOrSetAsync<string?>(key, _ =>
+    {
+      factoryCalls++;
+      return Task.FromResult<string?>("factory");
+    });
+
+    result.IsHit.Should().BeTrue();
+    result.Value.Should().BeNull();
+    factoryCalls.Should().Be(0);
+  }
+
+  [Fact]
+  public async Task SlidingExpiration_Should_Refresh_Until_AbsoluteExpiration()
+  {
+    var key = Guid.NewGuid().ToString();
+    var options = new CacheOptions
+    {
+      DefaultAbsoluteExpiration = TimeSpan.FromSeconds(4),
+      DefaultSlidingExpiration = TimeSpan.FromSeconds(1)
+    };
+
+    var first = await _provider.GetOrSetAsync(key, _ => Task.FromResult("cached"), options);
+    first.IsHit.Should().BeFalse();
+
+    await Task.Delay(600);
+    var second = await _provider.GetOrSetAsync(key, _ => Task.FromResult("replacement"), options);
+    second.IsHit.Should().BeTrue();
+
+    await Task.Delay(600);
+    var third = await _provider.GetOrSetAsync(key, _ => Task.FromResult("replacement"), options);
+    third.IsHit.Should().BeTrue();
+
+    await Task.Delay(3000);
+    var expired = await _provider.GetOrSetAsync(key, _ => Task.FromResult("fresh"), options);
+    expired.IsHit.Should().BeFalse();
+    expired.Value.Should().Be("fresh");
+  }
+
   [Theory]
   [InlineData("")]
   [InlineData(" ")]

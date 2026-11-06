@@ -34,6 +34,28 @@ public sealed class MemoryCacheConcurrencyTests
   }
 
   [Fact]
+  public async Task GetOrSetAsync_ShouldTreatNullAsAHit()
+  {
+    using var memory = new MemoryCache(new MemoryCacheOptions());
+    var options = new Mock<IOptionsMonitor<CacheOptions>>();
+    options.SetupGet(x => x.CurrentValue).Returns(new CacheOptions());
+    var provider = new MemoryCacheProvider(memory, options.Object);
+
+    await provider.SetAsync<string?>("nullable-entry", null);
+
+    var factoryCalls = 0;
+    var result = await provider.GetOrSetAsync<string?>("nullable-entry", _ =>
+    {
+      factoryCalls++;
+      return Task.FromResult<string?>("factory");
+    });
+
+    result.IsHit.Should().BeTrue();
+    result.Value.Should().BeNull();
+    factoryCalls.Should().Be(0);
+  }
+
+  [Fact]
   public async Task SetAsync_ShouldReplaceAnExistingValue()
   {
     using var memory = new MemoryCache(new MemoryCacheOptions());
