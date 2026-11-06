@@ -18,7 +18,7 @@ namespace Franz.Common.Caching.Tests.Pipelines;
 
 public sealed class CachingPipelineTests
 {
-  public sealed record TestRequest(int Id);
+  public sealed record TestRequest(int Id) : IQuery<TestResponse>;
   public sealed record TestResponse(string Value);
 
   /// <summary>
