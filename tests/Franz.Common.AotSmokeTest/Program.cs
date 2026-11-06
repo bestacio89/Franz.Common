@@ -49,48 +49,6 @@ public static class Program
         if (!distributedResult.IsHit || distributedResult.Value.Id != 42)
             return 14;
 
-        var hybridDistributedCache = new AotDistributedCache();
-
-        var firstHybridServices = new ServiceCollection();
-        firstHybridServices.AddSingleton<IDistributedCache>(hybridDistributedCache);
-        firstHybridServices.AddFranzCachingJsonTypeInfoResolver(AotCacheKeyJsonContext.Default);
-        firstHybridServices.AddFranzHybridCaching(options =>
-        {
-            options.DefaultAbsoluteExpiration = TimeSpan.FromMinutes(1);
-            options.DefaultSlidingExpiration = TimeSpan.FromSeconds(30);
-        });
-
-        using (var firstHybridProvider = firstHybridServices.BuildServiceProvider())
-        {
-            var hybridCache = firstHybridProvider.GetRequiredService<ICacheProvider>();
-            var firstHybrid = await hybridCache.GetOrSetAsync(
-                "aot-hybrid",
-                _ => Task.FromResult(new AotCacheKeyRequest(99, "hybrid")));
-
-            if (firstHybrid.IsHit)
-                return 15;
-        }
-
-        var secondHybridServices = new ServiceCollection();
-        secondHybridServices.AddSingleton<IDistributedCache>(hybridDistributedCache);
-        secondHybridServices.AddFranzCachingJsonTypeInfoResolver(AotCacheKeyJsonContext.Default);
-        secondHybridServices.AddFranzHybridCaching(options =>
-        {
-            options.DefaultAbsoluteExpiration = TimeSpan.FromMinutes(1);
-            options.DefaultSlidingExpiration = TimeSpan.FromSeconds(30);
-        });
-
-        using (var secondHybridProvider = secondHybridServices.BuildServiceProvider())
-        {
-            var hybridCache = secondHybridProvider.GetRequiredService<ICacheProvider>();
-            var secondHybrid = await hybridCache.GetOrSetAsync(
-                "aot-hybrid",
-                _ => Task.FromResult(new AotCacheKeyRequest(0, "must-not-run")));
-
-            if (!secondHybrid.IsHit || secondHybrid.Value.Id != 99)
-                return 16;
-        }
-
         var cachingServices = new ServiceCollection();
         cachingServices.AddFranzCachingJsonTypeInfoResolver(AotCacheKeyJsonContext.Default);
         cachingServices.AddFranzMemoryCaching();

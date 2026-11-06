@@ -143,6 +143,17 @@ providers, and the HybridCache serializer factory. Native AOT applications fail
 explicitly when required metadata is missing rather than relying on runtime
 reflection.
 
+The HybridCache integration uses Franz's metadata-only serializer, but the
+current Microsoft.Extensions.Caching.Hybrid registration path also roots its
+built-in reflection-based serializer factory. That dependency emits linker
+warnings during strict Native AOT publishing even when Franz removes the
+built-in factory from the runtime service collection. Consequently, the
+warning-clean AOT smoke test covers Franz's key strategy, Distributed provider,
+and Mediator caching pipeline; it deliberately does not claim that the current
+HybridCache package integration is warning-clean under Native AOT. Keep the
+HybridCache serializer metadata registered and validate that integration with
+the regular HybridCache provider tests.
+
 ## Mediator integration
 
 ```csharp
