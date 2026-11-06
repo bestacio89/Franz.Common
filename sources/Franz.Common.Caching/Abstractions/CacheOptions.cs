@@ -17,7 +17,7 @@ public sealed record CacheOptions
   [Required]
   public required TimeSpan DefaultSlidingExpiration { get; init; } = TimeSpan.FromMinutes(20);
 
-  [RegularExpression(@"^[a-zA-Z0-9_-]*$", ErrorMessage = "Prefix must be alphanumeric.")]
+  [RegularExpression(@"^[a-zA-Z0-9:_-]*$", ErrorMessage = "Prefix must be alphanumeric.")]
   public string KeyPrefix { get; set; } = "franz:";
 
   /// <summary>
