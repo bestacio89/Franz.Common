@@ -1,5 +1,6 @@
 using Franz.Common.Caching.Abstractions;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Caching.Hybrid;
 
@@ -10,12 +11,12 @@ namespace Franz.Common.Caching.Hybrid;
 public sealed class HybridCacheProvider : ICacheProvider
 {
   private readonly HybridCache _cache;
-  private readonly CacheOptions _defaultOptions;
+  private readonly IOptionsMonitor<CacheOptions> _optionsMonitor;
 
-  public HybridCacheProvider(HybridCache cache, CacheOptions options)
+  public HybridCacheProvider(HybridCache cache, IOptionsMonitor<CacheOptions> optionsMonitor)
   {
     _cache = cache ?? throw new ArgumentNullException(nameof(cache));
-    _defaultOptions = options ?? throw new ArgumentNullException(nameof(options));
+    _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
   }
 
   public async Task<CacheResult<T>> GetOrSetAsync<T>(
@@ -38,7 +39,7 @@ public sealed class HybridCacheProvider : ICacheProvider
           isHit = false;
           return await f(cancellationToken).ConfigureAwait(false);
         },
-        CreateEntryOptions(overrideOptions ?? _defaultOptions),
+        CreateEntryOptions(overrideOptions ?? _optionsMonitor.CurrentValue),
         cancellationToken: ct).ConfigureAwait(false);
 
     return new CacheResult<T>(value, isHit);
@@ -55,7 +56,7 @@ public sealed class HybridCacheProvider : ICacheProvider
     await _cache.SetAsync(
         ApplyPrefix(key),
         value,
-        CreateEntryOptions(options ?? _defaultOptions),
+        CreateEntryOptions(options ?? _optionsMonitor.CurrentValue),
         cancellationToken: ct).ConfigureAwait(false);
   }
 
@@ -65,7 +66,7 @@ public sealed class HybridCacheProvider : ICacheProvider
     return _cache.RemoveAsync(ApplyPrefix(key), ct).AsTask();
   }
 
-  private string ApplyPrefix(string key) => $"{_defaultOptions.KeyPrefix}{key}";
+  private string ApplyPrefix(string key) => $"{_optionsMonitor.CurrentValue.KeyPrefix}{key}";
 
   private static HybridCacheEntryOptions CreateEntryOptions(CacheOptions options)
       => new()

@@ -10,6 +10,7 @@ using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.MultiTenancy;
 using Franz.Common.Caching.MultiTenancy;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -71,6 +72,50 @@ public static class FranzCachingServiceCollectionExtensions
     if (configure != null) services.Configure(configure);
 
     services.TryAddSingleton<ICacheProvider, MemoryCacheProvider>();
+    return services.AddFranzCachingCore();
+  }
+
+  /// <summary>
+  /// Registers the .NET HybridCache provider. Register an IDistributedCache
+  /// implementation separately when a distributed L2 store is required.
+  /// </summary>
+  public static IServiceCollection AddFranzHybridCaching(
+      this IServiceCollection services,
+      Action<CacheOptions>? configure = null)
+  {
+    ArgumentNullException.ThrowIfNull(services);
+    services.AddHybridCache();
+    services.AddOptions<CacheOptions>();
+
+    if (configure is not null)
+    {
+      services.Configure(configure);
+    }
+
+    services.TryAddSingleton<ICacheProvider, HybridCacheProvider>();
+    return services.AddFranzCachingCore();
+  }
+
+  /// <summary>
+  /// Registers HybridCache and binds Franz cache options from configuration.
+  /// An IDistributedCache implementation may be registered separately for L2.
+  /// </summary>
+  public static IServiceCollection AddFranzHybridCaching(
+      this IServiceCollection services,
+      IConfiguration configuration,
+      Action<CacheOptions>? configure = null)
+  {
+    ArgumentNullException.ThrowIfNull(services);
+    ArgumentNullException.ThrowIfNull(configuration);
+    services.AddHybridCache();
+    services.AddFranzCachingOptions(configuration);
+
+    if (configure is not null)
+    {
+      services.Configure(configure);
+    }
+
+    services.TryAddSingleton<ICacheProvider, HybridCacheProvider>();
     return services.AddFranzCachingCore();
   }
 
