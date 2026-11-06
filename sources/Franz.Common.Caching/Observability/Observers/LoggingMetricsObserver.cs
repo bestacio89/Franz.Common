@@ -45,7 +45,6 @@ namespace Franz.Common.Caching.Observability.Observers
         _logger.LogInformation("Cache SET | Key={Key} | Size={SizeBytes} bytes | TTL={Ttl}",
             entry.Key, entry.EstimatedSizeInBytes, entry.Ttl);
 
-      CacheMetrics.Misses.Add(1);
       Interlocked.Increment(ref _totalSets);
     }
 
