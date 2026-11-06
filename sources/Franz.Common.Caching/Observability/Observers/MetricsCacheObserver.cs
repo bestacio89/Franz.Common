@@ -1,48 +1,51 @@
-﻿using Franz.Common.Caching.Observability;
-using Franz.Common.Caching.Metrics;
 using System.Collections.Concurrent;
-using System.Diagnostics.Metrics;
+using System.Collections.ObjectModel;
+using Franz.Common.Caching.Metrics;
 
 namespace Franz.Common.Caching.Observability.Observers;
 
+/// <summary>
+/// Emits aggregate cache metrics and keeps a bounded diagnostic snapshot of
+/// per-key activity. High-cardinality keys beyond the configured limit still
+/// contribute to aggregate counters but are not retained individually.
+/// </summary>
 public sealed class MetricsCacheObserver : ICacheObserver
 {
+  private const int MaxRemovedTags = 256;
   private readonly ConcurrentDictionary<string, CacheEntryStats> _stats = new();
-  private ConcurrentBag<string> _removedTags = new();
+  private readonly ConcurrentQueue<string> _removedTags = new();
+  private readonly object _trackingGate = new();
+  private readonly int _maxTrackedEntries;
+  private int _trackedEntries;
+  private int _totalSets;
+  private int _totalHits;
+  private int _totalRemovals;
 
-  public int TotalSets { get; private set; }
-  public int TotalHits { get; private set; }
-  public int TotalRemovals { get; private set; }
+  public MetricsCacheObserver() : this(10_000) { }
 
-  public List<string> CurrentRemovedTags => _removedTags.ToList();
+  public MetricsCacheObserver(int maxTrackedEntries)
+  {
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxTrackedEntries);
+    _maxTrackedEntries = maxTrackedEntries;
+  }
+
+  public int TotalSets => Volatile.Read(ref _totalSets);
+  public int TotalHits => Volatile.Read(ref _totalHits);
+  public int TotalRemovals => Volatile.Read(ref _totalRemovals);
+  public List<string> CurrentRemovedTags => _removedTags.ToArray().ToList();
   public List<string> CurrentKeys => _stats.Keys.ToList();
 
   public void OnCacheSet(CacheEntryDescriptor entry)
   {
-    var stat = _stats.GetOrAdd(entry.Key, _ => new CacheEntryStats());
-    stat.Sets++;
-    stat.EstimatedSizeBytes = entry.EstimatedSizeInBytes;
-    stat.LastSet = DateTime.UtcNow;
-
-    // Clear and store tags properly
-    stat.Tags.Clear();
-    if (entry.Tags != null)
-    {
-      foreach (var t in entry.Tags)
-        stat.Tags.Add(t);
-    }
-
-    TotalSets++;
+    GetOrAddStats(entry.Key)?.RecordSet(entry.EstimatedSizeInBytes, entry.Tags);
+    Interlocked.Increment(ref _totalSets);
+    CacheMetrics.Misses.Add(1);
   }
 
   public void OnCacheHit(CacheAccessDescriptor access)
   {
-    var stat = _stats.GetOrAdd(access.Key, _ => new CacheEntryStats());
-    stat.Hits++;
-    stat.LastAccess = DateTime.UtcNow;
-    TotalHits++;
-
-    // Optional metrics
+    GetOrAddStats(access.Key)?.RecordHit();
+    Interlocked.Increment(ref _totalHits);
     CacheMetrics.Hits.Add(1);
     if (access.LookupLatencyMs.HasValue)
       CacheMetrics.LookupLatencyMs.Record(access.LookupLatencyMs.Value);
@@ -50,34 +53,75 @@ public sealed class MetricsCacheObserver : ICacheObserver
 
   public void OnCacheRemove(string key)
   {
-    _stats.TryRemove(key, out _);
-    TotalRemovals++;
+    RemoveTrackedKey(key);
+    Interlocked.Increment(ref _totalRemovals);
   }
 
   public void OnCacheRemoveByTag(string tag)
   {
-    var keysToRemove = _stats
-        .Where(kvp => kvp.Value.Tags.Contains(tag))
-        .Select(kvp => kvp.Key)
-        .ToList();
-
-    foreach (var key in keysToRemove)
+    var removed = 0;
+    lock (_trackingGate)
     {
-      _stats.TryRemove(key, out _);
-      TotalRemovals++;
+      foreach (var pair in _stats.ToArray())
+      {
+        if (pair.Value.Tags.Contains(tag) && _stats.TryRemove(pair.Key, out _))
+        {
+          _trackedEntries--;
+          removed++;
+        }
+      }
     }
 
-    _removedTags.Add(tag);
+    if (!string.IsNullOrWhiteSpace(tag))
+    {
+      _removedTags.Enqueue(tag);
+      while (_removedTags.Count > MaxRemovedTags) _removedTags.TryDequeue(out _);
+    }
+
+    if (removed > 0) Interlocked.Add(ref _totalRemovals, removed);
   }
 
   public void Reset()
   {
-    TotalSets = 0;
-    TotalHits = 0;
-    TotalRemovals = 0;
-    _stats.Clear();
-    _removedTags = new ConcurrentBag<string>();
+    lock (_trackingGate)
+    {
+      _stats.Clear();
+      _trackedEntries = 0;
+      while (_removedTags.TryDequeue(out _)) { }
+    }
+
+    Interlocked.Exchange(ref _totalSets, 0);
+    Interlocked.Exchange(ref _totalHits, 0);
+    Interlocked.Exchange(ref _totalRemovals, 0);
   }
 
-  public IReadOnlyDictionary<string, CacheEntryStats> Snapshot() => _stats;
+  public IReadOnlyDictionary<string, CacheEntryStats> Snapshot()
+  {
+    var snapshot = _stats.ToDictionary(pair => pair.Key, pair => pair.Value.Snapshot());
+    return new ReadOnlyDictionary<string, CacheEntryStats>(snapshot);
+  }
+
+  private CacheEntryStats? GetOrAddStats(string key)
+  {
+    if (_stats.TryGetValue(key, out var existing)) return existing;
+
+    lock (_trackingGate)
+    {
+      if (_stats.TryGetValue(key, out existing)) return existing;
+      if (_trackedEntries >= _maxTrackedEntries) return null;
+
+      var created = new CacheEntryStats();
+      _stats[key] = created;
+      _trackedEntries++;
+      return created;
+    }
+  }
+
+  private void RemoveTrackedKey(string key)
+  {
+    lock (_trackingGate)
+    {
+      if (_stats.TryRemove(key, out _)) _trackedEntries--;
+    }
+  }
 }

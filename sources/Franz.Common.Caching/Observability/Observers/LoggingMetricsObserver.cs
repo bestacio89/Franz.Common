@@ -13,7 +13,11 @@ namespace Franz.Common.Caching.Observability.Observers
   {
     private readonly ILogger<LoggingMetricsObserver> _logger;
     private readonly ConcurrentDictionary<string, bool> _keys = new();
-    private readonly ConcurrentBag<string> _removedTags = new();
+    private readonly ConcurrentQueue<string> _removedTags = new();
+    private readonly ConcurrentDictionary<string, string[]> _keyTags = new();
+    private readonly object _keyGate = new();
+    private const int MaxTrackedKeys = 10_000;
+    private const int MaxRemovedTags = 256;
 
     // Track operation counts for testing using volatile fields for Interlocked
     private int _totalSets = 0;
@@ -27,7 +31,7 @@ namespace Franz.Common.Caching.Observability.Observers
 
     public void OnCacheHit(CacheAccessDescriptor access)
     {
-      _keys.TryAdd(access.Key, true);
+      TrackKey(access.Key);
 
       if (_logger.IsEnabled(LogLevel.Debug))
       {
@@ -48,7 +52,7 @@ namespace Franz.Common.Caching.Observability.Observers
 
     public void OnCacheSet(CacheEntryDescriptor entry)
     {
-      _keys.TryAdd(entry.Key, true);
+      TrackKey(entry.Key, entry.Tags);
 
       if (_logger.IsEnabled(LogLevel.Information))
       {
@@ -67,7 +71,7 @@ namespace Franz.Common.Caching.Observability.Observers
 
     public void OnCacheRemove(string key)
     {
-      _keys.TryRemove(key, out _);
+      RemoveKey(key);
 
       if (_logger.IsEnabled(LogLevel.Information))
       {
@@ -79,19 +83,28 @@ namespace Franz.Common.Caching.Observability.Observers
 
     public void OnCacheRemoveByTag(string tag)
     {
-      foreach (var k in _keys.Keys.ToList())
+      lock (_keyGate)
       {
-        // Logic usually assumes keys contain the tag or are associated via metadata
-        if (k.Contains(tag))
-          _keys.TryRemove(k, out _);
+        foreach (var pair in _keyTags.ToArray())
+        {
+          if (pair.Value.Contains(tag, StringComparer.Ordinal))
+          {
+            _keyTags.TryRemove(pair.Key, out _);
+            _keys.TryRemove(pair.Key, out _);
+          }
+        }
+      }
+
+      if (!string.IsNullOrWhiteSpace(tag))
+      {
+        _removedTags.Enqueue(tag);
+        while (_removedTags.Count > MaxRemovedTags)
+          _removedTags.TryDequeue(out _);
       }
 
       if (_logger.IsEnabled(LogLevel.Information))
-      {
         _logger.LogInformation("Cache REMOVE BY TAG | Tag={Tag}", tag);
-      }
 
-      _removedTags.Add(tag);
       Interlocked.Increment(ref _totalRemovals);
     }
 
@@ -102,27 +115,43 @@ namespace Franz.Common.Caching.Observability.Observers
       Interlocked.Exchange(ref _totalHits, 0);
       Interlocked.Exchange(ref _totalRemovals, 0);
 
-      // Clear collections
-      _keys.Clear();
+      lock (_keyGate)
+      {
+        _keys.Clear();
+        _keyTags.Clear();
+      }
+      while (_removedTags.TryDequeue(out _)) { }
+    }
 
-      // ConcurrentBag doesn't have .Clear() in older .NET versions, 
-      // but in modern .NET it does. Otherwise, we re-initialize.
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_0_OR_GREATER
-      _removedTags.Clear();
-#else
-            while (_removedTags.TryTake(out _)) { }
-#endif
+    private void TrackKey(string key, IEnumerable<string>? tags = null)
+    {
+      if (string.IsNullOrWhiteSpace(key)) return;
+      lock (_keyGate)
+      {
+        if (!_keys.ContainsKey(key) && _keys.Count >= MaxTrackedKeys) return;
+        _keys[key] = true;
+        if (tags is not null) _keyTags[key] = tags.ToArray();
+      }
+    }
+
+    private void RemoveKey(string key)
+    {
+      lock (_keyGate)
+      {
+        _keys.TryRemove(key, out _);
+        _keyTags.TryRemove(key, out _);
+      }
     }
 
     // Expose operation counts for testing
-    public int TotalSets => _totalSets;
-    public int TotalHits => _totalHits;
-    public int TotalRemovals => _totalRemovals;
+    public int TotalSets => Volatile.Read(ref _totalSets);
+    public int TotalHits => Volatile.Read(ref _totalHits);
+    public int TotalRemovals => Volatile.Read(ref _totalRemovals);
 
     // Expose keys for testing
     public IReadOnlyCollection<string> CurrentKeys => _keys.Keys.ToList();
 
     // Expose removed tags for test assertions
-    public IReadOnlyCollection<string> CurrentRemovedTags => _removedTags.ToList();
+    public IReadOnlyCollection<string> CurrentRemovedTags => _removedTags.ToArray();
   }
 }
