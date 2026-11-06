@@ -41,7 +41,7 @@ public sealed class MemoryCacheProvider : ICacheProvider
     // 🔹 3. Create entry options using Reactive Monitor for defaults
     var entryOptions = CreateMemoryCacheOptions(requestOptions);
 
-    _cache.Set(key, value!, entryOptions);
+    _cache.Set(fullKey, value!, entryOptions);
 
     return new CacheResult<T>(value, IsHit: false);
   }
@@ -51,11 +51,11 @@ public sealed class MemoryCacheProvider : ICacheProvider
     if (string.IsNullOrWhiteSpace(key))
       throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
 
-    _cache.Remove(key);
+    _cache.Remove(ApplyPrefix(key, _optionsMonitor.CurrentValue.KeyPrefix));
     return Task.CompletedTask;
   }
 
-  private MemoryCacheEntryOptions CreateMemoryCacheOptions(CacheOptions? requestOptions)
+  private static string ApplyPrefix(string key, string prefix) => $"{prefix}{key}";\n\n  private MemoryCacheEntryOptions CreateMemoryCacheOptions(CacheOptions? requestOptions)
   {
     var globalSettings = _optionsMonitor.CurrentValue;
     var memoryOptions = new MemoryCacheEntryOptions();
