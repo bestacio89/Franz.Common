@@ -26,7 +26,7 @@ public sealed class DistributedCacheProvider(
     ArgumentNullException.ThrowIfNull(factory);
 
     // 1. Optimistic Fast Path (No Lock)
-    var cached = await cache.GetStringAsync(key, ct);
+    var cached = await cache.GetStringAsync(fullKey, ct);
     if (TryDeserialize(cached, out T? result))
     {
       return new CacheResult<T>(result!, IsHit: true);
@@ -50,7 +50,7 @@ public sealed class DistributedCacheProvider(
       var json = JsonSerializer.Serialize(value);
       var entryOptions = CreateDistributedCacheOptions(requestOptions);
 
-      await cache.SetStringAsync(key, json, entryOptions, ct);
+      await cache.SetStringAsync(fullKey, json, entryOptions, ct);
 
       return new CacheResult<T>(value, IsHit: false);
     }
@@ -94,7 +94,7 @@ public sealed class DistributedCacheProvider(
     };
   }
 
-  public Task RemoveAsync(string key, CancellationToken ct = default) => cache.RemoveAsync(key, ct);
+  public Task RemoveAsync(string key, CancellationToken ct = default)\n  {\n    ArgumentException.ThrowIfNullOrWhiteSpace(key);\n    var fullKey = $"{optionsMonitor.CurrentValue.KeyPrefix}{key}";\n    return cache.RemoveAsync(fullKey, ct);\n  }
 
   public void Dispose()
   {
