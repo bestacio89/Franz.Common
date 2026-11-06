@@ -33,20 +33,29 @@ jobs:
           dotnet-version: 10.0.403
 
       - name: Run Release benchmarks
-        run: >-
-          dotnet run
-          --project benchmarks/Franz.Common.Caching.Benchmarks/Franz.Common.Caching.Benchmarks.csproj
-          --configuration Release
-          -p:EnablePackageValidation=false
-          --
-          --filter "*Cache*"
-          --exporters json markdown
-          --artifacts ./BenchmarkDotNet.Artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet run \
+            --project benchmarks/Franz.Common.Caching.Benchmarks/Franz.Common.Caching.Benchmarks.csproj \
+            --configuration Release \
+            -p:EnablePackageValidation=false \
+            -- \
+            --filter "*Cache*" \
+            --exporters json markdown \
+            --artifacts ./BenchmarkDotNet.Artifacts 2>&1 | tee benchmark.log
+
+          if ! grep -Eq 'executed benchmarks: [1-9][0-9]*' benchmark.log; then
+            echo "::error::BenchmarkDotNet completed without executing any benchmark cases."
+            exit 1
+          fi
 
       - name: Upload benchmark reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: caching-benchmark-reports
-          path: BenchmarkDotNet.Artifacts/**
+          path: |
+            BenchmarkDotNet.Artifacts/**
+            benchmark.log
           if-no-files-found: warn

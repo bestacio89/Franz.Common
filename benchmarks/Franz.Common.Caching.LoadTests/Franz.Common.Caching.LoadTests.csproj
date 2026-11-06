@@ -15,6 +15,6 @@
     <PackageReference Include="Testcontainers.Redis" Version="4.13.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../sources/Franz.Common.Caching/Franz.Common.Caching.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Caching/Franz.Common.Caching.csproj" AdditionalProperties="EnablePackageValidation=false" />
   </ItemGroup>
 </Project>
