@@ -22,7 +22,7 @@ public sealed class DefaultCacheKeyStrategyTests
     [Fact]
     public void BuildKey_Should_Be_Deterministic_ForEquivalentRequests()
     {
-        var strategy = new DefaultCacheKeyStrategy();
+        var strategy = new DefaultCacheKeyStrategy(TestJsonSerializerOptions.Create());
 
         strategy.BuildKey(new TestRequest(1, "a"))
             .Should()
@@ -32,7 +32,7 @@ public sealed class DefaultCacheKeyStrategyTests
     [Fact]
     public void BuildKey_Should_Change_When_Request_Changes()
     {
-        var strategy = new DefaultCacheKeyStrategy();
+        var strategy = new DefaultCacheKeyStrategy(TestJsonSerializerOptions.Create());
 
         var key1 = strategy.BuildKey(new TestRequest(1, "a"));
         var key2 = strategy.BuildKey(new TestRequest(2, "a"));
@@ -43,7 +43,7 @@ public sealed class DefaultCacheKeyStrategyTests
     [Fact]
     public void BuildKey_Should_Use_RuntimeType_When_Request_Is_Passed_Through_Interface()
     {
-        var strategy = new DefaultCacheKeyStrategy();
+        var strategy = new DefaultCacheKeyStrategy(TestJsonSerializerOptions.Create());
         IRequest request = new TestRequest(7, "runtime");
 
         var key = strategy.BuildKey(request);
@@ -69,7 +69,7 @@ public sealed class DefaultCacheKeyStrategyTests
     public void BuildKey_Should_Not_Expose_RequestPayload()
     {
         const string sensitiveValue = "customer-secret-value";
-        var strategy = new DefaultCacheKeyStrategy();
+        var strategy = new DefaultCacheKeyStrategy(TestJsonSerializerOptions.Create());
 
         var key = strategy.BuildKey(new TestRequest(1, sensitiveValue));
 

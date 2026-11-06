@@ -15,7 +15,7 @@ public sealed class TenantScopedCacheKeyStrategyTests
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
         var strategyA = new TenantScopedCacheKeyStrategy(new DefaultCacheKeyStrategy(new JsonSerializerOptions(JsonSerializerDefaults.General) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() }), new StubAccessor(CreateContext(tenantA)));
-        var strategyB = new TenantScopedCacheKeyStrategy(new DefaultCacheKeyStrategy(), new StubAccessor(CreateContext(tenantB)));
+        var strategyB = new TenantScopedCacheKeyStrategy(new DefaultCacheKeyStrategy(new JsonSerializerOptions(JsonSerializerDefaults.General) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() }), new StubAccessor(CreateContext(tenantB)));
 
         var keyA = strategyA.BuildKey(new { Id = 42 });
         var keyB = strategyB.BuildKey(new { Id = 42 });

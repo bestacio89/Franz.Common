@@ -23,7 +23,7 @@ public sealed class NamespacedKeyStrategyTests
   [Fact]
   public void GetKey_Should_UseTheSameUnderlyingStrategy()
   {
-    var strategy = new NamespacedCacheKeyStrategy("orders");
+    var strategy = new NamespacedCacheKeyStrategy("orders", new DefaultCacheKeyStrategy(TestJsonSerializerOptions.Create()));
     var request = new NamespacedRequest(42, "payload");
 
     strategy.GetKey(request).Should().Be(strategy.BuildKey(request));

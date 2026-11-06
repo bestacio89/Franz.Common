@@ -2,7 +2,7 @@ using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Pipelines;
 using Franz.Common.Mediator.Messages;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -26,7 +26,7 @@ public sealed class CachingPipelineSafetyTests
             cache,
             options.Object,
             keyStrategy ?? Mock.Of<ICacheKeyStrategy>(x => x.BuildKey(It.IsAny<TRequest>()) == "test-key"),
-            Mock.Of<ILogger<CachingPipeline<TRequest, TestResponse>>>(),
+            NullLogger<CachingPipeline<TRequest, TestResponse>>.Instance,
             Array.Empty<ICacheMetadataProvider>());
     }
 

@@ -50,10 +50,10 @@ public sealed class TenantScopedCacheKeyStrategyTests
     {
         var request = new { Id = 42 };
         var tenantA = new TenantScopedCacheKeyStrategy(
-            new DefaultCacheKeyStrategy(),
+            new DefaultCacheKeyStrategy(TestJsonSerializerOptions.Create()),
             new TenantContextAccessor(CreateContext(Guid.NewGuid())));
         var tenantB = new TenantScopedCacheKeyStrategy(
-            new DefaultCacheKeyStrategy(),
+            new DefaultCacheKeyStrategy(TestJsonSerializerOptions.Create()),
             new TenantContextAccessor(CreateContext(Guid.NewGuid())));
 
         Assert.NotEqual(tenantA.BuildKey(request), tenantB.BuildKey(request));
