@@ -138,12 +138,18 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
     var first = await _provider.GetOrSetAsync(key, _ => Task.FromResult("cached"), options);
     first.IsHit.Should().BeFalse();
 
+    var differentReadOptions = new CacheOptions
+    {
+      DefaultAbsoluteExpiration = TimeSpan.FromSeconds(30),
+      DefaultSlidingExpiration = TimeSpan.FromSeconds(30)
+    };
+
     await Task.Delay(600);
-    var second = await _provider.GetOrSetAsync(key, _ => Task.FromResult("replacement"), options);
+    var second = await _provider.GetOrSetAsync(key, _ => Task.FromResult("replacement"), differentReadOptions);
     second.IsHit.Should().BeTrue();
 
     await Task.Delay(600);
-    var third = await _provider.GetOrSetAsync(key, _ => Task.FromResult("replacement"), options);
+    var third = await _provider.GetOrSetAsync(key, _ => Task.FromResult("replacement"), differentReadOptions);
     third.IsHit.Should().BeTrue();
 
     await Task.Delay(3000);

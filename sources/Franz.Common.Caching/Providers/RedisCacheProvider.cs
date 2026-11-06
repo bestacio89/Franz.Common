@@ -18,28 +18,43 @@ public sealed class RedisCacheProvider : ICacheProvider
   private const string ReadAndRefreshScript = """
       local value = redis.call('GET', KEYS[1])
       if not value then
+        redis.call('DEL', KEYS[2])
         return nil
       end
 
       local time = redis.call('TIME')
       local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
-      local absolute = redis.call('GET', KEYS[2])
+      local metadata = redis.call('GET', KEYS[2])
+      local absoluteDeadline = 0
+      local sliding = tonumber(ARGV[1])
+
+      if metadata then
+        local separator = string.find(metadata, ':', 1, true)
+        if separator then
+          absoluteDeadline = tonumber(string.sub(metadata, 1, separator - 1)) or 0
+          sliding = tonumber(string.sub(metadata, separator + 1)) or 0
+        end
+      end
+
       local remaining = nil
-      if absolute then
-        remaining = tonumber(absolute) - now
+      if absoluteDeadline > 0 then
+        remaining = absoluteDeadline - now
         if remaining <= 0 then
           redis.call('DEL', KEYS[1], KEYS[2])
           return nil
         end
       end
 
-      local sliding = tonumber(ARGV[1])
       if sliding > 0 then
         local ttl = sliding
         if remaining and remaining < ttl then
           ttl = remaining
         end
         redis.call('PEXPIRE', KEYS[1], ttl)
+
+        if absoluteDeadline == 0 and metadata then
+          redis.call('PEXPIRE', KEYS[2], ttl)
+        end
       end
 
       return value
@@ -50,11 +65,20 @@ public sealed class RedisCacheProvider : ICacheProvider
       local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
       local absolute = tonumber(ARGV[2])
       local sliding = tonumber(ARGV[3])
+      local absoluteDeadline = 0
 
       redis.call('SET', KEYS[1], ARGV[1])
 
+      local metadataTtl = 0
       if absolute > 0 then
-        redis.call('SET', KEYS[2], now + absolute, 'PX', absolute)
+        absoluteDeadline = now + absolute
+        metadataTtl = absolute
+      elseif sliding > 0 then
+        metadataTtl = sliding
+      end
+
+      if metadataTtl > 0 then
+        redis.call('SET', KEYS[2], tostring(absoluteDeadline) .. ':' .. tostring(sliding), 'PX', metadataTtl)
       else
         redis.call('DEL', KEYS[2])
       end
