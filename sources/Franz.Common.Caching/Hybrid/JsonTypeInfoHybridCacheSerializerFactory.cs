@@ -7,16 +7,15 @@ using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Caching.Hybrid;
 
-/// <summary>
-/// Uses the application's configured System.Text.Json metadata for HybridCache.
-/// This allows the same source-generated context to serve cache keys, JSON
-/// distributed providers, and HybridCache serialization.
-/// </summary>
-internal sealed class JsonTypeInfoHybridCacheSerializerFactory(
-    IOptions<JsonSerializerOptions> serializerOptions) : IHybridCacheSerializerFactory
+internal sealed class JsonTypeInfoHybridCacheSerializerFactory : IHybridCacheSerializerFactory
 {
-  private readonly JsonSerializerOptions _serializerOptions =
-      serializerOptions?.Value ?? throw new ArgumentNullException(nameof(serializerOptions));
+  private readonly JsonSerializerOptions _serializerOptions;
+
+  public JsonTypeInfoHybridCacheSerializerFactory(IOptions<JsonSerializerOptions> serializerOptions)
+  {
+    _serializerOptions = serializerOptions?.Value
+        ?? throw new ArgumentNullException(nameof(serializerOptions));
+  }
 
   public bool TryCreateSerializer<T>(
       [NotNullWhen(true)] out IHybridCacheSerializer<T>? serializer)
@@ -48,9 +47,16 @@ internal sealed class JsonTypeInfoHybridCacheSerializerFactory(
       : IHybridCacheSerializer<T>
   {
     public T Deserialize(ReadOnlySequence<byte> source)
-        => JsonSerializer.Deserialize(source, typeInfo)!;
+    {
+      return source.IsSingleSegment
+          ? JsonSerializer.Deserialize(source.FirstSpan, typeInfo)!
+          : JsonSerializer.Deserialize(source.ToArray(), typeInfo)!;
+    }
 
     public void Serialize(T value, IBufferWriter<byte> target)
-        => JsonSerializer.Serialize(target, value, typeInfo);
+    {
+      using var writer = new Utf8JsonWriter(target);
+      JsonSerializer.Serialize(writer, value, typeInfo);
+    }
   }
 }

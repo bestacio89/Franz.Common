@@ -1,4 +1,5 @@
 ﻿using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Hybrid;
 using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Estrategies;
 using Franz.Common.Caching.Observability;

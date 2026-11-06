@@ -125,8 +125,8 @@ services.AddFranzCachingJsonTypeInfoResolver(ApplicationJsonContext.Default);
 services.AddFranzMemoryCaching();
 ```
 
-The resolver is shared by the default key strategy and the JSON-based
-Distributed/Redis providers. Missing metadata fails explicitly instead of
+The resolver is shared by the default key strategy, JSON-based Distributed/Redis
+providers, and the HybridCache serializer factory. Missing metadata fails explicitly instead of
 silently falling back to runtime reflection.
 
 ## Mediator integration

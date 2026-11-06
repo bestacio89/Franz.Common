@@ -1,3 +1,4 @@
+using Franz.Common.Caching.Observability;
 using Franz.Common.Caching.Observability.Observers;
 using Xunit;
 
