@@ -35,7 +35,7 @@ public sealed class DistributedCacheProviderTests : IDisposable
   public async Task GetOrSetAsync_OnJsonException_ShouldHealAndReturnFreshValue()
   {
     // Arrange
-    const string key = "dist:corrupt";
+    const string key = "franz:dist:corrupt";
     var corruptData = "invalid-json-content"u8.ToArray();
     var expectedValue = new TestPayload(Guid.CreateVersion7(), "healed");
 
@@ -63,7 +63,7 @@ public sealed class DistributedCacheProviderTests : IDisposable
   public async Task GetOrSetAsync_ConcurrentRequests_ShouldInvokeFactoryOnce()
   {
     // Arrange
-    const string key = "dist:stampede";
+    const string key = "franz:dist:stampede";
     int factoryCalls = 0;
     byte[]? internalCache = null; // Backing store as byte array
 
@@ -100,7 +100,7 @@ public sealed class DistributedCacheProviderTests : IDisposable
   public async Task GetOrSetAsync_DoubleCheckLocking_ShouldPreventRedundantFactoryCalls()
   {
     // Arrange
-    const string key = "dist:double-check";
+    const string key = "franz:dist:double-check";
     var payload = new TestPayload(Guid.CreateVersion7(), "data");
     var json = JsonSerializer.Serialize(payload);
     var bytes = System.Text.Encoding.UTF8.GetBytes(json);
