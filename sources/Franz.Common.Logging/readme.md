@@ -1,10 +1,10 @@
 # Franz.Common.Logging
 
-> Structured logging conventions and integrations for consistent scopes, correlation metadata, and application diagnostics.
+> Serilog host-builder integration with environment-specific sinks, enrichment, and framework-noise filters.
 
 ## Overview
 
-Structured logging conventions and integrations for consistent scopes, correlation metadata, and application diagnostics.
+Serilog host-builder integration with environment-specific sinks, enrichment, and framework-noise filters.
 
 ## Installation
 
@@ -12,97 +12,11 @@ Structured logging conventions and integrations for consistent scopes, correlati
 dotnet add package Franz.Common.Logging
 ```
 
-## Design principles
+## Host-builder extensions
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+The package exposes three extensions in `Franz.Common.Logging.Extensions`.
 
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A comprehensive logging library within the **Franz Framework**, designed to enhance application monitoring and diagnostics using **Serilog** and **Elastic APM**.
-This package provides tools for centralized logging, tracing, and seamless integration with .NET applications.
-
-* **Current Version:** v3.0.0
-* Part of the open-source Franz.Common ecosystem.
-
----
-
-## **What’s New in 2.2.17**
-
-* **Desktop Application Support**
-* `UseDesktopLog()` extension providing thread-aware logging for WPF/Avalonia/MAUI.
-* `ThreadIdEnricher` added for high-fidelity concurrency diagnostics.
-* Optimized templates: removed web-specific noise (ReqId/Path) to clean up local output.
-
-
-* **Dual Production Logging (v1.7.6+)**
-* **SRE logs:** JSON, structured, minimal noise, easy to ship to ELK/Datadog.
-* **Dev logs:** human-readable, verbose, retains stack traces for troubleshooting.
-
-
-* **Self-contained, production-ready defaults**
-* Automatic UTF-8-safe encoding, rolling files, environment-aware enrichers.
-* Global noise suppression applied consistently.
-
-
----
-
-## **Features**
-
-* **Centralized Logging**
-* Integration with **Serilog** for structured and enriched logs.
-
-
-* **Tracing Utilities**
-* `TraceHelper` for advanced tracing support in distributed applications.
-
-
-* **Host Extensions**
-* `UseLog()` for strict, environment-aware logging.
-* `UseHybridLog()` for flexible, configuration-driven logging.
-* `UseDesktopLog()` for thread-aware desktop diagnostics.
-
-
-* **Elastic APM Integration**
-* Full support for **Elastic APM** (enabled automatically in DEBUG).
-
-
-* **Dual Production Logging**
-* JSON logs for SRE (prod-sre-.json).
-* Human-readable logs for Dev (prod-dev-.log).
-
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Logging
-```
-
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Logging --version 2.3.3
-
-```
-
----
-
-## **Usage**
-
-### 1. Strict Environment-Aware Logging (`UseLog`)
+### UseLog
 
 ```csharp
 using Franz.Common.Logging.Extensions;
@@ -112,73 +26,46 @@ var host = Host.CreateDefaultBuilder(args)
     .Build();
 
 await host.RunAsync();
-
 ```
 
-### 2. Desktop-Optimized Logging (`UseDesktopLog`)
+`UseLog()` configures Serilog from host configuration and registered services, enriches events with log context, application name, machine name, and environment name, and applies the package's baseline source filters.
+
+- Development: Debug minimum level, console and debug sinks, and daily rolling `logs/dev-.log` files with a retained-file limit of 10.
+- Non-development: Information minimum level, console output, daily JSON `logs/prod-sre-.json` and human-readable `logs/prod-dev-.log` files.
+
+The extension configures UTF-8 console encoding and invokes `TraceHelper.LogConsole()`. Elastic APM agent setup is compiled only in DEBUG builds; it is not an unconditional production APM registration.
+
+### UseDesktopLog
 
 ```csharp
-using Franz.Common.Logging.Extensions;
-
 var host = Host.CreateDefaultBuilder(args)
     .UseDesktopLog()
     .Build();
-
-await host.RunAsync();
-
 ```
 
-* **Thread Enrichment:** Injects `ThreadId` for tracking UI vs. background execution.
-* **Desktop Template:** `[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} | Thread:{ThreadId} | {Message:lj}`.
+This uses a desktop-oriented template with thread ID enrichment, console/debug sinks, and daily rolling `logs/desktop-.log` files. It does not add request ID or request path fields to the output template.
 
-### 3. Hybrid Logging (`UseHybridLog`)
+### UseHybridLog
 
 ```csharp
-using Franz.Common.Logging.Extensions;
-
 var host = Host.CreateDefaultBuilder(args)
     .UseHybridLog()
     .Build();
-
-await host.RunAsync();
-
 ```
 
----
+This applies baseline filters, reads Serilog configuration, enriches from log context, application name, and machine name. It does not add the explicit console/file sinks used by `UseLog` or `UseDesktopLog`; configure sinks through host Serilog configuration.
 
-## **Changelog**
+## Filtering and enrichment
 
-### v2.2.18 - Desktop Diagnostics
+The baseline configuration excludes selected low-value framework sources, including EF Core internals, HttpClient, Data Protection, static files, host lifetime, health-check diagnostics, Kestrel transport, and selected routing/model-binding/versioning events below Warning. These filters are package defaults; review them against the diagnostic requirements of the deployed application.
 
-* Introduced `UseDesktopLog()` for desktop-first applications.
-* Added `ThreadIdEnricher` for high-fidelity concurrency diagnostics.
-* Optimized log templates for desktop output, removing web-specific infrastructure noise.
+## Operational guidance
 
-### v2.2.17 - Filter hardening
-
-* Logging filters hardened to prevent accidental log noise in production environments.
-* Logging Filters Improved to avoid noise in development environments.
-
-### v2.0.1 – Internal Modernization
-
-* Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-* All APIs remain fully backward compatible.
-
-### Version 1.7.6
-
-* Dual production logs: `prod-sre-.json` for SRE, `prod-dev-.log` for Dev
-* UTF-8 safe, rolling files, 30-day retention
-* Console logging preserved for live monitoring
-* Noise suppression applied consistently across logs
-* Integration-ready for **Franz.Common.OpenTelemetry**
-
----
-
-## Dependency maintenance — October 2026
-
-The logging package is aligned with the .NET 10 servicing baseline. Snappier is pinned to patched version 1.3.1 because the dependency graph previously resolved vulnerable 1.0.0. The public logging contracts are not intentionally changed. Validate restore, Release build, and the full solution tests before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+- Configure sink destinations, retention, access controls, and shipping in accordance with the deployment environment.
+- Treat logs as potentially sensitive data. Avoid credentials, tokens, and unnecessary personal data.
+- Do not assume the package configures an OpenTelemetry exporter or an Elastic APM production agent.
+- Choose one host logging extension deliberately; do not stack multiple competing Serilog configurations.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See [LICENSE](../../LICENSE).

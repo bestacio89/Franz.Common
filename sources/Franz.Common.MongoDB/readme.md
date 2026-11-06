@@ -1,10 +1,10 @@
 # Franz.Common.MongoDB
 
-> MongoDB persistence integration for Franz.Common repositories and durable messaging-related storage.
+> MongoDB context, tenant-aware repository, aggregate repository, and messaging-store integrations.
 
 ## Overview
 
-MongoDB persistence integration for Franz.Common repositories and durable messaging-related storage.
+The package provides a MongoDB context registration helper, native tenant-scoped repositories, and Mongo-backed outbox/inbox storage. It does not provide an EF Core provider.
 
 ## Installation
 
@@ -12,231 +12,68 @@ MongoDB persistence integration for Franz.Common repositories and durable messag
 dotnet add package Franz.Common.MongoDB
 ```
 
-## Design principles
+## Register a Mongo context
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Tenant-owned MongoDB documents — 2.3.5
-
-Tenant-owned Mongo documents implement `IMongoTenantEntity`, which combines a string document ID with the framework's validated `Guid TenantId` contract.
-
-Register a tenant-scoped repository after configuring MongoDB and the Franz tenant execution accessor:
+The registration helper reads `MongoDb:ConnectionString` and `MongoDb:DatabaseName`, registers `IMongoClient` as a singleton, registers `IMongoDatabase` and the concrete context as scoped services:
 
 ```csharp
-services.AddMongoTenantRepository<OrderDocument>("orders");
+using Franz.Common.MongoDB.Extensions;
+using Franz.Common.MongoDB.Configuration;
+
+var mongoSection = builder.Configuration.GetSection("MongoDb");
+builder.Services.Configure<MongoDBConfig>(options =>
+{
+    options.ConnectionString = mongoSection["ConnectionString"];
+    options.Database = mongoSection["DatabaseName"];
+    options.Collection = mongoSection["Collection"];
+});
+builder.Services.AddMongoDbContext<ApplicationMongoContext>(builder.Configuration);
 ```
 
-The repository enforces tenant identity in MongoDB filters for point reads, queries, replacements, and deletes. Inserts stamp an empty TenantId from the validated execution context and reject foreign ownership claims. Batch inserts validate every document before sending the batch. Invoke `CreateTenantIdentityIndexAsync` from a controlled index migration, not per request; it creates a compound `TenantId + Id` lookup index.
-
-MongoDB enforces a collection-wide unique `_id`; tenant document IDs therefore remain globally unique within a collection. The compound tenant lookup index is non-unique. The repository does not promise that the same `_id` can be reused by different tenants.
-
-The repository also exposes tenant-filtered atomic `UpdateOneAsync`/`UpdateManyAsync`, bulk writes, immutable tenant ownership update builders, optional client sessions and transaction execution. `MongoTenantUpdateBuilder<TEntity>` rejects attempts to change or unset `TenantId`; bulk definitions are fully validated before the driver receives the batch. `ExecuteInTransactionAsync` uses the driver's transaction retry behavior and requires a replica-set or sharded MongoDB deployment.
-
-For event sourcing, `AddMongoTenantAggregateRepository<TAggregate, TEvent>()` registers the aggregate repository with the validated tenant execution accessor. Stored events are stamped from the execution context and replay/delete queries include TenantId. The non-tenant mode sees only events with a null TenantId, so it cannot read tenant-owned event streams.
-
-The older generic `MongoRepository<TEntity>` remains available for non-tenant collections. Do not use it for tenant-owned documents: it does not apply tenant filters. The generic `AddMongoMessageStore` inbox/outbox stores and raw MongoDB collection access are not implicitly tenant-filtered; they require their own tenant-aware storage contract and must not be assumed protected by these repository APIs.
-
-## Package-specific guide
-
----
-
-```markdown
-# Franz.Common.MongoDB
-
-A library within the **Franz Framework** designed to streamline the integration of MongoDB into .NET applications.
-This package provides utilities for configuring MongoDB services, registering them with dependency injection, and enabling reliable **messaging persistence** patterns such as **Outbox** and **Inbox**.
-
----
-
-## ✨ Features
-
-- **MongoDB Service Registration**
-  - `MongoServiceRegistration` for simplified client and database registration.
-  - Options-driven configuration via `MongoOptions`.
-
-- **📦 Outbox Support**
-  - `MongoMessageStore` for storing pending messages.
-  - Automatic retry and **Dead Letter Queue (DLQ)** support.
-  - Auto-created indexes on:
-    - `SentOn` (pending lookups)
-    - `RetryCount` (retry cycles)
-    - `CreatedOn` (cleanup/archival)
-
-- **📥 Inbox Support**
-  - `MongoInboxStore` ensures **idempotent message consumption**.
-  - Unique index on processed message IDs prevents duplicates.
-
-- **⚙️ Dependency Injection**
-  - Extensions for clean setup:
-    - `AddMongoMessageStore`
-    - `AddMongoInboxStore`
-    - `AddMongoDB`
-
-- **🔒 Reliability**
-  - Atomic updates for retries (`UpdateRetryAsync`).
-  - Safe move to dead-letter collection (`MoveToDeadLetterAsync`).
-  - Mark-as-sent functionality for outbox messages.
-
----
-
-## 📂 Project Structure
-
-```
-
-Franz.Common.MongoDB/
-├── Configuration/
-│    └── MongoOptions.cs
-├── Outbox/
-│    ├── MongoMessageStore.cs
-│    └── DeadLetterCollection.cs
-├── Inbox/
-│    └── MongoInboxStore.cs
-├── Extensions/
-│    └── ServiceCollectionExtensions.cs
-└── MongoServiceRegistration.cs
-
-````
-
----
-
-## ⚙️ Configuration
-
-`appsettings.json`:
+The explicit `Configure<MongoDBConfig>` mapping is required when the context derives from `MongoDbContext`, because that base context consumes `IOptions<MongoDBConfig>` and reads its `Database` property. `AddMongoDbContext` reads `MongoDb:ConnectionString` and `MongoDb:DatabaseName` for client/database registration but does not bind `MongoDBConfig`; the options mapping must translate `DatabaseName` to `Database` as shown.
 
 ```json
-"Mongo": {
-  "ConnectionString": "mongodb://localhost:27017",
-  "DatabaseName": "MessagingDb",
-  "OutboxCollection": "OutboxMessages",
-  "DeadLetterCollection": "DeadLetterMessages",
-  "InboxCollection": "InboxMessages"
-}
-````
-
----
-
-## 🚀 Dependency Injection Setup
-
-```csharp
-builder.Services.AddMongoDB(options =>
 {
-    options.ConnectionString = "mongodb://localhost:27017";
-    options.DatabaseName = "MessagingDb";
-});
-
-builder.Services.AddMongoMessageStore(configuration);
-builder.Services.AddMongoInboxStore(configuration);
-```
-
----
-
-## 🔄 Usage
-
-### Outbox Message Store
-
-```csharp
-var message = new StoredMessage
-{
-    Id = Guid.NewGuid().ToString(),
-    Body = "{ \"OrderId\": 123 }",
-    CreatedOn = DateTime.UtcNow
-};
-
-await _messageStore.SaveAsync(message);
-```
-
-### Inbox Message Store
-
-```csharp
-if (!await _inboxStore.HasProcessedAsync(message.Id))
-{
-    await _dispatcher.PublishAsync(orderCreatedEvent);
-    await _inboxStore.MarkProcessedAsync(message.Id);
+  "MongoDb": {
+    "ConnectionString": "<secret>",
+    "DatabaseName": "application",
+    "Collection": "customers"
+  }
 }
 ```
 
----
+## Tenant-aware native repositories
 
-## 📊 Observability
+For documents implementing `IMongoTenantEntity`:
 
-* Mongo collections come with indexes for performance.
-* Logs include retries ⚠️, DLQ moves 🔥, and successful sends ✅.
-* OpenTelemetry hooks enabled via higher-level messaging layer.
+```csharp
+builder.Services.AddMongoTenantRepository<CustomerDocument>("customers");
+```
 
----
+The registration adds the concrete `MongoTenantRepository<CustomerDocument>` to DI; it does not register a separate repository interface. The repository requires `IMongoDatabase` and a scoped `ITenantExecutionContextAccessor`, and every read/mutation includes the validated tenant ID in the MongoDB filter. Inserts stamp an empty `TenantId` from the current context and reject cross-tenant ownership.
 
-## 📌 Roadmap
+For event-sourced aggregate repositories:
 
-* TTL indexes for automatic cleanup of old outbox/inbox entries.
-* Configurable sharding/replica set support for large-scale deployments.
-* RabbitMQ-backed inbox/outbox stores (parallel to Kafka).
+```csharp
+builder.Services.AddMongoTenantAggregateRepository<OrderAggregate, OrderEvent>();
+```
 
----
+This registration adds the concrete `MongoAggregateRepository<TAggregate, TEvent>` to DI and requires the scoped tenant execution context plus Mediator dispatcher. The class implements `IAggregateRepository<TAggregate, TEvent>`, but the helper registers only the concrete type; add an explicit `IAggregateRepository<TAggregate, TEvent>` mapping if the application resolves the repository through that abstraction. It is an event-store repository that persists and replays tenant-filtered domain events.
 
-## 📝 Version Information
+## Messaging stores
 
-* **Current Version:** v3.0.0
-* Part of the open-source Franz.Common ecosystem.
+```csharp
+builder.Services.AddMongoMessageStore(
+    connectionString: mongoConnectionString,
+    dbName: "messaging",
+    outboxCollectionName: "OutboxMessages",
+    deadLetterCollectionName: "DeadLetterMessages");
+```
 
----
+The helper registers Mongo client/database instances, `IMessageStore`, and `IInboxStore` as singletons. It takes the connection string and database name directly; configure those values explicitly at the registration call. This messaging-store registration is not tenant-scoped by the helper.
 
-## 📜 License
-
-This library is licensed under the MIT License. See the `LICENSE` file for details.
-
----
-
-## 📖 Changelog
-
-### Version 1.2.65
-
-* Added `MongoServiceRegistration` for streamlined MongoDB service configuration and registration.
-* Introduced support for custom MongoDB configurations.
-
-### Version 1.3
-
-* Upgraded to **.NET 9.0.8**.
-* Added **new features and improvements**.
-* Separated **business concepts** from **mediator concepts**.
-* Now compatible with both the **in-house mediator** and **MediatR**.
-
-### Version 1.6.2
-
-* Introduced **Mongo Outbox** (`MongoMessageStore`) with retries and Dead Letter Queue.
-* Added **Mongo Inbox** (`MongoInboxStore`) for idempotent consumption.
-* Auto-created indexes on `SentOn`, `RetryCount`, and `CreatedOn`.
-* Added dependency injection extensions:
-
-  * `AddMongoMessageStore`
-  * `AddMongoInboxStore`
-* Extended `IMessageStore` with:
-
-  * `UpdateRetryAsync`
-  * `MoveToDeadLetterAsync`
-  * `MarkAsSentAsync`
-* Improved observability with structured logging and OpenTelemetry hooks.
-
----
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
----
-
----
-
-## Dependency maintenance — October 2026
-
-The MongoDB driver was upgraded as part of the .NET 10 dependency baseline. Validate serialization, compression, and persistence integration tests against the resolved driver/transitive package graph before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+Use a secret manager for connection strings. Do not reuse tenant-scoped DbContexts or repository scopes across tenant execution boundaries.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

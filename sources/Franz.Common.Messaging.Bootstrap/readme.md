@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Bootstrap
 
-> Dependency-injection registration and configuration for composing Franz.Common messaging transports and policies.
+> Composition helper for common Franz architecture plus messaging identity, tenant, and header contexts.
 
 ## Overview
 
-Dependency-injection registration and configuration for composing Franz.Common messaging transports and policies.
+Composition helper for common Franz architecture plus messaging identity, tenant, and header contexts.
 
 ## Installation
 
@@ -12,154 +12,41 @@ Dependency-injection registration and configuration for composing Franz.Common m
 dotnet add package Franz.Common.Messaging.Bootstrap
 ```
 
-## Design principles
+## Registration
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A modular library within the **Franz Framework** designed to streamline the setup and integration of messaging components in distributed systems. This package provides a centralized configuration for messaging-related services, simplifying dependency injection and ensuring seamless interoperability across other **Franz Framework** messaging libraries.
-
----
-
-## **Features**
-
-- **Centralized Messaging Configuration**:
-  - Simplifies the setup of messaging utilities across projects.
-- **Service Registration**:
-  - `ServiceCollectionExtensions` to bootstrap messaging services, including hosting, identity, Kafka, and multi-tenancy.
-- **Seamless Integration**:
-  - Integrates effortlessly with other **Franz Messaging** components such as `Hosting`, `Hosting.MediatR`, `Identity`, `Kafka`, and `MultiTenancy`.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package depends on:
-- **Franz.Common.Bootstrap**: Provides core bootstrap utilities for application initialization.
-- **Franz.Common.Messaging.Hosting**: Enables hosting configurations for messaging services.
-- **Franz.Common.Messaging.Hosting.MediatR**: Adds MediatR support for messaging workflows.
-- **Franz.Common.Messaging.Identity**: Integrates identity management with messaging.
-- **Franz.Common.Messaging.Kafka**: Provides Kafka-specific messaging abstractions and tools.
-- **Franz.Common.Messaging.MultiTenancy**: Supports multi-tenant configurations for messaging services.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Messaging.Bootstrap
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Messaging.Bootstrap
-```
-
----
-
-## **Usage**
-
-### **1. Bootstrap Messaging Services**
-
-Leverage `ServiceCollectionExtensions` to register all messaging services:
+The current extension is `AddMessagingArchitecture` in the namespace `Franz.Common.Messaging.Bootstrap.Extenstions` (the namespace spelling is present in the source).
 
 ```csharp
-using Franz.Common.Messaging.Bootstrap.Extensions;
+using Franz.Common.Messaging.Bootstrap.Extenstions;
 
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddMessagingBootstrap(); // Registers messaging services and dependencies
-    }
-}
+builder.Services.AddMessagingArchitecture(
+    builder.Environment,
+    builder.Configuration,
+    typeof(Program).Assembly);
 ```
 
-This method ensures that all required messaging-related components, including hosting, Kafka, and multi-tenancy, are configured automatically.
+The assembly parameter is optional; when omitted, the method uses its calling assembly. Pass the application assembly explicitly to make scanning deterministic.
 
-### **2. Custom Messaging Configuration**
+## Composition performed
 
-You can further customize your messaging setup by directly registering specific components:
+The method delegates to `AddCommonArchitecture(configuration, assembly)`, then registers:
 
-```csharp
-services.AddMessagingHosting();
-services.AddMessagingHostingMediatR();
-services.AddMessagingKafka();
-services.AddMessagingMultiTenancy();
-```
+- `AddMessagingIdentityContext()`
+- `AddMessagingMultitenancyContext()`
+- `AddMessagingHeaderContext()`
 
----
+The common architecture helper performs the reflection, mediator, and marker-based dependency registrations documented by `Franz.Common.Bootstrap`. The three messaging context registrations add the relevant message-scoped context accessors.
 
-## **Integration with Franz Framework**
+## Important boundaries
 
-The **Franz.Common.Messaging.Bootstrap** package is designed to serve as a central hub for configuring and integrating messaging services within the **Franz Framework**. It seamlessly integrates with:
-- **Franz.Common.Bootstrap**
-- **Franz.Common.Messaging.Hosting**
-- **Franz.Common.Messaging.Identity**
-- **Franz.Common.Messaging.Kafka**
-- **Franz.Common.Messaging.MultiTenancy**
+This method does not register Kafka, RabbitMQ, Azure, or another broker transport. It also does not select a messaging provider from configuration. Add the broker-specific registration from the corresponding provider package.
 
-Ensure these dependencies are installed to fully leverage the package's capabilities.
+The `IHostEnvironment` parameter is present in the current signature but is not read by the implementation. Do not expect environment-dependent registration behavior from it.
 
----
+## Composition guidance
 
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+Use this package to compose the common messaging context layer, not as a substitute for provider setup, host worker registration, message-store configuration, or transport provisioning. Keep transport-specific decisions in the application composition root.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See [LICENSE](../../LICENSE).

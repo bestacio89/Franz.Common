@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.MultiTenancy
 
-> Tenant context propagation and tenant-aware message metadata for isolated multi-tenant messaging workflows.
+> Validated tenant and domain execution scopes for broker-delivered messages.
 
 ## Overview
 
-Tenant context propagation and tenant-aware message metadata for isolated multi-tenant messaging workflows.
+The messaging integration extracts tenant/domain identifiers from message headers, resolves an active tenant, optionally validates it, authorizes the authenticated producer, and establishes a scoped `TenantExecutionContext` for the message handler.
 
 ## Installation
 
@@ -12,241 +12,43 @@ Tenant context propagation and tenant-aware message metadata for isolated multi-
 dotnet add package Franz.Common.Messaging.MultiTenancy
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A library within the **Franz Framework** that adds multi-tenancy support to messaging workflows. This package provides tools for managing tenant and domain-specific messaging contexts, enabling seamless integration of multi-tenancy in distributed systems.
-
----
-
-## **Features**
-
-* **Tenant Context Management**:
-
-  * `TenantContextAccessor` for handling tenant-specific data in messaging workflows.
-* **Domain Context Management**:
-
-  * `DomainContextAccessor` for managing domain-specific information during message processing.
-* **Resolvers**:
-
-  * `HeaderTenantResolver` and `HeaderDomainResolver` for resolving multi-tenancy metadata from message headers.
-  * `MessagePropertyTenantResolver` and `MessagePropertyDomainResolver` for resolving multi-tenancy metadata from message properties.
-* **Resolution Pipelines**:
-
-  * `DefaultTenantResolutionPipeline` and `DefaultDomainResolutionPipeline` to coordinate multiple resolvers in order.
-* **Middleware**:
-
-  * `TenantResolutionMiddleware` and `DomainResolutionMiddleware` for automatic resolution per message.
-* **Service Registration**:
-
-  * `ServiceCollectionExtensions` to simplify the setup of multi-tenancy messaging services.
-* **Message Builders**:
-
-  * `TenantMessageBuilder` and `DomainMessageBuilder` for constructing messages with tenant and domain data.
-
----
-
-## **Version Information**
-
-* **Current Version:** v3.0.0
-* Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package relies on:
-
-* **Franz.Common.Messaging**: Provides foundational messaging utilities and abstractions.
-* **Franz.Common.MultiTenancy**: Core utilities for tenant and domain management.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Messaging.MultiTenancy
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Messaging.MultiTenancy --Version 1.3.1
-```
-
----
-
-## **Usage**
-
-### **1. Register Multi-Tenancy Messaging Services**
-
-Use `ServiceCollectionExtensions` to register messaging multi-tenancy services:
+## Registration
 
 ```csharp
 using Franz.Common.Messaging.MultiTenancy.Extensions;
 
-public class Startup
+builder.Services.AddMessagingMultitenancyContext(options =>
 {
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddFranzMessagingMultiTenancy();
-    }
-}
+    options.RequireTenantScope = true;
+});
+
+// Application-owned registrations:
+builder.Services.AddScoped<ITenantStore, TenantStore>();
+builder.Services.AddScoped<ITenantMessageAuthorizer, BrokerIdentityTenantMessageAuthorizer>();
 ```
 
----
+The parameterless overload is also available. `RequireTenantScope` defaults to false because the package can be used for outbound metadata propagation without requiring every consumer to establish a tenant context.
 
-### **2. Access Tenant and Domain Contexts**
+When enabled, hosted messaging consumers validate that `ITenantMessageContextInitializer` is registered before they start listening. The initializer requires an `ITenantStore`, `ITenantExecutionContextAccessor`, and `ITenantMessageAuthorizer`. An optional `ITenantValidator` is also invoked when registered.
 
-Leverage `TenantContextAccessor` and `DomainContextAccessor` to retrieve tenant and domain-specific data:
+## Message contract
 
-```csharp
-using Franz.Common.Messaging.MultiTenancy;
+A tenant-scoped message must contain exactly one valid, non-empty GUID value in the standard tenant header. A domain header is optional; when present it must contain exactly one valid GUID and resolve to a verified domain associated with the tenant.
 
-public class TenantService
-{
-    private readonly ITenantContextAccessor _tenantContextAccessor;
+The initializer rejects unknown or inactive tenants, invalid domain ownership, failed tenant validation, and unauthorized producers. The authorizer must use trusted broker/transport identity; a message header alone is not proof that the producer may publish for that tenant.
 
-    public TenantService(ITenantContextAccessor tenantContextAccessor)
-    {
-        _tenantContextAccessor = tenantContextAccessor;
-    }
+## Execution lifecycle
 
-    public Guid? GetCurrentTenantId() => _tenantContextAccessor.GetCurrentTenantId();
-}
-```
+The initializer exposes `BeginAsync(message, cancellationToken)`, which returns an async-disposable execution scope. Keep that scope alive for the full message handler execution and dispose it afterward. Disposal clears the scoped tenant execution context.
 
-```csharp
-using Franz.Common.Messaging.MultiTenancy;
+The package also registers tenant/domain message builders so outgoing messages can propagate the current validated context. Do not reuse a DI scope or tenant accessor across separate deliveries.
 
-public class DomainService
-{
-    private readonly IDomainContextAccessor _domainContextAccessor;
+## Related packages
 
-    public DomainService(IDomainContextAccessor domainContextAccessor)
-    {
-        _domainContextAccessor = domainContextAccessor;
-    }
-
-    public Guid? GetCurrentDomainId() => _domainContextAccessor.GetCurrentDomainId();
-}
-```
-
----
-
-### **3. Automatic Tenant/Domain Resolution in Messaging Pipelines**
-
-Enable middleware to resolve tenant and domain per-message:
-
-```csharp
-using Franz.Common.Messaging.MultiTenancy.Middleware;
-
-public class MessagingPipeline
-{
-    public void Configure(IMessagePipelineBuilder pipeline)
-    {
-        pipeline.Use<TenantResolutionMiddleware>();
-        pipeline.Use<DomainResolutionMiddleware>();
-    }
-}
-```
-
----
-
-### **4. Build Tenant and Domain Messages**
-
-Use `TenantMessageBuilder` and `DomainMessageBuilder` to create tenant and domain-aware messages:
-
-```csharp
-using Franz.Common.Messaging.MultiTenancy;
-
-var tenantMessage = new TenantMessageBuilder()
-    .WithTenantId(Guid.NewGuid())
-    .Build();
-
-var domainMessage = new DomainMessageBuilder()
-    .WithDomainId(Guid.NewGuid())
-    .Build();
-```
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Messaging.MultiTenancy** package integrates seamlessly with:
-
-* **Franz.Common.Messaging**: Provides core messaging abstractions.
-* **Franz.Common.MultiTenancy**: Extends tenant and domain management capabilities into messaging workflows.
-* **Franz.Common.Http.MultiTenancy**: Aligns messaging and HTTP multi-tenancy under the same abstractions and contracts.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-
-1. Clone the repository. @ [https://github.com/bestacio89/Franz.Common/](https://github.com/bestacio89/Franz.Common/)
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+- `Franz.Common.MultiTenancy`: tenant contracts and execution context.
+- `Franz.Common.Messaging`: message and header contracts.
+- `Franz.Common.Messaging.Hosting.Kafka` and `Franz.Common.Messaging.Hosting.RabbitMQ`: hosted transport integration.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-
-* Added `TenantContextAccessor` and `DomainContextAccessor` for managing tenant and domain contexts.
-* Introduced `TenantMessageBuilder` and `DomainMessageBuilder` for constructing tenant and domain-aware messages.
-* Integrated `ServiceCollectionExtensions` for streamlined multi-tenancy messaging setup.
-
-### Version 1.3
-
-* Upgraded to **.NET 9.0.8**
-* Added **new features and improvements**
-* Separated **business concepts** from **mediator concepts**
-* Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.3.1
-
-* Expanded **messaging multi-tenancy abstractions** to align with HTTP and core multi-tenancy:
-
-  * Added `HeaderTenantResolver` and `HeaderDomainResolver`.
-  * Added `MessagePropertyTenantResolver` and `MessagePropertyDomainResolver`.
-  * Introduced `DefaultTenantResolutionPipeline` and `DefaultDomainResolutionPipeline` to orchestrate resolvers.
-  * Added `TenantResolutionMiddleware` and `DomainResolutionMiddleware` for automatic resolution in messaging pipelines.
-* Enhanced `TenantContextAccessor` and `DomainContextAccessor` to fully implement the updated core contracts (`GetCurrentTenantId`, `SetCurrentTenantId`, etc.).
-* Extended `Message` with a `Properties` dictionary for application-level metadata.
-* Added `MessagePropertiesExtensions` for strongly-typed property access.
-* Improved **service registration** via `AddFranzMessagingMultiTenancy`.
-
----
-
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
-
-## Delivery execution boundary for 2.3.4
-
-Supported tenant-aware messaging paths establish validated tenant context within a delivery-scoped DI lifetime and clear the execution state when processing exits, including failure and cancellation. Outbound tenant/domain metadata must be derived from validated execution context, not trusted from stale message metadata. Producer authorization and tenant validation remain required; message headers alone are not authorization. See the [messaging execution lifecycle](../../docs/multitenancy-execution-lifecycle.md) for transport-specific behavior and limitations.
+MIT. See the repository [LICENSE](../../LICENSE).

@@ -1,10 +1,10 @@
 # Franz.Common.Bootstrap
 
-> Application composition and dependency-injection bootstrap extensions for registering Franz.Common services and infrastructure.
+> A composition extension that registers the common Franz application architecture for a selected set of assemblies.
 
 ## Overview
 
-Application composition and dependency-injection bootstrap extensions for registering Franz.Common services and infrastructure.
+A composition extension that registers the common Franz application architecture for a selected set of assemblies.
 
 ## Installation
 
@@ -12,146 +12,53 @@ Application composition and dependency-injection bootstrap extensions for regist
 dotnet add package Franz.Common.Bootstrap
 ```
 
-## Design principles
+## Composition entry point
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A foundational library within the **Franz Framework**, designed to simplify the application startup process by centralizing dependency injection, resource management, and configuration. This package integrates seamlessly with other **Franz Framework** libraries to provide a streamlined and modular development experience.
-
----
-
-## **Features**
-
-- **Service Registration**:
-  - `ServiceCollectionExtensions` to bootstrap common dependencies for application startup.
-- **Resource Management**:
-  - `Resources.resx` for centralized localization and configuration resources.
-- **Modular Integration**:
-  - Seamlessly integrates with key **Franz Framework** libraries, such as:
-    - `Franz.Common.AutoMapper`
-    - `Franz.Common.Business`
-    - `Franz.Common.DependencyInjection`
-    - `Franz.Common.Hosting`
-    - `Franz.Common.Logging`
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Bootstrap
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Bootstrap
-```
-
----
-
-## **Usage**
-
-### **1. Bootstrap Dependencies**
-
-Use the `ServiceCollectionExtensions` to register common dependencies with a single method:
+The current public entry point is `AddCommonArchitecture`, defined in `Franz.Common.Bootstrap.Extensions`. It accepts application configuration and an optional set of assemblies.
 
 ```csharp
-using Franz.Common.Bootstrap;
+using Franz.Common.Bootstrap.Extensions;
 
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.BootstrapCommonServices(); // Registers shared dependencies like Logging, AutoMapper, Hosting, etc.
-    }
-}
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddCommonArchitecture(
+    builder.Configuration,
+    typeof(Program).Assembly);
 ```
 
-This ensures all key dependencies from the **Franz Framework** are automatically registered.
+If no assembly is supplied, the extension falls back to the calling assembly. Prefer explicit assemblies for deterministic composition and to avoid depending on where the extension is invoked.
 
----
+## What it registers
 
-### **2. Resource Management**
+For each supplied assembly, the extension:
 
-Access localized strings or configuration values from `Resources.resx`:
+1. Calls `AddCallingAssembly(assembly)` from `Franz.Common.Reflection`.
+2. Calls `AddFranzMediator(new[] { assembly })` from `Franz.Common.Mediator.Extensions`.
+3. Calls `AddDependencies()` from `Franz.Common.DependencyInjection.Extensions`.
+
+The dependency scanner therefore applies the marker-based conventions of the dependency-injection package. Mediator handler and pipeline registration is delegated to the mediator package.
+
+## What it does not register
+
+The implementation does not currently call AutoMapper registration, logging registration, hosting initialization registration, persistence registration, messaging transport registration, or HTTP middleware registration. Add those capabilities explicitly through their owning packages.
+
+The `IConfiguration` parameter is part of the current method signature, but the implementation does not currently read values from it. Do not assume that configuration sections are bound by this call.
+
+## Recommended composition
+
+Keep the composition root explicit. Use this helper for the common reflection, mediator, and marker-based dependency registration, then add provider-specific infrastructure and host lifecycle services separately.
+
+## API
 
 ```csharp
-var message = Properties.Resources.SomeKey; // Retrieves a value by its key
+IServiceCollection AddCommonArchitecture(
+    this IServiceCollection services,
+    IConfiguration configuration,
+    params Assembly[] assemblies);
 ```
 
----
-
-## **Dependencies**
-
-The **Franz.Common.Bootstrap** library integrates with and relies on other key **Franz Framework** libraries:
-
-- **Franz.Common.AutoMapper**: For mapping configurations.
-- **Franz.Common.Business**: Provides business logic utilities.
-- **Franz.Common.DependencyInjection**: Simplifies dependency injection patterns.
-- **Franz.Common.Hosting**: Manages hosting-related configurations.
-- **Franz.Common.Logging**: Integrates with logging frameworks.
-
-Make sure these packages are installed and accessible within your project if required.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+Namespace: `Franz.Common.Bootstrap.Extensions`.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
----
-
-### Version 1.3.4
-- Eliminated dependency on `Franz.Common.Bootstrap` to Automapper
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-Snappier is pinned to a patched version to prevent a vulnerable transitive version from being selected. This does not change the bootstrap API. Restore and tests must validate the resolved graph before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See [LICENSE](../../LICENSE).

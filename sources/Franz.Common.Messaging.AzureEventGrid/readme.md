@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.AzureEventGrid
 
-> Azure Event Grid integration for publishing and handling event notifications through Franz.Common messaging contracts.
+> Host-agnostic Azure Event Grid ingress, event filtering, mapping, and Mediator dispatch.
 
 ## Overview
 
-Azure Event Grid integration for publishing and handling event notifications through Franz.Common messaging contracts.
+This package registers the Event Grid ingress service and mapper. It parses Azure Event Grid events, handles subscription-validation event recognition, applies an optional event-type allow-list, maps accepted events into Franz messages, and publishes them through the Mediator dispatcher.
 
 ## Installation
 
@@ -12,270 +12,41 @@ Azure Event Grid integration for publishing and handling event notifications thr
 dotnet add package Franz.Common.Messaging.AzureEventGrid
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-## **Franz.Common.Messaging.AzureEventGrid**
-
-`Franz.Common.Messaging.AzureEventGrid` is the **Azure Event Grid ingress adapter** for the **Franz Framework messaging stack**.
-
-It provides a **host-agnostic, mediator-driven entry point** for Azure Event Grid events, converting external cloud notifications into **deterministic Franz messages** without leaking HTTP, serialization, or hosting concerns into the domain.
-
-This package is intentionally **not a message broker adapter**.
-It is an **ingress transport**, designed for **push-based event delivery**.
-
----
-
-## 🎯 Purpose
-
-Azure Event Grid is:
-
-* HTTP push–based
-* notification-oriented
-* non-durable
-* externally controlled
-
-Franz treats Event Grid as an **edge ingress**, not as a backbone.
-
-This adapter ensures:
-
-* clean separation between **transport** and **business logic**
-* mediator-driven processing
-* deterministic metadata propagation
-* zero coupling to ASP.NET, Azure Functions, or hosting models
-
----
-
-## ✨ Features
-
-### 🟦 Azure Event Grid Integration
-
-* Native support for `EventGridEvent`
-* Single and batch event ingestion
-* Azure system events detection (subscription validation)
-
----
-
-### 🧠 Franz-Native Semantics
-
-* Converts Event Grid events into `Franz.Common.Messaging.Message`
-* Dispatches events through **Franz.Common.Mediator**
-* No direct domain deserialization
-* Correlation handled via Franz message properties
-
----
-
-### 🔐 Subscription Validation Handling
-
-* Detects `Microsoft.EventGrid.SubscriptionValidationEvent`
-* Extracts validation code
-* Returns validation result to the hosting layer
-* Prevents validation events from reaching business logic
-
----
-
-### 🚫 Event Type Filtering
-
-* Optional allow-list of accepted event types
-* Deterministic ingress control
-* Unknown or disallowed events are safely ignored
-
----
-
-### 📊 Observability & Diagnostics
-
-* Structured logging with scoped metadata:
-
-  * EventId
-  * EventType
-  * Subject
-  * Topic
-* Franz logging conventions
-* OpenTelemetry-compatible via mediator pipelines
-
----
-
-## 📦 Dependencies
-
-This package depends **only** on core Franz building blocks and the Azure Event Grid SDK:
-
-```
-Franz.Common.Messaging
-Franz.Common.Mediator
-Franz.Common.Logging
-Franz.Common.Errors
-Franz.Common.Headers
-
-Azure.Messaging.EventGrid
-```
-
-❌ No ASP.NET dependencies
-❌ No hosting logic
-❌ No serialization layer
-❌ No background workers
-
----
-
-## 📂 Project Structure
-
-```
-Franz.Common.Messaging.AzureEventGrid/
-├── Configuration/
-│   └── AzureEventGridFilterOptions.cs
-│
-├── Constants/
-│   ├── AzureEventGridHeaders.cs
-│   └── AzureEventGridEventTypes.cs
-│
-├── Ingress/
-│   ├── IAzureEventGridIngress.cs
-│   └── AzureEventGridIngress.cs
-│
-├── Logging/
-│   └── AzureEventGridLogScope.cs
-│
-├── Mapping/
-│   └── AzureEventGridMessageMapper.cs
-│
-├── Models/
-│   └── SubscriptionValidationResult.cs
-│
-├── DependencyInjection/
-│   └── ServiceCollectionExtensions.cs
-│
-└── README.md
-```
-
----
-
-## ⚙️ Dependency Injection
+## Registration
 
 ```csharp
-services.AddFranzAzureEventGrid(filter =>
-{
-    filter.AllowedEventTypes.Add("MyCompany.CustomerCreated");
-    filter.AllowedEventTypes.Add("MyCompany.OrderConfirmed");
-});
+using Franz.Common.Messaging.AzureEventGrid;
+
+builder.Services.AddFranzAzureEventGrid();
 ```
 
-Registers:
-
-* `IAzureEventGridIngress`
-* `AzureEventGridMessageMapper`
-* `AzureEventGridFilterOptions`
-
-Hosting is intentionally **not included**.
-
----
-
-## 🔄 Ingress Flow
-
-### Normal Event
-
-1. Event Grid pushes HTTP event
-2. Hosting layer forwards `EventGridEvent` to ingress
-3. Event type is validated
-4. Event is mapped to Franz `Message`
-5. Message is dispatched via mediator
-6. Business handlers execute
-
----
-
-### Subscription Validation Event
-
-1. Event Grid sends validation request
-2. Adapter detects system event
-3. Validation code is extracted
-4. Hosting layer echoes validation response
-5. Event is **not** dispatched to mediator
-
----
-
-## 🧭 Hosting Examples
-
-### ASP.NET Minimal API
+The current registration method has no configuration callback. It registers a default `AzureEventGridFilterOptions` instance with an empty allow-list, which permits all event types. To replace it with an allow-list:
 
 ```csharp
-app.MapPost("/eventgrid", async (
-    EventGridEvent[] events,
-    IAzureEventGridIngress ingress) =>
-{
-    foreach (var evt in events)
-    {
-        var validation = await ingress.IngestAsync(evt);
-        if (validation != null)
-            return Results.Ok(validation);
-    }
+using Franz.Common.Messaging.AzureEventGrid.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
-    return Results.Ok();
-});
+builder.Services.AddFranzAzureEventGrid();
+
+var filters = new AzureEventGridFilterOptions();
+filters.AllowedEventTypes.Add("Contoso.OrderCreated");
+builder.Services.Replace(ServiceDescriptor.Singleton(filters));
 ```
 
-### Azure Function
+## Ingress contract
 
-```csharp
-public async Task Run(
-    [EventGridTrigger] EventGridEvent evt,
-    IAzureEventGridIngress ingress)
-{
-    await ingress.IngestAsync(evt);
-}
-```
+`IAzureEventGridIngress.IngestAsync(EventGridEvent, cancellationToken)` returns `SubscriptionValidationResult?`. For a subscription-validation event, the result contains the validation code. Filtered events return null; accepted business events are mapped and dispatched as notifications.
 
----
+The batch overload processes each event in order. The package itself does not expose an HTTP endpoint; use the Azure hosting package to map the endpoint.
 
-## 🚀 Extensibility
+## DI lifetime limitation
 
-Future enhancements include:
+`AddFranzAzureEventGrid` registers `IAzureEventGridIngress` as a singleton, while its implementation captures `IDispatcher`, which Franz Mediator registers as scoped. With DI scope validation enabled, resolving the ingress fails; with validation disabled, it retains a root-scoped dispatcher. The ingress should be scoped or resolve a dispatcher from a per-request scope before being treated as production-safe.
 
-* Schema validation per event type
-* Event version routing
-* Event Grid → Outbox forwarding
-* Dead-letter forwarding strategies
-* Event Grid domain event projections
+## Subscription-validation limitation
 
----
-
-## 📝 Version Information
-
-* **Current Version:** v3.0.0
-* **Target Framework:** **.NET 10**
-* Part of the **Franz Framework**
-
----
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
-
----
-## 📜 License
-
-MIT License — see `LICENSE`.
-
-
----
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+The current built-in HTTP endpoint in `Franz.Common.Messaging.Hosting.Azure` calls the ingress for each event but discards the returned `SubscriptionValidationResult` and responds with an empty `200 OK`. Azure Event Grid requires a response body containing `validationResponse` for subscription validation. Therefore, the built-in endpoint does not complete the subscription-validation handshake. Use a custom endpoint that serializes the returned validation code until the host endpoint is corrected.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

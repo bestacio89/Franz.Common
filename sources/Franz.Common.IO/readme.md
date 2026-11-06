@@ -1,10 +1,10 @@
 # Franz.Common.IO
 
-> Asynchronous file, stream, and filesystem utilities with consistent resource handling for .NET applications.
+> A temporary-file-backed stream that deletes its backing file when disposed.
 
 ## Overview
 
-Asynchronous file, stream, and filesystem utilities with consistent resource handling for .NET applications.
+A temporary-file-backed stream that deletes its backing file when disposed.
 
 ## Installation
 
@@ -12,122 +12,37 @@ Asynchronous file, stream, and filesystem utilities with consistent resource han
 dotnet add package Franz.Common.IO
 ```
 
-## Design principles
+## DeleteTemporaryFileAfterReadingStream
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A utility library within the **Franz Framework** designed to simplify input/output operations in **.NET** applications. This package provides streamlined solutions for managing temporary files and file streams, ensuring efficient and clean file handling.
-
----
-
-## **Features**
-
-- **Temporary File Management**:
-  - `DeleteTemporaryFileAfterReadingStream` for safely handling temporary files and ensuring cleanup after file operations.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package is designed to operate independently and does not have external dependencies, making it lightweight and easy to integrate.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.IO
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.IO
-```
-
----
-
-## **Usage**
-
-### **1. Handle Temporary Files**
-
-Use `DeleteTemporaryFileAfterReadingStream` to ensure temporary files are deleted after being read:
+The package currently exposes `DeleteTemporaryFileAfterReadingStream`, a `FileStream` subclass. Its parameterless constructor creates a temporary file using `Path.GetTempFileName()` and opens it for writing with `FileMode.Create`.
 
 ```csharp
 using Franz.Common.IO;
 
-public class MyService
+await using (var temporary = new DeleteTemporaryFileAfterReadingStream())
 {
-    public void ProcessFile(Stream stream)
-    {
-        using var temporaryFileStream = new DeleteTemporaryFileAfterReadingStream(stream);
+    await source.CopyToAsync(temporary);
+    temporary.Position = 0;
 
-        // Read or process the stream
-        // The temporary file will be deleted after the stream is closed
-    }
+    // Consume the temporary stream before leaving this scope.
+    await temporary.CopyToAsync(destination);
 }
+// The stream is closed and its backing temporary file is deleted.
 ```
 
-This approach ensures temporary files are cleaned up automatically after their intended usage.
+## Ownership and lifecycle
 
----
+The stream owns the temporary file it creates. Disposing the stream first closes the underlying `FileStream`, then deletes the file if it still exists. Dispose it deterministically with `using` or `await using`; do not treat the backing path as durable storage.
 
-## **Integration with Franz Framework**
+The type does not wrap an arbitrary caller-provided stream, and it does not delete a source file after reading. It creates and owns its own temporary file.
 
-The **Franz.Common.IO** package is a lightweight addition to the **Franz Framework** and can be used alongside other Franz libraries without any dependencies.
+## Operational considerations
 
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+- Temporary storage capacity and permissions are environment concerns; ensure the process can create files in the platform temporary directory.
+- Temporary files may contain sensitive data. Apply appropriate host-level filesystem protections and avoid logging their contents.
+- The implementation deletes the file during synchronous disposal. Handle cleanup failures according to the application's operational policy.
+- This is a file-backed stream, not an in-memory buffer; account for disk I/O and temporary storage usage.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
+MIT. See [LICENSE](../../LICENSE).

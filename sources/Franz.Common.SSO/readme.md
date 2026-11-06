@@ -1,10 +1,10 @@
 # Franz.Common.SSO
 
-> Single sign-on provider abstractions and identity-management helpers for user lookup, credential checks, and sign-in workflows.
+> Configuration binding and claims-normalization composition for Franz identity integrations.
 
 ## Overview
 
-Single sign-on provider abstractions and identity-management helpers for user lookup, credential checks, and sign-in workflows.
+Configuration binding and claims-normalization composition for Franz identity integrations.
 
 ## Installation
 
@@ -12,199 +12,47 @@ Single sign-on provider abstractions and identity-management helpers for user lo
 dotnet add package Franz.Common.SSO
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
----
-
-# **Franz.Common.SSO**
-
-A library within the **Franz Framework** that provides streamlined support for **Single Sign-On (SSO)** in ASP.NET Core applications.
-This package unifies configuration and registration of multiple SSO providers into a single, consistent bootstrapping mechanism, while normalizing all claims into a unified **`FranzIdentityContext`**.
-
----
--**Current Version:** v3.0.0
----
-
-## **Features**
-
-* **Centralized SSO Bootstrapping**
-
-  * One entry point: `AddFranzSsoIdentity(configuration)`
-  * Loads provider settings directly from `appsettings.json`
-  * Ensures only one interactive provider is active unless explicitly configured
-
-* **Supported Providers**
-
-  * **WS-Federation** (Azure AD classic / ADFS)
-  * **SAML2** (via Sustainsys.Saml2)
-  * **OpenID Connect (OIDC)**
-  * **Keycloak** (via OIDC, with claims transformation)
-  * **JWT Bearer** (API token validation for microservices)
-
-* **Claims Normalization**
-
-  * Maps provider-specific claims (Azure AD, Keycloak, SAML attributes, etc.)
-  * Produces a unified `FranzIdentityContext` with:
-
-    * `UserId`, `Email`, `FullName`
-    * `Roles`
-    * `TenantId`, `DomainId`
-
-* **Structured Logging**
-
-  * Bootstrapping and provider activation logged via `ILogger<T>`
-  * Clean integration with **Franz.Common.Logging** / Serilog
-
-* **Configuration-Driven**
-
-  * All providers enabled/disabled via config
-  * No hard-coded values in code
-
----
-
-## **Installation**
-
-From your NuGet.org:
-
-
----
-
-## **Usage**
-
-### **1. Configure appsettings.json**
-
-```json
-{
-  "FranzIdentity": {
-    "AllowMultipleInteractiveProviders": false,
-    "WsFederation": {
-      "Enabled": false,
-      "MetadataAddress": "https://login.microsoftonline.com/...",
-      "Wtrealm": "https://your-app"
-    },
-    "Saml2": {
-      "Enabled": false,
-      "IdpMetadata": "https://idp.example.com/metadata",
-      "EntityId": "https://your-app"
-    },
-    "Oidc": {
-      "Enabled": true,
-      "Authority": "https://login.microsoftonline.com/{tenantId}/v2.0",
-      "ClientId": "your-client-id",
-      "ClientSecret": "your-client-secret"
-    },
-    "Keycloak": {
-      "Enabled": false,
-      "Authority": "https://keycloak.example.com/realms/yourrealm",
-      "ClientId": "your-client-id",
-      "ClientSecret": "your-client-secret"
-    },
-    "Jwt": {
-      "Enabled": true,
-      "Authority": "https://login.microsoftonline.com/{tenantId}/v2.0",
-      "Audience": "api://your-api"
-    }
-  }
-}
-```
-
----
-
-### **2. Register SSO in Program.cs**
+## Register the SSO identity composition
 
 ```csharp
 using Franz.Common.SSO.Extensions;
 
-var builder = WebApplication.CreateBuilder(args);
-
-// Add Franz SSO Identity
 builder.Services.AddFranzSsoIdentity(builder.Configuration);
-
-var app = builder.Build();
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapGet("/whoami", (IIdentityContextAccessor accessor) =>
-{
-    var identity = accessor.GetCurrentIdentity();
-    return Results.Json(identity);
-});
-
-app.Run();
 ```
 
----
+The extension binds the `FranzIdentity` configuration section to `FranzSsoSettings`, registers `IHttpContextAccessor`, adds the OIDC and Keycloak claims normalizers, registers `CompositeClaimsTransformation`, and installs a startup filter that logs the configured provider flags.
 
-### **3. Normalized Identity Usage**
+## Configuration model
 
-```csharp
-var identity = _accessor.GetCurrentIdentity();
-Console.WriteLine($"User: {identity.FullName}, Tenant: {identity.TenantId}, Roles: {string.Join(", ", identity.Roles)}");
-```
+`FranzSsoSettings` exposes:
 
----
+- `AllowMultipleInteractiveProviders`
+- `WsFederation`
+- `Oidc`
+- `Saml2`
+- `Keycloak`
+- `Jwt`
+- `InteractiveProvider`
 
-## **Integration with Franz Framework**
+The provider option types are supplied by the HTTP identity provider packages. Configuration binding alone does not register authentication schemes or handlers.
 
-* Works with **Franz.Common.Identity** for the core identity context.
-* Works with **Franz.Common.Http.Identity** for ASP.NET Core providers.
-* Centralizes all SSO wiring into one consistent package.
+## Important implementation boundary
 
----
+The current `AddFranzSsoIdentity` implementation does **not** call `AddAuthentication`, register WS-Federation/SAML/OIDC/Keycloak/JWT authentication handlers, or configure challenge schemes. It registers claims-normalization services and startup logging/validation only. Add the actual provider registration through the owning `Franz.Common.Http.Identity` integration and verify the resulting authentication schemes in the host.
 
-## **Changelog**
+The startup filter registered by the current method is a private nested implementation. Its `enabledInteractive` list is not populated before the multiple-provider check, so the check cannot currently detect multiple enabled interactive providers. Do not rely on `AllowMultipleInteractiveProviders` as an enforced guard until that implementation is corrected.
 
-### Version 1.6.2
+## Claims normalization
 
-* **Complete SSO overhaul**
+The registered transformation composes the OIDC and Keycloak normalizers. It is applied by ASP.NET Core's claims-transformation pipeline when that pipeline is active. The package does not establish the source identity or prove that incoming claims are trustworthy; authentication must be performed by a correctly configured provider.
 
-  * Removed legacy `GenericSSOManager`/`GenericSSOProvider`
-  * Introduced `FranzSsoSettings` for unified config binding
-  * Added `AddFranzSsoIdentity()` bootstrap extension
-  * Integrated **WS-Fed, SAML2, OIDC, Keycloak, JWT Bearer** providers
-  * Added claims normalization pipeline to `FranzIdentityContext`
-  * Added structured startup logging via `FranzSsoStartupFilter`
+## Security and deployment
 
-### Version 1.3
-
-* Upgraded to **.NET 9.0.8**
-* Added new features and improvements
-* Separated **business concepts** from **mediator concepts**
-* Now compatible with both the in-house mediator and MediatR
-
-### Version 1.2.65
-
-* Added `ISsoProvider` for custom SSO provider implementation
-* Introduced `GenericSSOProvider` and `GenericSSOManager` for generic workflows
-* Integrated with ASP.NET Core Identity and EF Core
-* Provided `SsoServiceRegistration` for streamlined configuration
-
----
-
-⚡ With v1.6.2, **Franz.Common.SSO** is now a unified, production-ready SSO abstraction for all supported protocols.
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
----
-
-## Dependency maintenance — October 2026
-
-The SSO package uses patched cryptography dependencies and a patched Snappier version where required by the resolved dependency graph. ASP.NET Core integration remains on the .NET 10 shared framework. Confirm SAML/OIDC and cryptographic flows with integration tests before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+- Store client secrets and signing material outside source control.
+- Configure issuer, audience, metadata, callback, and token validation settings in the actual provider registration.
+- Test authentication and claim normalization independently for every enabled provider.
+- Do not expose normalized identity endpoints without authorization.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See [LICENSE](../../LICENSE).

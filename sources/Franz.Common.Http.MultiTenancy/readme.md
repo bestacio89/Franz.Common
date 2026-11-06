@@ -1,10 +1,12 @@
 # Franz.Common.Http.MultiTenancy
 
-> ASP.NET Core tenant resolution and request-scoped isolation for multi-tenant HTTP applications.
+> Tenant resolution, membership authorization, and immutable tenant execution context for ASP.NET Core requests.
 
 ## Overview
 
-ASP.NET Core tenant resolution and request-scoped isolation for multi-tenant HTTP applications.
+The HTTP integration resolves a tenant from application-registered strategies, validates its status, optionally validates membership for authenticated principals, resolves a verified domain, and establishes a request-scoped `TenantExecutionContext`.
+
+The package does not treat a caller-supplied tenant identifier as authorization proof. Applications own the tenant store, resolver strategies, and membership policy.
 
 ## Installation
 
@@ -12,259 +14,64 @@ ASP.NET Core tenant resolution and request-scoped isolation for multi-tenant HTT
 dotnet add package Franz.Common.Http.MultiTenancy
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A library within the **Franz Framework** that extends multi-tenancy support for HTTP-based **ASP.NET Core** applications. This package provides tools for tenant-specific context management, dependency injection, and Swagger documentation enhancements, enabling seamless multi-tenant application development.
-
----
-
-## **Features**
-
-- **Tenant Context Management**:
-  - `TenantContextAccessor` and `DomainContextAccessor` for managing tenant-specific information across HTTP requests.
-- **Swagger Documentation**:
-  - `AddRequiredHeaderParameter` for including tenant-specific headers in Swagger documentation.
-- **Dependency Injection**:
-  - `ServiceCollectionExtensions` for integrating multi-tenancy into your services and application pipeline.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package relies on:
-- **Microsoft.AspNetCore.Mvc.Core** (2.2.5): Core MVC functionality for tenant-based HTTP applications.
-- **Swashbuckle.AspNetCore.SwaggerGen** (6.5.0): For Swagger generation with multi-tenancy support.
-- **Franz.Common.MultiTenancy**: Core multi-tenancy utilities and patterns.
-- **Franz.Common.Http.Headers**: Provides header utilities for tenant-specific HTTP headers.
-- **Franz.Common.Http**: Core HTTP utilities for multi-tenant scenarios.
-- **Franz.Common.Headers**: Core header management utilities.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Http.MultiTenancy
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Http.MultiTenancy
-```
-
----
-
-## **Usage**
-
-### **1. Register Multi-Tenancy Services**
-
-Use `ServiceCollectionExtensions` to register tenant-specific services:
+## Registration
 
 ```csharp
 using Franz.Common.Http.MultiTenancy.Extensions;
 
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddMultiTenancy(); // Registers multi-tenancy utilities and services
-    }
-}
-```
-
-### **2. Access Tenant Context**
-
-Access tenant-specific information using `TenantContextAccessor` or `DomainContextAccessor`:
-
-```csharp
-using Franz.Common.Http.MultiTenancy;
-
-public class MyService
-{
-    private readonly TenantContextAccessor _tenantContextAccessor;
-
-    public MyService(TenantContextAccessor tenantContextAccessor)
-    {
-        _tenantContextAccessor = tenantContextAccessor;
-    }
-
-    public string GetTenantId()
-    {
-        return _tenantContextAccessor.Tenant?.Id;
-    }
-}
-```
-
-### **3. Enhance Swagger Documentation**
-
-Use `AddRequiredHeaderParameter` to include tenant-specific headers in Swagger UI:
-
-```csharp
-using Franz.Common.Http.MultiTenancy.Documentation;
-
-services.AddSwaggerGen(options =>
-{
-    options.OperationFilter<AddRequiredHeaderParameter>();
-});
-```
-
-This ensures tenant headers are explicitly documented in API specifications.
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Http.MultiTenancy** package integrates seamlessly with:
-- **Franz.Common.MultiTenancy**: Provides foundational multi-tenancy utilities.
-- **Franz.Common.Http.Headers**: Enhances tenant-specific header handling.
-- **Franz.Common.Http**: Enables tenant-aware HTTP services.
-- **Franz.Common.Headers**: Provides shared header utilities for HTTP operations.
-
-Ensure these dependencies are installed to fully leverage the library's capabilities.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
-
-## License
-
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.3.1
-
-- Introduced tenant resolution pipeline (DefaultTenantResolutionPipeline) to orchestrate multiple strategies.
-- Added resolvers for different multi-tenancy strategies:
-  - HeaderTenantResolver (resolves tenant from request headers).
-  - HostTenantResolver (resolves tenant from host/subdomain).
-  - QueryStringTenantResolver (resolves tenant from query string).
-  - JwtClaimTenantResolver (resolves tenant from JWT claims).
-
-- Implemented TenantResolutionMiddleware for resolving the tenant once per request and storing it in context.
-- Enhanced TenantContextAccessor and DomainContextAccessor to use HttpContext.Items for request-scoped tenant/domain storage.
-- Added DI extension methods (AddFranzMultiTenancy) for easy registration of multi-tenancy services.
-- Added middleware extension (UseFranzMultiTenancy) for seamless integration into the ASP.NET Core pipeline.
-- Improved Swagger integration by supporting tenant-specific headers in documentation via AddRequiredHeaderParameter.
-- Laid foundation for tenant-aware services (DbContexts, caching, feature flags) by standardizing tenant resolution across HTTP requests.
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
-
-## Secure request context
-
-Register the HTTP integration and place its middleware after authentication and before authorization/endpoints:
-
-```csharp
-services.AddFranzMultiTenancy(options =>
-{
-    options.RequireTenant = true; // fail closed when no active tenant resolves
-});
-
-app.UseAuthentication();
-app.UseFranzMultiTenancy();
-app.UseAuthorization();
-```
-
-Tenant and domain accessors read server-established values from `HttpContext.Items`; inbound headers are resolution inputs only and are never the authoritative context. The middleware validates tenant lifecycle state, optionally invokes an application-registered `ITenantValidator`, creates an immutable execution context, and clears it after the request.
-
-The JWT claim resolver ignores unauthenticated principals. Register only the resolution strategies appropriate to the application. Query-string and header selection must not be treated as authorization: applications must still authorize the authenticated principal's membership in the resolved tenant.
-
-**Compatibility note:** HTTP accessors no longer read tenant/domain IDs from request headers. Consumers that previously used caller-supplied headers as ambient state must use a trusted resolver and the execution context accessor. `ITenantValidator` requires the cancellation-aware `IsValidAsync(Guid, CancellationToken)` contract; implementations must be updated accordingly.
-
-
-## Authenticated tenant membership
-
-For authenticated principals, the HTTP tenant middleware requires an application-registered `ITenantRequestAuthorizer`. If no authorizer is registered, or membership is denied, the request is rejected with HTTP 403. Implement this contract against your identity/membership store; a tenant ID claim or request header alone is not membership proof. Anonymous tenant access remains subject to the application's endpoint authorization policy.
-
-
-## Request resolution is not authorization for 2.3.5
-
-Tenant resolution from a host, route, claim, or header identifies a candidate tenant; it does not establish membership or authorize access by itself. For authenticated principals, register and implement `ITenantRequestAuthorizer`; absent registration or denied membership must fail closed. A tenant identifier supplied by the caller is not membership proof. See the [tenant-isolation audit](../../Docs/tenant-isolation-boundary-audit.md) for the broader framework boundary.
-
----
-
-## Cancellation and immutable request context
-
-Tenant resolution now carries `HttpContext.RequestAborted` through the resolution pipeline, HTTP resolvers, tenant-store lookup, tenant validation, and authenticated membership authorization. The cancellation-aware `ITenantStore` overloads have default interface implementations for source/binary compatibility; I/O-backed tenant stores should override them and pass the token to their underlying provider.
-
-After resolution and authorization, the middleware establishes one immutable `TenantExecutionContext`. The HTTP tenant/domain accessors reject attempts to replace tenant or domain identity while that validated context is active. The context is cleared in a `finally` block, including when downstream middleware throws or is cancelled.
-
-The authenticated `IdentityContextAccessor` reads user claims only from an authenticated principal. Tenant and domain values come from the validated execution context. Use `IHeaderContextAccessor` to inspect raw headers; never treat caller-supplied identity headers as proof of identity or membership.
-
-
-## HTTP tenant boundary configuration
-
-Tenant resolution exclusions are explicit path prefixes and are matched on segment boundaries, case-insensitively. Excluded endpoints bypass tenant resolution and tenant execution-context creation; secure those endpoints independently. The root path cannot be excluded.
-
-```csharp
-services.AddFranzMultiTenancy(options =>
+builder.Services.AddFranzMultiTenancy(options =>
 {
     options.RequireTenant = true;
+    options.RequireAuthenticatedAuthorization = true;
     options.ExcludedPaths.Add("/health");
-    options.ExcludedPaths.Add("/metrics");
 });
+
+// Register the application's ITenantStore and one or more ITenantResolver
+// implementations using the application's persistence and resolution rules.
+// Register ITenantRequestAuthorizer for authenticated tenant membership.
 ```
 
-At host startup, the HTTP integration validates that at least one `ITenantResolver` is registered when tenant resolution is required. Authenticated requests remain fail-closed by default: an `ITenantRequestAuthorizer` must be registered. Applications can opt in to the built-in GUID-claim authorizer:
+`AddFranzMultiTenancy` registers the HTTP context accessors, tenant execution-context accessor, default resolution pipelines, middleware, options validation, and startup validation. It does not invent a tenant store or a resolver strategy. When tenant resolution is required, startup validation expects at least one `ITenantResolver`.
+
+For authenticated requests, the default is fail-closed: an `ITenantRequestAuthorizer` must be registered. Applications with domain-specific membership, subscription, role, or delegated-access rules should implement this interface.
+
+The package also provides an explicit GUID-claim membership authorizer:
 
 ```csharp
-services.AddTenantClaimsAuthorizer(options =>
+builder.Services.AddTenantClaimsAuthorizer(options =>
 {
     options.TenantIdClaimType = "tenant_id";
 });
 ```
 
-The claims authorizer accepts only an authenticated principal containing a claim whose value parses to the exact resolved tenant GUID. It is a simple membership policy; applications with richer membership, role, subscription, or delegated-access rules should register their own `ITenantRequestAuthorizer`. Setting `RequireAuthenticatedAuthorization = false` disables this boundary check and should be an explicit, security-reviewed application decision.
+This authorizer accepts only an authenticated principal whose configured claim parses to the exact resolved tenant GUID. It is a simple membership policy, not a substitute for richer authorization rules.
+
+## Middleware
+
+Use `UseFranzMultiTenancy()` when composing the pipeline manually. With `Franz.Common.Http.Bootstrap`, `UseHttpArchitecture()` already inserts tenant resolution after authentication and before endpoint authorization; do not register the middleware twice.
+
+The validated context is immutable for the duration of the request and is cleared in a `finally` block. Attempts to replace tenant or domain identity while the context is active are rejected. Request cancellation is propagated through resolution, validation, and authorization.
+
+## Resolution and security behavior
+
+- Tenant resolution strategies are application-registered `ITenantResolver` implementations.
+- A missing or unresolved tenant is rejected when `RequireTenant` is enabled.
+- Inactive tenants and failed tenant validation are rejected.
+- Authenticated requests require successful tenant membership authorization when `RequireAuthenticatedAuthorization` is enabled.
+- Domain context is established only for a verified domain associated with the resolved tenant.
+- Excluded paths are explicit path prefixes matched on segment boundaries, case-insensitively. Excluded endpoints bypass tenant resolution and must be secured independently.
+- The root path cannot be excluded.
+
+## Accessing the validated context
+
+Use the provider-neutral contracts from `Franz.Common.MultiTenancy`:
+
+- `ITenantExecutionContextAccessor.Current` for the immutable execution context.
+- `ITenantContextAccessor.GetCurrentTenantId()` for the resolved tenant identifier.
+- `IDomainContextAccessor.GetCurrentDomainId()` for the resolved domain identifier.
+
+Do not read raw headers directly to establish trusted tenant identity.
+
+## License
+
+MIT. See the repository [LICENSE](../../LICENSE).

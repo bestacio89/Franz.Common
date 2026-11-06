@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.EntityFramework
 
-> Entity Framework Core persistence for messaging inbox and outbox workflows with transactional consistency.
+> Provider selection and persistence registration for messaging storage, with EF-specific repository and behavior setup for relational contexts.
 
 ## Overview
 
-Entity Framework Core persistence for messaging inbox and outbox workflows with transactional consistency.
+Provider selection and persistence registration for messaging storage, with EF-specific repository and behavior setup for relational contexts.
 
 ## Installation
 
@@ -12,214 +12,49 @@ Entity Framework Core persistence for messaging inbox and outbox workflows with 
 dotnet add package Franz.Common.Messaging.EntityFramework
 ```
 
-## Design principles
+## Registration API
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A specialized library within the **Franz Framework** designed to integrate **Entity Framework Core** with messaging workflows.
-This package ensures **transactional consistency** for outbox patterns in relational databases, while also supporting **polyglot persistence** by delegating messaging storage to MongoDB or Azure Cosmos DB when configured.
-
----
-
-## **Features**
-
-* **Transactional Filters**
-
-  * `TransactionFilter` to manage database transactions in messaging contexts, ensuring consistency and rollback.
-
-* **Service Registration**
-
-  * `ServiceCollectionExtensions` to simplify the integration of messaging and persistence services.
-
-* **Entity Framework Core Messaging**
-
-  * Native support for relational outbox patterns when using **EF Core** (MariaDB, Postgres, Oracle, SQL Server).
-
-* **Polyglot Messaging Support** *(new in 1.6.2)*
-
-  * Messaging outbox/dead-letter can also be stored in **MongoDB** or **Azure Cosmos DB** via unified configuration.
-  * Clean abstraction with `IMessageStore`, so your messaging workflow does not change regardless of provider.
-
----
-
-## **Version Information**
-
-* **Current Version:** v3.0.0
-* Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package relies on:
-
-* **Microsoft.EntityFrameworkCore** (8.0.0) – Core EF functionality for database access
-* **Microsoft.EntityFrameworkCore.Relational** (8.0.0) – Relational database support
-* **Franz.Common.EntityFramework.MariaDB** – MariaDB provider bootstrap
-* **Franz.Common.Messaging.Hosting** – Hosting + transaction coordination
-* **Franz.Common.MongoDB** *(new in 1.6.2)* – MongoDB messaging provider
-* **Franz.Common.AzureCosmosDB** *(new in 1.6.2)* – Cosmos DB messaging provider
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Messaging.EntityFramework
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Messaging.EntityFramework
-```
-
----
-
-## **Usage**
-
-### **1. Configure Messaging Provider**
-
-```json
-{
-  "Messaging": {
-    "Provider": "Postgres" // Options: MariaDb, Postgres, Oracle, SqlServer, Mongo, Cosmos
-  },
-  "Database": {
-    "ConnectionString": "Host=localhost;Database=franz;Username=sa;Password=pass"
-  },
-  "MongoDb": {
-    "ConnectionString": "mongodb://localhost:27017",
-    "DatabaseName": "FranzOutbox"
-  },
-  "CosmosDb": {
-    "ConnectionString": "AccountEndpoint=https://your-account.documents.azure.com:443/;AccountKey=your-key;",
-    "DatabaseName": "FranzCosmosOutbox"
-  }
-}
-```
-
----
-
-### **2. Register Messaging Outbox**
+The current entry point is `AddDatabase<TDbContext>(IHostEnvironment, IConfiguration)` in `Franz.Common.Messaging.EntityFramework.Extensions`, constrained to `DbContextBase`.
 
 ```csharp
 using Franz.Common.Messaging.EntityFramework.Extensions;
 
-builder.Services.AddMessageStore<MyDbContext>(builder.Configuration);
+builder.Services.AddDatabase<AppDbContext>(
+    builder.Environment,
+    builder.Configuration);
 ```
 
-* If `Provider` is `Postgres`, `MariaDb`, `Oracle`, or `SqlServer` → EF-based outbox via `DbContext`.
-* If `Provider` is `Mongo` → outbox/dead-letter stored in Mongo collections.
-* If `Provider` is `Cosmos` → outbox/dead-letter stored in Cosmos containers.
+The method reads `Database:Provider` and currently switches on:
 
----
+| Value | Registration |
+|---|---|
+| `mariadb` | MariaDB EF provider |
+| `postgres` | PostgreSQL EF provider |
+| `sqlserver` | SQL Server EF provider |
+| `mongo` | Mongo context registration |
+| `cosmos` | Cosmos context registration |
 
-### **3. Transaction Filters (Relational Only)**
+Provider matching is case-insensitive because the value is lower-cased before the switch. Unsupported or missing values throw `InvalidOperationException`.
 
-When using relational databases, ensure transaction consistency with filters:
+**Current implementation caveats:**
+- The exception text also lists Oracle, and `IsRelational` includes Oracle, but the switch has no Oracle branch. Oracle is therefore not selectable through this method as currently implemented.
+- The Mongo and Cosmos branches register the base `MongoDbContext` and `CosmosDbContextBase` types rather than using the generic `TDbContext` argument. Do not assume a custom generic context is registered by those branches.
+- The `IHostEnvironment` parameter is not used by the implementation.
 
-```csharp
-using Franz.Common.Messaging.EntityFramework.Transactions;
+For relational providers, the method additionally registers generic entity repositories and EF behaviors. The Mongo and Cosmos branches do not receive those EF-specific additions.
 
-services.AddControllers(options =>
-{
-    options.Filters.Add<TransactionFilter>();
-});
-```
+## Transaction filter
 
----
+The package's `TransactionFilter` implements `IAsyncMessageActionFilter`, not an MVC action filter. It checks whether the injected EF `DbContext` already has a current transaction after the message action executes; it commits when no exception is recorded and rolls back when one is recorded. It does not begin a transaction itself.
 
-### **4. Messaging Service Example**
+## Persistence semantics
 
-```csharp
-public class MessagingService
-{
-    private readonly IMessageStore _messageStore;
+Do not treat this package as a single interchangeable outbox implementation across all providers. Relational persistence uses EF registration and its context/repository behavior. Mongo and Cosmos use their provider-specific context implementations. Verify message-store durability, transaction boundaries, retry behavior, and duplicate handling against the actual provider and messaging host.
 
-    public MessagingService(IMessageStore messageStore)
-    {
-        _messageStore = messageStore;
-    }
+## Configuration
 
-    public async Task PublishAsync(Message message)
-    {
-        await _messageStore.SaveAsync(message);
-    }
-}
-```
-
-The code above works the same whether your provider is EF, Mongo, or Cosmos.
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Messaging.EntityFramework** package integrates seamlessly with:
-
-* **Franz.Common.EntityFramework** (base EF abstractions)
-* **Franz.Common.EntityFramework.MariaDB**
-* **Franz.Common.EntityFramework.Postgres**
-* **Franz.Common.EntityFramework.Oracle**
-* **Franz.Common.EntityFramework.SQLServer**
-* **Franz.Common.MongoDB** *(NoSQL messaging)*
-* **Franz.Common.AzureCosmosDB** *(NoSQL messaging)*
-* **Franz.Common.DependencyInjection**
-
----
-
-## **Changelog**
-
-### Version 1.6.2
-
-* Extended **messaging persistence** beyond EF: added support for **MongoDB** and **Azure Cosmos DB**.
-* Unified **config-driven provider selection** for messaging outbox/dead-letter (`Messaging:Provider`).
-* EF relational providers still supported via `DbContextBase` + `StoredMessage` entity.
-* Mongo & Cosmos backed by dedicated `IMessageStore` implementations.
-* All providers expose the same abstraction for **transparent messaging workflows**.
-
-### Version 1.3
-
-* Upgraded to **.NET 9.0.8**
-* Added new features and improvements
-* Separated **business concepts** from **mediator concepts**
-* Now compatible with both the in-house mediator and MediatR
-
-### Version 1.2.65
-
-* Upgraded version to **.NET 9**
-
-* ### Version 1.6.20
-- Updated to **.NET 10.0**
-- Removal and Deprecation of oracle support due to Oracle's shift away from EF Core.
----
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+Keep provider and connection settings in environment-specific configuration or a secret provider. Integration-test the selected provider with the same major dependency versions and topology used in production.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See [LICENSE](../../LICENSE).

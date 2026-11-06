@@ -1,10 +1,10 @@
 # Franz.Common.EntityFramework.SQLServer
 
-> SQL Server provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
+> SQL Server EF Core provider registration for Franz `DbContextBase` contexts.
 
 ## Overview
 
-SQL Server provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
+This adapter uses Microsoft.Data.SqlClient and the SQL Server EF Core provider. It consumes shared Franz database options and database-target resolution.
 
 ## Installation
 
@@ -12,145 +12,39 @@ SQL Server provider integration for Franz.Common Entity Framework Core persisten
 dotnet add package Franz.Common.EntityFramework.SQLServer
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A private utility library for seamless integration of **Entity Framework Core** with **SQL Server**, designed as part of the **Franz Framework** ecosystem. This package is versioned as `1.2.65` and is hosted exclusively on a NuGet.org.
-
----
-
-## **Features**
-
-- **SQL Server Integration**:
-  - Simplifies configuration and usage of `Microsoft.EntityFrameworkCore.SqlServer`.
-- **Dependency Injection**:
-  - Provides `ServiceCollectionExtensions` for easy registration of SQL Server services.
-- **SSL Enforcement**:
-  - Includes the `SslEnforcement` enum to handle SQL Server SSL configuration.
-- **Multi-Tenancy Support**:
-  - Integrates with `Franz.Common.MultiTenancy` to streamline tenant-based setups.
-- **Part of Franz Framework**:
-  - Works seamlessly with other `Franz` libraries, including `Franz.Common.EntityFramework` and `Franz.Common.MultiTenancy`.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- This package and all related `Franz` packages are under active development and maintained privately.
-
----
-
-## **Installation**
-
-Since this package is hosted on a NuGet.org, configure your NuGet client to access the feed before installing.
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.EntityFramework.SQLServer
-```
-
-```
-
-### **Step 2: Install the Package**
-Install the package via the .NET CLI:
-
-```bash
-dotnet add package Franz.Common.EntityFramework.SQLServer
-```
-
----
-
-## **Usage**
-
-### **1. Configure SQL Server for Entity Framework Core**
-Use the provided `ServiceCollectionExtensions` to streamline the setup:
+## Registration
 
 ```csharp
-using Franz.Common.EntityFramework.SQLServer;
+using Franz.Common.EntityFramework.SQLServer.Extensions;
 
-public void ConfigureServices(IServiceCollection services)
+builder.Services.AddSqlServerDatabase<ApplicationDbContext>(builder.Configuration);
+```
+
+The extension binds the `Database` section through `AddDatabaseOptions`, resolves the effective database name with `DatabaseTargetResolver`, configures `UseSqlServer`, and registers the concrete context as `DbContextBase`.
+
+## Configuration
+
+```json
 {
-    services.AddSqlServerDatabase("YourConnectionString");
+  "Database": {
+    "ServerName": "sql.example.internal",
+    "DatabaseName": "application",
+    "UserName": "application",
+    "Password": "<secret>",
+    "Port": 1433,
+    "SslMode": "Preferred",
+    "IsolationMode": "SharedDatabase",
+    "EnableSensitiveDataLogging": false
+  }
 }
 ```
 
-### **2. Enable Multi-Tenancy**
-Easily configure multi-tenancy when using `Franz.Common.MultiTenancy`:
+The adapter has development-oriented `sa/password` credentials; explicitly configure deployed connection fields and use a secret manager. It maps `SslMode` through `SslEnforcement` to SqlClient's `Encrypt` option, but the current connection-string builder unconditionally sets `TrustServerCertificate = true`. This bypasses certificate-chain validation. Do not treat `Encrypt` alone as server identity verification; correct this provider behavior before relying on certificate validation in production.
 
-```csharp
-services.AddTenantSupport();
-```
+## Multi-tenancy
 
-### **3. Enforce SSL Settings**
-Use the `SslEnforcement` enum to configure SSL options for SQL Server connections:
-
-```csharp
-using Franz.Common.EntityFramework.SQLServer.Enums;
-
-SslEnforcement sslOption = SslEnforcement.Required;
-```
-
----
-
-## **Dependencies**
-
-This package is built to work with the following Franz Framework packages (all versioned `1.3.3`):
-- `Franz.Common.EntityFramework`
-- `Franz.Common.MultiTenancy`
-
-Make sure to install them from your NuGet.org as needed.
-
----
-
-## **Development Note**
-
-This library is part of the **Franz Framework**, a privately developed and maintained suite of libraries. It is currently **not available on NuGet.org** but is hosted on a NuGet.org for internal use and development purposes.
-
----
-
-## **Contributing**
-
-Contributions are restricted to the internal development team. If you have access to the private repository, follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch for your updates.
-3. Submit a pull request for review.
-
----
+`TenantDatabase` and `DomainDatabase` use the shared resolver and require a configured `{dbName}` token plus the corresponding validated execution context. The derived DbContext must forward the execution accessor and database/multi-tenancy options to `DbContextBase`.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-The SQL Server provider is aligned with the .NET 10 EF Core servicing baseline. The dependency audit also checks transitive cryptography packages; vulnerable older versions must not remain in the resolved graph. Run SQL Server integration tests before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See the repository [LICENSE](../../LICENSE).

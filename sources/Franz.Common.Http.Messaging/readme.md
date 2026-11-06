@@ -1,10 +1,10 @@
 # Franz.Common.Http.Messaging
 
-> HTTP endpoint integration for publishing messages and exposing messaging-backed application operations.
+> ASP.NET Core MVC integration for Kafka or RabbitMQ messaging transaction coordination and health checks.
 
 ## Overview
 
-HTTP endpoint integration for publishing messages and exposing messaging-backed application operations.
+ASP.NET Core MVC integration for Kafka or RabbitMQ messaging transaction coordination and health checks.
 
 ## Installation
 
@@ -12,87 +12,9 @@ HTTP endpoint integration for publishing messages and exposing messaging-backed 
 dotnet add package Franz.Common.Http.Messaging
 ```
 
-## Design principles
+## RabbitMQ integration
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-Absolutely ✅ — here’s your **fully updated `Franz.Common.Http.Messaging` README** rewritten to match the structure you provided, with the **new v1.6.17** changelog compacted but still complete and consistent with your ecosystem documentation style.
-
----
-
-# **Franz.Common.Http.Messaging**
-
-A specialized library within the **Franz Framework**, designed to streamline the integration of messaging systems, health checks, and transaction management for HTTP-based services in **ASP.NET Core** applications.
-This package ensures seamless messaging health monitoring and transactional consistency across distributed systems — now supporting **Kafka**, **RabbitMQ**, and (future) **Azure EventBus** providers.
-
----
-
-## **Features**
-
-* **Unified Messaging Integration**
-
-  * Centralized orchestration for Kafka and RabbitMQ through `AddMessagingInHttpContext()`.
-* **Messaging Health Checks**
-
-  * Auto-detects and registers protocol-specific health checks (`RabbitMQHealthCheck`, `KafkaHealthCheck`).
-* **Transaction Management**
-
-  * `MessagingTransactionFilter` for consistent commit/rollback handling on HTTP requests.
-* **Dependency Injection**
-
-  * `ServiceCollectionExtensions` for unified setup across messaging providers.
-
----
-
-## **Version Information**
-
-* **Current Version:** v3.0.0
-* Part of the open-source Franz.Common ecosystem.
----
-
-## **Dependencies**
-
-This package depends on:
-
-* **Franz.Common.Http** — HTTP utilities and middleware integration.
-* **Franz.Common.Messaging** — Core messaging abstractions.
-* **Franz.Common.Messaging.Kafka** — Kafka backend support.
-* **Franz.Common.Messaging.RabbitMQ** — RabbitMQ backend support.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Http.Messaging
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Http.Messaging
-```
-
----
-
-## **Usage**
-
-### **1. Unified Messaging Context**
-
-Register a messaging provider directly in your API:
+The RabbitMQ extension is in `Franz.Common.Http.Messaging.Extensions`.
 
 ```csharp
 using Franz.Common.Http.Messaging.Extensions;
@@ -100,115 +22,35 @@ using Franz.Common.Http.Messaging.Extensions;
 builder.Services.AddMessagingInHttpContext(builder.Configuration);
 ```
 
-This single call:
+This composes RabbitMQ publisher, sender, and consumer registration through `Franz.Common.Messaging.RabbitMQ`, registers `MessagingTransactionFilter`, and adds the RabbitMQ connection health check. The filter is an MVC async action filter: after the action executes, it calls `IMessagingTransaction.CompleteAsync()` when no exception is present, or `RollbackAsync()` when an exception is present.
 
-* Registers the selected protocol (Kafka or RabbitMQ).
-* Adds messaging transaction filters.
-* Adds health checks automatically.
+The filter coordinates an existing messaging transaction; it does not itself create a broker transaction or guarantee atomicity between an HTTP database transaction and a broker operation.
 
-Your `appsettings.json` can define the provider:
+## Kafka integration
 
-```json
-{
-  "Messaging": {
-    "Provider": "rabbitmq" // or "kafka"
-  }
-}
-```
-
----
-
-### **2. Transaction Management**
-
-Ensures transactional consistency in request lifecycles:
+Kafka has a separate extension class and entry point:
 
 ```csharp
-using Franz.Common.Http.Messaging.Transactions;
+using Franz.Common.Http.Messaging;
 
-services.AddControllers(options =>
-{
-    options.Filters.Add<MessagingTransactionFilter>();
-});
+builder.Services.AddKafkaMessagingInHttpContext(builder.Configuration);
 ```
 
-Automatically commits or rolls back messaging operations based on action result success or failure.
+This delegates producer/consumer setup to `AddKafkaMessaging(configuration)`, registers the same MVC transaction filter, and adds a Kafka health check tagged `messaging`. The current health-check registration creates a default `ConsumerConfig`; supply and validate the actual broker configuration through the messaging package and test the health check against the target deployment.
 
----
+Kafka and RabbitMQ registration are separate explicit calls. This package does not currently expose a single configuration-driven provider switch.
 
-### **3. Health Checks**
+## Manual registration
 
-Health check registration is automatic but can also be manual:
+The package exposes separate methods for registering the messaging transaction filter and health checks. Use them only when composing those pieces manually; avoid duplicate registrations when the top-level extension has already been called.
 
-```csharp
-services.AddHealthChecks()
-    .AddRabbitMQ(sp => sp.GetRequiredService<IConnectionProvider>().Current);
-```
+## Operational considerations
 
-All checks are tagged under `messaging` for centralized monitoring.
-
----
-
-## **Integration with Franz Framework**
-
-Seamlessly integrates with:
-
-* **Franz.Common.Http** — Core HTTP abstractions.
-* **Franz.Common.Messaging** — Foundation for all messaging systems.
-* **Franz.Common.Messaging.Kafka** & **Franz.Common.Messaging.RabbitMQ** — Provider-specific implementations.
-
-Together, they form a **poly-protocol messaging layer** for distributed microservices.
-
----
-
-## **Contributing**
-
-This package is private to the Franz Framework.
-To contribute:
-
-1. Clone the repository:
-   `https://github.com/bestacio89/Franz.Common/`
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+- Treat health checks as diagnostics, not proof that publish/consume workflows are correct.
+- Configure broker credentials and TLS in the owning messaging package.
+- Define retry, dead-letter, idempotency, and delivery semantics in the broker-specific messaging layer.
+- Keep the HTTP request's success/failure semantics explicit. A filter completion callback is not a distributed transaction across arbitrary resources.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### **Version 1.6.17 — Unified Messaging Orchestration & RabbitMQ Integration**
-
-* Added **RabbitMQ messaging integration** with health checks and scoped transaction filters.
-* Introduced **`MessagingTransactionFilter`** (replacing `TransactionFilter`) for consistent messaging commit/rollback.
-* Implemented unified setup via `AddMessagingInHttpContext()` for both Kafka and RabbitMQ.
-* Improved health check registration to prevent duplicate service registration.
-* Aligned with Kafka’s API naming convention for consistency (`AddKafkaMessaging*`).
-* Synchronized versioning with the Franz Messaging ecosystem (`Kafka`, `RabbitMQ`, `AzureEventBus`).
-
-### **Version 1.3**
-
-* Upgraded to **.NET 9.0.8**.
-* Introduced new features and compatibility with both custom Mediator and MediatR.
-
-### **Version 1.2.65**
-
-* Initial upgrade to **.NET 9** baseline.
-
----
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-The package now uses the .NET 10 ASP.NET Core shared framework instead of legacy ASP.NET Core 2.3.11 packages, and cryptography dependencies are pinned to patched releases. Kafka, RabbitMQ, and health-check integration behavior must be validated by the solution test suite before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See [LICENSE](../../LICENSE).

@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Sagas
 
-> Saga orchestration contracts and execution support for coordinating long-running distributed workflows.
+> Saga registration, state contracts, routing, orchestration, persistence adapters, and audit hooks for long-running workflows.
 
 ## Overview
 
-Saga orchestration contracts and execution support for coordinating long-running distributed workflows.
+The package contains saga contracts, a registration builder, a message router, an orchestrator, execution pipeline, audit sink, and repository adapters. It is transport-agnostic; a transport handler must invoke saga orchestration when an integration event is received.
 
 ## Installation
 
@@ -12,336 +12,44 @@ Saga orchestration contracts and execution support for coordinating long-running
 dotnet add package Franz.Common.Messaging.Sagas
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-### **Version 2.2.1 — Distributed Orchestration Engine for the Franz Framework**
-
-`Franz.Common.Messaging.Sagas` provides **long-running workflow orchestration**, **distributed coordination**, and **deterministic state machines** fully integrated into the Franz architecture.
-
-Sagas in Franz unify:
-
-* **Microservice coordination**
-* **Async transactional consistency**
-* **Compensating workflows**
-* **Message-driven state transitions**
-* **Outbox-based reliability**
-
-They operate transport-agnostically and integrate seamlessly with:
-
-* Franz.Common.Messaging
-* Franz.Common.Mediator
-* Kafka
-* RabbitMQ
-* Azure CosmosDB
-* MongoDB
-* EntityFramework
-* In-memory transient orchestration
-
----
-
-## 🔖  **Current Version**:  v2.2.16
-
----
-
-# 🚀 **What’s New in v1.7.5**
-
-### ✔ **CosmosDB & Mongo-backed Saga Stores**
-
-New persistence providers added:
-
-* `MongoSagaRepository`
-* `CosmosSagaRepository`
-
-Both support:
-
-* Deterministic serialization (`JsonSagaStateSerializer`)
-* Concurrency tokens
-* Timestamped audit markers
-* Partition-aware storage (CosmosDB)
-
----
-
-### ✔ **Deterministic Saga ID & State Rules**
-
-Saga identity now follows one deterministic rule:
-
-```
-SagaId = derived from IMessageCorrelation<T> interface
-```
-
-This eliminates ambiguity across transports and persistence layers.
-
----
-
-### ✔ **Execution Pipeline Improvements**
-
-* Fully async-safe execution
-* Deterministic handler invocation
-* Better error propagation
-* Handler return types aligned with `Task<ISagaTransition>`
-
----
-
-### ✔ **Improved DI Boot Sequence**
-
-All saga infrastructure is now guaranteed to resolve **before** message listeners start:
-
-* SagaRouter registered early
-* SagaOrchestrator registered before Messaging listeners
-* Automatic discovery and finalization via `BuildFranzSagas()`
-
----
-
-### ✔ **Null-Safety + .NET 10 Compliance**
-
-The entire Saga engine is now:
-
-* `<Nullable>enable`
-* `<TreatWarningsAsErrors>true>`
-* Aligned with .NET 10 runtime
-
----
-
-### ✔ **Stabilized Mapping & Reflection**
-
-* Stronger validation in `SagaRegistration`
-* Improved scanning for Start, Step, Compensation handlers
-* Unified contract resolution
-
----
-
-### ✔ **Bug Fixes**
-
-* Fixed handler discovery with `ICompensateWith<>`
-* Fixed rare DI timing issues
-* Fixed correlation-based saga continuation rules
-
----
-
-# 🧩 **Core Components**
-
-The Saga engine is composed of:
-
-```
-ISaga<TState>
-    ↓
-SagaRegistration
-    ↓
-SagaRouter
-    ↓
-SagaOrchestrator
-    ↓
-SagaExecutionPipeline
-    ↓
-ISagaRepository (EF / Mongo / Cosmos / Memory)
-    ↓
-ISagaAuditSink
-```
-
----
-
-# 🧩 **Defining a Saga**
-
-A complete saga is defined by:
+## Registration
 
 ```csharp
-public sealed class OrderSaga :
-    SagaBase<OrderState>,
-    IStartWith<OrderCreated>,
-    IHandle<PaymentAccepted>,
-    ICompensateWith<PaymentFailed>,
-    IMessageCorrelation<OrderCreated>,
-    IMessageCorrelation<PaymentFailed>
+using Franz.Common.Messaging.Sagas.Configuration;
+
+var sagaBuilder = builder.Services.AddFranzSagas(options =>
 {
-    public override Task OnCreatedAsync(ISagaContext ctx, CancellationToken ct)
-    {
-        State.Id = GetCorrelationId((OrderCreated)ctx.Message);
-        State.CreatedAt = DateTime.UtcNow;
-        return Task.CompletedTask;
-    }
-
-    public Task<ISagaTransition> HandleAsync(OrderCreated msg, ISagaContext ctx, CancellationToken ct)
-        => SagaTransition.Continue(null);
-
-    public Task<ISagaTransition> HandleAsync(PaymentAccepted msg, ISagaContext ctx, CancellationToken ct)
-        => SagaTransition.Continue(null);
-
-    public Task<ISagaTransition> HandleAsync(PaymentFailed msg, ISagaContext ctx, CancellationToken ct)
-        => SagaTransition.Continue(null);
-
-    public string GetCorrelationId(OrderCreated message) => message.OrderId;
-    public string GetCorrelationId(PaymentFailed message) => message.OrderId;
-}
-```
-
-Handler discovery uses:
-
-* `IStartWith<TEvent>`
-* `IHandle<TEvent>`
-* `ICompensateWith<TEvent>`
-
----
-
-# 🗂️ **Registering Sagas**
-
-```csharp
-var builder = services.AddFranzSagas(opts =>
-{
-    opts.ValidateMappings = true;
+    options.ValidateMappings = true;
 });
 
-builder.AddSaga<OrderSaga>();
-builder.AddSaga<PaymentSaga>();
+sagaBuilder.AddSaga<OrderSaga>();
+```
 
-services.AddFranzMediator(…);
-services.AddRabbitMQMessaging(…);
+After the service provider is built, finalize registrations:
 
-var app = host.Build();
+```csharp
 app.Services.BuildFranzSagas();
 ```
 
----
+The builder also exposes `AddSaga(Type)`, `AddSagaAssembly(assembly)`, `AddSagasFromAssemblyContaining<T>()`, and `AddAuditSink<TSink>()`. Saga types are registered as transient services.
 
-# ⚙️ **Persistence Providers (1.7.5)**
+## Current contracts
 
-| Provider             | Package / Class          | Status         |
-| -------------------- | ------------------------ | -------------- |
-| **InMemory**         | `InMemorySagaRepository` | ✓ Stable       |
-| **EntityFramework**  | `EfSagaRepository`       | ✓ Production   |
-| **MongoDB**          | `MongoSagaRepository`    | ✓ New in 1.7.5 |
-| **Cosmos DB**        | `CosmosSagaRepository`   | ✓ New in 1.7.5 |
-| **Redis**            | `RedisSagaRepository`    | ✓ Stable       |
-| **Kafka Compaction** | (future provider)        | ✓ Stable       |
+- `ISaga<TState>` requires a `State` property, a non-empty `Guid SagaId`, and `OnCreatedAsync`.
+- `ISagaState` currently contains a nullable string `ConcurrencyToken`; it does not define an ID or timestamp.
+- `IStartWith<TMessage>`, `IHandle<TMessage>`, and `ICompensateWith<TMessage>` declare the message roles handled by a saga.
+- `IMessageCorrelation<TMessage>` currently declares an instance method returning `string`.
 
----
+## Important implementation limitation
 
-# 📐 **Saga State Model**
+The current correlation contract and orchestrator are inconsistent: the interface returns `string`, but the orchestrator invokes the interface method with a null target and then requires the result to be a `Guid`. In addition, the orchestrator requires `SagaId` to be non-empty before it starts the saga; it does not generate the ID automatically.
 
-All saga states must implement:
+Consequently, the current correlation-based start/continuation path is not reliably executable. Do not treat saga orchestration or its persistence adapters as production-ready until the correlation contract, invocation target, ID lifecycle, and end-to-end tests are corrected. This guide intentionally does not provide a misleading working-saga sample.
 
-```csharp
-public interface ISagaState
-{
-    string? ConcurrencyToken { get; set; }
-    DateTime UpdatedAt { get; set; }
-}
-```
+## Persistence and transport boundaries
 
-And optionally:
-
-```csharp
-public interface ISagaStateWithId
-{
-    string Id { get; set; }
-}
-```
-
----
-
-# 🎯 **Execution Pipeline**
-
-Wraps each handler:
-
-```csharp
-await _pipeline.ExecuteAsync(async () =>
-{
-    var result = handler.Invoke(...);
-    if (result is Task t) await t;
-});
-```
-
-Allows user-defined middlewares:
-
-* telemetry
-* retries
-* tracing
-* error behavior
-
----
-
-# 🧾 **Auditing & Logging**
-
-`SagaLogEvents` provides structured logs for all key lifecycle events:
-
-* Saga Start
-* Step Execution
-* Compensation
-* Outgoing message
-* Errors
-
-Default auditing sink:
-
-```csharp
-ISagaAuditSink = DefaultSagaAuditSink
-```
-
-Override with:
-
-```csharp
-builder.AddAuditSink<MyElasticSink>();
-```
-
----
-
-# 🧪 **Testing**
-
-For unit tests:
-
-```csharp
-services
-    .AddFranzSagas(o => o.ValidateMappings = true)
-    .AddSaga<TestSaga>();
-
-services.AddSingleton<ISagaRepository, InMemorySagaRepository>();
-```
-
-The in-memory store is:
-
-* deterministic
-* instant
-* ideal for workflow validation
-
----
-
-# 🧱 **Design Philosophy**
-
-The Saga engine adheres to Franz’s core principles:
-
-| Principle                   | Meaning                                                     |
-| --------------------------- | ----------------------------------------------------------- |
-| **Deterministic**           | Saga identity, mapping, and execution order are guaranteed. |
-| **Modular**                 | Stores, handlers, and audit sinks are fully pluggable.      |
-| **Transport-agnostic**      | Kafka, RabbitMQ, HTTP, or custom transports.                |
-| **Zero runtime reflection** | Only startup scanning.                                      |
-| **Safe by default**         | Built-in validation + null-safety.                          |
-
----
-
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+Repository classes exist for in-memory, EF Core, Cosmos DB, MongoDB, Redis, Kafka, and RabbitMQ. `AddFranzSagas` registers the router, execution pipeline, orchestrator, audit sink, options, and builder; it does not register an `ISagaRepository` implementation. The `FranzSagaOptions.Persistence` value is not currently used to select or register an adapter. Register the intended repository explicitly and do not infer adapter activation from that option. The options model documents Memory, EntityFramework, Redis, and Kafka as its allowed values; the other repository classes are not selected by this options path. Adapter presence does not imply equivalent transactional guarantees. Validate concurrency, atomicity, and failure recovery for the selected repository and transport.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

@@ -1,10 +1,10 @@
 # Franz.Common.Http
 
-> Reusable ASP.NET Core API infrastructure, middleware, endpoint conventions, and application integration utilities.
+> ASP.NET Core HTTP primitives for controller registration, CORS, error strategies, serialization, routing, and forwarded headers.
 
 ## Overview
 
-Reusable ASP.NET Core API infrastructure, middleware, endpoint conventions, and application integration utilities.
+This package contains the lower-level HTTP service-registration and middleware extensions used by the Franz HTTP bootstrap package. Error handling is registered through the fluent `AddErrors()` capability and the bootstrap package's global exception handler.
 
 ## Installation
 
@@ -12,203 +12,46 @@ Reusable ASP.NET Core API infrastructure, middleware, endpoint conventions, and 
 dotnet add package Franz.Common.Http
 ```
 
-## Design principles
+## Registering HTTP services
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A library within the **Franz Framework** designed to simplify HTTP-related operations, enhance exception handling, and streamline routing and serialization in **ASP.NET Core** applications. This package provides robust tools for managing errors, configuring application pipelines, and extending routing capabilities.
-
----
-
-## **Features**
-
-- **Error Management**:
-  - `ErrorResponseProvider` and `ExceptionFilter` for centralized error handling.
-  - Customizable error response strategies with `IErrorResponseProvider`.
-- **HTTP Context Extensions**:
-  - Utilities for working with `HttpContext` and application configuration.
-- **Routing Extensions**:
-  - Parameter transformers for localized or custom routing:
-    - `FrenchControllerParameterTransformer`
-    - `TranslateControllerParameterTransformer`.
-- **Service Registration**:
-  - `ServiceCollectionExtensions` to streamline dependency injection for HTTP services.
-- **Compatibility**:
-  - Seamlessly integrates with **Franz.Common**, **Franz.Common.DependencyInjection**, **Franz.Common.Errors**, and **Franz.Common.Serialization**.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package relies on:
-- **Microsoft.AspNetCore.Mvc.NewtonsoftJson** (8.0.0): Enables advanced JSON serialization and deserialization.
-- **Franz.Common**: Core utilities for the framework.
-- **Franz.Common.DependencyInjection**: Simplifies dependency injection.
-- **Franz.Common.Errors**: Standardized error handling.
-- **Franz.Common.Serialization**: Custom serialization utilities.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Http
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Http
-```
-
----
-
-## **Usage**
-
-### **1. Centralized Error Handling**
-
-Register the `ErrorResponseProvider` and `ExceptionFilter` to handle errors consistently:
-
-```csharp
-using Franz.Common.Http.Errors;
-
-services.AddControllers(options =>
-{
-    options.Filters.Add<ExceptionFilter>(); // Register the exception filter
-});
-
-services.AddSingleton<IErrorResponseProvider, ErrorResponseProvider>();
-```
-
-### **2. HTTP Context Extensions**
-
-Use `HttpContextExtensions` to simplify access to `HttpContext` data:
+`AddFranzHttp()` registers MVC controllers and returns a fluent `FranzHttpBuilder`. Additional capabilities are composed through that builder:
 
 ```csharp
 using Franz.Common.Http.Extensions;
 
-var userAgent = context.GetHeaderValue("User-Agent");
+builder.Services
+    .AddFranzHttp()
+    .AddErrors()
+    .AddSerialization()
+    .AddFrenchRouting()
+    .AddDefaultCors(builder.Configuration)
+    .AddForwardedHeaders();
 ```
 
-### **3. Routing Parameter Transformers**
+The available builder operations are:
 
-Implement custom routing logic with parameter transformers:
+- `AddErrors()`: registers the error response provider, built-in response strategies, and MVC exception filter.
+- `AddSerialization()`: configures the framework's JSON defaults and converters.
+- `AddFrenchRouting()`: installs the French controller-parameter transformer convention.
+- `AddDefaultCors(configuration)`: configures exact allowed origins from the `Cors` setting.
+- `AddForwardedHeaders()` or `AddForwardedHeaders(configure)`: configures forwarded-header processing while preserving trusted-proxy restrictions.
 
-```csharp
-using Franz.Common.Http.Routing;
+## Error response strategies
 
-public class CustomRouting : FrenchControllerParameterTransformer
-{
-    public override string TransformOutbound(object value)
-    {
-        return base.TransformOutbound(value)?.ToUpperInvariant(); // Custom transformation logic
-    }
-}
-```
+`AddErrors()` registers `IErrorResponseProvider`, `IErrorResponseStrategy` implementations, and `ExceptionFilter`. Applications can add or replace strategy registrations through dependency injection. Technical errors must use sanitized responses in production; do not expose raw exception details to clients.
 
-Register the transformer in your `Startup.cs`:
+The higher-level `Franz.Common.Http.Bootstrap` package registers the global `FranzGlobalExceptionHandler` and ProblemDetails support as part of `AddHttpArchitecture(...)`.
 
-```csharp
-services.AddRouting(options =>
-{
-    options.ConstraintMap.Add("custom", typeof(CustomRouting));
-});
-```
+## Middleware helpers
 
-### **4. Application Pipeline Configuration**
+The package exposes `UseFrenchLocalization()` and `UseDefaultCors()` as application-builder extensions. The standard composed middleware pipeline is owned by `Franz.Common.Http.Bootstrap` through `UseHttpArchitecture()`.
 
-Use `ApplicationBuilderExtensions` to enhance the middleware pipeline:
+## CORS and forwarded headers
 
-```csharp
-using Franz.Common.Http.Extensions;
+The `Cors` configuration value is a semicolon-separated list of exact HTTP/HTTPS origins. Wildcards and origin paths are rejected. An empty list does not grant cross-origin access.
 
-app.UseCustomErrorHandling(); // Custom extension for error handling
-```
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Http** package integrates seamlessly with:
-- **Franz.Common.Errors**: For centralized error handling.
-- **Franz.Common.DependencyInjection**: Simplifies DI setup for HTTP services.
-- **Franz.Common.Serialization**: Enhances JSON serialization and deserialization.
-- **Franz.Common**: Provides foundational utilities.
-
-Ensure these dependencies are installed to fully leverage the library's capabilities.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+Forwarded headers are not trusted from arbitrary clients. Configure the deployment's known proxy addresses or networks using ASP.NET Core's `ForwardedHeadersOptions`.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.3.6
-- Compatible with Franz 1.3.6 stack.
-- Self-contained middleware bootstrap (UseHttpArchitecture).
-- Swagger & pipeline setup hidden behind Franz extensions.
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
----
-
-## HTTP security defaults
-
-- CORS accepts only exact HTTP/HTTPS origins from the semicolon-separated `Cors` configuration value. Wildcards and origin paths are rejected.
-- With no configured origins, the default policy does not grant cross-origin access.
-- Forwarded-header processing preserves ASP.NET Core's trusted-proxy/network restrictions. Add deployment proxy addresses explicitly through `ForwardedHeadersOptions.KnownProxies` or `KnownNetworks`.
-- `AddErrors()` registers a default error strategy, and `ErrorResponseProvider` now uses the selected strategy's message. Production technical errors therefore use the sanitized strategy response rather than raw exception messages.
-- Keep raw request headers separate from authenticated identity. Use `IHeaderContextAccessor` for raw headers; `IdentityContextAccessor` reads authenticated claims only.
+MIT. See the repository [LICENSE](../../LICENSE).

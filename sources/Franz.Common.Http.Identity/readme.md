@@ -1,10 +1,10 @@
 # Franz.Common.Http.Identity
 
-> Authenticated-user context accessors for ASP.NET Core endpoints, claims, and authorization-aware application services.
+> ASP.NET Core identity-context access backed by authenticated claims and validated tenant execution state.
 
 ## Overview
 
-Authenticated-user context accessors for ASP.NET Core endpoints, claims, and authorization-aware application services.
+This package provides the HTTP implementation of Franz identity access. It does not authenticate users itself. Authentication is configured by the host through ASP.NET Core or one of the provider registration extensions included in this package.
 
 ## Installation
 
@@ -12,247 +12,71 @@ Authenticated-user context accessors for ASP.NET Core endpoints, claims, and aut
 dotnet add package Franz.Common.Http.Identity
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A utility library within the **Franz Framework** that enhances **ASP.NET Core** identity management for HTTP-based applications.
-This package provides tools for **identity context access**, **dependency injection**, and **plug-and-play SSO providers** (WS-Fed, OIDC, SAML2, Keycloak).
-
----
--**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
----
-## **Features**
-
-* **Identity Context Access**
-
-  * `IdentityContextAccessor`: resolves identity consistently from `HttpContext` (headers & claims).
-  * Unified into `FranzIdentityContext` (UserId, Email, FullName, Roles, TenantId, DomainId).
-
-* **Dependency Injection**
-
-  * `AddFranzHttpIdentity()`: registers identity accessor and supporting services.
-
-* **Authentication Providers** (config-driven via `appsettings.json`):
-
-  * `AddFranzWsFedIdentity()` – WS-Federation.
-  * `AddFranzOidcIdentity()` – OpenID Connect.
-  * `AddFranzSaml2Identity()` – SAML2 (via Sustainsys).
-  * `AddFranzKeycloakIdentity()` – Keycloak (OIDC + role normalization).
-
-* **Claims Normalization**
-
-  * All providers map claims into the same `FranzIdentityContext`.
-  * Ensures consistent user & tenant resolution across IdPs.
-
----
-
-## **Installation**
-
-```bash
-dotnet add package Franz.Common.Http.Identity
-```
-
----
-
-## **Usage**
-
-### 1. Register Core Identity
+## Register the identity context
 
 ```csharp
-builder.Services.AddFranzHttpIdentity();
+using Franz.Common.Http.Identity.Extensions;
+
+builder.Services.AddHttpIdentityContext();
 ```
 
----
-
-### 2. Add a Provider
-
-Identity providers are registered via DI extensions and configured in **appsettings.json**.
-
-#### 🔹 WS-Federation
+Inject `IIdentityContextAccessor` into application services or endpoints:
 
 ```csharp
-builder.Services.AddFranzWsFedIdentity(builder.Configuration);
-```
-
-**appsettings.json**
-
-```json
-"FranzIdentity": {
-  "WsFed": {
-    "MetadataAddress": "https://login.microsoftonline.com/{tenant}/federationmetadata/2007-06/federationmetadata.xml",
-    "Wtrealm": "https://myapp.example.com/"
-  }
-}
-```
-
----
-
-#### 🔹 OpenID Connect (OIDC)
-
-```csharp
-builder.Services.AddFranzOidcIdentity(builder.Configuration);
-```
-
-**appsettings.json**
-
-```json
-"FranzIdentity": {
-  "Oidc": {
-    "Authority": "https://login.microsoftonline.com/{tenant}/v2.0",
-    "ClientId": "my-client-id",
-    "ClientSecret": "super-secret",
-    "CallbackPath": "/signin-oidc"
-  }
-}
-```
-
----
-
-#### 🔹 SAML2
-
-```csharp
-builder.Services.AddFranzSaml2Identity(builder.Configuration);
-```
-
-**appsettings.json**
-
-```json
-"FranzIdentity": {
-  "Saml2": {
-    "EntityId": "https://myapp.example.com/",
-    "IdpMetadata": "https://idp.example.com/metadata",
-    "CallbackPath": "/signin-saml"
-  }
-}
-```
-
----
-
-#### 🔹 Keycloak (via OIDC)
-
-```csharp
-builder.Services.AddFranzKeycloakIdentity(builder.Configuration);
-```
-
-**appsettings.json**
-
-```json
-"FranzIdentity": {
-  "Keycloak": {
-    "Authority": "https://keycloak.example.com/auth/realms/myrealm",
-    "ClientId": "franz-web",
-    "ClientSecret": "super-secret",
-    "CallbackPath": "/signin-keycloak"
-  }
-}
-```
-
----
-
-### 3. Access Identity in Your App
-
-```csharp
-app.MapGet("/whoami", (IIdentityContextAccessor ctx) =>
+app.MapGet("/whoami", (IIdentityContextAccessor identity) =>
 {
-    var identity = ctx.GetCurrentIdentity();
+    var current = identity.GetCurrentIdentity();
+
     return Results.Ok(new
     {
-        identity.UserId,
-        identity.Email,
-        identity.FullName,
-        identity.Roles,
-        identity.TenantId,
-        identity.DomainId
+        current.UserId,
+        current.Email,
+        current.FullName,
+        current.Roles,
+        current.TenantId,
+        current.DomainId
     });
 });
 ```
 
----
+The accessor reads user ID, email, display name, and roles only from an authenticated `ClaimsPrincipal`. Tenant and domain identifiers are read from `ITenantExecutionContextAccessor`, which is established by the validated tenant-resolution pipeline. Unauthenticated principals produce no user identity.
 
-## **Integration with Franz Framework**
+## Authentication provider registration
 
-The **Franz.Common.Http.Identity** package integrates seamlessly with:
+The package includes optional provider-specific registration methods. Use only the provider required by the application:
 
-* **Franz.Common.Identity** → core identity contracts and models.
-* **Franz.Common.Http** → HTTP utilities and middleware.
-* **Franz.Common.Headers** → standardized header handling for identity propagation.
+| Provider | Registration method | Configuration section |
+|---|---|---|
+| WS-Federation | `AddFranzWsFederationIdentity(configuration)` | `FranzIdentity:WsFederation` |
+| OpenID Connect | `AddFranzOidcIdentity(configuration)` | `FranzIdentity:Oidc` |
+| SAML 2.0 | `AddFranzSaml2Identity(configuration)` | `FranzIdentity:Saml2` |
+| Keycloak (OIDC) | `AddFranzKeycloakIdentity(configuration)` | `FranzIdentity:Keycloak` |
 
----
+For example:
 
-## **Contributing**
+```csharp
+using Franz.Common.Http.Identity.Providers.OIDC;
 
-This package is part of the open-source Franz.Common ecosystem. Contributions are limited to the internal development team.
+builder.Services.AddFranzOidcIdentity(builder.Configuration);
+```
 
-1. Clone the repository @ [Franz.Common](https://github.com/bestacio89/Franz.Common/)
-2. Create a feature branch.
-3. Submit a pull request for review.
+Each provider extension configures ASP.NET Core authentication. These provider methods do not replace `AddHttpIdentityContext()`; register the identity accessor separately when the application needs `IIdentityContextAccessor`.
 
----
+Provider configuration contains credentials and identity-provider metadata. Keep client secrets in a secret manager or protected deployment configuration; never commit real credentials.
+
+## Trust boundary
+
+- User identity is never inferred from arbitrary request headers.
+- A tenant claim is not, by itself, proof that the user belongs to the resolved tenant.
+- Tenant and domain identity are exposed only from the validated tenant execution context.
+- Use `IHeaderContextAccessor` for raw message/request header metadata; do not use it as an authentication source.
+
+## Related packages
+
+- `Franz.Common.Identity`: provider-neutral identity contracts and models.
+- `Franz.Common.Http.Authentication`: strict symmetric JWT bearer configuration.
+- `Franz.Common.Http.MultiTenancy`: tenant resolution and request authorization.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.6.2
-
-* Added `IdentityContextAccessor` (HttpContext-based).
-* Introduced `AddFranzHttpIdentity()` DI extension.
-* Added provider extensions:
-
-  * WS-Federation (`AddFranzWsFedIdentity`).
-  * OpenID Connect (`AddFranzOidcIdentity`).
-  * SAML2 (`AddFranzSaml2Identity`).
-  * Keycloak (`AddFranzKeycloakIdentity`).
-* Config-driven setup via `appsettings.json`.
-* Unified claims mapping into `FranzIdentityContext`.
-
-
-### Version 1.3
-
-* Upgraded to **.NET 9.0.8**
-* Added **new features and improvements**
-* Separated **business concepts** from **mediator concepts**
-* Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.2.65
-
-* Upgrade version to .NET 9
-
----
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
----
-
-## Authenticated identity boundary
-
-`IdentityContextAccessor` reads user ID, email, display name, and roles only from an authenticated `ClaimsPrincipal`. It does not fall back to `X-User-Id`, `X-User-Email`, `X-User-Roles`, or other caller-supplied headers.
-
-Tenant and domain IDs are read from the validated `ITenantExecutionContextAccessor`, not directly from a tenant claim or request header. Register the HTTP multi-tenancy module when the application needs tenant-aware identity context. Use `IHeaderContextAccessor` separately when raw inbound headers are needed for non-authoritative application metadata.
-
-This intentionally tightens the trust boundary without changing the public `IIdentityContextAccessor` contract. Existing applications that used identity headers as ambient identity must move that trust decision into an authentication handler or a trusted service-to-service integration.
+MIT. See the repository [LICENSE](../../LICENSE).

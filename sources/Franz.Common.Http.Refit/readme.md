@@ -1,10 +1,10 @@
 # Franz.Common.Http.Refit
 
-> Refit client registration and configuration with shared HTTP headers and Franz.Common request context.
+> Refit typed-client registration with Franz header and optional authentication handlers.
 
 ## Overview
 
-Refit client registration and configuration with shared HTTP headers and Franz.Common request context.
+Refit typed-client registration with Franz header and optional authentication handlers.
 
 ## Installation
 
@@ -12,347 +12,81 @@ Refit client registration and configuration with shared HTTP headers and Franz.C
 dotnet add package Franz.Common.Http.Refit
 ```
 
-## Design principles
+## Register a typed client
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-**Package**: `Franz.Common.Http.Refit`
-
-Refit integration for the **Franz Framework** — production-oriented, small-surface, and highly modular.
-Provides **typed Refit clients** pre-wired with **correlation and tenant propagation**, **optional authentication**, **resilience with Polly**, **Serilog-friendly logging**, and **OpenTelemetry-friendly instrumentation**.
-
----
-
-* **Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
----
-
-## **Goals**
-
-* Simplify and standardize outbound HTTP client creation across Franz-based applications.
-* Leverage Franz primitives (`MediatorContext`, correlation IDs, and shared Polly registry).
-* Ensure all external calls are **traceable, resilient, and predictable** out of the box.
-* Maintain a **minimal public API surface** while delivering production-grade ergonomics.
-
----
-
-## **Features**
-
-* **Unified Client Registration**
-  `AddFranzRefit<TClient>(...)` — single-line registration that configures:
-
-  * Base URL
-  * Correlation & tenant headers
-  * Authentication (optional)
-  * Polly resilience policy
-  * OpenTelemetry enrichment
-
-* **Header Propagation**
-  `FranzRefitHeadersHandler` automatically injects:
-
-  * `X-Correlation-ID`
-  * `X-Tenant-Id`
-  * `X-User-Id` (if available)
-
-* **Authentication Handler**
-  `FranzRefitAuthHandler` integrates via a pluggable `ITokenProvider`.
-  Automatically **disables itself** if no provider or options are configured.
-
-* **Resilience Integration**
-  Seamless `Polly` policy attachment via `AddPolicyHandlerFromRegistry`.
-
-* **Telemetry and Metrics**
-
-  * Annotates `Activity.Current` with `franz.http.*` tags for distributed tracing.
-  * Lightweight internal `System.Diagnostics.Metrics` (Meter: `Franz.Refit`).
-
----
-
-## **Dependencies**
-
-* **Refit.HttpClientFactory** (8.2.0) — Refit integration with `IHttpClientFactory`.
-* **Microsoft.Extensions.Http.Polly** (8.1.2) — HTTP-level resilience policies.
-* **Serilog** (8.0.0) — Structured log correlation.
-* **OpenTelemetry.Api** (1.8.1) — Distributed tracing support.
-* **Polly** (8.1.2) — Retry, circuit-breaker, and fallback strategies.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Http.Refit
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Http.Refit
-```
-
----
-
-## **Usage**
-
-### 1. Register a Refit Client
+The current extension is `AddFranzRefit<TClient>` in `Franz.Common.Http.Refit.Extensions`.
 
 ```csharp
 using Franz.Common.Http.Refit.Extensions;
 
-builder.Services.AddFranzRefit<IMyExternalApi>(
-    name: "MyApi",
-    baseUrl: "https://api.example.com",
-    policyName: "standard-http-retry",
-    configureOptions: opt =>
+builder.Services.AddFranzRefit<IBooksApi>(
+    name: "Books",
+    baseUrl: configuration["ExternalApis:Books:BaseUrl"]!,
+    policyName: "books-read",
+    configureOptions: options =>
     {
-        opt.EnableOpenTelemetry = true;
-        opt.DefaultPolicyName = "standard-http-retry";
-        opt.Timeout = TimeSpan.FromSeconds(30);
+        options.EnableOpenTelemetry = true;
+        options.Timeout = TimeSpan.FromSeconds(20);
+        options.DefaultPolicyName = "books-read";
     });
 ```
 
-✅ **Automatically configures:**
+The method registers the Refit client, configures its base address, adds `FranzRefitHeadersHandler`, and adds `FranzRefitAuthHandler`. A named Polly policy is attached only when the `policyName` argument is non-empty and the host has registered that policy in the Polly registry. The `configureRefitSettings` callback can customize Refit's own settings independently of Franz options.
 
-* Correlation & tenant headers (`FranzRefitHeadersHandler`)
-* Authentication (via `FranzRefitAuthHandler`, optional)
-* Named Polly policy (from registry)
-* OpenTelemetry tagging (if enabled)
+**Implementation caveat:** the current extension accepts a `name` argument but does not pass it to a named Refit-client registration. Do not rely on that argument to establish a distinct named `HttpClient` until the implementation is corrected.
 
----
+## Authentication
 
-### 2. Authentication (Optional)
-
-Implement a token provider:
+Implement `ITokenProvider` to supply a token asynchronously:
 
 ```csharp
 using Franz.Common.Http.Refit.Contracts;
 
-public sealed class MyTokenProvider : ITokenProvider
+public sealed class ServiceTokenProvider : ITokenProvider
 {
     public Task<string?> GetTokenAsync(CancellationToken ct = default)
     {
-        // Fetch from secure store, cache, or identity service
-        return Task.FromResult("example-token");
+        // Retrieve a token from the application's secure token service.
+        return Task.FromResult<string?>(null);
     }
 }
 ```
 
-Register it in DI:
+Register the provider in DI. When no provider is registered, the extension creates a private no-op provider that returns null. Do not interpret this as authentication being configured; no Authorization token is produced by the no-op provider.
 
-```csharp
-builder.Services.AddSingleton<ITokenProvider, MyTokenProvider>();
-```
+## Options contract
 
-If no `ITokenProvider` is registered, the handler auto-disables and no `Authorization` header is sent.
+`RefitClientOptions` exposes:
 
----
+| Option | Default | Purpose |
+|---|---:|---|
+| `Timeout` | null | Optional timeout value |
+| `EnableOpenTelemetry` | true | Enables HTTP activity tagging behavior where implemented |
+| `DefaultPolicyName` | null | Default policy name |
+| `AutoHandleAuthFailures` | true | Authentication recovery switch |
+| `MaxAuthRetryAttempts` | 1 | Maximum recovery attempts |
+| `OnAuthenticationFailureAsync` | null | Async credential-refresh callback |
+| `OnAuthRecoverySuccess` | null | Recovery-success callback |
+| `OnAuthRecoveryFailed` | null | Recovery-failure callback |
 
-### 3. Configuration via appsettings.json
+The current extension registers configured options through `services.Configure(configureOptions)`. Its authentication-handler factory also requests `RefitClientOptions` directly from DI rather than resolving `IOptions<RefitClientOptions>`; verify this path before relying on options-driven authentication recovery. The timeout and default-policy option properties are not automatically equivalent to the explicit `policyName` argument.
 
-```json
-{
-  "RefitClientOptions": {
-    "EnableOpenTelemetry": true,
-    "DefaultPolicyName": "standard-http-retry",
-    "Timeout": "00:00:30"
-  }
-}
-```
-
-Wire configuration:
-
-```csharp
-builder.Services.AddFranzRefit<IMyApi>(
-    name: "MyApi",
-    baseUrl: builder.Configuration["ExternalApi:BaseUrl"]!,
-    configureOptions: opt =>
-    {
-        builder.Configuration.GetSection("RefitClientOptions").Bind(opt);
-    });
-```
-
----
-
-### 4. Example Resilience Policy Registration
-
-```csharp
-using Polly;
-using Polly.Extensions.Http;
-
-builder.Services.AddPolicyRegistry(registry =>
-{
-    registry.Add("standard-http-retry", HttpPolicyExtensions
-        .HandleTransientHttpError()
-        .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-        .WaitAndRetryAsync(3, retry => TimeSpan.FromSeconds(Math.Pow(2, retry))));
-});
-```
-
----
-
-### 5. Example Typed Client Interface
+## Typed API contract
 
 ```csharp
 using Refit;
-using System.Threading.Tasks;
 
 public interface IBooksApi
 {
-    [Get("/books")]
-    Task<ApiResponse<List<BookDto>>> GetBooksAsync();
+    [Get("/books/{id}")]
+    Task<ApiResponse<BookDto>> GetBookAsync(Guid id);
 }
 ```
 
----
+## Operational guidance
 
-### 6. DefaultTokenProvider Example (OAuth2)
-
-```csharp
-using Franz.Common.Http.Refit.Handlers;
-using Microsoft.Extensions.Options;
-
-builder.Services.Configure<DefaultTokenProviderOptions>(builder.Configuration.GetSection("Auth"));
-builder.Services.AddHttpClient(nameof(DefaultTokenProvider));
-builder.Services.AddSingleton<ITokenProvider, DefaultTokenProvider>();
-```
-
-Example `Auth` configuration:
-
-```json
-{
-  "Auth": {
-    "TokenEndpoint": "https://login.example.com/oauth2/token",
-    "ClientId": "my-client",
-    "ClientSecret": "my-secret",
-    "Scope": "api.read"
-  }
-}
-```
-
-This enables a cached OAuth2 token provider without any custom code.
-
----
-
-## **appsettings (Bootstrapper)**
-
-If `Franz.Common.Http.Bootstrap` is active and `Franz:HttpClients:EnableRefit = true`,
-Refit clients can be registered automatically from configuration:
-
-```json
-{
-  "Franz": {
-    "HttpClients": {
-      "EnableRefit": true,
-      "Apis": {
-        "Books": {
-          "InterfaceType": "MyApp.ApiClients.IBooksApi, MyApp",
-          "BaseUrl": "https://api.example.com",
-          "Policy": "standard-http-retry"
-        }
-      }
-    }
-  }
-}
-```
-
----
-
-## **Changelog**
-
-
-### **Franz 1.6.17 — Refit Overhaul & Self-Healing Auth**
-
-🔹 **Highlights**
-
-* **Self-Disabling Authentication Handler**
-
-  * `FranzRefitAuthHandler` now auto-deactivates when no token provider or configuration is present.
-
-* **Unified Refit Registration**
-
-  * Simplified `AddFranzRefit<TClient>()` registration combining Refit setup, Polly, OTEL, and Serilog context propagation.
-
-* **Improved Token Provider Contract**
-
-  * `ITokenProvider` fully async, nullable token support, integrated fallback provider.
-
-* **OpenTelemetry Support**
-
-  * Native tag injection with `franz.http.*` naming convention.
-
-* **Config Binding**
-
-  * Direct JSON binding for `RefitClientOptions` (e.g., `Timeout`, `DefaultPolicyName`).
-
-* **Default Token Provider**
-
-  * New optional `DefaultTokenProvider` with client credentials OAuth2 flow support.
-
-* **Better Sandbox Behavior**
-
-  * Auto-switch to `NoOpTokenProvider` when authentication is not required.
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
-
----
-
-## **Integration with Franz Framework**
-
-* **Franz.Common.Mediator** — shares correlation and policy context.
-* **Franz.Common.Logging** — consistent logging with correlation IDs.
-* **Franz.Common.Http.Client** — same conventions for non-Refit clients.
-
-Together, they provide a **fully coherent HTTP and API integration ecosystem** under Franz.
-
----
-
-## **Contributing**
-
-This package is internal to the Franz Framework.
-If you have repository access:
-
-1. Clone: `https://github.com/bestacio89/Franz.Common/`
-2. Branch from `develop`.
-3. Submit a PR with changelog updates and semantic version bump.
-
----
+Register only the headers and credentials that the downstream trust boundary requires. Define retry policies according to operation idempotency; retries on non-idempotent requests can duplicate side effects. The host remains responsible for configuring OpenTelemetry providers/exporters and for securing token acquisition.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Best Practices**
-
-| Scenario          | Recommendation                                                         |
-| ----------------- | ---------------------------------------------------------------------- |
-| No Auth / Sandbox | Do not register `ITokenProvider`; auth handler disables automatically. |
-| Auth APIs         | Register `ITokenProvider` or use `DefaultTokenProvider`.               |
-| Resilient APIs    | Use Polly policies from the global registry.                           |
-| Observability     | Enable OpenTelemetry tagging and use Serilog for structured logs.      |
-| Configuration     | Prefer JSON-bound `RefitClientOptions` for consistency.                |
-
----
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See [LICENSE](../../LICENSE).

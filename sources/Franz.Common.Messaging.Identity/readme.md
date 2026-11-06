@@ -1,10 +1,10 @@
 # Franz.Common.Messaging.Identity
 
-> Identity metadata propagation across message publishing and consumption, preserving authenticated execution context.
+> Message-context identity access and authorization-header enrichment for Franz messaging envelopes.
 
 ## Overview
 
-Identity metadata propagation across message publishing and consumption, preserving authenticated execution context.
+Message-context identity access and authorization-header enrichment for Franz messaging envelopes.
 
 ## Installation
 
@@ -12,163 +12,44 @@ Identity metadata propagation across message publishing and consumption, preserv
 dotnet add package Franz.Common.Messaging.Identity
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A library within the **Franz Framework** designed to integrate identity management with messaging workflows. This package provides tools for handling authorization contexts, building identity-based message structures, and ensuring seamless communication between identity and messaging services.
-
----
-
-## **Features**
-
-- **Identity Context Integration**:
-  - `IdentityContextAccessor` for managing identity-specific data within messaging workflows.
-- **Authorization Message Builder**:
-  - `AuthorizationMessageBuilder` for constructing messages with embedded authorization data.
-- **Service Registration**:
-  - `ServiceCollectionExtensions` for simplifying the setup of identity-aware messaging services.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package relies on:
-- **Franz.Common.Headers**: For managing and propagating headers in messaging workflows.
-- **Franz.Common.Identity**: Core utilities for identity and authorization management.
-- **Franz.Common.Messaging**: Provides foundational messaging utilities and abstractions.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Messaging.Identity
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Messaging.Identity
-```
-
----
-
-## **Usage**
-
-### **1. Access Identity Context in Messaging**
-
-Use `IdentityContextAccessor` to retrieve identity-related data in messaging workflows:
-
-```csharp
-using Franz.Common.Messaging.Identity;
-
-public class MyService
-{
-    private readonly IdentityContextAccessor _identityContextAccessor;
-
-    public MyService(IdentityContextAccessor identityContextAccessor)
-    {
-        _identityContextAccessor = identityContextAccessor;
-    }
-
-    public string GetUserId()
-    {
-        return _identityContextAccessor.User?.FindFirst("sub")?.Value;
-    }
-}
-```
-
-### **2. Build Authorization Messages**
-
-Leverage `AuthorizationMessageBuilder` to create messages with embedded authorization data:
-
-```csharp
-using Franz.Common.Messaging.Identity;
-
-var builder = new AuthorizationMessageBuilder();
-var message = builder.WithUserId("12345")
-                     .WithRoles(new[] { "Admin", "User" })
-                     .Build();
-```
-
-### **3. Register Identity-Aware Messaging Services**
-
-Use `ServiceCollectionExtensions` to register identity-aware messaging components:
+## Register the identity accessor
 
 ```csharp
 using Franz.Common.Messaging.Identity.Extensions;
 
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddMessagingWithIdentity();
-    }
-}
+services.AddMessagingIdentityContext();
 ```
 
----
+This registers `IIdentityContextAccessor` as a scoped `IdentityContextAccessor` using the no-duplicate scoped registration helper.
 
-## **Integration with Franz Framework**
+## Read identity from the current message
 
-The **Franz.Common.Messaging.Identity** package integrates seamlessly with:
-- **Franz.Common.Messaging**: Provides messaging abstractions and utilities.
-- **Franz.Common.Identity**: Extends identity and authorization support into messaging workflows.
-- **Franz.Common.Headers**: Facilitates header management for identity-based messages.
+`IdentityContextAccessor` reads identity metadata from `IMessageContextAccessor.Current.Message.Headers`. It exposes:
 
----
+- `GetCurrentEmail()`
+- `GetCurrentId()`
+- `GetCurrentFullName()`
+- `GetCurrentTenantId()`
+- `GetCurrentDomainId()`
+- `GetCurrentRoles()`
+- `GetCurrentIdentity()`
 
-## **Contributing**
+User, tenant, and domain identifiers are parsed as GUIDs. Roles are returned as the string array stored in the message headers. Missing message context or missing headers produce null values or an empty role array. `GetCurrentIdentity()` returns null when there is no current message context; otherwise it constructs a `FranzIdentityContext` from the available fields.
 
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
+## Authorization header enrichment
 
----
+`AuthorizationMessageBuilder` implements `IMessageBuilder`. It accepts an optional `IHeaderContextAccessor`. `CanBuild` returns true when that accessor is available. `BuildAsync` copies non-empty values from the current Authorization header into the outgoing message's headers.
+
+The builder performs a memory copy and currently returns a completed task. It does not validate, refresh, or exchange the credential.
+
+## Security model
+
+Authorization propagation is credential delegation. Only enable it when the downstream consumer is intended to act with the originating caller's authority. Define token audience, expiry, and trust boundaries explicitly; do not forward credentials to arbitrary brokers or downstream services. Avoid logging the Authorization header or persisting it in message payloads.
+
+## Package boundaries
+
+This package adapts identity and header context to messaging. It does not authenticate the original HTTP request, authorize message handlers, or validate tenant ownership. Those responsibilities remain in the identity provider and consuming application.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Introduced `IdentityContextAccessor` for managing identity contexts in messaging workflows.
-- Added `AuthorizationMessageBuilder` for constructing identity-aware messages.
-- Integrated `ServiceCollectionExtensions` for simplified registration of identity-aware messaging services.
-
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
+MIT. See [LICENSE](../../LICENSE).

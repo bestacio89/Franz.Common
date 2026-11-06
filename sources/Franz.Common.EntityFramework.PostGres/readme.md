@@ -1,10 +1,10 @@
 # Franz.Common.EntityFramework.PostGres
 
-> PostgreSQL provider integration for Franz.Common Entity Framework Core persistence, including Npgsql configuration and model conventions.
+> PostgreSQL EF Core provider registration for Franz `DbContextBase` contexts.
 
 ## Overview
 
-PostgreSQL provider integration for Franz.Common Entity Framework Core persistence, including Npgsql configuration and model conventions.
+The adapter configures Npgsql using shared Franz `DatabaseOptions` and the common database-target resolver.
 
 ## Installation
 
@@ -12,184 +12,45 @@ PostgreSQL provider integration for Franz.Common Entity Framework Core persisten
 dotnet add package Franz.Common.EntityFramework.PostGres
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A dedicated library within the **Franz Framework** that extends **Entity Framework Core** support for **PostgreSQL** using the **Npgsql.EntityFrameworkCore.PostgreSQL** provider. This package simplifies PostgreSQL configuration and integration for .NET applications, supporting both single-tenant and multi-tenant environments.
-
----
-
-## **Features**
-
-- **PostgreSQL Integration**:
-  - Leverages `Npgsql.EntityFrameworkCore.PostgreSQL` for robust PostgreSQL database support.
-- **Service Registration**:
-  - `ServiceCollectionExtensions` to streamline dependency injection for PostgreSQL database contexts.
-- **Multi-Tenancy Support**:
-  - Full integration with `Franz.Common.MultiTenancy` for tenant-based database configurations.
-- **Compatibility**:
-  - Seamless integration with **Franz.Common.EntityFramework** for shared utilities, repository patterns, and extensions.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package relies on:
-- **Npgsql.EntityFrameworkCore.PostgreSQL** (9.0.0): Official EF Core provider for PostgreSQL.
-- **Franz.Common.EntityFramework**: Core EF utilities and repository patterns.
-- **Franz.Common.MultiTenancy**: Multi-tenancy support for PostgreSQL databases.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.EntityFramework.PostGres
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.EntityFramework.Postgres
-```
-
----
-
-## **Usage**
-
-### **1. Configuring PostgreSQL Context**
-
-Define a `DbContext` for PostgreSQL integration:
-
-```csharp
-using Microsoft.EntityFrameworkCore;
-
-public class PostgresDbContext : DbContext
-{
-    public PostgresDbContext(DbContextOptions<PostgresDbContext> options) : base(options) { }
-
-    public DbSet<Order> Orders { get; set; }
-}
-```
-
-### **2. Dependency Injection**
-
-Use `ServiceCollectionExtensions` to register PostgreSQL database contexts:
+## Registration
 
 ```csharp
 using Franz.Common.EntityFramework.Postgres.Extensions;
 
-public class Startup
+builder.Services.AddPostgresDatabase<ApplicationDbContext>(builder.Configuration);
+```
+
+The extension binds the `Database` section through `AddDatabaseOptions`, resolves the effective database name, configures `UseNpgsql`, and registers the concrete context as `DbContextBase`.
+
+## Configuration
+
+```json
 {
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddPostgresDbContext<PostgresDbContext>(options =>
-            options.UseNpgsql(
-                "Host=localhost;Database=MyDatabase;Username=my_user;Password=my_password"
-            ));
-    }
+  "Database": {
+    "ServerName": "localhost",
+    "DatabaseName": "application",
+    "UserName": "application",
+    "Password": "<secret>",
+    "Port": 5432,
+    "SslMode": "Require",
+    "IsolationMode": "SharedDatabase",
+    "EnableSensitiveDataLogging": false
+  }
 }
 ```
 
-### **3. Multi-Tenancy Support**
+The configured `SslMode` is parsed as Npgsql's `SslMode` enum; the adapter fallback is `Disable`. It also has development-oriented `postgres/password` credentials. Explicitly configure deployed connection fields, use an appropriate TLS mode such as certificate-validated verification for the environment, store credentials in a secret manager, and keep sensitive-data logging disabled in production.
 
-Integrate with `Franz.Common.MultiTenancy` to support multi-tenant PostgreSQL configurations:
+## Multi-tenancy and database routing
 
-```csharp
-using Franz.Common.MultiTenancy;
-using Franz.Common.EntityFramework.Postgres.Extensions;
+The adapter delegates database-name selection to `DatabaseTargetResolver`:
 
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddMultiTenantPostgresDbContext<PostgresDbContext>(tenantOptions =>
-        {
-            tenantOptions.ConnectionStringResolver = tenantId =>
-                $"Host=localhost;Database=Tenant_{tenantId};Username=my_user;Password=my_password";
-        });
-    }
-}
-```
+- `SharedDatabase` uses a concrete database name unchanged.
+- `TenantDatabase` requires a `{dbName}` token and a validated tenant execution context.
+- `DomainDatabase` requires a `{dbName}` token and a validated domain context.
 
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.EntityFramework.Postgres** package integrates seamlessly with:
-- **Franz.Common.EntityFramework**: Shared repository patterns and utilities.
-- **Franz.Common.MultiTenancy**: Simplifies tenant-specific database configurations.
-
-Ensure these dependencies are installed to leverage the library's full capabilities.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+Missing required execution context fails closed. A derived context must forward the tenant accessor and the database/multi-tenancy options to `DbContextBase` for model validation and tenant filters.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-PostgreSQL EF Core dependencies are aligned with the .NET 10 servicing baseline. Validate migrations, transactions, and repository behavior with the PostgreSQL Testcontainers suite before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
-
-## Database-per-tenant routing
-
-When `Database:DatabaseName` contains the `{dbName}` token, routing is determined exclusively by the configured `DatabaseIsolationMode`. `TenantDatabase` requires a validated `ITenantExecutionContextAccessor.Current.TenantId`; it never falls back to domain identity. `DomainDatabase` is a separate, explicit opt-in that requires `IDomainContextAccessor.GetCurrentDomainId()`. `SharedDatabase` rejects tokenized names. Missing context fails closed; there is no compatibility fallback. For a shared-database deployment, configure a concrete database name without the token. Never derive tenant routing from a raw request header or unvalidated message metadata.
-
-For shared-database deployments, keep the `DbContextBase` tenant query/write enforcement enabled. For stronger isolation, define PostgreSQL row-level security policies in migrations and set the tenant session variable inside the same explicit transaction using a transaction-local setting (`set_config(..., true)`). A session-level setting must not be used with pooled connections because it can leak between tenants. The application role should not own protected tables or have `BYPASSRLS`.
-
-EF sensitive-data logging is disabled by default and can be enabled explicitly through `Database:EnableSensitiveDataLogging` for controlled development diagnostics only.
+MIT. See the repository [LICENSE](../../LICENSE).

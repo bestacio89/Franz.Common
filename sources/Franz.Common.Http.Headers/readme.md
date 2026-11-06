@@ -1,10 +1,10 @@
 # Franz.Common.Http.Headers
 
-> ASP.NET Core request and response header accessors for correlation, identity, tenant, and application metadata.
+> ASP.NET Core adapters for the transport-agnostic header context contract and required-header action constraints.
 
 ## Overview
 
-ASP.NET Core request and response header accessors for correlation, identity, tenant, and application metadata.
+ASP.NET Core adapters for the transport-agnostic header context contract and required-header action constraints.
 
 ## Installation
 
@@ -12,183 +12,46 @@ ASP.NET Core request and response header accessors for correlation, identity, te
 dotnet add package Franz.Common.Http.Headers
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A library within the **Franz Framework** designed to streamline the management, validation, and processing of HTTP headers in **ASP.NET Core** applications. This package provides custom model binders, attributes, and utilities for working with headers, ensuring consistency and efficiency across applications.
-
----
-
-## **Features**
-
-- **Header Validation**:
-  - `HeaderRequiredAttribute` for enforcing required headers on API actions.
-  - `HeaderRequiredActionConstraint` for conditional routing based on headers.
-- **Custom Model Binding**:
-  - `ComplexModelBinder` and `HeaderComplexModelBinderProvider` for advanced header parsing and mapping.
-- **HTTP Context Utilities**:
-  - `HeaderContextAccessor` for simplified access to HTTP header data.
-- **Dependency Injection**:
-  - `ServiceCollectionExtensions` for easily integrating header-related services.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package relies on:
-- **Microsoft.AspNetCore.Mvc.Core** (2.2.5): Provides core MVC functionality for headers.
-- **Newtonsoft.Json** (13.0.3): Advanced JSON serialization for complex header handling.
-- **Franz.Common.Headers**: Core header utilities.
-- **Franz.Common.Serialization**: Serialization utilities for advanced header operations.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Http.Headers
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Http.Headers
-```
-
----
-
-## **Usage**
-
-### **1. Enforce Required Headers**
-
-Use `HeaderRequiredAttribute` to enforce the presence of specific headers:
+## Register HTTP header context access
 
 ```csharp
 using Franz.Common.Http.Headers.Extensions;
 
+builder.Services.AddHttpHeaderContext();
+```
+
+This registers ASP.NET Core's `IHttpContextAccessor` and a scoped `IHeaderContextAccessor` implementation (`HeaderContextAccessor`) using the no-duplicate registration strategy.
+
+The accessor adapts the current request's headers to the `IDictionary<string, string[]>` contract defined by `Franz.Common.Headers`. `ListAll()` returns an empty case-insensitive dictionary when there is no current HTTP context. It filters blank values when building the full dictionary. The raw `TryGetValue` overload returns the values for the requested key. The generic overload returns the first value as-is for `string`; for other types it delegates deserialization to `IJsonSerializer`.
+
+## Require a header for an action
+
+`HeaderRequiredAttribute` can be applied to a controller or action, allows multiple declarations, and takes a CLR type and header name.
+
+```csharp
+using Franz.Common.Http.Headers;
+
+[HeaderRequired(typeof(Guid), "X-Tenant-Id")]
 [HttpGet]
-[HeaderRequired("X-Custom-Header")]
-public IActionResult Get()
-{
-    return Ok("Header is present");
-}
+public IActionResult GetTenantData() => Ok();
 ```
 
-### **2. Advanced Header Parsing**
-
-Leverage `ComplexModelBinder` to parse and bind headers to complex objects:
+Register the action-constraint capability:
 
 ```csharp
-using Franz.Common.Http.Headers.Extensions;
-
-public class CustomHeaderModel
-{
-    public string Key { get; set; }
-    public string Value { get; set; }
-}
-
-[HttpPost]
-public IActionResult Post([ModelBinder(typeof(ComplexModelBinder))] CustomHeaderModel headerModel)
-{
-    return Ok(headerModel);
-}
+builder.Services.AddHeaderRequiredCapability();
 ```
 
-### **3. HTTP Context Access**
+The attribute is an `IActionConstraintFactory`; it resolves `HeaderRequiredActionConstraint` from DI. The package's constraint determines whether the route/action is eligible based on the declared header metadata. It is an MVC action-selection mechanism, not an authentication or authorization policy.
 
-Simplify access to header data using `HeaderContextAccessor`:
+## Security boundary
 
-```csharp
-using Franz.Common.Http.Headers.Extensions;
+A present header is not proof that its value is trustworthy. Validate tenant, identity, and authorization metadata against an authenticated and trusted source. Do not let clients self-assert privileged identity or tenant values simply because the action requires a header.
 
-var customHeader = contextAccessor.GetHeaderValue("X-Custom-Header");
-```
+## Package relationship
 
-### **4. Register Header Utilities**
-
-Use `ServiceCollectionExtensions` to register all header-related utilities:
-
-```csharp
-using Franz.Common.Http.Headers.Extensions;
-
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddHeaderUtilities(); // Registers header-related services and utilities
-    }
-}
-```
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Http.Headers** package integrates seamlessly with:
-- **Franz.Common.Headers**: Core header utilities and extensions.
-- **Franz.Common.Serialization**: Enhances serialization for complex header processing.
-
-Ensure these dependencies are installed to fully leverage the library's capabilities.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+The transport-neutral contracts and propagation configuration are in `Franz.Common.Headers`. This package supplies the ASP.NET Core implementation and MVC integration. Serialization is used to convert non-string header values through the configured `IJsonSerializer`.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
----
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See [LICENSE](../../LICENSE).

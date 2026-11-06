@@ -1,10 +1,10 @@
 # Franz.Common.Http.Client
 
-> Typed HttpClient registration and configuration extensions for reliable outbound HTTP integrations.
+> A named-HttpClient-backed base service for outbound HTTP calls, request construction, serialization, and multipart content.
 
 ## Overview
 
-Typed HttpClient registration and configuration extensions for reliable outbound HTTP integrations.
+A named-HttpClient-backed base service for outbound HTTP calls, request construction, serialization, and multipart content.
 
 ## Installation
 
@@ -12,206 +12,75 @@ Typed HttpClient registration and configuration extensions for reliable outbound
 dotnet add package Franz.Common.Http.Client
 ```
 
-## Design principles
+## Registration
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A powerful library within the **Franz Framework** that simplifies the creation, configuration, and management of HTTP clients in .NET applications. This package provides tools for handling HTTP requests, authentication, custom request builders, and error management, enabling consistent and efficient communication with external APIs.
-
----
-
-## **Features**
-
-- **HTTP Client Abstractions**:
-  - `HttpService` for streamlined HTTP request execution.
-  - `HttpClientException` for managing HTTP-related errors.
-- **Authentication**:
-  - `AuthenticationService` for token-based authentication workflows.
-- **Request Builders**:
-  - Customizable request builders for advanced HTTP scenarios:
-    - `AuthorizationRequestBuilder`
-    - `DomainRequestBuilder`
-    - `HeaderPropagationRequestBuilder`
-- **Delegating Handlers**:
-  - Middleware for HTTP client pipelines:
-    - `ExceptionDelegatingHandler`
-    - `RequestBuilderDelegatingHandler`
-- **File Handling**:
-  - `HttpFileParameter` and `FileParameter` for file uploads.
-- **Dependency Injection**:
-  - `ServiceCollectionExtensions` to register HTTP client services easily.
-- **Content Utilities**:
-  - `HttpContentParameter` for building HTTP content with flexibility.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package relies on:
-- **Microsoft.Extensions.Http** (8.0.0): Provides core HTTP client factory functionality.
-- **Newtonsoft.Json** (13.0.3): Advanced JSON serialization and deserialization.
-- **Microsoft.Extensions.Configuration.Abstractions** (8.0.0): Configuration management utilities.
-- **Franz.Common**: Core utilities for shared functionality.
-- **Franz.Common.DependencyInjection**: Simplified DI setup.
-- **Franz.Common.Headers**: HTTP header utilities and extensions.
-- **Franz.Common.Errors**: Error handling and management.
-- **Franz.Common.Identity**: Identity integration for authentication.
-- **Franz.Common.MultiTenancy**: Multi-tenant HTTP client configurations.
-- **Franz.Common.Serialization**: Serialization utilities for API communication.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Http.Client
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Http.Client
-```
-
----
-
-## **Usage**
-
-### **1. Configure HTTP Client Services**
-
-Use `ServiceCollectionExtensions` to register HTTP clients:
+The package exposes `AddHttpServices(IConfiguration, TimeSpan, Func<Assembly, bool>?)` in `Franz.Common.Http.Client.Extensions`.
 
 ```csharp
 using Franz.Common.Http.Client.Extensions;
 
-public class Startup
+builder.Services.AddHttpServices(
+    builder.Configuration,
+    TimeSpan.FromSeconds(30),
+    assembly => assembly.GetName().Name?.StartsWith("MyCompany.", StringComparison.Ordinal) == true);
+```
+
+When no predicate is supplied, discovery targets assemblies whose names start with the configured Franz company/product-generation prefix and end with `.ClientHttp`. For each matching assembly, registration derives a named client identifier from the assembly name and requires:
+
+```json
 {
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddHttpClientServices(); // Registers HTTP clients and related services
+  "HttpServices": {
+    "MyCompany.Orders": {
+      "BaseAddress": "https://orders.example.net/",
+      "Timeout": "00:00:30"
     }
+  }
 }
 ```
 
-### **2. Execute HTTP Requests**
+The `BaseAddress` setting is mandatory for each discovered client. The method-level timeout is applied first; a valid per-client `Timeout` setting overrides it. Invalid or missing base-address configuration fails registration with a `TechnicalException`.
 
-Use the `HttpService` for simplified HTTP interactions:
+Registration also adds the package's request-builder and exception delegating handlers, registers serializers, and adds a transient `HttpClient` registration. Use the factory-managed named clients rather than creating clients manually.
 
-```csharp
-using Franz.Common.Http.Client.Files;
+## Implement an HttpService
 
-var httpService = serviceProvider.GetRequiredService<HttpService>();
-
-var response = await httpService.GetAsync<MyResponse>("https://api.example.com/resource");
-```
-
-### **3. Custom Request Builders**
-
-Create custom request configurations with request builders:
+`HttpService` is abstract. A concrete service derives from it and uses the protected request methods. Its constructor resolves the named client associated with the concrete service's assembly-derived namespace.
 
 ```csharp
-using Franz.Common.Http.Client.Delegating;
+using Franz.Common.Http.Client;
 
-var requestBuilder = new DomainRequestBuilder("https://api.example.com")
-    .AddHeader("Authorization", "Bearer token")
-    .AddQueryParameter("key", "value");
-```
-
-### **4. File Uploads**
-
-Handle file uploads using `HttpFileParameter`:
-
-```csharp
-using Franz.Common.Http.Client.Content;
-
-var fileParameter = new HttpFileParameter
+public sealed class OrdersClient : HttpService
 {
-    FileName = "document.pdf",
-    ContentType = "application/pdf",
-    Content = fileStream
-};
+    public OrdersClient(
+        IHttpClientFactory factory,
+        IEnumerable<Newtonsoft.Json.JsonConverter> converters)
+        : base(factory, converters) { }
 
-await httpService.PostFileAsync("https://api.example.com/upload", fileParameter);
+    public Task<OrderDto> GetOrderAsync(Guid id, CancellationToken ct) =>
+        GetRequestAsync<OrderDto>($"orders/{id}", ct);
+}
 ```
 
-### **5. Authentication**
+The base class provides GET, POST, PUT, and DELETE helpers, typed and untyped responses, cancellation-token-aware asynchronous overloads, request headers, and multipart form-data support. It also exposes query-parameter and multipart-parameter generation helpers for derived clients.
 
-Integrate authentication workflows with `AuthenticationService`:
+Prefer the asynchronous methods and pass the caller's cancellation token. Synchronous wrappers block on asynchronous work and should not be used in request paths.
 
-```csharp
-using Franz.Common.Http.Client.Authentication;
+## Request and response behavior
 
-var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
-var token = await authService.GetAccessTokenAsync("my-client-id", "my-client-secret");
-```
+- Requests use the configured `HttpClient` and the package's configured JSON converters.
+- Non-success responses are checked by the internal send path; inspect the concrete exception contract before translating failures at the application boundary.
+- Header values are serialized before being added to `HttpRequestMessage.Headers`.
+- Multipart helpers support ordinary content parameters and file parameters.
+- Download helpers return a temporary-file-backed stream; dispose it to remove the backing file.
 
----
+## Ownership
 
-## **Integration with Franz Framework**
+`HttpService` implements `IDisposable` and disposes its internally created client. Keep the service lifetime aligned with the factory-created client usage in the application. Do not share mutable request state between concurrent operations.
 
-The **Franz.Common.Http.Client** package integrates seamlessly with:
-- **Franz.Common**: Provides core utilities.
-- **Franz.Common.Headers**: Simplifies header management.
-- **Franz.Common.Errors**: Handles HTTP-specific errors consistently.
-- **Franz.Common.Serialization**: Enhances serialization for HTTP payloads.
-- **Franz.Common.MultiTenancy**: Enables tenant-specific HTTP configurations.
+## Important boundaries
 
-Ensure these dependencies are installed to fully leverage the library's capabilities.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+This package is not a generic Refit adapter and does not itself define authentication policy. Use the dedicated Refit package for typed Refit clients. Configure credentials and request headers deliberately; never place secrets in configuration files committed to source control.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See [LICENSE](../../LICENSE).
