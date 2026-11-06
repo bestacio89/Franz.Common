@@ -134,8 +134,9 @@ services.AddFranzMemoryCaching();
 ```
 
 The resolver is shared by the default key strategy, JSON-based Distributed/Redis
-providers, and the HybridCache serializer factory. Missing metadata fails explicitly instead of
-silently falling back to runtime reflection.
+providers, and the HybridCache serializer factory. Native AOT applications fail
+explicitly when required metadata is missing rather than relying on runtime
+reflection.
 
 ## Mediator integration
 
@@ -175,7 +176,7 @@ Register observers after the provider and then decorate it:
 
 ```csharp
 services.AddFranzMemoryCaching();
-services.AddCacheObserver<LoggingCacheObserver>();
+services.AddCacheObserver<LoggingMetricsObserver>();
 services.AddCacheObserver<MetricsCacheObserver>();
 services.AddObservableCaching();
 ```
