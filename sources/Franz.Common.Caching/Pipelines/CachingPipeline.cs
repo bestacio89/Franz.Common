@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Franz.Common.Caching.Abstractions;
-using Franz.Common.Caching.Metrics;
 using Franz.Common.Caching.Options;
 using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
@@ -85,13 +84,6 @@ public sealed class CachingPipeline<
         cancellationToken).ConfigureAwait(false);
 
     stopwatch.Stop();
-
-    if (result.IsHit)
-      CacheMetrics.Hits.Add(1);
-    else
-      CacheMetrics.Misses.Add(1);
-
-    CacheMetrics.LookupLatencyMs.Record(stopwatch.Elapsed.TotalMilliseconds);
 
     using (LogContext.PushProperty("FranzCorrelationId", MediatorContext.Current?.CorrelationId))
     using (LogContext.PushProperty("FranzPipeline", nameof(CachingPipeline<TRequest, TResponse>)))

@@ -39,16 +39,12 @@ public sealed class MetricsCacheObserver : ICacheObserver
   {
     GetOrAddStats(entry.Key)?.RecordSet(entry.EstimatedSizeInBytes, entry.Tags);
     Interlocked.Increment(ref _totalSets);
-    CacheMetrics.Misses.Add(1);
   }
 
   public void OnCacheHit(CacheAccessDescriptor access)
   {
     GetOrAddStats(access.Key)?.RecordHit();
     Interlocked.Increment(ref _totalHits);
-    CacheMetrics.Hits.Add(1);
-    if (access.LookupLatencyMs.HasValue)
-      CacheMetrics.LookupLatencyMs.Record(access.LookupLatencyMs.Value);
   }
 
   public void OnCacheRemove(string key)

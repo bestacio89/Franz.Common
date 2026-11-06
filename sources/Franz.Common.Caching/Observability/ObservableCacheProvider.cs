@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Metrics;
 using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Caching.Observability;
@@ -34,6 +35,7 @@ public sealed class ObservableCacheProvider : ICacheProvider, ICacheWriter
 
     if (result.IsHit)
     {
+      CacheMetrics.Hits.Add(1);
       Notify(observer => observer.OnCacheHit(new CacheAccessDescriptor
       {
         Key = key,
@@ -43,9 +45,11 @@ public sealed class ObservableCacheProvider : ICacheProvider, ICacheWriter
     }
     else
     {
+      CacheMetrics.Misses.Add(1);
       NotifySet(key, options);
     }
 
+    CacheMetrics.LookupLatencyMs.Record(elapsedMs);
     return result;
   }
 

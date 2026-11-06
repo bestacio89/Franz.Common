@@ -1,5 +1,4 @@
 ﻿using Franz.Common.Caching.Observability;
-using Franz.Common.Caching.Metrics;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -36,9 +35,6 @@ namespace Franz.Common.Caching.Observability.Observers
         _logger.LogDebug("Cache HIT | Key={Key} | AccessedAt={AccessedAt} | LatencyMs={Latency}",
             access.Key, access.AccessedAt, access.LookupLatencyMs ?? 0);
 
-      CacheMetrics.Hits.Add(1);
-      if (access.LookupLatencyMs.HasValue)
-        CacheMetrics.LookupLatencyMs.Record(access.LookupLatencyMs.Value);
       Interlocked.Increment(ref _totalHits);
     }
 
