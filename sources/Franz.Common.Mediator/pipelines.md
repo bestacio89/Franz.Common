@@ -44,6 +44,8 @@ Choose the registration profile based on the required behavior and deployment mo
 ### Generated closed-generic default pipelines
 
 ```csharp
+using Franz.Common.Mediator.Extensions;
+
 services.AddFranzMediatorDefault<OrdersApplicationAssembly>();
 ```
 
@@ -52,6 +54,8 @@ This registers generated handlers from the marker assembly and applies generator
 ### V2 default pipelines
 
 ```csharp
+using Franz.Common.Mediator.Extensions;
+
 services.AddFranzMediatorV2Default(
     handlerAssembly: typeof(OrdersApplicationAssembly).Assembly);
 ```
@@ -61,6 +65,8 @@ This applies open-generic request logging, validation, Serilog logging, and tran
 ### Full standard composition
 
 ```csharp
+using Franz.Common.Mediator.Bootstrap;
+
 services.AddFranzMediatorStandard(
     new[] { typeof(OrdersApplicationAssembly).Assembly });
 ```
@@ -72,6 +78,8 @@ The standard helper is provided by the Mediator bootstrap package. It composes g
 For an application that needs a tailored set of behaviors, register core Mediator infrastructure and generated handlers, then add the required modules:
 
 ```csharp
+using Franz.Common.Mediator.Extensions;
+
 services.AddFranzMediator(
     new[] { typeof(OrdersApplicationAssembly).Assembly });
 
