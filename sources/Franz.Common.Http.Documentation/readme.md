@@ -1,10 +1,6 @@
 # Franz.Common.Http.Documentation
 
-> OpenAPI and endpoint-documentation conventions for consistent ASP.NET Core API descriptions.
-
-## Overview
-
-OpenAPI and endpoint-documentation conventions for consistent ASP.NET Core API descriptions.
+> ASP.NET Core API-versioning and native OpenAPI/Scalar endpoint registration.
 
 ## Installation
 
@@ -12,276 +8,58 @@ OpenAPI and endpoint-documentation conventions for consistent ASP.NET Core API d
 dotnet add package Franz.Common.Http.Documentation
 ```
 
-## Design principles
+## Service registration
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A robust library within the **Franz Framework** designed to simplify and enhance API documentation for **ASP.NET Core** applications. This package provides seamless integration with native .NET OpenAPI, API versioning, Scalar UI, and route conventions — enabling clear, versioned, and comprehensive API documentation with zero third-party documentation dependencies.
-
----
-
-## **Features**
-
-- **Native OpenAPI Integration** *(since 2.2.13)*:
-  - Uses `Microsoft.AspNetCore.OpenApi` — the official .NET 10 OpenAPI pipeline.
-  - No Swashbuckle dependency — eliminates `Microsoft.OpenApi` version conflict hell permanently.
-  - One OpenAPI document per API version, served at `/openapi/{version}/openapi.json`.
-
-- **Scalar UI** *(since 2.2.13)*:
-  - Replaces Swagger UI with `Scalar.AspNetCore` — cleaner interface, better auth support, multi-version switcher.
-  - Available at `/scalar/{documentName}` (e.g. `/scalar/v1`).
-
-- **API Versioning**:
-  - Built-in support via `Asp.Versioning.Mvc.ApiExplorer` — the officially maintained successor to the legacy `Microsoft.AspNetCore.Mvc.Versioning` package.
-  - Fluent `.AddApiExplorer()` chained on `AddApiVersioning()` replaces the old `AddVersionedApiExplorer()` pattern.
-
-- **Route Customization**:
-  - `RoutePrefixConvention` for consistent routing across controllers.
-  - Default route prefix: `api/v{version:apiVersion}`.
-
-- **EnumerationClass Schema Support**:
-  - `OpenApiSchemaExtensions.ConvertEnumeration()` maps `EnumerationClass` types from Contracts assemblies to correct OpenAPI scalar types via document transformers.
-
-- **Dependency Injection**:
-  - `FranzDocumentationBuilder` fluent builder for composing documentation pipeline.
-  - `AddFranzDocumentation()` → `ConfigureApiVersioning()` → `ConfigureOpenApi()`.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-| Package | Version |
-|---|---|
-| `Asp.Versioning.Mvc.ApiExplorer` | 10.0.0 |
-| `Microsoft.AspNetCore.OpenApi` | 10.0.14 |
-| `Microsoft.Extensions.DependencyInjection.Abstractions` | 10.0.14 |
-| `Scalar.AspNetCore` | 2.16.6 |
-| `Franz.Common.Business` | 2.2.14 |
-| `Franz.Common.Reflection` | 2.2.14 |
-
-> **Removed since v2.2.14:**
-> `Swashbuckle.AspNetCore.SwaggerGen`, `Swashbuckle.AspNetCore.SwaggerUI`,
-> `Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer`, `Microsoft.OpenApi` (explicit pin no longer needed).
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Http.Documentation
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Http.Documentation
-```
-
----
-
-## **Usage**
-
-### **1. Register Documentation Pipeline**
-
-Called automatically by `AddHttpArchitecture`. For manual registration:
+The fluent builder is defined in `Franz.Common.Http.Documentation.Extensions`.
 
 ```csharp
-services
+using Franz.Common.Http.Documentation.Extensions;
+
+builder.Services
     .AddFranzDocumentation()
     .ConfigureApiVersioning()
     .ConfigureOpenApi();
 ```
 
-### **2. API Versioning**
+Call `ConfigureApiVersioning()` before `ConfigureOpenApi()`. The versioning setup registers controllers with the route prefix `api/v{version:apiVersion}`, sets the default API version to 1.0, assumes the default when the request omits a version, reports supported versions, and combines URL-segment, `x-api-version` header, and `x-api-version` media-type readers.
 
-Every controller must declare `[ApiVersion]` for version discovery:
+The current `ConfigureOpenApi()` implementation registers the native OpenAPI document named `v1`. It sets the document title from the entry assembly and the document version to `1.0`. Do not assume that it currently discovers and registers one document for every API version: the implementation shown registers only `v1`.
+
+## Endpoint mapping
+
+Call `UseDocumentation()` from the namespace `Franz.Common.Http.Bootstrap.Extensions` after the application is built and routing is configured.
 
 ```csharp
-[ApiVersion("1.0")]
+using Franz.Common.Http.Bootstrap.Extensions;
+
+app.UseDocumentation();
+```
+
+The extension maps the native OpenAPI endpoint at `/openapi/{documentName}.json` and Scalar's API reference. The current Scalar configuration exposes the `v1` document using `/openapi/v1.json`.
+
+Restrict documentation endpoints according to the deployment's exposure policy. The extension itself does not enforce a Development-only environment condition.
+
+## Route conventions
+
+The versioning registration adds the general route prefix through MVC options. Controllers still need API-version metadata for the versioning explorer to group them correctly.
+
+```csharp
 [ApiController]
-[Route("api/v{version:apiVersion}/heroes")]
-public sealed class HeroController : ControllerBase { }
-```
-
-Default versioning behaviour:
-- Default version: `1.0`
-- Assumes default version when unspecified: `true`
-- Readers: URL segment, `x-api-version` header, `x-api-version` media type
-
-### **3. OpenAPI Documents**
-
-One document registered per discovered API version:
-
-```
-GET /openapi/v1/openapi.json   → OpenAPI spec for v1
-GET /openapi/v2/openapi.json   → OpenAPI spec for v2
-```
-
-### **4. Scalar UI**
-
-```
-GET /scalar/v1   → Scalar API reference for v1
-GET /scalar/v2   → Scalar API reference for v2
-```
-
-### **5. Route Prefix Customization**
-
-```csharp
-using Franz.Common.Http.Documentation.Routing;
-
-services.AddMvc(options =>
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/orders")]
+public sealed class OrdersController : ControllerBase
 {
-    options.Conventions.Add(new RoutePrefixConvention("api/v{version:apiVersion}"));
-});
-```
-
-### **6. EnumerationClass Schema Mapping**
-
-Applied automatically via `ConfigureOpenApi()`. To apply manually:
-
-```csharp
-services.AddOpenApi(options =>
-{
-    options.ConvertEnumeration();
-});
-```
-
----
-
-## **Middleware**
-
-`UseDocumentation()` is called automatically by `UseHttpArchitecture()`.
-For manual registration:
-
-```csharp
-if (app.Environment.IsDevelopment())
-{
-    app.UseDocumentation();
 }
 ```
 
-This registers:
-- `MapOpenApi()` per version → `/openapi/{groupName}/openapi.json`
-- `MapScalarApiReference()` → `/scalar/{documentName}`
+Avoid applying a second route-prefix convention manually unless the application intentionally replaces the package's default.
 
----
+## Current implementation boundaries
 
-## **Migration from v2.2.14 → v2.2.14**
+The project uses ASP.NET Core native OpenAPI and Scalar rather than the legacy Swashbuckle integration described in older package history. The current source still contains historical filenames such as `ConfigureSwaggerOptions.cs` and `SwaggerGenOptionsExtensions.cs`; filenames are not a reliable statement of the public API. Verify the active extension signatures in the source before using historical changelog names.
 
-| Before (Swashbuckle) | After (Native OpenAPI) |
-|---|---|
-| `ConfigureSwagger()` | `ConfigureOpenApi()` |
-| `ConfigureSwaggerOptions` | `ConfigureVersionedOpenApiOptions` |
-| `SwaggerGenOptionsExtensions.ConvertEnumeration` | `OpenApiSchemaExtensions.ConvertEnumeration` |
-| `UseSwagger()` + `UseSwaggerUI()` | `MapOpenApi()` + `MapScalarApiReference()` |
-| `/swagger/index.html` | `/scalar/v1` |
-| `/swagger/v1/swagger.json` | `/openapi/v1/openapi.json` |
-| `AddVersionedApiExplorer()` | `.AddApiExplorer()` chained on `AddApiVersioning()` |
-| `Microsoft.AspNetCore.Mvc.Versioning` | `Asp.Versioning.Mvc` |
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Http.Documentation** package integrates seamlessly with:
-- **Franz.Common.Http.Bootstrap** — `AddHttpArchitecture` and `UseHttpArchitecture` wire it automatically.
-- **Franz.Common.Business** — provides `EnumerationClass` utilities consumed by schema mapping.
-- **Franz.Common.Reflection** — reflection utilities for dynamic configuration.
-
----
-
-## **Contributing**
-
-This package is part of the open-source Franz.Common ecosystem. Contributions are limited to the internal development team.
-1. Clone the repository at https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review. All PRs must comply with **Franz Tribunal** architecture rules.
-
----
+The current document registration is fixed to `v1`; multi-version document discovery and schema-transformer behavior should not be assumed from earlier README text.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### v2.2.13 — Native OpenAPI + Scalar Migration
-
-**Breaking changes:**
-
-- `ConfigureSwagger()` renamed to `ConfigureOpenApi()` — update all call sites.
-- `ConfigureSwaggerOptions` removed — replaced by `ConfigureVersionedOpenApiOptions`.
-- `SwaggerGenOptionsExtensions` removed — replaced by `OpenApiSchemaExtensions`.
-- `UseSwagger()` / `UseSwaggerUI()` removed from `UseDocumentation()`.
-- Swagger UI at `/swagger/index.html` replaced by Scalar UI at `/scalar/v1`.
-- OpenAPI spec moved from `/swagger/v1/swagger.json` to `/openapi/v1/openapi.json`.
-
-**Added:**
-
-- `Microsoft.AspNetCore.OpenApi` native pipeline — one document per API version.
-- `Scalar.AspNetCore` — replaces Swagger UI entirely.
-- `ConfigureVersionedOpenApiOptions` — `IConfigureOptions<OpenApiOptions>` document transformer
-  replacing `IConfigureNamedOptions<SwaggerGenOptions>`.
-- `OpenApiSchemaExtensions.ConvertEnumeration()` — document transformer replacing
-  `SwaggerGenOptions.MapType()` overrides.
-- `OpenApiSchema.Type` now uses `JsonSchemaType` enum (aligned with `Microsoft.OpenApi 2.x`).
-
-**Removed:**
-
-- `Swashbuckle.AspNetCore.SwaggerGen`
-- `Swashbuckle.AspNetCore.SwaggerUI`
-- `Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer` (legacy, unmaintained)
-- `Microsoft.OpenApi` explicit version pin (no longer needed — SDK manages it)
-
-**Root cause resolved:**
-`Microsoft.OpenApi 3.x` breaks `IOpenApiRequestBody.Content` which Swashbuckle 10.x
-depends on, causing `MissingMethodException` at `/swagger/v1/swagger.json` generation.
-Native OpenAPI eliminates this entire class of version conflict permanently.
-
----
-
-### v2.0.1 — Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-### v1.3 — .NET 9 Upgrade
-
-- Upgraded to **.NET 9.0.8**.
-- Separated business concepts from mediator concepts.
-- Now compatible with both the in-house Franz mediator and MediatR.
-
----
-
-### v1.2.65 — Initial .NET 9 Migration
-
-- Upgraded to **.NET 9**.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See [LICENSE](../../LICENSE).
