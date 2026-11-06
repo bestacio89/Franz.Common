@@ -29,8 +29,10 @@ public sealed class MemoryCacheProvider : ICacheProvider
     if (factory is null)
       throw new ArgumentNullException(nameof(factory));
 
-    // 🔹 1. Try cache
-    if (_cache.TryGetValue(key, out var existing))
+    var fullKey = ApplyPrefix(key, _optionsMonitor.CurrentValue.KeyPrefix);
+
+    // 1. Try cache
+    if (_cache.TryGetValue(fullKey, out var existing))
     {
       return new CacheResult<T>((T)existing!, IsHit: true);
     }
@@ -55,7 +57,9 @@ public sealed class MemoryCacheProvider : ICacheProvider
     return Task.CompletedTask;
   }
 
-  private static string ApplyPrefix(string key, string prefix) => $"{prefix}{key}";\n\n  private MemoryCacheEntryOptions CreateMemoryCacheOptions(CacheOptions? requestOptions)
+  private static string ApplyPrefix(string key, string prefix) => $"{prefix}{key}";
+
+  private MemoryCacheEntryOptions CreateMemoryCacheOptions(CacheOptions? requestOptions)
   {
     var globalSettings = _optionsMonitor.CurrentValue;
     var memoryOptions = new MemoryCacheEntryOptions();
