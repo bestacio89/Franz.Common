@@ -5,6 +5,7 @@ using StackExchange.Redis;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Franz.Common.Caching.Providers;
 
@@ -20,10 +21,12 @@ public sealed class RedisCacheProvider : ICacheProvider
         return nil
       end
 
+      local time = redis.call('TIME')
+      local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
       local absolute = redis.call('GET', KEYS[2])
       local remaining = nil
       if absolute then
-        remaining = tonumber(absolute) - tonumber(ARGV[2])
+        remaining = tonumber(absolute) - now
         if remaining <= 0 then
           redis.call('DEL', KEYS[1], KEYS[2])
           return nil
@@ -42,16 +45,47 @@ public sealed class RedisCacheProvider : ICacheProvider
       return value
       """;
 
+  private const string WriteScript = """
+      local time = redis.call('TIME')
+      local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
+      local absolute = tonumber(ARGV[2])
+      local sliding = tonumber(ARGV[3])
+
+      redis.call('SET', KEYS[1], ARGV[1])
+
+      if absolute > 0 then
+        redis.call('SET', KEYS[2], now + absolute, 'PX', absolute)
+      else
+        redis.call('DEL', KEYS[2])
+      end
+
+      local ttl = absolute
+      if sliding > 0 and (ttl == 0 or sliding < ttl) then
+        ttl = sliding
+      end
+
+      if ttl > 0 then
+        redis.call('PEXPIRE', KEYS[1], ttl)
+      else
+        redis.call('PERSIST', KEYS[1])
+      end
+
+      return 1
+      """;
+
   private readonly IOptionsMonitor<CacheOptions> _optionsMonitor;
+  private readonly JsonSerializerOptions _serializerOptions;
   private readonly IDatabase _db;
   private readonly AsyncKeyedLock<string> _locks = new();
 
   public RedisCacheProvider(
       IConnectionMultiplexer connection,
-      IOptionsMonitor<CacheOptions> optionsMonitor)
+      IOptionsMonitor<CacheOptions> optionsMonitor,
+      IOptions<JsonSerializerOptions>? serializerOptions = null)
   {
     ArgumentNullException.ThrowIfNull(connection);
     _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
+    _serializerOptions = serializerOptions?.Value ?? new JsonSerializerOptions(JsonSerializerDefaults.General);
     _db = connection.GetDatabase();
   }
 
@@ -113,16 +147,9 @@ public sealed class RedisCacheProvider : ICacheProvider
     var fullKey = ApplyPrefix(key);
     using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
-      var transaction = _db.CreateTransaction();
-      var removeValue = transaction.KeyDeleteAsync(fullKey);
-      var removeMetadata = transaction.KeyDeleteAsync(GetAbsoluteExpirationKey(fullKey));
-
-      if (!await transaction.ExecuteAsync().ConfigureAwait(false))
-      {
-        throw new InvalidOperationException("Redis did not execute the cache removal transaction.");
-      }
-
-      await Task.WhenAll(removeValue, removeMetadata).ConfigureAwait(false);
+      // A single DEL removes both the value and its absolute-expiration metadata.
+      await _db.KeyDeleteAsync(new RedisKey[] { fullKey, GetAbsoluteExpirationKey(fullKey) })
+          .ConfigureAwait(false);
     }
   }
 
@@ -143,8 +170,7 @@ public sealed class RedisCacheProvider : ICacheProvider
     var result = await _db.ScriptEvaluateAsync(
         ReadAndRefreshScript,
         new RedisKey[] { fullKey, GetAbsoluteExpirationKey(fullKey) },
-        new RedisValue[] { slidingMilliseconds, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() })
-        .ConfigureAwait(false);
+        new RedisValue[] { slidingMilliseconds }).ConfigureAwait(false);
 
     if (result.IsNull)
     {
@@ -154,8 +180,7 @@ public sealed class RedisCacheProvider : ICacheProvider
     var serialized = ((RedisValue)result).ToString();
     try
     {
-      // A JSON null is a valid value. Found is independent of Value.
-      return (true, JsonSerializer.Deserialize<T>(serialized));
+      return (true, JsonSerializer.Deserialize(serialized, GetTypeInfo<T>()));
     }
     catch (JsonException)
     {
@@ -171,52 +196,34 @@ public sealed class RedisCacheProvider : ICacheProvider
   {
     ct.ThrowIfCancellationRequested();
 
-    var serialized = JsonSerializer.Serialize(value);
-    var absoluteExpiration = options.DefaultAbsoluteExpiration > TimeSpan.Zero
-        ? DateTimeOffset.UtcNow.Add(options.DefaultAbsoluteExpiration)
-        : (DateTimeOffset?)null;
-    var slidingExpiration = options.DefaultSlidingExpiration > TimeSpan.Zero
-        ? options.DefaultSlidingExpiration
-        : (TimeSpan?)null;
+    var serialized = JsonSerializer.Serialize(value, GetTypeInfo<T>());
+    var absoluteMilliseconds = options.DefaultAbsoluteExpiration > TimeSpan.Zero
+        ? Math.Max(1L, (long)options.DefaultAbsoluteExpiration.TotalMilliseconds)
+        : 0L;
+    var slidingMilliseconds = options.DefaultSlidingExpiration > TimeSpan.Zero
+        ? Math.Max(1L, (long)options.DefaultSlidingExpiration.TotalMilliseconds)
+        : 0L;
 
-    var initialExpiration = absoluteExpiration.HasValue
-        ? absoluteExpiration.Value - DateTimeOffset.UtcNow
-        : (TimeSpan?)null;
+    await _db.ScriptEvaluateAsync(
+        WriteScript,
+        new RedisKey[] { fullKey, GetAbsoluteExpirationKey(fullKey) },
+        new RedisValue[] { serialized, absoluteMilliseconds, slidingMilliseconds })
+        .ConfigureAwait(false);
+  }
 
-    if (slidingExpiration.HasValue &&
-        (!initialExpiration.HasValue || slidingExpiration.Value < initialExpiration.Value))
+  private JsonTypeInfo<T> GetTypeInfo<T>()
+  {
+    try
     {
-      initialExpiration = slidingExpiration;
+      return (JsonTypeInfo<T>)_serializerOptions.GetTypeInfo(typeof(T));
     }
-
-    if (initialExpiration <= TimeSpan.Zero)
+    catch (Exception exception) when (exception is NotSupportedException or InvalidOperationException)
     {
-      initialExpiration = TimeSpan.FromMilliseconds(1);
+      throw new InvalidOperationException(
+          $"No JSON metadata is registered for cached value type '{typeof(T).FullName}'. " +
+          "Register a source-generated JsonSerializerContext with AddFranzCachingJsonTypeInfoResolver.",
+          exception);
     }
-
-    var transaction = _db.CreateTransaction();
-    var writeValue = transaction.StringSetAsync(fullKey, serialized, initialExpiration);
-    Task<bool> writeMetadata;
-
-    if (absoluteExpiration.HasValue)
-    {
-      var remainingAbsolute = absoluteExpiration.Value - DateTimeOffset.UtcNow;
-      writeMetadata = transaction.StringSetAsync(
-          GetAbsoluteExpirationKey(fullKey),
-          absoluteExpiration.Value.ToUnixTimeMilliseconds(),
-          remainingAbsolute > TimeSpan.Zero ? remainingAbsolute : TimeSpan.FromMilliseconds(1));
-    }
-    else
-    {
-      writeMetadata = transaction.KeyDeleteAsync(GetAbsoluteExpirationKey(fullKey));
-    }
-
-    if (!await transaction.ExecuteAsync().ConfigureAwait(false))
-    {
-      throw new InvalidOperationException("Redis did not execute the cache write transaction.");
-    }
-
-    await Task.WhenAll(writeValue, writeMetadata).ConfigureAwait(false);
   }
 
   private string ApplyPrefix(string key) => $"{_optionsMonitor.CurrentValue.KeyPrefix}{key}";
