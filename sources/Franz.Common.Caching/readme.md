@@ -1,9 +1,12 @@
 # Franz.Common.Caching
 
-Provider-neutral caching for Franz.Common and .NET 10 applications. The package
-contains memory, `IDistributedCache`, Redis, and .NET HybridCache adapters,
-Mediator query caching, settings caching, tenant-aware key strategies, and
-provider observability.
+> Provider-neutral caching abstractions and .NET 10 provider integrations, including memory, distributed, Redis, HybridCache, and Mediator query caching.
+
+## Overview
+
+Franz.Common.Caching provides a consistent cache contract, configurable providers,
+tenant-aware key strategies, settings caching, and cache observability for .NET 10
+applications.
 
 ## Installation
 
