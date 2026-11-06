@@ -181,7 +181,10 @@ public sealed class CachingPipelineTests
     var optionsMonitorMock = new Mock<IOptionsMonitor<CacheOptions>>();
     optionsMonitorMock.Setup(m => m.CurrentValue).Returns(options);
 
-    var provider = new DistributedCacheProvider(cacheMock.Object, optionsMonitorMock.Object);
+    var provider = new DistributedCacheProvider(
+        cacheMock.Object,
+        optionsMonitorMock.Object,
+        Options.Create(TestJsonSerializerOptions.Create()));
     bool factoryWasCalled = false;
 
     // Act

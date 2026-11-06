@@ -27,7 +27,7 @@ public sealed class TenantScopedCacheKeyStrategyTests
     {
         var tenantId = Guid.NewGuid();
         var strategy = new TenantScopedCacheKeyStrategy(
-            new DefaultCacheKeyStrategy(),
+            new DefaultCacheKeyStrategy(TestJsonSerializerOptions.Create()),
             new TenantContextAccessor(CreateContext(tenantId)));
 
         var key = strategy.BuildKey(new { Id = 42 });

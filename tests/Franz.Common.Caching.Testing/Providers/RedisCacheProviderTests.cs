@@ -33,7 +33,10 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
     _optionsMock = new Mock<IOptionsMonitor<CacheOptions>>();
     _optionsMock.Setup(m => m.CurrentValue).Returns(_globalOptions);
 
-    _provider = new RedisCacheProvider(_muxer, _optionsMock.Object);
+    _provider = new RedisCacheProvider(
+        _muxer,
+        _optionsMock.Object,
+        Options.Create(TestJsonSerializerOptions.Create()));
   }
 
   [Fact]

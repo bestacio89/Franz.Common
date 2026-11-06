@@ -13,7 +13,7 @@ public sealed class DefaultCacheKeyStrategyTests
     [Fact]
     public void GetKey_Should_Include_Runtime_Type_Name()
     {
-        var strategy = new DefaultCacheKeyStrategy();
+        var strategy = new DefaultCacheKeyStrategy(TestJsonSerializerOptions.Create());
         var key = strategy.GetKey(new TestRequest(1, "a"));
 
         key.Should().StartWith($"{typeof(TestRequest).FullName}:");

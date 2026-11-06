@@ -28,7 +28,10 @@ public sealed class DistributedCacheProviderTests
 
     _optionsMock = new Mock<IOptionsMonitor<CacheOptions>>();
     _optionsMock.Setup(m => m.CurrentValue).Returns(_globalOptions);
-    _provider = new DistributedCacheProvider(_cacheMock.Object, _optionsMock.Object);
+    _provider = new DistributedCacheProvider(
+        _cacheMock.Object,
+        _optionsMock.Object,
+        Options.Create(TestJsonSerializerOptions.Create()));
   }
 
   [Fact]

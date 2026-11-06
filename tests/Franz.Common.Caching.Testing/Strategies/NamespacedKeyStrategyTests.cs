@@ -9,7 +9,7 @@ public sealed class NamespacedKeyStrategyTests
   public void BuildKey_Should_UseDeterministicOpaqueKeyWithinNamespace()
   {
     const string sensitiveValue = "private-customer-payload";
-    var strategy = new NamespacedCacheKeyStrategy("orders");
+    var strategy = new NamespacedCacheKeyStrategy("orders", new DefaultCacheKeyStrategy(TestJsonSerializerOptions.Create()));
     var request = new NamespacedRequest(42, sensitiveValue);
 
     var first = strategy.BuildKey(request);

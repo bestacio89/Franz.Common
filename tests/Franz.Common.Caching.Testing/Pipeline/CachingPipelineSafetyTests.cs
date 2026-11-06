@@ -34,7 +34,7 @@ public sealed class CachingPipelineSafetyTests
     public async Task Handle_CommandRequest_BypassesCacheEvenWhenNoMetadataProvidersAreRegistered()
     {
         var cache = new Mock<ICacheProvider>(MockBehavior.Strict);
-        var pipeline = CreatePipeline<ICommand<TestResponse>>(cache.Object);
+        var pipeline = CreatePipeline<WriteCommand>(cache.Object);
         var expected = new TestResponse("executed");
         var nextCalls = 0;
 
@@ -63,7 +63,7 @@ public sealed class CachingPipelineSafetyTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CacheResult<TestResponse>(expected, IsHit: true));
 
-        var pipeline = CreatePipeline<IQuery<TestResponse>>(cache.Object);
+        var pipeline = CreatePipeline<ReadQuery>(cache.Object);
         var nextCalls = 0;
 
         var actual = await pipeline.Handle(
