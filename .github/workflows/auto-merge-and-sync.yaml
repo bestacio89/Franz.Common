@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   sync-to-azure:
+    environment: production
     name: Mirror develop to Azure DevOps
     runs-on: ubuntu-latest
     timeout-minutes: 10
