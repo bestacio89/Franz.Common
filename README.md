@@ -457,7 +457,7 @@ The dependency baseline and compatibility notes are tracked in [the October 2026
 ## Versioning and compatibility
 
 - **Framework packages:** versioned together through `common.targets`; the current documentation baseline targets **2.3.3**.
-- **Target framework:** supported library projects target .NET 10 (`net10.0`). The repository pins SDK `10.0.400` in `global.json`; CI should use that same SDK.
+- **Target framework:** supported library projects target .NET 10 (`net10.0`). The repository pins SDK `10.0.403` in `global.json`; CI should use that same SDK.
 - **Third-party dependencies:** package versions are selected independently according to compatibility and security requirements. A package's version number is not the Franz.Common release version.
 - **Publishing:** the Azure DevOps publishing pipeline validates package metadata before publishing. Publish only after restore/audit, Release build, and full tests pass.
 

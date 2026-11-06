@@ -37,7 +37,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
 
     - task: NuGetAuthenticate@1
 
@@ -72,7 +72,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj \
@@ -91,7 +91,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
 
     - script: |
         set -euo pipefail
@@ -111,7 +111,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packagetype: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Mediator.Tests.csproj \
@@ -128,7 +128,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Caching.Tests.csproj \
@@ -144,7 +144,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Mapping.Tests.csproj \
@@ -160,7 +160,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Tests.csproj \
@@ -176,7 +176,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Kafka.Tests.csproj \
@@ -192,7 +192,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.RabbitMQ.Tests.csproj \
@@ -208,7 +208,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Hosting.Kafka.Tests.csproj \
@@ -224,7 +224,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Messaging.Hosting.RabbitMQ.Tests.csproj \
@@ -240,7 +240,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.EntityFramework.SQLServer.Tests.csproj \
@@ -256,7 +256,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.EntityFramework.Postgres.Tests.csproj \
@@ -272,7 +272,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.EntityFramework.Oracle.Tests.csproj \
@@ -289,7 +289,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.AzureCosmosDB.Tests.csproj \
@@ -323,7 +323,7 @@ stages:
           - task: UseDotNet@2
             inputs:
               packageType: sdk
-              version: '10.0.400'
+              version: '10.0.403'
 
           - task: NuGetAuthenticate@1
 

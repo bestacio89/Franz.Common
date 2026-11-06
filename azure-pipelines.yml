@@ -26,7 +26,7 @@ stages:
       displayName: Install .NET 10 SDK
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
         includePreviewVersions: true
 
     - task: NuGetAuthenticate@1
@@ -86,7 +86,7 @@ stages:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
-        version: '10.0.400'
+        version: '10.0.403'
     - script: |
         set -euo pipefail
         dotnet test $(Pipeline.Workspace)/built-sources/tests/*/Franz.Common.Mediator.Tests.csproj \
