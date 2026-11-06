@@ -105,7 +105,12 @@ services.AddFranzHybridCaching(options =>
 ```
 
 HybridCache uses its local cache by default. Register an `IDistributedCache`
-implementation separately when a distributed L2 store is required. Franz replaces
+implementation separately when a distributed L2 store is required. Its stampede
+coordination is scoped to one `HybridCache` instance and does not provide a
+cross-node lock. L2 read failures are treated as misses; L2 write failures are
+logged but do not fail the caller, so HybridCache provides best-effort L2
+semantics. Use the direct Redis or Distributed providers when backend failures
+must propagate to the caller. Franz replaces
 HybridCache's reflection-based default serializer factory with a metadata-only
 factory. Register `AddFranzCachingJsonTypeInfoResolver` for every cached value
 type before the provider is resolved; missing metadata fails explicitly. You may
