@@ -1,5 +1,6 @@
 ﻿using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Hybrid;
+using Franz.Common.Caching.Internal;
 using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Estrategies;
 using Franz.Common.Caching.Observability;
@@ -190,8 +191,8 @@ public static class FranzCachingServiceCollectionExtensions
     services.AddOptions<MediatorCachingOptions>()
         .Bind(configuration.GetSection(MediatorCachingOptions.SectionName))
         .Validate(
-            options => IsValidLifetime(options.DefaultTtl) &&
-                       IsValidLifetime(options.DefaultSlidingExpiration),
+            options => CacheOptionsValidator.IsValidLifetime(options.DefaultTtl) &&
+                       CacheOptionsValidator.IsValidLifetime(options.DefaultSlidingExpiration),
             "Mediator cache expirations must be between zero and 100 years.")
         .ValidateOnStart();
 
@@ -233,34 +234,11 @@ public static class FranzCachingServiceCollectionExtensions
 
   #endregion
 
-  private static readonly TimeSpan MaximumCacheLifetime = TimeSpan.FromDays(36500);
-
-  private static bool IsValidLifetime(TimeSpan value)
-      => value >= TimeSpan.Zero && value <= MaximumCacheLifetime;
-
-  private static bool IsValidKeyPrefix(string? value)
-  {
-    if (value is null) return false;
-
-    foreach (var character in value)
-    {
-      if (!char.IsAsciiLetterOrDigit(character) && character is not ':' and not '_' and not '-')
-        return false;
-    }
-
-    return true;
-  }
-
   private static OptionsBuilder<CacheOptions> AddValidatedCacheOptions(IServiceCollection services)
   {
     return services.AddOptions<CacheOptions>()
         .Validate(
-            options => IsValidLifetime(options.DefaultAbsoluteExpiration) &&
-                       IsValidLifetime(options.DefaultSlidingExpiration) &&
-                       (!options.LocalCacheHint.HasValue || IsValidLifetime(options.LocalCacheHint.Value)) &&
-                       options.DefaultEstimatedSizeInBytes >= 0 &&
-                       Enum.IsDefined(options.DefaultPriority) &&
-                       IsValidKeyPrefix(options.KeyPrefix),
+            CacheOptionsValidator.IsValid,
             "Cache options contain an invalid expiration, key prefix, priority, or estimated size.")
         .ValidateOnStart();
   }

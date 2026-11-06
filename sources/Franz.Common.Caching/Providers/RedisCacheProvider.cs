@@ -133,6 +133,7 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
 
     var fullKey = ApplyPrefix(key);
     var options = requestOptions ?? _optionsMonitor.CurrentValue;
+    CacheOptionsValidator.ThrowIfInvalid(options);
 
     var cached = await TryGetAsync<T>(fullKey, options, ct).ConfigureAwait(false);
     if (cached.Found)
@@ -163,10 +164,12 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
     ArgumentException.ThrowIfNullOrWhiteSpace(key);
     ct.ThrowIfCancellationRequested();
 
+    var options = requestOptions ?? _optionsMonitor.CurrentValue;
+    CacheOptionsValidator.ThrowIfInvalid(options);
     var fullKey = ApplyPrefix(key);
     using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
-      await SetCoreAsync(fullKey, value, requestOptions ?? _optionsMonitor.CurrentValue, ct)
+      await SetCoreAsync(fullKey, value, options, ct)
           .ConfigureAwait(false);
     }
   }

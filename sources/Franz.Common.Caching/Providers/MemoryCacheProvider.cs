@@ -29,6 +29,8 @@ public sealed class MemoryCacheProvider : ICacheProvider, ICacheWriter
     ArgumentNullException.ThrowIfNull(factory);
     ct.ThrowIfCancellationRequested();
 
+    var effectiveOptions = requestOptions ?? _optionsMonitor.CurrentValue;
+    CacheOptionsValidator.ThrowIfInvalid(effectiveOptions);
     var fullKey = ApplyPrefix(key);
 
     if (_cache.TryGetValue(fullKey, out T? cached))
@@ -44,7 +46,7 @@ public sealed class MemoryCacheProvider : ICacheProvider, ICacheWriter
       }
 
       var value = await factory(ct).ConfigureAwait(false);
-      SetCore(fullKey, value, requestOptions);
+      SetCore(fullKey, value, effectiveOptions);
       return new CacheResult<T>(value, IsHit: false);
     }
   }
@@ -58,10 +60,12 @@ public sealed class MemoryCacheProvider : ICacheProvider, ICacheWriter
     ArgumentException.ThrowIfNullOrWhiteSpace(key);
     ct.ThrowIfCancellationRequested();
 
+    var effectiveOptions = requestOptions ?? _optionsMonitor.CurrentValue;
+    CacheOptionsValidator.ThrowIfInvalid(effectiveOptions);
     var fullKey = ApplyPrefix(key);
     using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
-      SetCore(fullKey, value, requestOptions);
+      SetCore(fullKey, value, effectiveOptions);
     }
   }
 
@@ -79,9 +83,8 @@ public sealed class MemoryCacheProvider : ICacheProvider, ICacheWriter
 
   private string ApplyPrefix(string key) => $"{_optionsMonitor.CurrentValue.KeyPrefix}{key}";
 
-  private void SetCore<T>(string fullKey, T value, CacheOptions? requestOptions)
+  private void SetCore<T>(string fullKey, T value, CacheOptions options)
   {
-    var options = requestOptions ?? _optionsMonitor.CurrentValue;
     var entryOptions = new MemoryCacheEntryOptions
     {
       Priority = options.DefaultPriority

@@ -42,6 +42,31 @@ public sealed class CacheOptionsSecurityTests
   }
 
   [Fact]
+  public async Task PerCallOptions_Should_RejectInvalidExpirationBeforeRunningFactory()
+  {
+    var services = new ServiceCollection();
+    services.AddFranzMemoryCaching();
+    using var provider = services.BuildServiceProvider();
+    var cache = provider.GetRequiredService<ICacheProvider>();
+    var factoryCalls = 0;
+
+    var action = () => cache.GetOrSetAsync(
+        "invalid-per-call-options",
+        _ =>
+        {
+          factoryCalls++;
+          return Task.FromResult("value");
+        },
+        new CacheOptions
+        {
+          DefaultAbsoluteExpiration = TimeSpan.FromSeconds(-1)
+        });
+
+    await action.Should().ThrowAsync<ArgumentException>();
+    factoryCalls.Should().Be(0);
+  }
+
+  [Fact]
   public void Registration_Should_RejectNegativeEstimatedSize()
   {
     var services = new ServiceCollection();

@@ -1,4 +1,5 @@
 using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Internal;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
 
@@ -36,6 +37,8 @@ public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
     ArgumentException.ThrowIfNullOrWhiteSpace(key);
     ArgumentNullException.ThrowIfNull(factory);
 
+    var options = overrideOptions ?? CurrentOptions;
+    CacheOptionsValidator.ThrowIfInvalid(options);
     var effectiveKey = ApplyPrefix(key);
     var isHit = true;
 
@@ -47,7 +50,7 @@ public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
           isHit = false;
           return await f(cancellationToken).ConfigureAwait(false);
         },
-        CreateEntryOptions(overrideOptions ?? CurrentOptions),
+        CreateEntryOptions(options),
         cancellationToken: ct).ConfigureAwait(false);
 
     return new CacheResult<T>(value, isHit);
@@ -61,10 +64,12 @@ public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
   {
     ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
+    var effectiveOptions = options ?? CurrentOptions;
+    CacheOptionsValidator.ThrowIfInvalid(effectiveOptions);
     await _cache.SetAsync(
         ApplyPrefix(key),
         value,
-        CreateEntryOptions(options ?? CurrentOptions),
+        CreateEntryOptions(effectiveOptions),
         cancellationToken: ct).ConfigureAwait(false);
   }
 

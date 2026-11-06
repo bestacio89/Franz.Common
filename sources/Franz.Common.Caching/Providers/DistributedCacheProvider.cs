@@ -37,6 +37,8 @@ public sealed class DistributedCacheProvider : ICacheProvider, ICacheWriter, IDi
     ArgumentNullException.ThrowIfNull(factory);
     ct.ThrowIfCancellationRequested();
 
+    var effectiveOptions = requestOptions ?? _optionsMonitor.CurrentValue;
+    CacheOptionsValidator.ThrowIfInvalid(effectiveOptions);
     var fullKey = ApplyPrefix(key);
     var cached = await _cache.GetStringAsync(fullKey, ct).ConfigureAwait(false);
     if (TryDeserialize(cached, out T? result))
@@ -49,7 +51,7 @@ public sealed class DistributedCacheProvider : ICacheProvider, ICacheWriter, IDi
         return new CacheResult<T>(result!, IsHit: true);
 
       var value = await factory(ct).ConfigureAwait(false);
-      await SetCoreAsync(fullKey, value, requestOptions, ct).ConfigureAwait(false);
+      await SetCoreAsync(fullKey, value, effectiveOptions, ct).ConfigureAwait(false);
       return new CacheResult<T>(value, IsHit: false);
     }
   }
@@ -60,9 +62,11 @@ public sealed class DistributedCacheProvider : ICacheProvider, ICacheWriter, IDi
     ThrowIfDisposed();
     ArgumentException.ThrowIfNullOrWhiteSpace(key);
     ct.ThrowIfCancellationRequested();
+    var effectiveOptions = requestOptions ?? _optionsMonitor.CurrentValue;
+    CacheOptionsValidator.ThrowIfInvalid(effectiveOptions);
     var fullKey = ApplyPrefix(key);
     using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
-      await SetCoreAsync(fullKey, value, requestOptions, ct).ConfigureAwait(false);
+      await SetCoreAsync(fullKey, value, effectiveOptions, ct).ConfigureAwait(false);
   }
 
   public async Task RemoveAsync(string key, CancellationToken ct = default)
@@ -85,10 +89,10 @@ public sealed class DistributedCacheProvider : ICacheProvider, ICacheWriter, IDi
 
   private string ApplyPrefix(string key) => $"{_optionsMonitor.CurrentValue.KeyPrefix}{key}";
 
-  private async Task SetCoreAsync<T>(string fullKey, T value, CacheOptions? requestOptions, CancellationToken ct)
+  private async Task SetCoreAsync<T>(string fullKey, T value, CacheOptions options, CancellationToken ct)
   {
     var json = JsonSerializer.Serialize(value, GetTypeInfo<T>());
-    await _cache.SetStringAsync(fullKey, json, CreateDistributedCacheOptions(requestOptions), ct)
+    await _cache.SetStringAsync(fullKey, json, CreateDistributedCacheOptions(options), ct)
         .ConfigureAwait(false);
   }
 
@@ -122,9 +126,8 @@ public sealed class DistributedCacheProvider : ICacheProvider, ICacheWriter, IDi
     }
   }
 
-  private DistributedCacheEntryOptions CreateDistributedCacheOptions(CacheOptions? requestOptions)
+  private static DistributedCacheEntryOptions CreateDistributedCacheOptions(CacheOptions options)
   {
-    var options = requestOptions ?? _optionsMonitor.CurrentValue;
     return new DistributedCacheEntryOptions
     {
       AbsoluteExpirationRelativeToNow = options.DefaultAbsoluteExpiration > TimeSpan.Zero

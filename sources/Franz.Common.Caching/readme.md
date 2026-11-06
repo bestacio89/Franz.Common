@@ -43,7 +43,10 @@ mechanisms do not provide a cross-process or cross-node distributed lock.
 | HybridCache | Maps to HybridCache entry expiration | Maps to local-cache expiration; it is not a distributed sliding TTL |
 
 A zero expiration disables that expiration dimension. Negative values and
-lifetimes above 100 years are rejected during options validation. HybridCache
+lifetimes above 100 years are rejected during options validation. Per-call
+options and metadata-provider TTL overrides are validated before a cache lookup
+or factory invocation; invalid overrides fail fast rather than silently disabling
+expiration. HybridCache
 uses an explicit long-lived entry option for disabled expiration and caps its
 L1 lifetime at the absolute expiration.
 
