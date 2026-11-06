@@ -1,10 +1,15 @@
 # Franz.Common.Mapping
 
-> Strongly typed mapping contracts and deterministic object-mapping utilities for application and domain models.
+> Configurable runtime mapping plus strongly typed mapping contracts for application and domain models.
 
 ## Overview
 
-Strongly typed mapping contracts and deterministic object-mapping utilities for application and domain models.
+The package exposes two distinct mapping paths:
+
+1. `IFranzMapper`/`IMappingService`: a runtime mapper driven by `MappingConfiguration` and `IFranzMapProfile`.
+2. `IMapper<TSource, TDestination>`: a strongly typed contract implemented by the companion incremental source generator.
+
+These paths have different trimming and Native AOT characteristics.
 
 ## Installation
 
@@ -12,253 +17,56 @@ Strongly typed mapping contracts and deterministic object-mapping utilities for 
 dotnet add package Franz.Common.Mapping
 ```
 
-## Design principles
+The mapping generator is included as an analyzer dependency of the package.
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-*A deterministic, high-performance object mapping engine for the Franz Framework.*
-
-* **Current Version:** v3.0.0
-* **Codename:** *Mapping Engine Formalization & Constructor-Aware Evolution*
-* Part of the **Franz Core Infrastructure Suite**
-
----
-
-## 🌐 Overview
-
-`Franz.Common.Mapping` is a **deterministic object mapping engine**, designed to replace traditional “magic mappers” with a **strict, explicit execution model**.
-
-It is built around a single principle:
-
-> Mapping is not inference — it is execution over declared intent.
-
-This version formalizes the engine into a **three-layer architecture**:
-
-* **Configuration Layer** → mapping intent (profiles & expressions)
-* **Execution Engine** → deterministic transformation (FranzMapper)
-* **Service Layer** → DI-safe orchestration (MappingService)
-
----
-
-## 🧠 Core Architectural Upgrade (v2.2.2)
-
-### 🔹 Mapping Engine Formalization
-
-* Reframed the system into a **deterministic mapping execution pipeline**
-* Removed ambiguity from implicit mapping behavior
-* Standardized execution order across all mappings
-
-### Execution Pipeline Order:
-
-1. Circular reference detection (graph safety guard)
-2. Value-object unwrapping (`Value` pattern resolution)
-3. Collection mapping (generic enumerable handling)
-4. Configured mappings (MappingConfiguration lookup)
-5. Constructor-based projection (`ConstructUsing`)
-6. Property-based fallback mapping
-
----
-
-## 🏗 Architecture Separation
-
-### 1. Configuration Layer (Mapping Intent)
-
-* All mappings are explicitly registered
-* No automatic or implicit discovery of mappings
-* Deterministic override behavior: **last registration wins**
+## Runtime mapper registration
 
 ```csharp
-config.Register(new MappingExpression<User, UserDto>()
-    .ConstructUsing(u => new UserDto { Name = u.Name }));
+using Franz.Common.Mapping.Extensions;
+
+builder.Services.AddFranzMapping(
+    assemblies: new[] { typeof(CustomerMapProfile).Assembly });
 ```
 
----
+The extension registers `MappingConfiguration`, `IFranzMapper`, and `IMappingService`. It discovers concrete `IFranzMapProfile` implementations in the supplied assemblies; when no assemblies are supplied, it scans matching assemblies loaded in the current AppDomain. This profile discovery uses reflection and dynamic activation and is annotated as trimming/Native AOT incompatible.
 
-### 2. Execution Engine (FranzMapper)
+## Profiles and expressions
 
-The `FranzMapper` is a **pure execution engine** responsible for applying mapping rules.
-
-#### Key Responsibilities:
-
-* Graph traversal and safety control
-* Constructor resolution (including record types)
-* Property binding execution
-* Collection transformation
-* Value-object unwrapping
-* Fallback mapping logic
-
----
-
-## 🧱 Constructor-Aware Mapping (NEW in v2.2.2)
-
-### 🔹 Record & Immutable Type Support
-
-The engine now natively supports:
-
-* C# records (positional constructors)
-* Immutable DTOs
-* Constructor-only types
-
-### Behavior:
-
-* Automatically detects the **best constructor**
-* Binds constructor parameters from source properties
-* Supports `ConstructUsing` overrides
-* Falls back to reflection-based instantiation only when necessary
+Derive a profile from `FranzMapProfile` and declare mappings through `CreateMap<TSource, TDestination>()`:
 
 ```csharp
-CreateMap<User, UserDto>()
-    .ConstructUsing(u => new UserDto(u.Name, u.Email));
-```
-
-### Architectural Impact:
-
-* Eliminates dependency on parameterless constructors
-* Enables fully immutable DTO designs
-* Aligns mapping with domain-driven design principles
-
----
-
-## 🔁 Value Object Unwrapping System
-
-### New deterministic unwrapping model:
-
-The engine automatically resolves wrapped values:
-
-```csharp
-class WrappedInt
+public sealed class CustomerMapProfile : FranzMapProfile
 {
-    public int Value { get; set; }
+    public CustomerMapProfile()
+    {
+        CreateMap<Customer, CustomerDto>()
+            .ForMember(destination => destination.DisplayName, source => source.Name)
+            .Ignore(destination => destination.InternalCode)
+            .Strict();
+    }
 }
 ```
 
-Mapping:
+The expression API supports:
 
-```csharp
-WrappedInt → int
-```
+- `ForMember(destination, source)` for direct property-to-property bindings.
+- `Ignore(destination)` to skip a destination member.
+- `ConstructUsing(Func<TSource, TDestination>)` or the mapper-aware overload.
+- `ReverseConstructUsing(...)` stores a reverse constructor delegate in the expression. The current runtime mapper does not consume that delegate or expose automatic reverse mapping.
+- `Strict()` to fail when required source members/constructor parameters cannot be resolved.
 
-### Rules:
+Mappings are registered by source/destination type pair; a later registration for the same pair replaces the previous expression.
 
-* Extracts `Value` property automatically
-* Applies scalar conversion rules before mapping
-* Preserves type safety when compatible
-* Falls back to full mapping engine if needed
+## Runtime behavior
 
----
+The runtime mapper supports constructor-based destination creation, explicit constructor selection through `[MapConstructor]`, member bindings, ignored members, collection mapping, and `[ValueObject]` unwrapping. It detects circular object graphs and fails with a technical mapping exception.
 
-## 📦 Collection Mapping Engine
+`IMappingService.MapAsync` is a compatibility/composition API that returns a `ValueTask`; mapping remains CPU-bound and is not moved to a background thread.
 
-* Fully supports:
+## Native AOT
 
-  * Lists
-  * Enumerables
-  * Arrays
-* Element mapping is recursive and pipeline-consistent
-* Uses cached delegate dispatch for performance optimization
-
----
-
-## 🔄 Circular Reference Protection
-
-* Built-in graph traversal tracking
-* Prevents infinite recursion in object graphs
-* Uses reference-equality tracking for accuracy
-
-### Behavior:
-
-```text
-TechnicalException: Circular mapping detected
-```
-
----
-
-## ⚙️ Performance Model
-
-The framework is optimized for:
-
-* Minimal reflection in hot paths
-* Cached constructor and property resolution
-* Compiled delegate dispatch for recursive mappings
-* Allocation-efficient collection handling
-
----
-
-## 🧩 Mapping Service (DI Layer)
-
-A lightweight orchestration layer over the engine.
-
-### Responsibilities:
-
-* Dependency injection integration
-* Safe lifecycle management
-* Async-compatible API surface
-
-```csharp
-var dto = service.Map<User, UserDto>(user);
-```
-
-### Async Behavior:
-
-* Mapping remains **CPU-bound**
-* Async API is a **compatibility and composition layer**
-* No hidden concurrency introduced by default
-
----
-
-## ⚖️ Design Guarantees
-
-Franz Mapping guarantees:
-
-* Deterministic output for identical inputs
-* No hidden runtime discovery of mappings
-* Thread-safe execution
-* Strict separation of configuration and execution
-* Predictable graph traversal semantics
-
----
-
-## 🧠 Design Philosophy
-
-> “Mapping is not inference. It is a deterministic execution graph over explicit intent.”
-
----
-
-## 🚀 Version Highlights (v2.2.2)
-
-### ✨ Major Changes
-
-* Formalized mapping engine execution pipeline
-* Introduced constructor-aware mapping (records supported natively)
-* Strengthened value-object unwrapping system
-* Standardized circular reference detection
-* Unified mapping resolution order across all execution paths
-
-### ⚙️ Internal Improvements
-
-* Reduced reflection dependency in runtime mapping
-* Improved constructor resolution logic
-* Stabilized collection mapping pipeline
-* Improved DI service consistency and lifecycle safety
-
----
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+The reflection-based `IFranzMapper` and profile-discovery registration are not Native AOT-safe. For trimming and Native AOT, use a generated `IMapper<TSource, TDestination>` implementation from the companion source generator and call its typed `Map` method directly. See [Franz.Common.Mapping.Generators](../Franz.Common.Mapping.Generators/readme.md).
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

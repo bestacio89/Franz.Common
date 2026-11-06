@@ -1,10 +1,10 @@
 # Franz.Common.Identity
 
-> Identity execution-context abstractions for accessing the current authenticated principal and its claims across application services.
+> Provider-neutral identity contracts and models for authenticated application execution.
 
 ## Overview
 
-Identity execution-context abstractions for accessing the current authenticated principal and its claims across application services.
+This package defines the core identity model independently of ASP.NET Core, HTTP, or any specific identity provider. Authentication and HTTP claim extraction are implemented by integration packages.
 
 ## Installation
 
@@ -12,142 +12,33 @@ Identity execution-context abstractions for accessing the current authenticated 
 dotnet add package Franz.Common.Identity
 ```
 
-## Design principles
+## Identity model
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+`FranzIdentityContext` carries the current identity values:
 
-## Usage and configuration
+- `UserId`: optional GUID subject identifier.
+- `Email`: optional email address.
+- `FullName`: optional display name.
+- `Roles`: optional role-name array.
+- `TenantId`: optional validated tenant identifier.
+- `DomainId`: optional validated domain identifier.
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+`IIdentityContextAccessor` exposes the individual values through `GetCurrentId()`, `GetCurrentEmail()`, `GetCurrentFullName()`, `GetCurrentRoles()`, `GetCurrentTenantId()`, and `GetCurrentDomainId()`, as well as the nullable aggregate `GetCurrentIdentity()`.
 
-## Package-specific guide
+## Framework integration
 
-A foundational library within the **Franz Framework** that provides contracts and utilities for managing **identity context** across applications.
-This package defines the **core abstractions** for accessing user identity information in a consistent, provider-agnostic way.
+The core package does not register an ASP.NET Core implementation or an authentication provider.
 
----
--**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
----
-## **Features**
+- `Franz.Common.Http.Identity` provides `AddHttpIdentityContext()` and the HTTP-backed accessor.
+- `Franz.Common.Http.Identity` also contains provider registration extensions for OIDC, SAML2, WS-Federation, and Keycloak.
+- `Franz.Common.Http.Authentication` provides the explicit symmetric JWT bearer configuration helper.
 
-* **Identity Context Management**
+Tenant and domain values should come from a validated tenant execution context, not from arbitrary request headers or untrusted claims.
 
-  * `FranzIdentityContext`: unified model (UserId, Email, FullName, Roles, TenantId, DomainId).
-  * `IIdentityContextAccessor`: contract for resolving identity across frameworks.
+## Testing
 
-* **Testing Support**
-
-  * `FakeIdentityContextAccessor`: simple stub for unit/integration tests.
-
-* **Framework-Agnostic**
-
-  * No dependency on ASP.NET Core or `HttpContext`.
-  * ASP.NET-specific implementation lives in [`Franz.Common.Http.Identity`](../Franz.Common.Http.Identity).
-
----
-
-## **Installation**
-
-```bash
-dotnet add package Franz.Common.Identity
-```
-
----
-
-## **Usage**
-
-### Access Identity Context
-
-```csharp
-using Franz.Common.Identity;
-
-public class MyService
-{
-    private readonly IIdentityContextAccessor _identityContext;
-
-    public MyService(IIdentityContextAccessor identityContext)
-    {
-        _identityContext = identityContext;
-    }
-
-    public FranzIdentityContext GetIdentity()
-        => _identityContext.GetCurrentIdentity();
-}
-```
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Identity** package integrates seamlessly with:
-
-* **Franz.Common.Http.Identity**: ASP.NET Core implementation + SSO providers.
-* **Franz.Common.Headers**: standardized HTTP header propagation.
-
----
-
-## **Contributing**
-
-This package is part of the open-source Franz.Common ecosystem. Contributions are limited to the internal development team.
-
-1. Clone the repository @ [Franz.Common](https://github.com/bestacio89/Franz.Common/)
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+Use a test implementation of `IIdentityContextAccessor` in unit tests. Do not make production services depend on `HttpContext` or a provider-specific claims principal when the provider-neutral contract is sufficient.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.6.2
-
-* Introduced **`FranzIdentityContext`** (UserId, Email, FullName, Roles, TenantId, DomainId).
-* Added **`IIdentityContextAccessor`** interface for framework-agnostic identity access.
-* Added **`FakeIdentityContextAccessor`** for testing.
-* Moved ASP.NET Core specifics into a new package: **Franz.Common.Http.Identity**, including:
-
-  * `IdentityContextAccessor` (HttpContext-based implementation).
-  * `AddFranzHttpIdentity()` DI extension.
-  * Provider extensions:
-
-    * `AddFranzWsFedIdentity()` (WS-Federation).
-    * `AddFranzOidcIdentity()` (OpenID Connect).
-    * `AddFranzSaml2Identity()` (SAML2 via Sustainsys).
-    * `AddFranzKeycloakIdentity()` (Keycloak OIDC with role normalization).
-* All providers normalize into **`FranzIdentityContext`**.
-* Config-driven setup via **appsettings.json** (no hardcoded values).
-
-### Version 1.3
-
-* Upgraded to **.NET 9.0.8**.
-* Added new features and improvements.
-* Separated business concepts from mediator concepts.
-* Now compatible with both in-house mediator and MediatR.
-
-### Version 1.2.65
-
-* Upgraded to **.NET 9**.
-
----
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See the repository [LICENSE](../../LICENSE).

@@ -1,10 +1,10 @@
 # Franz.Common.MultiTenancy
 
-> Tenant resolution and execution-context abstractions for enforcing isolation across application and persistence boundaries.
+> Provider-neutral contracts and scoped execution context for tenant and domain isolation.
 
 ## Overview
 
-Tenant resolution and execution-context abstractions for enforcing isolation across application and persistence boundaries.
+This package defines tenant/domain identity, tenant persistence contracts, validation contracts, and the immutable execution context shared by HTTP, messaging, gRPC, and persistence integrations. It does not choose how a tenant is resolved from an HTTP request or broker message; boundary-specific packages implement those integrations.
 
 ## Installation
 
@@ -12,190 +12,37 @@ Tenant resolution and execution-context abstractions for enforcing isolation acr
 dotnet add package Franz.Common.MultiTenancy
 ```
 
-## Design principles
+## Core contracts
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+- `TenantInfo`: tenant identity, status, and associated domains.
+- `ITenantStore`: asynchronous tenant lookup by ID or host, enumeration, and existence checks.
+- `ITenantResolver`: boundary-specific tenant resolution strategy.
+- `ITenantValidator`: application validation of a resolved tenant.
+- `ITenantExecutionContextAccessor`: scoped access to the validated execution context.
+- `ITenantContextAccessor` and `IDomainContextAccessor`: tenant/domain identity accessors.
+- `ITenantEntity` and `IGlobalEntity`: explicit ownership classifications for persistence models.
 
-## Usage and configuration
+## Validated execution context
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+A `TenantExecutionContext` can be created only for a non-empty, active tenant. It records the tenant, optional verified domain, resolution source, and resolution timestamp. The scoped `ScopedTenantExecutionContextAccessor` allows one initialization per execution scope and exposes an explicit `Clear()` operation.
 
-## Package-specific guide
+The context is not a mutable request DTO. Initialize it only after resolution, status validation, and authorization have succeeded. Clear it when the request/message execution scope ends.
 
-A lightweight library within the **Franz Framework** designed to enable multi-tenancy support in .NET applications. This package provides interfaces for accessing and managing tenant and domain contexts, enabling seamless integration with multi-tenant architectures.
+## Boundary integrations
 
----
+Use the appropriate package for each boundary:
 
-## **Features**
+- `Franz.Common.Http.MultiTenancy`: HTTP tenant resolution and membership authorization.
+- `Franz.Common.Messaging.MultiTenancy`: message-header extraction, producer authorization, and message-scoped execution.
+- `Franz.Common.Grpc`: gRPC client/server tenant propagation and resolution.
+- `Franz.Common.EntityFramework`: tenant-aware query filters and write enforcement for relational EF contexts.
 
-- **Tenant Context Accessor**:
-  - `ITenantContextAccessor` interface for retrieving tenant-specific information.
-- **Domain Context Accessor**:
-  - `IDomainContextAccessor` interface for handling domain-specific data.
-- **Extensible Multi-Tenancy**:
-  - Provides a foundation for building multi-tenant systems with minimal overhead.
+## Persistence ownership
 
----
+Tenant-owned entities implement `ITenantEntity` and expose a mapped `Guid TenantId`. Data intentionally shared across tenants implements `IGlobalEntity`. When multi-tenancy is enabled with a shared relational database, the EF integration requires each persisted Franz entity to declare exactly one of these ownership classifications.
 
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package does not depend on external libraries and is designed to be easily integrated into any .NET project.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.MultiTenancy
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.MultiTenancy
-```
-
----
-
-## **Usage**
-
-### **1. Implement Tenant and Domain Context Accessors**
-
-Provide implementations for the `ITenantContextAccessor` and `IDomainContextAccessor` interfaces:
-
-```csharp
-using Franz.Common.MultiTenancy;
-
-public class TenantContextAccessor : ITenantContextAccessor
-{
-    public string TenantId { get; set; } = "DefaultTenant";
-}
-
-public class DomainContextAccessor : IDomainContextAccessor
-{
-    public string DomainName { get; set; } = "DefaultDomain";
-}
-```
-
-### **2. Register Accessors with Dependency Injection**
-
-Add the context accessors to your service collection:
-
-```csharp
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddSingleton<ITenantContextAccessor, TenantContextAccessor>();
-        services.AddSingleton<IDomainContextAccessor, DomainContextAccessor>();
-    }
-}
-```
-
-### **3. Access Tenant and Domain Information**
-
-Inject the accessors into your services to retrieve tenant and domain-specific data:
-
-```csharp
-using Franz.Common.MultiTenancy;
-
-public class MyService
-{
-    private readonly ITenantContextAccessor _tenantContextAccessor;
-    private readonly IDomainContextAccessor _domainContextAccessor;
-
-    public MyService(ITenantContextAccessor tenantContextAccessor, IDomainContextAccessor domainContextAccessor)
-    {
-        _tenantContextAccessor = tenantContextAccessor;
-        _domainContextAccessor = domainContextAccessor;
-    }
-
-    public void DisplayContextInfo()
-    {
-        Console.WriteLine($"Tenant ID: {_tenantContextAccessor.TenantId}");
-        Console.WriteLine($"Domain Name: {_domainContextAccessor.DomainName}");
-    }
-}
-```
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.MultiTenancy** package serves as a foundational utility for enabling multi-tenancy in any **Franz Framework**-based application. Use it alongside other libraries in the framework to build fully multi-tenant-aware systems.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+Do not treat a tenant ID from an untrusted header or claim as proof of membership. Boundary authorization must validate the caller or transport identity independently.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Added `ITenantContextAccessor` for accessing tenant-specific information.
-- Added `IDomainContextAccessor` for retrieving domain-specific data.
-- Simplified multi-tenancy support for .NET applications.
-
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.3.1
-
-- Bug fixes and performance improvements.
-  - Expanded multi-tenancy core abstractions to support advanced scenarios:
-  - Introduced TenantInfo and TenantDomain models (supporting multiple domains per tenant).
-  - Added ITenantStore interface for tenant registry and validation.
-  - Added ITenantResolver and ITenantResolutionPipeline abstractions for flexible resolution strategies (headers, hosts, query strings, JWT claims).
-  - Introduced ITenantValidator to enforce tenant state (active, expired, disabled).
-  - Added ITenantContext to represent scoped tenant metadata.
-  - Added TenantResolutionResult and TenantResolutionSource to standardize resolution outcomes.
-  - Provided InMemoryTenantStore for testing and prototyping.
-  - Enhanced Domain Context Accessor and Tenant Context Accessor for setting and retrieving context within the request scope.
-  - Prepared groundwork for Franz.Common.Http.MultiTenancy middleware and resolver implementations.
-
-  ### Version 1.6.20
-- Updated to **.NET 10.0**
-
-
-## Validated tenant execution
-
-Tenant resolution identifies a candidate; it does not by itself authorize execution. Adapters should validate tenant lifecycle and establish a scoped `TenantExecutionContext` only after successful resolution.
-
-- `TenantExecutionContext` is immutable and rejects inactive tenants.
-- `TenantStatus` distinguishes provisioning, active, suspended, disabled, and deprovisioned tenants.
-- `TenantDomain` has its own identifier and normalizes internationalized hostnames to IDNA ASCII.
-- `DefaultTenantResolutionPipeline` evaluates all successful strategies and rejects contradictory tenant identities.
-- `ITenantExecutionContextAccessor` is the execution-boundary contract. Implementations must isolate concurrent requests and messages.
-
-Tenant stores must guarantee globally unique verified hostname mappings. The in-memory implementation is intended only for tests and local demonstrations.
-
-
-`ITenantValidator` exposes one canonical contract: `IsValidAsync(Guid, CancellationToken)`. Implementations must observe cancellation and must not rely on a parameterless compatibility overload.
+MIT. See the repository [LICENSE](../../LICENSE).

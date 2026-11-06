@@ -1,10 +1,10 @@
 # Franz.Common.Http.Bootstrap
 
-> ASP.NET Core application composition for authentication, headers, API documentation, health checks, multitenancy, and typed clients.
+> Composition root for the standard Franz ASP.NET Core HTTP services and middleware pipeline.
 
 ## Overview
 
-ASP.NET Core application composition for authentication, headers, API documentation, health checks, multitenancy, and typed clients.
+This package provides two explicit entry points: `AddHttpArchitecture(...)` for service registration and `UseHttpArchitecture()` for middleware composition. It centralizes the framework's HTTP defaults without silently configuring an identity provider or tenant membership policy.
 
 ## Installation
 
@@ -12,236 +12,65 @@ ASP.NET Core application composition for authentication, headers, API documentat
 dotnet add package Franz.Common.Http.Bootstrap
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-**Package**: `Franz.Common.Http.Bootstrap`
-**Current Version:** v3.0.0
-
-Opinionated HTTP bootstrapper for the Franz Framework.
-Centralizes common ASP.NET Core HTTP wiring (controllers, auth, headers, docs, serialization, health checks, multi-tenancy) and optionally registers config-driven Refit clients so applications get consistent, production-ready defaults with minimal boilerplate.
-
----
-
-## Why use this package
-
-* One-line HTTP architecture wiring for consistent apps across teams.
-* Plugs into Franz primitives (multi-tenancy, header context, identity, docs).
-* Config-driven optional features (Refit clients) keep `Program.cs` tidy.
-* Reduces boilerplate and enforces best practices (correlation, tenant propagation, policy reuse).
-
----
-
-## Quickstart
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Http.Bootstrap
-```
-
-### Minimal wiring (Program.cs)
+## Service registration
 
 ```csharp
 using Franz.Common.Http.Bootstrap.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Adds controllers, auth, headers, docs, multi-tenancy, serialization, health, etc.
-builder.Services.AddHttpArchitecture(builder.Environment, builder.Configuration, typeof(Program).Assembly);
+builder.Services.AddHttpArchitecture(
+    builder.Environment,
+    builder.Configuration,
+    typeof(Program).Assembly);
+```
 
+The registration composes common architecture services, HTTP controllers, exact-origin CORS, forwarded-header support, serialization, error strategies, JWT authentication entry-point, header context, API documentation, HTTP identity context, tenant resolution, serializers, and health checks.
+
+### Authentication is explicit
+
+`AddHttpArchitecture` calls `AddFranzAuthentication()` to expose the authentication builder, but it does not configure a JWT bearer handler or choose an identity provider. Configure the intended scheme explicitly. For symmetric JWTs:
+
+```csharp
+builder.Services
+    .AddFranzAuthentication()
+    .ConfigureJwtBearer(builder.Configuration);
+```
+
+For OIDC, SAML2, WS-Federation, or Keycloak, use the corresponding provider registration from `Franz.Common.Http.Identity`. Do not register multiple competing default authentication schemes unless the application explicitly composes them.
+
+### Tenant membership is explicit
+
+The bootstrapper registers `AddFranzMultiTenancy()`, but the application must provide its `ITenantStore`, at least one `ITenantResolver` when tenant resolution is required, and an `ITenantRequestAuthorizer` for authenticated tenant membership. The built-in GUID-claim authorizer is opt-in through `AddTenantClaimsAuthorizer(...)`.
+
+## Middleware pipeline
+
+```csharp
 var app = builder.Build();
-app.UseHttpArchitecture(); // optional pipeline helper if provided
-app.MapControllers();
+
+app.UseHttpArchitecture();
 app.Run();
 ```
 
-`AddHttpArchitecture(...)` wires the canonical Franz HTTP stack. If Refit is enabled in configuration it will also register Refit clients automatically.
+`UseHttpArchitecture()` composes exception handling, forwarded headers, certificate forwarding, localization, routing, CORS, authentication, tenant resolution, authorization, controller endpoints, API documentation, and health checks in the required order.
 
----
+Do not add a second `UseFranzMultiTenancy()` call when using this composed pipeline. The composed endpoint mapping requires authorization for mapped controllers; configure endpoint policies and anonymous endpoints deliberately.
 
-## Refit (optional) — what the bootstrapper does
+## Configuration boundaries
 
-When `Franz:HttpClients:EnableRefit` is `true`, the bootstrapper will:
+- `Cors` is a semicolon-separated list of exact HTTP/HTTPS origins. Wildcards, paths, query strings, fragments, and credentials in an origin are rejected. No configured origins means no cross-origin access is granted.
+- Forwarded headers preserve ASP.NET Core trusted-proxy/network restrictions. Add the actual reverse proxies explicitly through `ForwardedHeadersOptions`; do not trust arbitrary senders.
+- Symmetric JWT configuration requires issuer, audience, and a secret signing key of at least 32 UTF-8 bytes. Keep secrets in a secret manager.
+- Tenant resolution exclusions are explicit path prefixes; excluded endpoints must be secured independently.
 
-* Read `Franz:HttpClients:Apis` from configuration.
-* Resolve each typed Refit interface (prefer `InterfaceType` — assembly-qualified; falls back to assembly scan).
-* Invoke `AddFranzRefit<TClient>(...)` reflectively to register the typed client.
-* For each client it wires:
+## Refit
 
-  * Base address
-  * `FranzRefitHeadersHandler` (adds `X-Correlation-ID`, `X-Tenant-Id`, optional `X-User-Id`)
-  * Optional `FranzRefitAuthHandler` (if an `ITokenProvider` is registered)
-  * Optional Polly policy attachment (by name, via the host's policy registry)
+Refit is not automatically discovered or registered by `AddHttpArchitecture`. Add the `Franz.Common.Http.Refit` integration and register typed clients explicitly using its API.
 
-### appsettings.json example (Refit)
+## Related packages
 
-```json
-{
-  "Franz": {
-    "HttpClients": {
-      "EnableRefit": true,
-      "Apis": {
-        "Weather": {
-          "InterfaceType": "MyApp.ApiClients.IWeatherApi, MyApp",
-          "BaseUrl": "https://api.weather.local",
-          "Policy": "DefaultHttpRetry"
-        }
-      }
-    }
-  }
-}
-```
-
-**Notes**
-
-* `InterfaceType` (assembly-qualified) is recommended for deterministic resolution.
-* `Policy` is optional — if present the bootstrapper will attach the named policy from the host's `IPolicyRegistry<string>`.
-
----
-
-## Features (at a glance)
-
-* Registers controllers, Swagger documentation, and health checks.
-* Authentication and identity context wiring.
-* Header context utilities and header-based capabilities.
-* Multi-tenancy integration via `Franz.Common.Http.MultiTenancy`.
-* Optional, config-driven Refit client registration with correlation, auth, Polly, and OTEL-friendly annotations.
-* Opinionated, production-friendly defaults to reduce friction.
-
----
-
-## Host project dependencies (when using Refit)
-
-When enabling Refit you must ensure the host project references the Refit integration and related primitives:
-
-* `Franz.Common.Http.Refit` (the Refit integration package)
-* `Refit.HttpClientFactory` (provides `AddRefitClient<T>()`) or an equivalent Refit package exposing factory helpers
-* `Microsoft.Extensions.Http`
-* `Polly` & `Microsoft.Extensions.Http.Polly` (if you want policy integration)
-* `Serilog` (recommended for enriched logging)
-* `OpenTelemetry.Api` (optional; used to tag `Activity.Current`)
-
-> The bootstrapper itself depends on other Franz packages (http modules). Make sure those Franz packages are available to the host.
-
----
-
-## Troubleshooting
-
-* **Refit clients not registered**:
-
-  * Ensure `"Franz:HttpClients:EnableRefit": true` and that `Franz.Common.Http.Refit` is referenced in the host project.
-* **Typed interface cannot be resolved**:
-
-  * Add `InterfaceType` with the assembly-qualified type name (e.g. `MyApp.ApiClients.IWeatherApi, MyApp`) to the config entry or ensure the interface is in the assembly passed to `AddHttpArchitecture`.
-* **`AddRefitClient<T>()` not found**:
-
-  * Confirm `Refit.HttpClientFactory` (or the Refit package exposing the factory) is referenced in the project that performs the registration, and add `using Refit;` where needed.
-* **Polly policy not applied**:
-
-  * Register policies in `IPolicyRegistry<string>` (`services.AddPolicyRegistry().Add("MyPolicy", policy)`).
-
----
-
-## Example: manual Refit registration (if you prefer code)
-
-```csharp
-builder.Services.AddPolicyRegistry()
-  .Add("DefaultHttpRetry", HttpPolicyExtensions
-    .HandleTransientHttpError()
-    .WaitAndRetryAsync(new[] { TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(300) }));
-
-builder.Services.AddFranzRefit<MyApp.ApiClients.IWeatherApi>(
-    name: "Weather",
-    baseUrl: "https://api.weather.local",
-    policyName: "DefaultHttpRetry");
-```
-
----
-
-## Changelog (recent)
-
-* **v1.4.1**
-
-  * Added optional Refit client registration via the HTTP bootstrapper (config-driven).
-  * Refit clients registered by the bootstrapper support correlation header injection, optional token injection, and Polly policy wiring.
-
-For full changelog/history see the repository `CHANGELOG.md`.
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
-
-### v2.2.16 - Universal Exception Handling
-- Added global exception handling middleware to standardize error responses and logging across all HTTP endpoints.
-- Exceution context is now enriched with correlation and tenant information for better traceability in logs and monitoring systems.
----
-
-## Contributing
-
-Contributions are welcome via pull request.
+`Franz.Common.Http`, `Franz.Common.Http.Authentication`, `Franz.Common.Http.Identity`, `Franz.Common.Http.MultiTenancy`, and `Franz.Common.Http.Documentation`.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## Dependency maintenance — October 2026
-
-The dependency graph pins Snappier to a patched version to avoid the known high-severity issue in 1.0.0. The package continues to target .NET 10. Verify HTTP bootstrap, serialization, health-check, and compression-related paths with the full test suite before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
-
-## HTTP multitenancy pipeline — 2.3.5
-
-`UseHttpArchitecture()` now composes the tenant middleware automatically. Do not add a second `UseFranzMultiTenancy()` call when using the composed pipeline.
-
-The request order is:
-
-1. Exception handling and forwarded/certificate headers.
-2. Routing and CORS.
-3. Authentication.
-4. Tenant resolution and membership authorization.
-5. Endpoint authorization and controller execution.
-
-This order makes authenticated JWT claims available to tenant resolution and ensures endpoint authorization runs only after the validated tenant execution context has been established. Applications must still register an `ITenantRequestAuthorizer` for authenticated tenant membership.
-
----
-
-## Security configuration
-
-`AddHttpArchitecture()` wires the HTTP services and `UseHttpArchitecture()` composes middleware in the required order. The host still owns the identity-provider configuration and tenant membership policy.
-
-### JWT
-
-For symmetric JWTs, configure `JwtSettings:Issuer`, `JwtSettings:Audience`, and a secret-store-backed `JwtSettings:SigningKey` of at least 32 UTF-8 bytes using `AddFranzAuthentication().ConfigureJwtBearer(configuration)`. The helper fails fast if a required setting is absent and never disables issuer, audience, lifetime, expiration, or signature validation. Use native ASP.NET Core OIDC/JWT configuration for asymmetric provider keys.
-
-### CORS
-
-The `Cors` setting is a semicolon-separated list of exact origins. No configured origins means no cross-origin access is granted. Wildcard origins and subdomain wildcards are rejected.
-
-### Reverse proxies
-
-Forwarded headers are processed only when the immediate sender is in ASP.NET Core's trusted proxy/network list. Add the actual reverse-proxy IPs or networks through `ForwardedHeadersOptions`; do not clear those restrictions or trust arbitrary clients.
-
-### Tenant membership
-
-Register `ITenantRequestAuthorizer` for authenticated tenant membership. The tenant middleware returns 403 if the authorizer is missing or denies access. Tenant IDs from headers or claims are resolution inputs, not membership proof.
-
-See [the authentication and HTTP trust model](../../Docs/security/authentication-model.md).
-
-
-## License
-
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

@@ -1,10 +1,10 @@
 # Franz.Common.Reflection
 
-> Assembly discovery, type scanning, and reflection utilities for deterministic application composition and infrastructure registration.
+> Focused reflection helpers, assembly wrappers, type-inspection extensions, and host assembly loading.
 
 ## Overview
 
-Assembly discovery, type scanning, and reflection utilities for deterministic application composition and infrastructure registration.
+This package contains small reflection abstractions and helpers. It does not provide a general-purpose assembly scanning DI container or a service-registration convention engine.
 
 ## Installation
 
@@ -12,170 +12,29 @@ Assembly discovery, type scanning, and reflection utilities for deterministic ap
 dotnet add package Franz.Common.Reflection
 ```
 
-## Design principles
+## Assembly abstractions
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+- `IAssembly` exposes the wrapped assembly's name and full name.
+- `AssemblyWrapper` adapts a `System.Reflection.Assembly`.
+- `IAssemblyAccessor` exposes the entry assembly abstraction.
+- `AssemblyAccessorWrapper` resolves `Assembly.GetEntryAssembly()`, falling back to the executing assembly.
 
-## Usage and configuration
+`AddCallingAssembly(assembly)` registers an `IAssemblyAccessor`. The optional assembly parameter is currently not used to select the returned assembly; the accessor resolves the process entry assembly. Do not rely on that argument to override the entry assembly.
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+## Host assembly loading
 
-## Package-specific guide
+`LoadAssemblyReferencedNotLoaded(entryAssembly)` scans `AppContext.BaseDirectory` for DLL names matching the first two name components of the supplied entry assembly and loads those not already loaded.
 
-A utility library within the **Franz Framework** that provides reflection-based tools to simplify and enhance application development. This package includes helper classes, extensions, and abstractions for working with assemblies, types, and dependency injection.
+This operation is explicitly marked as trimming- and Native AOT-incompatible because it discovers and loads assemblies at runtime. Prefer explicit compile-time registration and generated manifests in trimmed/AOT applications.
 
----
+## Type and assembly helpers
 
-## **Features**
-
-- **Assembly Utilities**:
-  - `AssemblyWrapper` and `AssemblyAccessorWrapper` for wrapping and accessing assembly details.
-  - `ReflectionHelper` for simplifying reflection-based operations.
-- **Interface Abstractions**:
-  - `IAssembly` and `IAssemblyAccessor` to standardize assembly interactions.
-- **Extension Methods**:
-  - `AssemblyExtensions`, `TypeExtensions`, `ServiceCollectionExtensions`, and `HostBuilderExtensions` for extending reflection and dependency injection capabilities.
-- **Flexible Integration**:
-  - Provides a foundation for working with types and assemblies dynamically, enabling runtime configurations.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package has no additional external dependencies, making it lightweight and easy to integrate.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Reflection
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Reflection
-```
-
----
-
-## **Usage**
-
-### **1. Work with Assemblies**
-
-Leverage `AssemblyWrapper` to interact with assemblies:
-
-```csharp
-using Franz.Common.Reflection;
-
-var assemblyWrapper = new AssemblyWrapper(typeof(MyClass).Assembly);
-var types = assemblyWrapper.GetExportedTypes();
-foreach (var type in types)
-{
-    Console.WriteLine(type.Name);
-}
-```
-
-### **2. Extend Types**
-
-Use `TypeExtensions` to simplify type-related operations:
-
-```csharp
-using Franz.Common.Reflection.Extensions;
-
-var properties = typeof(MyClass).GetPublicProperties();
-foreach (var property in properties)
-{
-    Console.WriteLine(property.Name);
-}
-```
-
-### **3. Register Dependencies Dynamically**
-
-Use `ServiceCollectionExtensions` to register types dynamically:
-
-```csharp
-using Franz.Common.Reflection.Extensions;
-
-services.RegisterAssemblyTypes(typeof(MyClass).Assembly, type =>
-{
-    return type.IsClass && !type.IsAbstract;
-});
-```
-
-### **4. Build Hosts Dynamically**
-
-Use `HostBuilderExtensions` to dynamically configure host builders:
-
-```csharp
-using Franz.Common.Reflection.Extensions;
-
-var host = Host.CreateDefaultBuilder(args)
-    .ConfigureDynamicServices(services =>
-    {
-        services.RegisterAssemblyTypes(typeof(MyClass).Assembly);
-    })
-    .Build();
-```
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Reflection** package integrates seamlessly with the **Franz Framework**, providing foundational utilities for dynamic assembly and type handling. It is especially useful in scenarios where runtime configurations or advanced dependency injection are required.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+- `ReflectionHelper.GetCurrentAppDomainAssemblies(predicate)` returns loaded, non-dynamic assemblies, optionally filtered.
+- `ReflectionHelper.GetAssemblyCompanyOrProductPredicate(optionalPredicate)` creates a filter for matching company/product assembly names.
+- `Type.Implements<TInterface>()` checks whether a type implements the specified interface.
+- `Type.DirectlyImplements<TInterface>()` excludes interfaces inherited from the base class when evaluating direct implementation.
+- `IAssembly.ExtractParts(number, joinSeparator)` returns the requested leading components of the wrapped assembly's full name and throws when the name has too few components.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Added `AssemblyWrapper` and `AssemblyAccessorWrapper` for assembly management.
-- Introduced `ReflectionHelper` for simplifying reflection-based tasks.
-- Provided `TypeExtensions` for enhanced type operations.
-- Added `ServiceCollectionExtensions` and `HostBuilderExtensions` for dynamic dependency injection and host configuration.
-
----
-
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See the repository [LICENSE](../../LICENSE).

@@ -1,10 +1,10 @@
 # Franz.Common.Grpc
 
-> gRPC client and server integration for Franz.Common services, including shared execution context and tenant-aware request handling.
+> gRPC client/server behavior pipelines, call context, tenant propagation, and client factory abstractions.
 
 ## Overview
 
-gRPC client and server integration for Franz.Common services, including shared execution context and tenant-aware request handling.
+The package supplies Franz behavior pipelines and shared context for gRPC calls. It deliberately does not register ASP.NET Core gRPC endpoints or generated typed clients; the host application owns those framework registrations.
 
 ## Installation
 
@@ -12,357 +12,72 @@ gRPC client and server integration for Franz.Common services, including shared e
 dotnet add package Franz.Common.Grpc
 ```
 
-## Design principles
+## Dependency injection
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-### **v1.6.20 — .NET 10 Modernization Release**
-
-High-performance, pipeline-driven gRPC for distributed microservices
-
----
-**Current Version:** v3.0.0
-
----
-
-Franz.Common.Grpc brings the **full Franz architectural standard** to gRPC:
-
-* Canonical behavior pipelines (Validation → Tenant → Auth → Logging → Metrics → Exceptions)
-* Unified *GrpcCallContext* abstraction
-* Client-side and server-side interceptors
-* Behavior providers with ordered pipeline resolution
-* Metadata normalization + context propagation
-* Pure-core design with optional ASP.NET Core adapters
-* First-class DI integration
-* Flexible channel factory + service routing
-* No-op defaults so services boot cleanly
-
-This release is aligned with the **Franz v1.6.20 refactor** and `.NET 10` modernization.
-
----
-
-# 🚀 **What’s New in v1.6.20**
-
-### ✔ Complete folder and pipeline redesign
-
-Franz.Common.Grpc is now structured into:
-
-```
-Abstractions/
-Client/
-Server/
-Hosting/
-DependencyInjection/
-Configuration/
-```
-
-### ✔ Full Server Pipeline
-
-Six canonical server interceptors:
-
-1. **ValidationServerBehavior**
-2. **TenantResolutionServerBehavior**
-3. **AuthorizationServerBehavior**
-4. **LoggingServerBehavior**
-5. **MetricServerBehavior**
-6. **ExceptionMappingServerBehavior**
-
-### ✔ Full Client Pipeline
-
-Equivalent client behaviors (correctly named):
-
-* ValidationClientBehavior
-* TenantResolutionClientBehavior
-* AuthorizationClientBehavior
-* LoggingClientBehavior
-* MetricClientBehavior
-* ExceptionMappingClientBehavior
-
-### ✔ Behavior Providers (pipeline resolvers)
-
-* `GrpcServerBehaviorProvider`
-* `GrpcClientBehaviorProvider`
-
-Both provide **ordered, cached** behavior pipelines per request/response pair.
-
-### ✔ Unified GrpcCallContext
-
-Core abstraction shared by both ends.
-
-### ✔ Channel Factory
-
-`FranzGrpcClientFactory` provides:
-
-* Named service routing
-* Channel creation
-* Auto-configuration
-* Timeout handling
-* Optional metadata injection
-* Safe instantiation of generated gRPC clients
-
-### ✔ No-Op Defaults
-
-Franz.Common.Grpc stays zero-config compatible:
-
-* `NoOpValidationEngine`
-* `NoOpAuthorizationService`
-* `NoOpTenantResolver`
-* `NoOpGrpcLogger`
-* `NoOpGrpcMetrics`
-
-### ✔ Pure Core — No ASP.NET Dependencies
-
-All ASP.NET Core routing / MapGrpcService integrations are now moved to the upcoming package:
-
-```
-Franz.Common.Grpc.AspNetCore
-```
-
-### ✔ Configuration Cleanup
-
-`FranzGrpcClientOptions` now includes:
-
-```json
-"Franz": {
-  "Grpc": {
-    "Client": {
-      "Services": {
-        "UserService": {
-          "BaseAddress": "https://localhost:6001"
-        }
-      }
-    }
-  }
-}
-```
-
-And a new type:
-
-```
-FranzGrpcClientServiceConfig
-```
-
----
-
-# 📁 **Final Project Structure (v1.6.20)**
-
-```
-Franz.Common.Grpc
-│
-├── Abstractions/
-│     ├── IGrpcServerBehavior.cs
-│     ├── IGrpcClientBehavior.cs
-│     ├── IGrpcServerBehaviorProvider.cs
-│     ├── IGrpcClientBehaviorProvider.cs
-│     ├── IFranzGrpcClientFactory.cs
-│     ├── IFranzValidationEngine.cs
-│     ├── IFranzAuthorizationService.cs
-│     ├── IFranzTenantResolver.cs
-│     ├── IFranzGrpcLogger.cs
-│     ├── IFranzGrpcMetrics.cs
-│     ├── GrpcCallContext.cs
-│
-├── Client/
-│     ├── GrpcClientBehaviorProvider.cs
-│     ├── FranzGrpcClientFactory.cs
-│     ├── Interceptors/
-│           ├── ValidationClientBehavior.cs
-│           ├── TenantResolutionClientBehavior.cs
-│           ├── AuthorizationClientBehavior.cs
-│           ├── LoggingClientBehavior.cs
-│           ├── MetricClientBehavior.cs
-│           ├── ExceptionMappingClientBehavior.cs
-│
-├── Server/
-│     ├── GrpcServerBehaviorProvider.cs
-│     ├── Interceptors/
-│           ├── ValidationServerBehavior.cs
-│           ├── TenantResolutionServerBehavior.cs
-│           ├── AuthorizationServerBehavior.cs
-│           ├── LoggingServerBehavior.cs
-│           ├── MetricServerBehavior.cs
-│           ├── ExceptionMappingServerBehavior.cs
-│
-├── Configuration/
-│     ├── FranzGrpcOptions.cs
-│     ├── FranzGrpcClientOptions.cs
-│     ├── FranzGrpcClientServiceConfig.cs
-│
-├── Hosting/
-│     ├── GrpcContextExtensions.cs
-│     ├── NoOp/
-│           ├── NoOpValidationEngine.cs
-│           ├── NoOpAuthorizationService.cs
-│           ├── NoOpTenantResolver.cs
-│           ├── NoOpGrpcLogger.cs
-│           ├── NoOpGrpcMetrics.cs
-│
-├── DependencyInjection/
-│     ├── GrpcServiceCollectionExtensions.cs
-│
-└── (ASP.NET Core integration coming in `Franz.Common.Grpc.AspNetCore`)
-```
-
----
-
-# ⚙️ **Dependency Injection**
-
-The core DI setup:
+Register the default no-op services when an application does not yet provide custom validation, authorization, tenant resolution, logging, or metrics:
 
 ```csharp
+using Franz.Common.Grpc.DependencyInjection;
+
 builder.Services.AddFranzGrpcDefaults();
-builder.Services.AddFranzGrpcServer(configuration);
-builder.Services.AddFranzGrpcClient(configuration);
+builder.Services.AddFranzGrpcServer(builder.Configuration);
+builder.Services.AddFranzGrpcClient(builder.Configuration);
 ```
 
-You must configure:
+The registrations are independent; add only the client or server side used by the process.
+
+### Server side
+
+`AddFranzGrpcServer(configuration)` binds `Franz:Grpc` and registers the ordered server behaviors:
+
+1. Validation
+2. Tenant resolution
+3. Authorization
+4. Logging
+5. Metrics
+6. Exception mapping
+
+The host must register its gRPC server services and map its generated service implementations:
 
 ```csharp
-builder.Services.AddGrpc();              // ASP.NET Core host only
-builder.Services.AddGrpcClient<TClient>();  // for each generated client
+builder.Services.AddGrpc();
+// Register application services and Franz behavior dependencies.
 ```
 
-These calls DO NOT live in Franz.Common.Grpc.
+The application provides implementations of `IFranzValidationEngine`, `IFranzAuthorizationService`, `IFranzTenantResolver`, `IFranzGrpcLogger`, and `IFranzGrpcMetrics` according to its security and operational requirements. When a tenant is resolved, `IFranzTenantAuthorizer` and an execution-context accessor are also required; with `RequireTenant = true`, an `ITenantValidator` is required as well. The default no-op resolver is not an authorization policy. With `RequireTenant = true`, an unresolved tenant is denied; if a tenant is resolved, the authorizer and execution-context accessor must be registered, and the validator is also mandatory.
 
----
+### Client side
 
-# 🧠 **Design Principles**
+`AddFranzGrpcClient(configuration)` binds `Franz:Grpc:Client`, registers the tenant-resolution client behavior/provider, and registers `IFranzGrpcClientFactory`. The application must still configure each generated client through the gRPC client factory:
 
-### ✔ Pure-Core Philosophy
-
-No reference to ASP.NET Core inside the core library.
-
-### ✔ Canonical Pipeline Ordering
-
-The same strict behavior order as Franz.Common.Mediator, Messaging, HTTP.
-
-### ✔ 100% Predictable Execution
-
-Every call passes through the same ordered pipeline.
-
-### ✔ First-Class Context
-
-GrpcCallContext replaces ServerCallContext to ensure:
-
-* correlationId
-* requestId
-* tenantId
-* userId
-* serviceName
-* methodName
-* deadlines
-* cancellation
-
-Are all unified between client and server.
-
-### ✔ Behavior-Driven Architecture
-
-Like Middleware but transport-agnostic.
-
-### ✔ Adaptable
-
-Client & Server behaviors use generics:
-
-```
-IGrpcClientBehavior<TRequest, TResponse>
-IGrpcServerBehavior<TRequest, TResponse>
-```
-
-This allows typesafe interception at compile time.
-
----
-
-# 🌐 **Future: Franz.Common.Grpc.AspNetCore**
-
-All of the following will move to the integration package:
-
-* MapFranzGrpcService
-* EndpointRouteBuilderExtensions
-* UseFranzGrpc middleware
-* Diagnostics + correlation pipeline
-* gRPC JSON transcoding support
-* OpenAPI & API explorer integration
-
-Core remains pure, integration becomes optional.
-
----
-
-# 🏁 **Conclusion**
-
-`Franz.Common.Grpc v1.6.20` delivers:
-
-* A complete microservice-grade gRPC pipeline
-* Clean architecture layering
-* Fully aligned behavior systems across Franz (Mediator, Messaging, Http, Grpc)
-* Modernized .NET 10 compatibility
-* Clear separation between **core** and **hosting adapters**
-* Production grade DI, context, factory, and routing design
-
-This makes Franz one of the **strictest, most consistent, and most architecturally coherent** .NET gRPC stacks available.
-
----
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-The gRPC client dependency is updated to the current compatible `Grpc.Net.Client` release. The legacy `Grpc` package remains at 2.46.6 because NuGet does not publish version 2.83.0 for that package ID; do not copy the client version onto the legacy package. Restore and integration tests must pass before publishing this maintenance update. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
-
-## Tenant execution — 2.3.5
-
-The server tenant behavior now removes caller-supplied `x-tenant-id` metadata before invoking the application-provided `IFranzTenantResolver`. A resolved tenant must be a valid non-empty Guid. The behavior requires an application-provided `IFranzTenantAuthorizer` for membership authorization, optionally applies the shared `ITenantValidator`, establishes a scoped `TenantExecutionContext` for downstream persistence, and clears it in a `finally` block.
-
-Enable strict tenant enforcement for tenant-required services:
-
-```json
+```csharp
+builder.Services.AddGrpcClient<Orders.OrdersClient>(options =>
 {
-  "Franz": {
-    "Grpc": {
-      "RequireTenant": true
-    }
-  }
-}
+    options.Address = new Uri(
+        builder.Configuration["Franz:Grpc:Client:Services:Orders:BaseAddress"]!);
+});
 ```
 
-Register trusted resolution and membership services:
+The package does not call `AddGrpcClient<TClient>()` itself.
 
-```csharp
-services.AddFranzGrpcDefaults();
-services.AddFranzGrpcServer(configuration);
-services.AddScoped<IFranzTenantResolver, ApplicationGrpcTenantResolver>();
-services.AddScoped<IFranzTenantAuthorizer, ApplicationGrpcTenantAuthorizer>();
-services.AddScoped<ITenantValidator, ApplicationTenantValidator>();
-```
+## GrpcCallContext
 
-When `RequireTenant` is enabled, unresolved tenants fail with `PermissionDenied`; resolved tenants require a membership authorizer, tenant validator, and execution-context accessor. The default no-op resolver therefore fails closed in strict mode.
+`GrpcCallContext` is an immutable client/server call context containing correlation ID, request ID, optional tenant/user identifiers, method/service names, peer, deadline, cancellation token, and request/response metadata.
 
-When an ASP.NET HTTP middleware has already established a validated tenant context for the same request, the gRPC server behavior reuses it and leaves cleanup to the HTTP request scope. For gRPC-only hosts, the behavior resolves, authorizes, initializes and clears its own scoped context.
+Use `GrpcCallContext.CreateClient(...)` to create outgoing context and `GrpcCallContext.FromServerCallContext(...)` to adapt an incoming server call. The context can produce gRPC metadata and `CallOptions`, and exposes immutable `WithTenant`, `WithUser`, `WithDeadline`, `WithCancellation`, and `WithAdditionalHeader` helpers.
 
-On the client, the tenant behavior propagates only the tenant from the current validated `ITenantExecutionContextAccessor`. It removes any caller-created tenant metadata when no validated execution context exists. Tenant IDs in gRPC metadata are propagation data, never authorization evidence. Tenant and general authorization implementations (including `IFranzAuthorizationService`) must obtain caller identity from the authenticated host security context, not from `x-user-id` or `x-tenant-id` metadata.
+## Tenant trust boundary
 
-The server and client behavior providers are scoped so behavior instances cannot be cached across dependency-injection scopes.
+The server tenant behavior removes caller-supplied `x-tenant-id` metadata before invoking the application-provided tenant resolver. The resolver must derive the tenant from authenticated server-side identity or another trusted transport signal. The tenant authorizer must verify membership; metadata is propagation data, not proof of authorization.
 
-## Tenant identity trust boundary
+On the client, the tenant behavior propagates only the tenant from a validated `ITenantExecutionContextAccessor`. It does not trust a caller-created tenant header when no validated execution context exists.
 
-Server-side tenant behavior removes caller-supplied `x-tenant-id` metadata before invoking `IFranzTenantResolver`. The resolver must derive the tenant from authenticated server-side identity or another trusted transport signal. Client-side tenant behavior implements `IGrpcClientBehavior<TRequest,TResponse>` and enriches outgoing calls using the client pipeline contract. A tenant ID in metadata is propagation data, not proof of authorization.
+When a validated HTTP tenant context already exists for the same request, the gRPC server behavior can reuse it. For gRPC-only hosts, the gRPC behavior owns its scoped tenant execution context lifecycle.
 
+## Hosting boundary
+
+The package does not call `AddGrpc()`, map endpoints, or configure ASP.NET Core routing. It also does not provide a separate `Franz.Common.Grpc.AspNetCore` package in this repository state. Use the official gRPC host integration and the Franz behaviors together.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).
