@@ -2,6 +2,8 @@ using Franz.Common.Mapping.Abstractions;
 using Franz.Common.Caching.Estrategies;
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Distributed;
+using Franz.Common.Caching.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
@@ -44,6 +46,28 @@ public static class Program
             _ => Task.FromResult(new AotCacheKeyRequest(0, "must-not-run")));
         if (!distributedResult.IsHit || distributedResult.Value.Id != 42)
             return 14;
+
+        var hybridServices = new ServiceCollection();
+        hybridServices.AddFranzCachingJsonTypeInfoResolver(AotCacheKeyJsonContext.Default);
+        hybridServices.AddFranzHybridCaching(options =>
+        {
+            options.DefaultAbsoluteExpiration = TimeSpan.FromMinutes(1);
+            options.DefaultSlidingExpiration = TimeSpan.FromSeconds(30);
+        });
+
+        using (var hybridServiceProvider = hybridServices.BuildServiceProvider())
+        {
+            var hybridCache = hybridServiceProvider.GetRequiredService<ICacheProvider>();
+            var firstHybrid = await hybridCache.GetOrSetAsync(
+                "aot-hybrid",
+                _ => Task.FromResult(new AotCacheKeyRequest(99, "hybrid")));
+            var secondHybrid = await hybridCache.GetOrSetAsync(
+                "aot-hybrid",
+                _ => Task.FromResult(new AotCacheKeyRequest(0, "must-not-run")));
+
+            if (firstHybrid.IsHit || !secondHybrid.IsHit || secondHybrid.Value.Id != 99)
+                return 15;
+        }
 
         var source = new AotSource("Franz", 10);
         var destination = new AotMapper().Map(source);

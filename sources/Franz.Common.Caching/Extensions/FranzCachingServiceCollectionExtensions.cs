@@ -83,7 +83,7 @@ public static class FranzCachingServiceCollectionExtensions
       Action<CacheOptions>? configure = null)
   {
     ArgumentNullException.ThrowIfNull(services);
-    services.AddHybridCache();
+    services.AddHybridCache().AddSerializerFactory<JsonTypeInfoHybridCacheSerializerFactory>();
     AddValidatedCacheOptions(services);
 
     if (configure is not null)
