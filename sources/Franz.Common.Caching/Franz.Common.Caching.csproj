@@ -6,7 +6,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.14" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.11.0" />
     <PackageReference Include="EPPlus" Version="8.7.2" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.14" />
     <PackageReference Include="StackExchange.Redis" Version="3.0.17" />
