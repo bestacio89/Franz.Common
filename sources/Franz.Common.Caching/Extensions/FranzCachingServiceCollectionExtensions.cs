@@ -242,6 +242,9 @@ public static class FranzCachingServiceCollectionExtensions
     services.AddOptions<JsonSerializerOptions>();
     services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
     services.TryAddSingleton<ISettingsCache, SettingsCache>();
+    services.TryAddTransient<ICacheWriter>(sp =>
+        sp.GetRequiredService<ICacheProvider>() as ICacheWriter
+        ?? throw new InvalidOperationException("The configured cache provider does not implement ICacheWriter."));
     return services;
   }
 

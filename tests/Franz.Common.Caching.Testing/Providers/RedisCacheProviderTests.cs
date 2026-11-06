@@ -144,15 +144,19 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
       DefaultSlidingExpiration = TimeSpan.FromSeconds(30)
     };
 
-    await Task.Delay(600);
-    var second = await _provider.GetOrSetAsync(key, _ => Task.FromResult("replacement"), differentReadOptions);
-    second.IsHit.Should().BeTrue();
+    differentReadOptions.DefaultSlidingExpiration = TimeSpan.FromMilliseconds(100);
+
+    for (var access = 0; access < 6; access++)
+    {
+      await Task.Delay(600);
+      var hit = await _provider.GetOrSetAsync(
+          key,
+          _ => Task.FromResult("replacement"),
+          differentReadOptions);
+      hit.IsHit.Should().BeTrue();
+    }
 
     await Task.Delay(600);
-    var third = await _provider.GetOrSetAsync(key, _ => Task.FromResult("replacement"), differentReadOptions);
-    third.IsHit.Should().BeTrue();
-
-    await Task.Delay(3000);
     var expired = await _provider.GetOrSetAsync(key, _ => Task.FromResult("fresh"), options);
     expired.IsHit.Should().BeFalse();
     expired.Value.Should().Be("fresh");
