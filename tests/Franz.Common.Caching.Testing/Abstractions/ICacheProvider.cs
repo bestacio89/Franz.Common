@@ -1,7 +1,5 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Franz.Common.Caching.Abstractions;
-using System;
-using Xunit;
 
 namespace Franz.Common.Caching.Tests.Abstractions;
 
@@ -15,10 +13,16 @@ public sealed class ICacheProviderTests
   }
 
   [Fact]
+  public void Interface_Should_Expose_SetAsync()
+  {
+    typeof(ICacheProvider).GetMethod("SetAsync")
+        .Should().NotBeNull();
+  }
+
+  [Fact]
   public void Interface_Should_Expose_RemoveAsync()
   {
     typeof(ICacheProvider).GetMethod("RemoveAsync")
         .Should().NotBeNull();
   }
-
 }

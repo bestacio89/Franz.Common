@@ -50,8 +50,6 @@ internal sealed class AsyncKeyedLock<TKey> where TKey : notnull
 
       if (entry.ReferenceCount == 0)
       {
-        // Remove only the exact entry whose reference count reached zero.
-        // All dictionary access and reference-count changes share this gate.
         _entries.Remove(key);
         entry.Semaphore.Dispose();
       }
@@ -70,7 +68,7 @@ internal sealed class AsyncKeyedLock<TKey> where TKey : notnull
     private readonly TKey _key;
     private readonly Entry _entry;
 
-    internal Releaser(AsyncKeyedLock<TKey> owner, TKey key, Entry entry)
+    private Releaser(AsyncKeyedLock<TKey> owner, TKey key, Entry entry)
     {
       _owner = owner;
       _key = key;

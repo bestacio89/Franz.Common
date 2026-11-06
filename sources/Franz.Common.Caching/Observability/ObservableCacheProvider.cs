@@ -1,7 +1,4 @@
-﻿using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Diagnostics;
 using Franz.Common.Caching.Abstractions;
 
 namespace Franz.Common.Caching.Observability;
@@ -25,89 +22,73 @@ public sealed class ObservableCacheProvider : ICacheProvider
       CacheOptions? options = null,
       CancellationToken ct = default)
   {
-    // Use ValueStopwatch or a simple long-based timestamp for sub-ms precision if needed
     var timestamp = Stopwatch.GetTimestamp();
-
-    var result = await _inner.GetOrSetAsync(key, factory, options, ct);
-
+    var result = await _inner.GetOrSetAsync(key, factory, options, ct).ConfigureAwait(false);
     var elapsedMs = Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds;
 
     if (result.IsHit)
     {
-      NotifyHit(key, elapsedMs);
+      Notify(observer => observer.OnCacheHit(new CacheAccessDescriptor
+      {
+        Key = key,
+        AccessedAt = DateTimeOffset.UtcNow,
+        LookupLatencyMs = elapsedMs
+      }));
     }
     else
     {
-      NotifySet(key, result.Value, options);
+      NotifySet(key, options);
     }
 
     return result;
   }
 
-  public async Task RemoveAsync(string key, CancellationToken ct = default)
+  public async Task SetAsync<T>(
+      string key,
+      T value,
+      CacheOptions? options = null,
+      CancellationToken ct = default)
   {
-    await _inner.RemoveAsync(key, ct);
-    NotifyRemove(key);
+    await _inner.SetAsync(key, value, options, ct).ConfigureAwait(false);
+    NotifySet(key, options);
   }
 
-  #region Observer Notifications
-
-  private void NotifySet<T>(string key, T value, CacheOptions? options)
+  public async Task RemoveAsync(string key, CancellationToken ct = default)
   {
-    if (_observers.Length == 0) return;
+    await _inner.RemoveAsync(key, ct).ConfigureAwait(false);
+    Notify(observer => observer.OnCacheRemove(key));
+  }
 
+  private void NotifySet(string key, CacheOptions? options)
+  {
     var entry = new CacheEntryDescriptor
     {
       Key = key,
-      // Leverage the new 'DefaultEstimatedSizeInBytes' from your CacheOptions
       EstimatedSizeInBytes = options?.DefaultEstimatedSizeInBytes ?? 1024,
       Ttl = options?.DefaultAbsoluteExpiration ?? TimeSpan.FromMinutes(30)
-      // Tags removed: Clean Cereal approach.
     };
 
-    // Fire-and-forget to avoid blocking the request thread. 
-    // In a real Principal-level system, we would use a Channel<T> for background processing.
-    _ = Task.Run(() =>
-    {
-      foreach (var observer in _observers)
-      {
-        try { observer.OnCacheSet(entry); } catch { /* Swallow to protect pipeline */ }
-      }
-    });
+    Notify(observer => observer.OnCacheSet(entry));
   }
 
-  private void NotifyHit(string key, double latencyMs)
+  private void Notify(Action<ICacheObserver> notification)
   {
-    if (_observers.Length == 0) return;
-
-    var access = new CacheAccessDescriptor
+    foreach (var observer in _observers)
     {
-      Key = key,
-      AccessedAt = DateTimeOffset.UtcNow,
-      LookupLatencyMs = latencyMs
-    };
-
-    _ = Task.Run(() =>
-    {
-      foreach (var observer in _observers)
+      try
       {
-        try { observer.OnCacheHit(access); } catch { }
+        notification(observer);
       }
-    });
-  }
-
-  private void NotifyRemove(string key)
-  {
-    if (_observers.Length == 0) return;
-
-    _ = Task.Run(() =>
-    {
-      foreach (var observer in _observers)
+      catch (Exception exception)
       {
-        try { observer.OnCacheRemove(key); } catch { }
+        // Observer failures must not change the result of a cache operation.
+        // Notifications are synchronous because ICacheObserver is a synchronous
+        // contract; no unbounded Task.Run queue or unobserved exception is created.
+        Trace.TraceError(
+            "Cache observer {0} failed: {1}",
+            observer.GetType().FullName,
+            exception);
       }
-    });
+    }
   }
-
-  #endregion
 }
