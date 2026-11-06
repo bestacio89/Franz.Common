@@ -10,7 +10,7 @@ namespace Franz.Common.Caching.Tests.Pipelines;
 
 public sealed class CachingPipelineSafetyTests
 {
-    private sealed record TestResponse(string Value);
+    public sealed record TestResponse(string Value);
     private sealed record ReadQuery(int Id) : IQuery<TestResponse>;
     private sealed record WriteCommand(int Id) : ICommand<TestResponse>;
 

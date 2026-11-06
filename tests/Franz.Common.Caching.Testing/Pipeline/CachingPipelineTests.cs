@@ -174,7 +174,8 @@ public sealed class CachingPipelineTests
     var options = new CacheOptions
     {
       DefaultAbsoluteExpiration = TimeSpan.FromMinutes(5),
-      DefaultSlidingExpiration = TimeSpan.FromMinutes(1)
+      DefaultSlidingExpiration = TimeSpan.FromMinutes(1),
+      KeyPrefix = string.Empty
     };
 
     var optionsMonitorMock = new Mock<IOptionsMonitor<CacheOptions>>();

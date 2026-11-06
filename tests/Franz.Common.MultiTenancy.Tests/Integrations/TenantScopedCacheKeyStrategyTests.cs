@@ -24,11 +24,11 @@ public sealed class TenantScopedCacheKeyStrategyTests
     }
 
     [Fact]
-    public void GetKey_UsesSeparateGlobalNamespaceWithoutTenantContext()
+    public void GetKey_ThrowsWhenTenantContextIsMissing()
     {
         var strategy = new TenantScopedCacheKeyStrategy(new DefaultCacheKeyStrategy(), new StubAccessor(null));
 
-        Assert.StartsWith("global:", strategy.GetKey(new { Id = 42 }));
+        Assert.Throws<InvalidOperationException>(() => strategy.GetKey(new { Id = 42 }));
     }
 
     private static TenantExecutionContext CreateContext(Guid tenantId)
