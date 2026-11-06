@@ -6,7 +6,10 @@ namespace Franz.Common.Caching.Abstractions;
 
 public sealed record CacheOptions
 {
-  public const string SectionName = "Caching";
+  // Retained for source/binary compatibility with earlier package versions.
+  public const string SectionName = "Franz:Caching";
+
+  public const string ConfigurationSectionName = "Caching";
 
   [SetsRequiredMembers]
   public CacheOptions() { }

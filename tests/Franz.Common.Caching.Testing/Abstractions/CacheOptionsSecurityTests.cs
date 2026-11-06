@@ -22,6 +22,7 @@ public sealed class CacheOptionsSecurityTests
   [Fact]
   public void SectionName_Should_Match_ConfigurationBindingSection()
   {
-    CacheOptions.SectionName.Should().Be("Caching");
+    CacheOptions.SectionName.Should().Be("Franz:Caching");
+    CacheOptions.ConfigurationSectionName.Should().Be("Caching");
   }
 }

@@ -23,7 +23,7 @@ namespace Franz.Common.Caching.Extensions;
 
 public static class FranzCachingServiceCollectionExtensions
 {
-  private const string CachingSection = CacheOptions.SectionName;
+  private const string CachingSection = CacheOptions.ConfigurationSectionName;
 
 
   /// <summary>
