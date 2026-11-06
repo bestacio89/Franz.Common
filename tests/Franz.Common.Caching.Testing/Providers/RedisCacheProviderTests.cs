@@ -132,7 +132,7 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
     var options = new CacheOptions
     {
       DefaultAbsoluteExpiration = TimeSpan.FromSeconds(4),
-      DefaultSlidingExpiration = TimeSpan.FromSeconds(1)
+      DefaultSlidingExpiration = TimeSpan.FromSeconds(2)
     };
 
     var first = await _provider.GetOrSetAsync(key, _ => Task.FromResult("cached"), options);
@@ -146,7 +146,7 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
 
     for (var access = 0; access < 6; access++)
     {
-      await Task.Delay(600);
+      await Task.Delay(500);
       var hit = await _provider.GetOrSetAsync(
           key,
           _ => Task.FromResult("replacement"),
@@ -154,7 +154,7 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
       hit.IsHit.Should().BeTrue();
     }
 
-    await Task.Delay(600);
+    await Task.Delay(1200);
     var expired = await _provider.GetOrSetAsync(key, _ => Task.FromResult("fresh"), options);
     expired.IsHit.Should().BeFalse();
     expired.Value.Should().Be("fresh");

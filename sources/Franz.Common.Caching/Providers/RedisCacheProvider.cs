@@ -33,6 +33,8 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
         if separator then
           absoluteDeadline = tonumber(string.sub(metadata, 1, separator - 1)) or 0
           sliding = tonumber(string.sub(metadata, separator + 1)) or 0
+        else
+          absoluteDeadline = tonumber(metadata) or 0
         end
       end
 
@@ -45,14 +47,17 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
         end
       end
 
+      local ttl = nil
       if sliding > 0 then
-        local ttl = sliding
-        if remaining and remaining < ttl then
-          ttl = remaining
-        end
-        redis.call('PEXPIRE', KEYS[1], ttl)
+        ttl = sliding
+      end
+      if remaining and (not ttl or remaining < ttl) then
+        ttl = remaining
+      end
 
-        if absoluteDeadline == 0 and metadata then
+      if ttl and ttl > 0 then
+        redis.call('PEXPIRE', KEYS[1], ttl)
+        if metadata then
           redis.call('PEXPIRE', KEYS[2], ttl)
         end
       end
@@ -67,21 +72,11 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
       local sliding = tonumber(ARGV[3])
       local absoluteDeadline = 0
 
-      redis.call('SET', KEYS[1], ARGV[1])
-
-      local metadataTtl = 0
       if absolute > 0 then
         absoluteDeadline = now + absolute
-        metadataTtl = absolute
-      elseif sliding > 0 then
-        metadataTtl = sliding
       end
 
-      if metadataTtl > 0 then
-        redis.call('SET', KEYS[2], tostring(absoluteDeadline) .. ':' .. tostring(sliding), 'PX', metadataTtl)
-      else
-        redis.call('DEL', KEYS[2])
-      end
+      redis.call('SET', KEYS[1], ARGV[1])
 
       local ttl = absolute
       if sliding > 0 and (ttl == 0 or sliding < ttl) then
@@ -90,8 +85,14 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
 
       if ttl > 0 then
         redis.call('PEXPIRE', KEYS[1], ttl)
+        if absolute > 0 or sliding > 0 then
+          redis.call('SET', KEYS[2], tostring(absoluteDeadline) .. ':' .. tostring(sliding), 'PX', ttl)
+        else
+          redis.call('DEL', KEYS[2])
+        end
       else
         redis.call('PERSIST', KEYS[1])
+        redis.call('DEL', KEYS[2])
       end
 
       return 1
@@ -259,9 +260,10 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
 
   private string ApplyPrefix(string key) => $"{_optionsMonitor.CurrentValue.KeyPrefix}{key}";
 
-  private static RedisKey GetAbsoluteExpirationKey(string fullKey)
+  private static (RedisKey ValueKey, RedisKey MetadataKey) GetRedisKeys(string fullKey)
   {
     var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fullKey)));
-    return $"__franz_internal__:cache-absolute:{digest}";
+    var hashTag = $"{{{digest}}}";
+    return ($"{fullKey}:{hashTag}:value", $"{fullKey}:{hashTag}:metadata");
   }
 }
