@@ -5,7 +5,7 @@ namespace Franz.Common.Caching.Tests.Strategies;
 
 public sealed class DefaultCacheKeyStrategyTests
 {
-    private interface IRequest;
+    private interface IRequest { }
     private sealed record TestRequest(int Id, string Name) : IRequest;
 
     [Fact]
