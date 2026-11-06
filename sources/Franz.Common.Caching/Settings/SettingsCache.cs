@@ -1,14 +1,16 @@
-﻿using Franz.Common.Caching.Abstractions;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
+using Franz.Common.Caching.Abstractions;
 
 namespace Franz.Common.Caching.Settings;
 
 public sealed class SettingsCache : ISettingsCache
 {
   private readonly ICacheProvider _cache;
-  private static readonly TimeSpan DefaultExpiration = TimeSpan.FromHours(12);
+  private static readonly CacheOptions SettingsOptions = new()
+  {
+    DefaultAbsoluteExpiration = TimeSpan.FromHours(12),
+    DefaultSlidingExpiration = TimeSpan.FromHours(12),
+    DefaultEstimatedSizeInBytes = 0
+  };
 
   public SettingsCache(ICacheProvider cache)
   {
@@ -16,38 +18,27 @@ public sealed class SettingsCache : ISettingsCache
   }
 
   /// <summary>
-  /// Gets a setting from the cache. Returns null if the key doesn't exist.
+  /// Gets a setting from the cache. A missing setting resolves to default(T).
   /// </summary>
   public async Task<T?> GetSettingAsync<T>(string key, CancellationToken ct = default)
   {
-    if (string.IsNullOrWhiteSpace(key))
-      throw new ArgumentException("Key cannot be null or empty.", nameof(key));
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
     var result = await _cache.GetOrSetAsync(
         $"settings:{key}",
         _ => Task.FromResult(default(T)!),
-        new CacheOptions {  },
-        ct
-    );
+        SettingsOptions,
+        ct).ConfigureAwait(false);
 
-    // Unwrap the CacheResult<T>
     return result.Value;
   }
 
   /// <summary>
-  /// Sets a setting in the cache with a default expiration.
+  /// Unconditionally replaces the cached setting value.
   /// </summary>
-  public async Task SetSettingAsync<T>(string key, T value, CancellationToken ct = default)
+  public Task SetSettingAsync<T>(string key, T value, CancellationToken ct = default)
   {
-    if (string.IsNullOrWhiteSpace(key))
-      throw new ArgumentException("Key cannot be null or empty.", nameof(key));
-
-    // GetOrSetAsync will store the value if missing
-    await _cache.GetOrSetAsync(
-        $"settings:{key}",
-        _ => Task.FromResult(value!),
-        new CacheOptions { },
-        ct
-    );
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    return _cache.SetAsync($"settings:{key}", value, SettingsOptions, ct);
   }
 }

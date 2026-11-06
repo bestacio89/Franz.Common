@@ -1,20 +1,22 @@
-﻿#nullable enable
+#nullable enable
 using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Internal;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
-using System.Collections.Concurrent;
 
 namespace Franz.Common.Caching.Distributed;
 
 /// <summary>
-/// Thread-safe distributed cache provider with automatic healing on deserialization failure.
+/// Adapts IDistributedCache with process-local single-flight execution per key.
+/// The lock prevents duplicate factories only within this provider instance; it
+/// does not provide a cross-node distributed lock.
 /// </summary>
 public sealed class DistributedCacheProvider(
     IDistributedCache cache,
-    IOptionsMonitor<CacheOptions> optionsMonitor) : ICacheProvider, IDisposable
+    IOptionsMonitor<CacheOptions> optionsMonitor) : ICacheProvider
 {
-  private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
+  private readonly AsyncKeyedLock<string> _locks = new();
 
   public async Task<CacheResult<T>> GetOrSetAsync<T>(
       string key,
@@ -24,91 +26,108 @@ public sealed class DistributedCacheProvider(
   {
     ArgumentException.ThrowIfNullOrWhiteSpace(key);
     ArgumentNullException.ThrowIfNull(factory);
+    ct.ThrowIfCancellationRequested();
 
-    var fullKey = $"{optionsMonitor.CurrentValue.KeyPrefix}{key}";
-
-    // 1. Optimistic Fast Path (No Lock)
-    var cached = await cache.GetStringAsync(fullKey, ct);
+    var fullKey = ApplyPrefix(key);
+    var cached = await cache.GetStringAsync(fullKey, ct).ConfigureAwait(false);
     if (TryDeserialize(cached, out T? result))
     {
       return new CacheResult<T>(result!, IsHit: true);
     }
 
-    // 2. Cache Miss or Corrupt Data -> Prepare for healing
-    var semaphore = _locks.GetOrAdd(fullKey, _ => new SemaphoreSlim(1, 1));
-    await semaphore.WaitAsync(ct);
-
-    try
+    using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
-      // 3. Double-Check Locking (Check cache again after acquiring lock)
-      cached = await cache.GetStringAsync(fullKey, ct);
+      cached = await cache.GetStringAsync(fullKey, ct).ConfigureAwait(false);
       if (TryDeserialize(cached, out result))
       {
         return new CacheResult<T>(result!, IsHit: true);
       }
 
-      // 4. Factory Execution (Heal from Source)
-      var value = await factory(ct);
-      var json = JsonSerializer.Serialize(value);
-      var entryOptions = CreateDistributedCacheOptions(requestOptions);
-
-      await cache.SetStringAsync(fullKey, json, entryOptions, ct);
+      var value = await factory(ct).ConfigureAwait(false);
+      await SetCoreAsync(fullKey, value, requestOptions, ct).ConfigureAwait(false);
 
       return new CacheResult<T>(value, IsHit: false);
     }
-    finally
+  }
+
+  public async Task SetAsync<T>(
+      string key,
+      T value,
+      CacheOptions? requestOptions = null,
+      CancellationToken ct = default)
+  {
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    ct.ThrowIfCancellationRequested();
+
+    var fullKey = ApplyPrefix(key);
+    using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
-      semaphore.Release();
-      // Optional: Clean up semaphores if memory pressure is a concern
+      await SetCoreAsync(fullKey, value, requestOptions, ct).ConfigureAwait(false);
     }
+  }
+
+  public async Task RemoveAsync(string key, CancellationToken ct = default)
+  {
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    ct.ThrowIfCancellationRequested();
+
+    var fullKey = ApplyPrefix(key);
+    using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
+    {
+      await cache.RemoveAsync(fullKey, ct).ConfigureAwait(false);
+    }
+  }
+
+  private string ApplyPrefix(string key) => $"{optionsMonitor.CurrentValue.KeyPrefix}{key}";
+
+  private async Task SetCoreAsync<T>(
+      string fullKey,
+      T value,
+      CacheOptions? requestOptions,
+      CancellationToken ct)
+  {
+    var json = JsonSerializer.Serialize(value);
+    await cache.SetStringAsync(
+        fullKey,
+        json,
+        CreateDistributedCacheOptions(requestOptions),
+        ct).ConfigureAwait(false);
   }
 
   private static bool TryDeserialize<T>(string? cached, out T? result)
   {
     result = default;
-    if (string.IsNullOrWhiteSpace(cached)) return false;
+    if (cached is null)
+    {
+      return false;
+    }
 
     try
     {
+      // JSON "null" is a valid cached value and must be distinguishable from
+      // a missing entry. A successful deserialize is therefore a hit even
+      // when the resulting reference is null.
       result = JsonSerializer.Deserialize<T>(cached);
-      return result is not null;
+      return true;
     }
     catch (JsonException)
     {
-   
       return false;
     }
   }
 
   private DistributedCacheEntryOptions CreateDistributedCacheOptions(CacheOptions? requestOptions)
   {
-    var globalSettings = optionsMonitor.CurrentValue;
-    var options = requestOptions ?? globalSettings;
+    var options = requestOptions ?? optionsMonitor.CurrentValue;
 
     return new DistributedCacheEntryOptions
     {
       AbsoluteExpirationRelativeToNow = options.DefaultAbsoluteExpiration > TimeSpan.Zero
-            ? options.DefaultAbsoluteExpiration
-            : null,
+          ? options.DefaultAbsoluteExpiration
+          : null,
       SlidingExpiration = options.DefaultSlidingExpiration > TimeSpan.Zero
-            ? options.DefaultSlidingExpiration
-            : null
+          ? options.DefaultSlidingExpiration
+          : null
     };
-  }
-
-  public Task RemoveAsync(string key, CancellationToken ct = default)
-  {
-    ArgumentException.ThrowIfNullOrWhiteSpace(key);
-    var fullKey = $"{optionsMonitor.CurrentValue.KeyPrefix}{key}";
-    return cache.RemoveAsync(fullKey, ct);
-  }
-
-  public void Dispose()
-  {
-    foreach (var semaphore in _locks.Values)
-    {
-      semaphore.Dispose();
-    }
-    _locks.Clear();
   }
 }
