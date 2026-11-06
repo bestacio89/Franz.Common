@@ -1,7 +1,8 @@
 ﻿using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Metrics;
 using Franz.Common.Caching.Options;
-using Franz.Common.Mediator.Context;\nusing Franz.Common.Mediator.Messages;
+using Franz.Common.Mediator.Context;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -34,7 +35,25 @@ public sealed class CachingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
     _metadataProviders = metadataProviders;
   }
 
-  private static bool IsCacheableQuery(TRequest request)\n  {\n    var requestType = request.GetType();\n    var interfaces = requestType.GetInterfaces();\n\n    // Commands may mutate state and must never be cached, even when they also\n    // implement a query contract. Only query requests are eligible.\n    if (typeof(ICommand).IsAssignableFrom(requestType) ||\n        interfaces.Any(type => type.IsGenericType &&\n            type.GetGenericTypeDefinition() == typeof(ICommand<>)))\n    {\n      return false;\n    }\n\n    return interfaces.Any(type => type.IsGenericType &&\n        type.GetGenericTypeDefinition() == typeof(IQuery<>));\n  }\n\n  public async Task<TResponse> Handle(
+  private static bool IsCacheableQuery(TRequest request)
+  {
+    var requestType = request.GetType();
+    var interfaces = requestType.GetInterfaces();
+
+    // Commands may mutate state and must never be cached, even when they also
+    // implement a query contract. Only query requests are eligible.
+    if (typeof(ICommand).IsAssignableFrom(requestType) ||
+        interfaces.Any(type => type.IsGenericType &&
+            type.GetGenericTypeDefinition() == typeof(ICommand<>)))
+    {
+      return false;
+    }
+
+    return interfaces.Any(type => type.IsGenericType &&
+        type.GetGenericTypeDefinition() == typeof(IQuery<>));
+  }
+
+  public async Task<TResponse> Handle(
       TRequest request,
       Func<Task<TResponse>> next,
       CancellationToken cancellationToken = default)
@@ -42,7 +61,8 @@ public sealed class CachingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
     var options = _optionsMonitor.CurrentValue;
 
     // 1. Check Global Toggle & Strategy-based "ShouldCache"
-    if (!options.Enabled || options.BypassAll || !IsCacheableQuery(request) ||\n        _metadataProviders.Any(provider => !provider.ShouldCache(request)))
+    if (!options.Enabled || options.BypassAll || !IsCacheableQuery(request) ||
+        _metadataProviders.Any(provider => !provider.ShouldCache(request)))
     {
       return await next();
     }
