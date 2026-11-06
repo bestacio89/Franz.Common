@@ -3,6 +3,7 @@ using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Extensions;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Franz.Common.Caching.Tests.Extensions;
@@ -14,17 +15,20 @@ public sealed class HybridCacheIntegrationTests
   [Fact]
   public async Task HybridCache_Should_ReadSerializedValuesFromSharedL2()
   {
-    var firstServices = CreateServices();
-    firstServices.AddDistributedMemoryCache();
+    var sharedDistributedCache = new SharedDistributedCache();
+    var firstServices = CreateServices(sharedDistributedCache);
     using var firstProvider = firstServices.BuildServiceProvider();
 
-    var sharedDistributedCache = firstProvider.GetRequiredService<IDistributedCache>();
     var secondServices = CreateServices(sharedDistributedCache);
     using var secondProvider = secondServices.BuildServiceProvider();
 
     var firstCache = firstProvider.GetRequiredService<ICacheProvider>();
     var secondCache = secondProvider.GetRequiredService<ICacheProvider>();
     await ((ICacheWriter)firstCache).SetAsync("customer:42", new CachePayload("from-l2"));
+
+    var keyPrefix = firstProvider.GetRequiredService<IOptions<CacheOptions>>().Value.KeyPrefix;
+    var serializedEntry = await sharedDistributedCache.GetAsync($"{keyPrefix}customer:42");
+    serializedEntry.Should().NotBeNull("the first HybridCache instance must persist the serialized payload to L2");
 
     var factoryCalls = 0;
     var result = await secondCache.GetOrSetAsync("customer:42", _ =>
@@ -107,12 +111,46 @@ public sealed class HybridCacheIntegrationTests
 
     if (distributedCache is not null)
     {
-      services.AddSingleton(distributedCache);
+      services.AddSingleton<IDistributedCache>(distributedCache);
     }
 
     services.AddFranzCachingJsonTypeInfoResolver(TestJsonSerializerOptions.Create().TypeInfoResolver!);
     services.AddFranzHybridCaching(configure);
     return services;
+  }
+
+  // HybridCache intentionally disables MemoryDistributedCache as L2 when paired
+  // with MemoryCache L1. The wrapper gives the shared test backend a distinct
+  // concrete type so the test exercises the actual L2 serialization path.
+  private sealed class SharedDistributedCache : IDistributedCache
+  {
+    private readonly MemoryDistributedCache _inner = new(
+        Options.Create(new MemoryDistributedCacheOptions()));
+
+    public byte[]? Get(string key) => _inner.Get(key);
+
+    public Task<byte[]?> GetAsync(string key, CancellationToken token = default)
+        => _inner.GetAsync(key, token);
+
+    public void Refresh(string key) => _inner.Refresh(key);
+
+    public Task RefreshAsync(string key, CancellationToken token = default)
+        => _inner.RefreshAsync(key, token);
+
+    public void Remove(string key) => _inner.Remove(key);
+
+    public Task RemoveAsync(string key, CancellationToken token = default)
+        => _inner.RemoveAsync(key, token);
+
+    public void Set(string key, byte[] value, DistributedCacheEntryOptions options)
+        => _inner.Set(key, value, options);
+
+    public Task SetAsync(
+        string key,
+        byte[] value,
+        DistributedCacheEntryOptions options,
+        CancellationToken token = default)
+        => _inner.SetAsync(key, value, options, token);
   }
 
   private sealed class ThrowingDistributedCache : IDistributedCache
