@@ -15,6 +15,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Franz.Common.Caching.Extensions;
 
@@ -32,6 +34,28 @@ public static class FranzCachingServiceCollectionExtensions
         .Bind(configuration.GetSection(CachingSection))
         .ValidateDataAnnotations()
         .ValidateOnStart();
+
+    return services;
+  }
+
+  /// <summary>
+  /// Adds source-generated JSON metadata to the cache-key serializer. Register
+  /// the application's JsonSerializerContext so cache keys remain compatible
+  /// with trimming and Native AOT.
+  /// </summary>
+  public static IServiceCollection AddFranzCachingJsonTypeInfoResolver(
+      this IServiceCollection services,
+      IJsonTypeInfoResolver resolver)
+  {
+    ArgumentNullException.ThrowIfNull(services);
+    ArgumentNullException.ThrowIfNull(resolver);
+
+    services.Configure<JsonSerializerOptions>(options =>
+    {
+      options.TypeInfoResolver = options.TypeInfoResolver is null
+          ? resolver
+          : JsonTypeInfoResolver.Combine(resolver, options.TypeInfoResolver);
+    });
 
     return services;
   }
@@ -162,6 +186,7 @@ public static class FranzCachingServiceCollectionExtensions
 
   private static IServiceCollection AddFranzCachingCore(this IServiceCollection services)
   {
+    services.AddOptions<JsonSerializerOptions>();
     services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
     services.TryAddSingleton<ISettingsCache, SettingsCache>();
     return services;

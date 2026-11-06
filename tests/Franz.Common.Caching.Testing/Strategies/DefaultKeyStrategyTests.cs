@@ -1,5 +1,7 @@
 using FluentAssertions;
 using Franz.Common.Caching.Estrategies;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Franz.Common.Caching.Tests.Strategies;
 
@@ -50,6 +52,20 @@ public sealed class DefaultCacheKeyStrategyTests
     }
 
     [Fact]
+    public void BuildKey_Should_Use_SourceGeneratedMetadata()
+    {
+        var options = new JsonSerializerOptions
+        {
+            TypeInfoResolver = CacheKeyTestJsonContext.Default
+        };
+        var strategy = new DefaultCacheKeyStrategy(options);
+
+        var key = strategy.BuildKey(new CacheKeySourceGeneratedRequest(17, "aot"));
+
+        key.Should().StartWith($"{typeof(CacheKeySourceGeneratedRequest).FullName}:");
+    }
+
+    [Fact]
     public void BuildKey_Should_Not_Expose_RequestPayload()
     {
         const string sensitiveValue = "customer-secret-value";
@@ -59,4 +75,11 @@ public sealed class DefaultCacheKeyStrategyTests
 
         key.Should().NotContain(sensitiveValue);
     }
+}
+
+internal sealed record CacheKeySourceGeneratedRequest(int Id, string Name);
+
+[JsonSerializable(typeof(CacheKeySourceGeneratedRequest))]
+internal partial class CacheKeyTestJsonContext : JsonSerializerContext
+{
 }

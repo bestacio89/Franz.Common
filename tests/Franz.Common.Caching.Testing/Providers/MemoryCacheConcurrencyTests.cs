@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Providers;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;

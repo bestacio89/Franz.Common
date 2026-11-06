@@ -1,4 +1,7 @@
 using Franz.Common.Mapping.Abstractions;
+using Franz.Common.Caching.Estrategies;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Extensions;
 using Franz.Common.Mediator.Handlers;
@@ -15,6 +18,14 @@ public static class Program
 {
     public static async Task<int> Main()
     {
+        var cacheKeyStrategy = new DefaultCacheKeyStrategy(new JsonSerializerOptions
+        {
+            TypeInfoResolver = AotCacheKeyJsonContext.Default
+        });
+        var cacheKey = cacheKeyStrategy.BuildKey(new AotCacheKeyRequest(42, "source-generated"));
+        if (!cacheKey.StartsWith($"{typeof(AotCacheKeyRequest).FullName}:"))
+            return 13;
+
         var source = new AotSource("Franz", 10);
         var destination = new AotMapper().Map(source);
         if (destination.Name != source.Name || destination.Version != source.Version)
@@ -208,4 +219,11 @@ public sealed class AotStreamQueryHandler : IStreamQueryHandler<AotStreamQuery, 
             yield return index;
         }
     }
+}
+
+public sealed record AotCacheKeyRequest(int Id, string Name);
+
+[JsonSerializable(typeof(AotCacheKeyRequest))]
+internal partial class AotCacheKeyJsonContext : JsonSerializerContext
+{
 }
