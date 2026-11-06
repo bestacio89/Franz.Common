@@ -63,7 +63,7 @@ public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
     await _cache.SetAsync(
         ApplyPrefix(key),
         value,
-        CreateEntryOptions(options ?? _optionsMonitor.CurrentValue),
+        CreateEntryOptions(options ?? CurrentOptions),
         cancellationToken: ct).ConfigureAwait(false);
   }
 
@@ -75,7 +75,7 @@ public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
 
   private CacheOptions CurrentOptions => _optionsMonitor?.CurrentValue ?? _fixedOptions!;
 
-  private string ApplyPrefix(string key) => $"{_optionsMonitor.CurrentValue.KeyPrefix}{key}";
+  private string ApplyPrefix(string key) => $"{CurrentOptions.KeyPrefix}{key}";
 
   private static HybridCacheEntryOptions CreateEntryOptions(CacheOptions options)
       => new()
