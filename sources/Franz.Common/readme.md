@@ -28,7 +28,7 @@ Follow the package-specific setup, configuration, and code examples below. Only 
 A foundational library in the **Franz Framework** designed to provide core utilities, dependency injection abstractions, and common extensions for .NET applications. This library is part of the open-source Franz.Common ecosystem ecosystem, versioned as `1.2.65`, and hosted on a NuGet.org.
 
 ---
-**Current Version:** v2.3.4
+**Current Version:** v3.0.0
 ---
 ## **Features**
 
@@ -66,7 +66,7 @@ A foundational library in the **Franz Framework** designed to provide core utili
 
 ## **Version Information**
 
-- **Current Version**: 2.3.4
+- **Current Version**: 3.0.0
 - Part of the open-source Franz.Common ecosystem suite, hosted on a NuGet.org.
 
 ---

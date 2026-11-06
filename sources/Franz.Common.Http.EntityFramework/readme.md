@@ -65,7 +65,7 @@ This package simplifies transactional handling, dependency injection, and middle
 
 ## **Version Information**
 
-* **Current Version:** v2.3.4
+* **Current Version:** v3.0.0
   → Adds **environment-aware validation**, stronger governance for multi-database setups, and provider-context alignment.
 * Part of the open-source Franz.Common ecosystem.
 

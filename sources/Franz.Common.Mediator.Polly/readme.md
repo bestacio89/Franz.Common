@@ -32,7 +32,7 @@ It gives you **retry, circuit breaker, advanced circuit breaker, timeout, and bu
 
 ---
 
-* **Current Version:** v2.3.4
+* **Current Version:** v3.0.0
 * **Target Frameworks**: .NET 9+
 * **Dependencies**: `Polly`, `Serilog`, `Franz.Common.Mediator`
 - Part of the open-source Franz.Common ecosystem.

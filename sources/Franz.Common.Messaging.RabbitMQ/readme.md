@@ -78,7 +78,7 @@ Choose **Kafka** or **RabbitMQ** — your application code does not change.
 
 ---
 
-**Current Version:** v2.3.4
+**Current Version:** v3.0.0
 
 ---
 

@@ -59,7 +59,7 @@ A robust library within the **Franz Framework** designed to simplify and enhance
 
 ## **Version Information**
 
-**Current Version:** v2.3.4
+**Current Version:** v3.0.0
 - Part of the open-source Franz.Common ecosystem.
 
 ---
