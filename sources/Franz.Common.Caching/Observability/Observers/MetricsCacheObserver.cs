@@ -5,9 +5,9 @@ using Franz.Common.Caching.Metrics;
 namespace Franz.Common.Caching.Observability.Observers;
 
 /// <summary>
-/// Emits aggregate cache metrics and keeps a bounded diagnostic snapshot of
-/// per-key activity. High-cardinality keys beyond the configured limit still
-/// contribute to aggregate counters but are not retained individually.
+/// Keeps a bounded diagnostic snapshot of per-key activity. Aggregate
+/// instrument measurements are emitted once by ObservableCacheProvider;
+/// high-cardinality keys beyond the configured limit are not retained individually.
 /// </summary>
 public sealed class MetricsCacheObserver : ICacheObserver
 {

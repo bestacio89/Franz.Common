@@ -6,6 +6,7 @@ namespace Franz.Common.Caching.Observability.Observers;
 
 public sealed class ExcelCacheObserver : ICacheObserver
 {
+  private const int MaximumTagsPerEntry = 64;
   private readonly ConcurrentDictionary<string, CacheStats> _stats = new();
   private readonly CacheStats _overflowStats = new();
   private readonly object _trackingGate = new();
@@ -126,7 +127,14 @@ public sealed class ExcelCacheObserver : ICacheObserver
       {
         _tags.Clear();
         if (tags is not null)
-          foreach (var tag in tags) _tags.Add(tag);
+        {
+          var inspected = 0;
+          foreach (var tag in tags)
+          {
+            if (inspected++ >= MaximumTagsPerEntry) break;
+            if (!string.IsNullOrWhiteSpace(tag)) _tags.Add(tag);
+          }
+        }
       }
     }
 
