@@ -22,7 +22,8 @@ public sealed class DistributedCacheProviderTests : IDisposable
     _globalOptions = new CacheOptions
     {
       DefaultAbsoluteExpiration = TimeSpan.FromMinutes(10),
-      DefaultSlidingExpiration = TimeSpan.FromMinutes(2),\n      KeyPrefix = string.Empty
+      DefaultSlidingExpiration = TimeSpan.FromMinutes(2),
+      KeyPrefix = string.Empty
     };
 
     _optionsMock = new Mock<IOptionsMonitor<CacheOptions>>();
@@ -141,5 +142,6 @@ public sealed class DistributedCacheProviderTests : IDisposable
 
     _cacheMock.Verify(cache => cache.RemoveAsync(fullKey, It.IsAny<CancellationToken>()), Times.Once);
   }
-\n  public void Dispose() => _provider.Dispose();
+
+  public void Dispose() => _provider.Dispose();
 }
