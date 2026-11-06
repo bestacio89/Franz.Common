@@ -22,7 +22,7 @@ public sealed class DistributedCacheProviderTests : IDisposable
     _globalOptions = new CacheOptions
     {
       DefaultAbsoluteExpiration = TimeSpan.FromMinutes(10),
-      DefaultSlidingExpiration = TimeSpan.FromMinutes(2)
+      DefaultSlidingExpiration = TimeSpan.FromMinutes(2),\n      KeyPrefix = string.Empty
     };
 
     _optionsMock = new Mock<IOptionsMonitor<CacheOptions>>();
@@ -35,7 +35,7 @@ public sealed class DistributedCacheProviderTests : IDisposable
   public async Task GetOrSetAsync_OnJsonException_ShouldHealAndReturnFreshValue()
   {
     // Arrange
-    const string key = "franz:dist:corrupt";
+    const string key = "dist:corrupt";
     var corruptData = "invalid-json-content"u8.ToArray();
     var expectedValue = new TestPayload(Guid.CreateVersion7(), "healed");
 
@@ -63,7 +63,7 @@ public sealed class DistributedCacheProviderTests : IDisposable
   public async Task GetOrSetAsync_ConcurrentRequests_ShouldInvokeFactoryOnce()
   {
     // Arrange
-    const string key = "franz:dist:stampede";
+    const string key = "dist:stampede";
     int factoryCalls = 0;
     byte[]? internalCache = null; // Backing store as byte array
 
@@ -100,7 +100,7 @@ public sealed class DistributedCacheProviderTests : IDisposable
   public async Task GetOrSetAsync_DoubleCheckLocking_ShouldPreventRedundantFactoryCalls()
   {
     // Arrange
-    const string key = "franz:dist:double-check";
+    const string key = "dist:double-check";
     var payload = new TestPayload(Guid.CreateVersion7(), "data");
     var json = JsonSerializer.Serialize(payload);
     var bytes = System.Text.Encoding.UTF8.GetBytes(json);
@@ -119,5 +119,27 @@ public sealed class DistributedCacheProviderTests : IDisposable
     result.Value.Id.Should().Be(result.Value.Id);
   }
 
-  public void Dispose() => _provider.Dispose();
+
+  [Fact]
+  public async Task GetOrSetAsync_AndRemoveAsync_ShouldApplyConfiguredKeyPrefix()
+  {
+    _globalOptions.KeyPrefix = "franz:";
+    const string key = "dist:prefixed";
+    const string fullKey = "franz:dist:prefixed";
+    var payload = new TestPayload(Guid.CreateVersion7(), "cached");
+    var bytes = System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload));
+
+    _cacheMock.Setup(cache => cache.GetAsync(fullKey, It.IsAny<CancellationToken>()))
+      .ReturnsAsync(bytes);
+
+    var result = await _provider.GetOrSetAsync(key, _ => throw new InvalidOperationException("Factory must not run."));
+
+    result.IsHit.Should().BeTrue();
+    result.Value.Should().Be(payload);
+
+    await _provider.RemoveAsync(key);
+
+    _cacheMock.Verify(cache => cache.RemoveAsync(fullKey, It.IsAny<CancellationToken>()), Times.Once);
+  }
+\n  public void Dispose() => _provider.Dispose();
 }
