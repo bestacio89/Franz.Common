@@ -87,11 +87,13 @@ services.AddFranzRedisCaching(options =>
 ```
 
 The Redis provider uses StackExchange.Redis commands and Lua scripts for atomic
-sliding-expiration refresh and absolute-expiration enforcement. StackExchange.Redis
-does not expose cancellation-token overloads for these commands: cancellation
-is observed before issuing a command and while waiting for the local keyed lock
-or running the factory, but an already-issued Redis command cannot be aborted by
-the provider.
+sliding-expiration refresh and absolute-expiration enforcement. It persists the
+per-entry expiration policy, including an explicit no-expiration marker, so a
+later read using different defaults cannot introduce an unintended TTL.
+StackExchange.Redis does not expose cancellation-token overloads for these
+commands: cancellation is observed before issuing a command and while waiting
+for the local keyed lock or running the factory, but an already-issued Redis
+command cannot be aborted by the provider.
 
 ### HybridCache
 

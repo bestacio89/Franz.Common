@@ -92,8 +92,9 @@ public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
     var absoluteExpiration = options.DefaultAbsoluteExpiration > TimeSpan.Zero
         ? options.DefaultAbsoluteExpiration
         : NoExpiration;
-    var localExpiration = options.LocalCacheHint ??
-        (options.DefaultSlidingExpiration > TimeSpan.Zero
+    var localExpiration = options.LocalCacheHint is { } localHint
+        ? (localHint > TimeSpan.Zero ? localHint : NoExpiration)
+        : (options.DefaultSlidingExpiration > TimeSpan.Zero
             ? options.DefaultSlidingExpiration
             : NoExpiration);
 

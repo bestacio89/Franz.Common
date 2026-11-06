@@ -19,14 +19,13 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
 
   public RedisCacheProviderTests(RedisCacheFixture fixture)
   {
-    // 🛠️ FIX: Use the multiplexer from the fixture, not a new empty connection
     _muxer = fixture.ServiceProvider.GetRequiredService<IConnectionMultiplexer>();
 
     _globalOptions = new CacheOptions
     {
       KeyPrefix = "test:",
       DefaultAbsoluteExpiration = TimeSpan.FromSeconds(30),
-      // Ensure the provider knows where to connect if it needs to re-resolve
+      DefaultSlidingExpiration = TimeSpan.FromMinutes(20),
       ConnectionString = fixture.ConnectionString
     };
 
@@ -42,54 +41,42 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
   [Fact]
   public async Task GetOrSetAsync_Should_Handle_Cache_Miss_And_Hit()
   {
-    // Arrange
-    var key = Guid.NewGuid().ToString(); // Use unique keys to avoid test pollution
-    var expectedValue = "franz-data";
+    var key = Guid.NewGuid().ToString();
+    const string expectedValue = "franz-data";
     var calls = 0;
 
-    async Task<string> Factory(CancellationToken ct)
+    Task<string> Factory(CancellationToken ct)
     {
       calls++;
-      return await Task.FromResult(expectedValue);
+      return Task.FromResult(expectedValue);
     }
 
-    // Act - First Call (Miss)
     var firstResult = await _provider.GetOrSetAsync(key, Factory);
-
-    // Act - Second Call (Hit)
     var secondResult = await _provider.GetOrSetAsync(key, Factory);
 
-    // Assert
     firstResult.Value.Should().Be(expectedValue);
     firstResult.IsHit.Should().BeFalse();
-
     secondResult.Value.Should().Be(expectedValue);
     secondResult.IsHit.Should().BeTrue();
-
     calls.Should().Be(1);
   }
 
   [Fact]
   public async Task GetOrSetAsync_Should_Respect_Request_Specific_Expiration()
   {
-    // Arrange
     var key = Guid.NewGuid().ToString();
     var shortOptions = new CacheOptions
     {
       DefaultAbsoluteExpiration = TimeSpan.FromMilliseconds(500)
     };
 
-    // Act
     await _provider.GetOrSetAsync(key, _ => Task.FromResult("val"), shortOptions);
 
-    // Assert hit immediately
     var immediate = await _provider.GetOrSetAsync(key, _ => Task.FromResult("val"));
     immediate.IsHit.Should().BeTrue();
 
-    // Wait for Redis TTL
-    await Task.Delay(1000); // 1s to be safe for Redis internal cleanup
+    await Task.Delay(1000);
 
-    // Assert miss after expiration
     var result = await _provider.GetOrSetAsync(key, _ => Task.FromResult("new-val"));
     result.IsHit.Should().BeFalse();
     result.Value.Should().Be("new-val");
@@ -98,14 +85,10 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
   [Fact]
   public async Task RemoveAsync_Should_Delete_Key_With_Prefix()
   {
-    // Arrange
     var key = Guid.NewGuid().ToString();
     await _provider.GetOrSetAsync(key, _ => Task.FromResult("data"));
-
-    // Act
     await _provider.RemoveAsync(key);
 
-    // Assert
     var result = await _provider.GetOrSetAsync(key, _ => Task.FromResult("fresh"));
     result.IsHit.Should().BeFalse();
   }
@@ -150,10 +133,7 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
     for (var access = 0; access < 6; access++)
     {
       await Task.Delay(500);
-      var hit = await _provider.GetOrSetAsync(
-          key,
-          _ => Task.FromResult("replacement"),
-          differentReadOptions);
+      var hit = await _provider.GetOrSetAsync(key, _ => Task.FromResult("replacement"), differentReadOptions);
       hit.IsHit.Should().BeTrue();
     }
 
@@ -161,6 +141,31 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
     var expired = await _provider.GetOrSetAsync(key, _ => Task.FromResult("fresh"), options);
     expired.IsHit.Should().BeFalse();
     expired.Value.Should().Be("fresh");
+  }
+
+  [Fact]
+  public async Task NoExpiration_Should_Not_InheritSlidingExpirationFromALaterRead()
+  {
+    var key = Guid.NewGuid().ToString();
+    _globalOptions.DefaultSlidingExpiration = TimeSpan.FromMilliseconds(200);
+
+    var noExpiration = new CacheOptions
+    {
+      DefaultAbsoluteExpiration = TimeSpan.Zero,
+      DefaultSlidingExpiration = TimeSpan.Zero
+    };
+
+    await _provider.SetAsync(key, "persistent", noExpiration);
+
+    await Task.Delay(50);
+    var firstRead = await _provider.GetOrSetAsync(key, _ => Task.FromResult("replacement"));
+    firstRead.IsHit.Should().BeTrue();
+    firstRead.Value.Should().Be("persistent");
+
+    await Task.Delay(350);
+    var secondRead = await _provider.GetOrSetAsync(key, _ => Task.FromResult("replacement"));
+    secondRead.IsHit.Should().BeTrue();
+    secondRead.Value.Should().Be("persistent");
   }
 
   [Theory]
@@ -171,5 +176,4 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
     var act = () => _provider.GetOrSetAsync(key, _ => Task.FromResult("1"));
     await act.Should().ThrowAsync<ArgumentException>();
   }
-
 }

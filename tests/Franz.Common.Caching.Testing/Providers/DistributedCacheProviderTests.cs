@@ -35,6 +35,20 @@ public sealed class DistributedCacheProviderTests
   }
 
   [Fact]
+  public async Task GetOrSetAsync_Should_Propagate_DistributedBackendFailures()
+  {
+    const string key = "dist:backend-failure";
+    _cacheMock.Setup(cache => cache.GetAsync(key, It.IsAny<CancellationToken>()))
+        .ThrowsAsync(new InvalidOperationException("distributed backend unavailable"));
+
+    var act = () => _provider.GetOrSetAsync(key, _ => Task.FromResult("must-not-run"));
+
+    await act.Should()
+        .ThrowAsync<InvalidOperationException>()
+        .WithMessage("distributed backend unavailable");
+  }
+
+  [Fact]
   public async Task GetOrSetAsync_OnJsonException_ShouldHealAndReturnFreshValue()
   {
     const string key = "dist:corrupt";

@@ -85,14 +85,12 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
 
       if ttl > 0 then
         redis.call('PEXPIRE', KEYS[1], ttl)
-        if absolute > 0 or sliding > 0 then
-          redis.call('SET', KEYS[2], tostring(absoluteDeadline) .. ':' .. tostring(sliding), 'PX', ttl)
-        else
-          redis.call('DEL', KEYS[2])
-        end
+        redis.call('SET', KEYS[2], tostring(absoluteDeadline) .. ':' .. tostring(sliding), 'PX', ttl)
       else
         redis.call('PERSIST', KEYS[1])
-        redis.call('DEL', KEYS[2])
+        -- Persist the explicit 0:0 policy. Without this marker, a later read
+        -- would apply its own sliding default to an entry written with no expiry.
+        redis.call('SET', KEYS[2], tostring(absoluteDeadline) .. ':' .. tostring(sliding))
       end
 
       return 1
