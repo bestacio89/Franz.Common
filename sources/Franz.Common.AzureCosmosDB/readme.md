@@ -1,10 +1,10 @@
 # Franz.Common.AzureCosmosDB
 
-> Azure Cosmos DB persistence integration for EF Core and tenant-partitioned documents, including repository and message-store support.
+> Azure Cosmos DB EF Core and native SDK integration for Franz persistence and messaging.
 
 ## Overview
 
-Azure Cosmos DB persistence integration for EF Core and tenant-partitioned documents, including repository and message-store support.
+This package provides Cosmos-specific DbContext registration, EF entity repositories, native tenant-partitioned document repositories, and Cosmos-backed messaging stores. It is separate from the relational provider adapters.
 
 ## Installation
 
@@ -12,240 +12,66 @@ Azure Cosmos DB persistence integration for EF Core and tenant-partitioned docum
 dotnet add package Franz.Common.AzureCosmosDB
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Tenant-owned Cosmos DB documents — 2.3.5
-
-The EF Core Cosmos adapter inherits the tenant query filters and SaveChanges ownership checks from `DbContextBase`. Entities implementing `ITenantEntity` are automatically partitioned by `TenantId`. The Guid tenant identifier is converted to a Cosmos-supported string partition key, stored as `tenantId`. If an entity also implements `ICosmosPartitionKey`, the model uses a hierarchical partition key with tenant identity first and the entity-specific `PartitionKey` second.
-
-For direct Cosmos SDK access, use the native `ICosmosTenantDocument` and `CosmosTenantRepository<TDocument>` contracts. Register the repository after configuring `CosmosOptions` and a validated tenant execution accessor:
+## EF Core Cosmos context
 
 ```csharp
-services.AddCosmosTenantRepository<OrderDocument>("orders");
+using Franz.Common.AzureCosmosDB.Extensions;
+
+builder.Services.AddFranzCosmosDbContext<ApplicationCosmosDbContext>(
+    builder.Configuration);
 ```
 
-The container must be provisioned with `/tenantId` as its partition-key path. The native repository supplies the validated tenant partition key to point reads, queries, creates, replacements, deletes, and read-many operations. Queries are physically constrained to one tenant partition by the SDK request options; they do not rely on EF Core filters.
+The extension binds the `Cosmos` configuration section to `CosmosOptions`, validates required endpoint, key, and database settings on startup by default, and configures EF Core's Cosmos provider. Setting `Enabled` to `false` skips provider configuration but does not bypass those required-option checks when `validateOnStart` is enabled; the native tenant repository also throws if its client is resolved while Cosmos is disabled.
 
-Cosmos partition keys are immutable container-level infrastructure. Existing containers with another partition-key path cannot be converted in place; migrate their data into a correctly provisioned tenant-partitioned container. Provision containers and throughput through deployment infrastructure, not request-time repository code. Native result contracts expose RU request charge, activity IDs, ETags, and query continuation tokens. Replacements require an explicit ETag for optimistic concurrency; stale writes are rejected by Cosmos with HTTP 412. Read-many operations use the tenant partition key for each point read. Transactional batch remains a separate same-partition operation and is not presented as a cross-partition transaction.
-
-
-## Package-specific guide
-
-A specialized persistence library within the **Franz Framework**, providing seamless integration with **Azure Cosmos DB**.
-
-This package extends the framework’s **polyglot persistence** capabilities by enabling:
-
-* **NoSQL document storage**
-* **Outbox pattern messaging**
-* **Dead-letter storage**
-* **Cosmos-backed distributed transaction patterns**
-* **EF Core Cosmos provider alignment**
-
-All designed following Franz’s *deterministic, message-driven architecture*.
-
----
-
-## **Features**
-
-### 🚀 **Cosmos DB Bootstrapping**
-
-* High-level `ServiceCollectionExtensions` for Cosmos initialization.
-* Automatic provisioning of:
-
-  * `CosmosClient`
-  * `Database`
-  * Containers with partitioning
-* Supports typed container resolution through configuration patterns.
-
----
-
-### 📬 **Outbox & Dead-Letter Messaging**
-
-* `CosmosDBMessageStore` implements `IMessageStore` from **Franz.Common.Messaging.Storage**.
-* Guarantees:
-
-  * Async-safe writes
-  * Deterministic message IDs
-  * Automatic dead-lettering
-  * Resilient retry-based delivery
-
-Now supports **Batch Writes** introduced in 1.7.5 for improved performance.
-
----
-
-### 📦 **Repository Support**
-
-A generic Cosmos repository abstraction:
+For the broader EF repository/factory composition:
 
 ```csharp
-ICosmosRepository<T>
+builder.Services.AddCosmosInfrastructure<ApplicationCosmosDbContext>(
+    builder.Configuration);
 ```
 
-providing:
+This composes the Cosmos context, entity repositories, GUID v7 ID generator, and entity factory registration. Entity-repository discovery inspects DbSet properties at runtime and uses reflection to close repository types; this helper is not a Native AOT registration path.
 
-* CRUD operations
-* Partition key awareness
-* Automatic model-to-container mapping
-* Optional optimistic concurrency
+## Native tenant-partitioned documents
 
-Now aligned with the **Cosmos EF Provider** conventions for maximum portability across SQL, Mongo, and Cosmos stores.
+For native Cosmos SDK documents, implement `ICosmosTenantDocument` and register the repository with the container name:
 
----
-
-### 🔧 **EF Core Cosmos Provider (1.7.x Integration)**
-
-Franz 1.7.x unifies Cosmos EF Core support:
-
-* New `CosmosDbContextBase`
-* Conventions via `ApplyCosmosConventions()`
-* Default container fallback for multi-container apps
-* Deterministic outbox dispatch integration using `IDispatcher`
-
-This makes CosmosDB a first-class citizen in the event-sourced pipeline.
-
----
-
-### ⚡ **Version 1.7.5 Additions**
-
-#### **Major Additions**
-
-* Full alignment with `.NET 10.0` SDK.
-* Cosmos EF provider stabilization & conventions.
-* Unified Cosmos document serializer aligned with Franz’s null-safety rules.
-* Deterministic container creation logic (optional auto-provisioning).
-* Batch persistence for message-based storage.
-
-#### **Fixes & Improvements**
-
-* Hardened message serialization for CosmosDB.
-* Fixed dead-letter partition routing.
-* Improved DI boot ordering for Cosmos-backed message stores.
-* Refactored container naming strategy for multi-tenant scenarios.
-* Ensured async safety across the entire Cosmos subsystem.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.AzureCosmosDB
+```csharp
+builder.Services.AddCosmosTenantRepository<CustomerDocument>("customers");
 ```
 
+The target Cosmos container must use `/tenantId` as its partition-key path. The helper registers the concrete `CosmosTenantRepository<TDocument>`; resolve that concrete type or add an explicit interface mapping. The repository obtains the validated `ITenantExecutionContextAccessor` from the current scope and scopes operations to that tenant. This package does not create the tenant execution context; register it through the HTTP, messaging, or application-owned multi-tenancy integration used by the host. Documents use Cosmos-compatible lower-camel JSON names, including `id` and `tenantId`.
+
+This native repository is distinct from the EF Core `IEntityRepository<TEntity, TKey>` registration.
+
+## Cosmos messaging stores
+
+```csharp
+builder.Services.AddFranzCosmosMessaging(builder.Configuration);
 ```
 
-Install:
+This registers `CosmosMessagingDbContext` and the Cosmos EF implementations of `IMessageStore` and `IInboxStore`. The package owns Cosmos-specific store mapping; transport hosting remains in the relevant messaging-hosting package.
 
-```bash
-dotnet add package Franz.Common.AzureCosmosDB
-```
-
----
-
-## **Usage**
-
-### 1️⃣ **Configure Cosmos DB**
+## Configuration
 
 ```json
 {
-  "CosmosDb": {
-    "ConnectionString": "...",
-    "DatabaseName": "FranzAppDb",
-    "Containers": {
-      "Messages": "outbox",
-      "DeadLetters": "failed"
-    }
+  "Cosmos": {
+    "Enabled": true,
+    "AccountEndpoint": "https://<account>.documents.azure.com:443/",
+    "AccountKey": "<secret>",
+    "DatabaseName": "application",
+    "ApplicationName": "orders-api"
   }
 }
 ```
 
----
+Keep account keys in a secret manager. Set `Enabled` deliberately and validate endpoint, database, throughput, partition-key, and indexing choices against the actual deployment. The current EF and native-client setup disables TLS certificate validation when `ApplicationName` contains `Tests`; reserve that marker for isolated test configuration and never use it in production.
 
-### 2️⃣ **Register Cosmos in DI**
+## Tenant isolation
 
-```csharp
-services.AddCosmosDatabase(Configuration);
-
-services.AddCosmosMessageStore(
-    Configuration["CosmosDb:ConnectionString"],
-    Configuration["CosmosDb:DatabaseName"]);
-```
-
----
-
-### 3️⃣ **Using the Message Store**
-
-```csharp
-var msg = new Message("hello");
-await messageStore.SaveAsync(msg);
-```
-
----
-
-## **Dependencies**
-
-* **Franz.Common.Messaging**
-* **Franz.Common.Messaging.Storage**
-* **Microsoft.Azure.Cosmos**
-* **Franz.Common.EntityFramework** (optional for EF provider)
-
----
-
-**Current Version:** v3.0.0
-
-## **Changelog**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
-### **Version 1.7.8**
-🔹 Updated to .NET 10.0.3 SDK.
-
-### **Version 1.7.5**
-
-🔹 CosmosDB EF provider fully integrated
-🔹 Unified Cosmos conventions for container naming & partitioning
-🔹 Batch write support for outbox
-🔹 Deterministic message serialization & schema validation
-🔹 Improved DI bootstrapping order
-🔹 Full .NET 10 alignment
-
-### **Version 1.6.2**
-
-* Introduced Cosmos DB integration.
-* Added `CosmosDBMessageStore`.
-* Added generic repository pattern.
-* Added outbox/dead-letter support.
-
-### **Version 1.6.20**
-
-* Updated to .NET 10 SDK.
-
----
-
-## **Contributing**
-
-Contributions are welcome via pull request.
-
----
+The EF Cosmos integration composes the framework tenant filter when multi-tenancy is enabled and the context receives a validated tenant execution accessor. Native tenant repositories use the tenant ID as the Cosmos partition key. These are distinct persistence paths; configure the matching entity/document contracts and container partition key for each.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See the repository [LICENSE](../../LICENSE).

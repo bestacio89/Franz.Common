@@ -1,10 +1,10 @@
 # Franz.Common.EntityFramework.Oracle
 
-> Oracle provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
+> Oracle EF Core provider registration for Franz `DbContextBase` contexts.
 
 ## Overview
 
-Oracle provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
+This provider adapter builds an Oracle connection string from the shared Franz `DatabaseOptions` and registers the concrete EF Core context.
 
 ## Installation
 
@@ -12,165 +12,38 @@ Oracle provider integration for Franz.Common Entity Framework Core persistence, 
 dotnet add package Franz.Common.EntityFramework.Oracle
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A specialized library within the **Franz Framework** that extends **Entity Framework Core** support for **Oracle Database** using the **Oracle.EntityFrameworkCore** provider. This package simplifies the configuration and integration of Oracle databases in .NET applications, supporting both single-tenant and multi-tenant environments.
-
----
-
-## **Features**
-
-- **Oracle Database Integration**:
-  - Leverages `Oracle.EntityFrameworkCore` for Oracle database support.
-- **Service Registration**:
-  - `ServiceCollectionExtensions` to streamline dependency injection for Oracle database contexts.
-- **Multi-Tenancy Support**:
-  - Integrates with `Franz.Common.MultiTenancy` for multi-tenant Oracle database configurations.
-- **Compatibility**:
-  - Fully integrates with **Franz.Common.EntityFramework** for shared utilities and repository patterns.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package relies on:
-- **Oracle.EntityFrameworkCore** (10.23.26200): Official EF Core provider for Oracle databases.
-- **Franz.Common.EntityFramework**: Core EF utilities and patterns.
-- **Franz.Common.MultiTenancy**: Multi-tenancy support for database operations.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.EntityFramework.Oracle
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.EntityFramework.Oracle
-```
-
----
-
-## **Usage**
-
-### **1. Configuring Oracle Context**
-
-Define a `DbContext` for Oracle integration:
-
-```csharp
-using Microsoft.EntityFrameworkCore;
-
-public class OracleDbContext : DbContext
-{
-    public OracleDbContext(DbContextOptions<OracleDbContext> options) : base(options) { }
-
-    public DbSet<Order> Orders { get; set; }
-}
-```
-
-### **2. Dependency Injection**
-
-Use `ServiceCollectionExtensions` to register Oracle database contexts:
+## Registration
 
 ```csharp
 using Franz.Common.EntityFramework.Oracle.Extensions;
 
-public class Startup
+builder.Services.AddOracleDatabase<ApplicationDbContext>(builder.Configuration);
+```
+
+The extension binds the `Database` section through `AddDatabaseOptions`, resolves the effective database/service name through `DatabaseTargetResolver`, configures `UseOracle`, and registers the context as `DbContextBase`.
+
+## Configuration
+
+```json
 {
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddOracleDbContext<OracleDbContext>(options =>
-            options.UseOracle(
-                "User Id=myUser;Password=myPassword;Data Source=myDataSource"
-            ));
-    }
+  "Database": {
+    "ServerName": "oracle.example.internal",
+    "DatabaseName": "APP",
+    "UserName": "application",
+    "Password": "<secret>",
+    "Port": 1521,
+    "IsolationMode": "SharedDatabase",
+    "EnableSensitiveDataLogging": false
+  }
 }
 ```
 
-### **3. Multi-Tenancy Support**
+The adapter uses Oracle's managed data access connection-string builder. It has development-oriented fallbacks including `system/oracle`; explicitly configure the host, service name, user, and password in deployed environments. Validate connectivity against the actual Oracle deployment, keep credentials in a secret store, and leave sensitive-data logging disabled in production.
 
-Integrate with `Franz.Common.MultiTenancy` to support multiple tenants:
+## Multi-tenancy
 
-```csharp
-using Franz.Common.MultiTenancy;
-using Franz.Common.EntityFramework.Oracle.Extensions;
-
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddMultiTenantOracleDbContext<OracleDbContext>(tenantOptions =>
-        {
-            tenantOptions.ConnectionStringResolver = tenantId =>
-                $"User Id=tenant_{tenantId};Password=tenantPassword;Data Source=myDataSource";
-        });
-    }
-}
-```
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.EntityFramework.Oracle** package integrates seamlessly with:
-- **Franz.Common.EntityFramework**: Shared repository patterns and EF utilities.
-- **Franz.Common.MultiTenancy**: Simplifies multi-tenant database configurations.
-
-Ensure these dependencies are installed to fully leverage the library's capabilities.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+The adapter uses the shared `DatabaseTargetResolver`. `TenantDatabase` and `DomainDatabase` require the corresponding validated execution context and a `{dbName}` token in `Database:DatabaseName`. The derived DbContext must forward the execution accessor and required options to `DbContextBase`.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
----
-
-## Dependency maintenance — October 2026
-
-Oracle EF Core integration and its test dependency graph are part of the .NET 10 dependency validation pass. The project pins System.Security.Cryptography.Pkcs 10.0.13, and tests explicitly resolve patched SSH.NET 2026.0.0. Run Oracle Testcontainers integration tests before release. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See the repository [LICENSE](../../LICENSE).
