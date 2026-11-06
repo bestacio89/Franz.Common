@@ -346,12 +346,22 @@ dotnet build
 dotnet test
 ```
 
-Kafka integration tests (real broker via Testcontainers, not mocks):
+Kafka integration tests use real brokers through Testcontainers rather than mocks:
 
 ```bash
-docker-compose up -d
 dotnet test --filter Category=Integration
 ```
+
+## Caching performance and production workload validation
+
+Caching changes automatically trigger two independent validation layers:
+
+- **Microbenchmarks** — BenchmarkDotNet measures isolated provider operations, deterministic key generation, payload-size sensitivity and concurrent access. See [the benchmark methodology](benchmarks/Franz.Common.Caching.Benchmarks/README.md).
+- **Production-style workload simulation** — a self-contained .NET workload runner exercises MemoryCache, Redis-backed DistributedCache, HybridCache with Redis L2, and direct Redis. It models multi-tenant access, hot-key skew, mixed payloads, partial warm-up, think time, ramp-up, sustained concurrency and ramp-down. See [the workload methodology and profiles](benchmarks/Franz.Common.Caching.LoadTests/README.md).
+
+The PR profile runs on relevant caching, multitenancy and caching-test changes. A longer profile runs nightly and an extended stress profile runs weekly. Each provider publishes HTML, Markdown, CSV and JSON reports as GitHub Actions artifacts. The workload checks tenant isolation, same-key factory single-flight and expiration before measuring; it also reports throughput, sampled p50/p95/p99 latency, CPU time, allocations and GC activity.
+
+These reports provide reproducible regression evidence. Absolute performance thresholds remain disabled on variable hosted runners until controlled-runner baselines are established.
 
 ---
 
