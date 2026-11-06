@@ -3,9 +3,12 @@ using Franz.Common.Caching.Estrategies;
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Extensions;
+using Franz.Common.Caching.Options;
+using Franz.Common.Caching.Pipelines;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -86,6 +89,32 @@ public static class Program
 
             if (!secondHybrid.IsHit || secondHybrid.Value.Id != 99)
                 return 16;
+        }
+
+        var cachingServices = new ServiceCollection();
+        cachingServices.AddFranzCachingJsonTypeInfoResolver(AotCacheKeyJsonContext.Default);
+        cachingServices.AddFranzMemoryCaching();
+
+        using (var cachingProvider = cachingServices.BuildServiceProvider())
+        {
+            var pipeline = new CachingPipeline<AotCachingQuery, AotCachingResponse>(
+                cachingProvider.GetRequiredService<ICacheProvider>(),
+                new AotMediatorCachingOptionsMonitor(new MediatorCachingOptions()),
+                cachingProvider.GetRequiredService<ICacheKeyStrategy>(),
+                NullLogger<CachingPipeline<AotCachingQuery, AotCachingResponse>>.Instance,
+                Array.Empty<ICacheMetadataProvider>());
+
+            var factoryCalls = 0;
+            Task<AotCachingResponse> Next()
+            {
+                factoryCalls++;
+                return Task.FromResult(new AotCachingResponse(73));
+            }
+
+            var first = await pipeline.Handle(new AotCachingQuery(73), Next);
+            var second = await pipeline.Handle(new AotCachingQuery(73), Next);
+            if (factoryCalls != 1 || first.Value != 73 || second.Value != 73)
+                return 17;
         }
 
         var source = new AotSource("Franz", 10);
@@ -286,8 +315,21 @@ public sealed class AotStreamQueryHandler : IStreamQueryHandler<AotStreamQuery, 
 public sealed record AotCacheKeyRequest(int Id, string Name);
 
 [JsonSerializable(typeof(AotCacheKeyRequest))]
+[JsonSerializable(typeof(AotCachingQuery))]
+[JsonSerializable(typeof(AotCachingResponse))]
 internal partial class AotCacheKeyJsonContext : JsonSerializerContext
 {
+}
+
+public sealed record AotCachingQuery(int Id) : IQuery<AotCachingResponse>;
+public sealed record AotCachingResponse(int Value);
+
+public sealed class AotMediatorCachingOptionsMonitor(MediatorCachingOptions currentValue)
+    : IOptionsMonitor<MediatorCachingOptions>
+{
+    public MediatorCachingOptions CurrentValue { get; } = currentValue;
+    public MediatorCachingOptions Get(string? name) => CurrentValue;
+    public IDisposable? OnChange(Action<MediatorCachingOptions, string?> listener) => null;
 }
 
 public sealed class AotCacheOptionsMonitor(CacheOptions currentValue) : IOptionsMonitor<CacheOptions>
