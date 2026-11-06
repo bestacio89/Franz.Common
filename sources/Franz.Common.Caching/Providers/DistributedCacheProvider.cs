@@ -91,7 +91,9 @@ public sealed class DistributedCacheProvider : ICacheProvider, ICacheWriter, IDi
 
   private async Task SetCoreAsync<T>(string fullKey, T value, CacheOptions options, CancellationToken ct)
   {
+    ct.ThrowIfCancellationRequested();
     var json = JsonSerializer.Serialize(value, GetTypeInfo<T>());
+    ct.ThrowIfCancellationRequested();
     await _cache.SetStringAsync(fullKey, json, CreateDistributedCacheOptions(options), ct)
         .ConfigureAwait(false);
   }

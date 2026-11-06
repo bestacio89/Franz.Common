@@ -49,7 +49,9 @@ public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
         async (f, cancellationToken) =>
         {
           isHit = false;
-          return await f(cancellationToken).ConfigureAwait(false);
+          var created = await f(cancellationToken).ConfigureAwait(false);
+          cancellationToken.ThrowIfCancellationRequested();
+          return created;
         },
         CreateEntryOptions(options),
         cancellationToken: ct).ConfigureAwait(false);

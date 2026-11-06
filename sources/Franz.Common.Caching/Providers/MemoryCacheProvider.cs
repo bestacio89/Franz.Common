@@ -40,12 +40,14 @@ public sealed class MemoryCacheProvider : ICacheProvider, ICacheWriter
 
     using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
+      ct.ThrowIfCancellationRequested();
       if (_cache.TryGetValue(fullKey, out cached))
       {
         return new CacheResult<T>(cached!, IsHit: true);
       }
 
       var value = await factory(ct).ConfigureAwait(false);
+      ct.ThrowIfCancellationRequested();
       SetCore(fullKey, value, effectiveOptions);
       return new CacheResult<T>(value, IsHit: false);
     }
@@ -65,6 +67,7 @@ public sealed class MemoryCacheProvider : ICacheProvider, ICacheWriter
     var fullKey = ApplyPrefix(key);
     using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
+      ct.ThrowIfCancellationRequested();
       SetCore(fullKey, value, effectiveOptions);
     }
   }
@@ -77,6 +80,7 @@ public sealed class MemoryCacheProvider : ICacheProvider, ICacheWriter
     var fullKey = ApplyPrefix(key);
     using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
+      ct.ThrowIfCancellationRequested();
       _cache.Remove(fullKey);
     }
   }

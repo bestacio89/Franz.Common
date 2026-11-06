@@ -67,6 +67,38 @@ public sealed class CacheOptionsSecurityTests
   }
 
   [Fact]
+  public async Task MemoryProvider_ShouldNotWriteWhenFactoryCompletesAfterCancellation()
+  {
+    var services = new ServiceCollection();
+    services.AddFranzMemoryCaching();
+    using var provider = services.BuildServiceProvider();
+    var cache = provider.GetRequiredService<ICacheProvider>();
+    using var cancellation = new CancellationTokenSource();
+    var factoryStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var releaseFactory = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    var pending = cache.GetOrSetAsync(
+        "cancelled-factory",
+        async _ =>
+        {
+          factoryStarted.SetResult();
+          await releaseFactory.Task.ConfigureAwait(false);
+          return "stale";
+        },
+        ct: cancellation.Token);
+
+    await factoryStarted.Task.ConfigureAwait(false);
+    cancellation.Cancel();
+    releaseFactory.SetResult();
+
+    await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+
+    var next = await cache.GetOrSetAsync("cancelled-factory", _ => Task.FromResult("fresh"));
+    next.IsHit.Should().BeFalse();
+    next.Value.Should().Be("fresh");
+  }
+
+  [Fact]
   public void Registration_Should_RejectNegativeEstimatedSize()
   {
     var services = new ServiceCollection();

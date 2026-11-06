@@ -182,6 +182,7 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
     var fullKey = ApplyPrefix(key);
     using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
+      ct.ThrowIfCancellationRequested();
       // Both keys share a Redis Cluster hash tag, so this multi-key DEL is cluster-safe.
       var keys = GetRedisKeys(fullKey);
       await _db.KeyDeleteAsync(new[] { keys.ValueKey, keys.MetadataKey }).ConfigureAwait(false);
