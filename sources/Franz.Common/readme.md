@@ -1,10 +1,19 @@
 # Franz.Common
 
-> Shared .NET application foundations for domain modeling, mediator dispatch, messaging, persistence, resilience, and observability.
+> Foundational contracts and small cross-cutting utilities shared by Franz.Common applications.
 
-## Overview
+## Responsibilities
 
-Shared .NET application foundations for domain modeling, mediator dispatch, messaging, persistence, resilience, and observability.
+This package contains framework-neutral building blocks. It is not the dependency-injection scanner, hosting bootstrapper, mediator implementation, or persistence provider. Those capabilities live in their dedicated packages.
+
+The current source surface includes:
+
+- Dependency lifetime markers: `IScopedDependency` and `ISingletonDependency`.
+- Seeding contract: `ISeeder`.
+- Collection helpers: `AddIfNotContains`, `AddRange`, and `IsNullOrEmpty`.
+- Enumerable helper: `ForEach`.
+- Environment predicates: `IsIntegration`, `IsValidation`, and `IsPreProduction`.
+- Shared company/product-generation identifiers and resource definitions.
 
 ## Installation
 
@@ -12,235 +21,65 @@ Shared .NET application foundations for domain modeling, mediator dispatch, mess
 dotnet add package Franz.Common
 ```
 
-## Design principles
+## Dependency lifetime markers
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+The marker interfaces describe intended lifetimes for implementations discovered by the separate `Franz.Common.DependencyInjection` package. They do not register services by themselves.
 
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A foundational library in the **Franz Framework** designed to provide core utilities, dependency injection abstractions, and common extensions for .NET applications. This library is part of the open-source Franz.Common ecosystem ecosystem, versioned as `1.2.65`, and hosted on a NuGet.org.
-
----
-**Current Version:** v3.0.0
----
-## **Features**
-
-### **Dependency Injection Interfaces**
-- **`IScopedDependency`**: Marker interface for services with a scoped lifetime.
-- **`ISingletonDependency`**: Marker interface for services with a singleton lifetime.
-
-**Important**: Any service interface must inherit from either `IScopedDependency` or `ISingletonDependency`. Services that do not implement one of these interfaces will not be registered properly in the dependency injection system.
-
-### **Data Seeding**
-- **`ISeeder`**: Interface for implementing database seeding logic.
-  - Includes:
-    - **`Order`**: Determines the execution order of seeders.
-    - **`SeedAsync()`**: Defines the asynchronous method for data initialization.
-
-### **Extensions**
-- **`CollectionExtensions`**:
-  - Includes methods for manipulating and interacting with collections:
-    - `AddIfNotContains`
-    - `AddRange`
-    - `IsNullOrEmpty`
-- **`EnumerableExtensions`**:
-  - Enhances LINQ functionality with methods such as `ForEach`.
-- **`HostEnvironmentExtensions`**:
-  - Helps determine the current environment:
-    - `IsIntegration`
-    - `IsValidation`
-    - `IsPreProduction`
-
-### **Core Utilities**
-- **`Company`**: Provides foundational business logic for managing company-related data.
-- **`ProductGeneration`**: Handles logic for generating product-related data.
-
----
-
-## **Version Information**
-
-- **Current Version**: 3.0.0
-- Part of the open-source Franz.Common ecosystem suite, hosted on a NuGet.org.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common
-```
-
-zure feed:
-
-
-### **Step 2: Install the Package**
-Use the .NET CLI to install:
-
-```bash
-dotnet add package Franz.Common
-```
-
----
-
-## **Usage**
-
-### **1. Dependency Injection**
-
-Use `IScopedDependency` and `ISingletonDependency` to simplify service registrations. **Ensure that your service interfaces implement one of these dependencies.**
-
-#### Scoped Service Example:
 ```csharp
-public interface IScopedExampleService : IScopedDependency
+using Franz.Common.DependencyInjection;
+
+public sealed class RequestContext : IScopedDependency
 {
-    void PerformScopedOperation();
+    // Request-scoped state belongs here.
 }
 
-public class ScopedExampleService : IScopedExampleService
+public sealed class ApplicationClock : ISingletonDependency
 {
-    public void PerformScopedOperation()
+    public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+}
+```
+
+When using assembly scanning, include the implementation assemblies in the scanner's discovery scope and apply the matching registration extensions from `Franz.Common.DependencyInjection`. Do not mark a service singleton if it captures scoped dependencies or mutable request state.
+
+## Seeding contract
+
+`ISeeder` exposes an ordering value and asynchronous seed operation. The application owns orchestration, scope creation, execution policy, and failure handling; this package does not automatically run seeders.
+
+```csharp
+using Franz.Common.Data;
+
+public sealed class ReferenceDataSeeder : ISeeder
+{
+    public int Order => 100;
+
+    public Task SeedAsync()
     {
-        Console.WriteLine("Scoped operation executed.");
+        // Seed application-owned reference data.
+        return Task.CompletedTask;
     }
 }
-
-// Registration
-services.AddScoped<IScopedExampleService, ScopedExampleService>();
 ```
 
-#### Singleton Service Example:
-```csharp
-public interface ISingletonExampleService : ISingletonDependency
-{
-    string GetConfigValue();
-}
+Resolve seeders from an application scope, order them by `Order`, and await each operation. Decide explicitly whether a failure should stop subsequent seeders.
 
-public class SingletonExampleService : ISingletonExampleService
-{
-    public string GetConfigValue() => "Singleton Config";
-}
+## Utility extensions
 
-// Registration
-services.AddSingleton<ISingletonExampleService, SingletonExampleService>();
-```
+Collection and enumerable extensions are convenience operations; they do not introduce persistence, concurrency, or transactional guarantees. Environment predicates are helpers over the host environment name. Use the host's canonical environment configuration and avoid treating these predicates as a security boundary.
 
-### **2. Database Seeding**
+## Package boundaries
 
-Implement the `ISeeder` interface for database initialization:
+| Concern | Package |
+|---|---|
+| Marker-based service scanning | `Franz.Common.DependencyInjection` |
+| Host initialization lifecycle | `Franz.Common.Hosting` |
+| Mediator dispatch and pipelines | `Franz.Common.Mediator` |
+| HTTP composition | `Franz.Common.Http.Bootstrap` |
+| Persistence and repositories | `Franz.Common.EntityFramework` and provider packages |
 
-```csharp
-public class ExampleSeeder : ISeeder
-{
-    public int Order => 1;
+## Compatibility and maintenance
 
-    public async Task SeedAsync()
-    {
-        Console.WriteLine("Seeding database...");
-        // Add your data seeding logic here
-        await Task.CompletedTask;
-    }
-}
-
-// Example usage
-var seeders = serviceProvider.GetServices<ISeeder>()
-                             .OrderBy(seeder => seeder.Order);
-
-foreach (var seeder in seeders)
-{
-    await seeder.SeedAsync();
-}
-```
-
-### **3. Extensions**
-
-#### Collection Extensions:
-```csharp
-var list = new List<int> { 1, 2, 3 };
-
-// Check if list is null or empty
-if (!list.IsNullOrEmpty())
-{
-    Console.WriteLine("List contains elements.");
-}
-
-// Add an item if it doesn't exist
-list.AddIfNotContains(4); // Adds 4
-list.AddIfNotContains(1); // Does nothing
-
-// Add a range of items
-list.AddRange(new[] { 5, 6 });
-```
-
-#### Enumerable Extensions:
-```csharp
-var numbers = Enumerable.Range(1, 5);
-
-// Perform an action for each element
-numbers.ForEach(x => Console.WriteLine($"Processing {x}"));
-```
-
-#### Host Environment Extensions:
-```csharp
-if (hostEnvironment.IsIntegration())
-{
-    Console.WriteLine("Running in the integration environment.");
-}
-else if (hostEnvironment.IsValidation())
-{
-    Console.WriteLine("Running in the validation environment.");
-}
-else if (hostEnvironment.IsPreProduction())
-{
-    Console.WriteLine("Running in the pre-production environment.");
-}
-```
-
----
-
-## **Dependencies**
-
-This library is fully self-contained and serves as a core building block for the open-source Franz.Common ecosystem.
-
----
-
-## **Development Notes**
-
-This package is publicly available on NuGet.org and distributed under the MIT License.
-
-### **Contributing**
-Contributions are restricted to the Franz Framework development team. If you are authorized to contribute:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request with a detailed explanation of your changes.
-
----
+The package targets the repository's .NET 10 baseline. The package version is governed by the repository's release process; do not infer a package version from historical text in this guide.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
----
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See [LICENSE](../../LICENSE).

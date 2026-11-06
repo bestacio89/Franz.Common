@@ -1,10 +1,10 @@
 # Franz.Common.Annotations
 
-> Attribute contracts for validating Kafka topic names and other configuration metadata in Franz.Common applications.
+> Attribute metadata for declaring Kafka topic requirements on application types.
 
-## Overview
+## Responsibilities
 
-Attribute contracts for validating Kafka topic names and other configuration metadata in Franz.Common applications.
+This package currently exposes `RequiredKafkaTopicAttribute`. It is metadata only: it does not discover attributes, validate runtime configuration, create Kafka topics, or register producers and consumers. Those behaviors belong to the consuming package or application.
 
 ## Installation
 
@@ -12,140 +12,50 @@ Attribute contracts for validating Kafka topic names and other configuration met
 dotnet add package Franz.Common.Annotations
 ```
 
-## Design principles
+## Attribute contract
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A lightweight library within the **Franz Framework** designed to provide custom attribute-based annotations for simplifying Kafka topic validation in .NET applications.
-
----
-
-## **Features**
-
-- **Custom Kafka Topic Annotation**:
-  - `RequiredKafkaTopicAttribute`: Ensures that a Kafka topic is specified and validated for producer/consumer configurations.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Annotations
-```
-
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Annotations
-```
-
----
-
-## **Usage**
-
-### **1. Apply `RequiredKafkaTopicAttribute`**
-
-Use the `RequiredKafkaTopicAttribute` to annotate properties or fields that represent Kafka topics in your application. This ensures that all required topics are explicitly defined and validated at runtime.
-
-Example:
+The attribute can be applied once to a class. It supports parameterless named-property configuration and two positional constructors.
 
 ```csharp
 using Franz.Common.Annotations;
 
-public class KafkaConfiguration
+// Explicit topic metadata.
+[RequiredKafkaTopic(Topic = "orders", DeadLetterTopic = "orders-dlq")]
+public sealed class OrderConsumer
 {
-    [RequiredKafkaTopic]
-    public string OrdersTopic { get; set; }
+}
 
-    [RequiredKafkaTopic]
-    public string PaymentsTopic { get; set; }
+// Format metadata for a consumer-specific convention.
+[RequiredKafkaTopic("{0}-in")]
+public sealed class CustomerConsumer
+{
+}
+
+// Format plus entity name; Topic is materialized by the constructor.
+[RequiredKafkaTopic("{0}-in", "Customers")]
+public sealed class CustomerEventsConsumer
+{
 }
 ```
 
-### **2. Validation**
+### Properties
 
-Ensure that annotated properties are checked during application initialization:
+| Member | Meaning |
+|---|---|
+| `Topic` | Explicit or constructor-derived topic name. |
+| `Format` | Topic format/convention metadata. |
+| `DeadLetterTopic` | Optional dead-letter topic metadata. |
 
-```csharp
-var kafkaConfig = new KafkaConfiguration
-{
-    OrdersTopic = "orders",
-    PaymentsTopic = string.Empty // Validation will fail here
-};
+The positional constructors reject a null format. The two-argument constructor formats the supplied pattern with the entity name and stores the resulting value in `Topic`. The one-argument constructor stores the pattern in `Format`; it does not resolve a topic name itself.
 
-ValidateKafkaConfiguration(kafkaConfig);
+## Consumption and validation
 
-void ValidateKafkaConfiguration(object config)
-{
-    var properties = config.GetType().GetProperties();
+A consumer of this metadata must define its own interpretation rules, including how it handles missing values, format placeholders, invalid topic names, and dead-letter topic provisioning. Do not assume that decorating a class triggers validation automatically.
 
-    foreach (var property in properties)
-    {
-        var attribute = property.GetCustomAttribute<RequiredKafkaTopicAttribute>();
-        if (attribute != null && string.IsNullOrWhiteSpace(property.GetValue(config)?.ToString()))
-        {
-            throw new InvalidOperationException($"The Kafka topic '{property.Name}' is required but was not provided.");
-        }
-    }
-}
-```
+## Package boundaries
 
----
-
-## **Dependencies**
-
-This package has no external dependencies but integrates seamlessly with other **Franz Framework** libraries.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+This assembly contains the attribute contract only. Kafka provisioning and runtime behavior are implemented by the relevant messaging packages and host application.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
----
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
+MIT. See [LICENSE](../../LICENSE).
