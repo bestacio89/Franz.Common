@@ -1,194 +1,112 @@
-# 🚀 Full Example: Franz.Common.Mediator in Action
+# Mediator application example
 
-This demo shows how to use **Franz.Common.Mediator** with multiple pipelines (logging, retry, caching, transaction) around a simple command handler.
+This guide demonstrates the supported generated-registration path for an application command and query. It complements the [package guide](readme.md), which documents registration modes, supported handler contracts, pipeline modules, and Native AOT boundaries.
 
----
+## 1. Define request contracts
 
-## 1. Command + Handler
+Keep requests immutable and give each request one explicit handler contract.
 
 ```csharp
-public record CreateOrderCommand(Guid OrderId, decimal Amount) : ICommand<bool>;
+public sealed record CreateOrderCommand(Guid OrderId, decimal Total)
+    : ICommand<bool>;
 
-public class CreateOrderHandler : ICommandHandler<CreateOrderCommand, bool>
+public sealed record GetOrderQuery(Guid OrderId)
+    : IQuery<OrderDto>;
+
+public sealed record OrderDto(Guid Id, decimal Total);
+```
+
+## 2. Implement handlers
+
+```csharp
+public sealed class CreateOrderHandler
+    : ICommandHandler<CreateOrderCommand, bool>
 {
     private readonly OrdersDbContext _db;
+
     public CreateOrderHandler(OrdersDbContext db) => _db = db;
 
-    public async Task<bool> Handle(CreateOrderCommand request, CancellationToken ct)
+    public async Task<bool> Handle(
+        CreateOrderCommand request,
+        CancellationToken cancellationToken)
     {
-        _db.Orders.Add(new Order { Id = request.OrderId, Amount = request.Amount });
-        await _db.SaveChangesAsync(ct);
+        _db.Orders.Add(new Order(request.OrderId, request.Total));
+        await _db.SaveChangesAsync(cancellationToken);
         return true;
     }
 }
-```
 
----
-
-## 2. Pipelines
-
-### Logging Pipeline
-
-```csharp
-public class LoggingPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
-{
-    private readonly ILogger<LoggingPipeline<TRequest, TResponse>> _logger;
-
-    public LoggingPipeline(ILogger<LoggingPipeline<TRequest, TResponse>> logger) 
-        => _logger = logger;
-
-    public async Task<TResponse> Handle(TRequest request, CancellationToken ct, Func<Task<TResponse>> next)
-    {
-        _logger.LogInformation("Handling {Request}", typeof(TRequest).Name);
-        var response = await next();
-        _logger.LogInformation("Handled {Request} with {Response}", typeof(TRequest).Name, typeof(TResponse).Name);
-        return response;
-    }
-}
-```
-
-### Polly Retry Pipeline
-
-```csharp
-public class PollyRetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
-{
-    private readonly AsyncPolicy _policy;
-
-    public PollyRetryPipeline(RetryOptions options)
-    {
-        _policy = Policy
-            .Handle<Exception>();
-        if (options.MaxRetries > 0)
-            _policy = _policy.WaitAndRetryAsync(options.MaxRetries, _ => options.Delay);
-    }
-
-    public Task<TResponse> Handle(TRequest request, CancellationToken ct, Func<Task<TResponse>> next)
-        => _policy.ExecuteAsync(() => next());
-}
-```
-
-### Caching Pipeline
-
-```csharp
-public class CachingPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
-{
-    private readonly IMemoryCache _cache;
-    private readonly CachingOptions _options;
-
-    public CachingPipeline(IMemoryCache cache, CachingOptions options)
-    {
-        _cache = cache;
-        _options = options;
-    }
-
-    public async Task<TResponse> Handle(TRequest request, CancellationToken ct, Func<Task<TResponse>> next)
-    {
-        var key = $"{typeof(TRequest).Name}:{request.GetHashCode()}";
-        if (_cache.TryGetValue<TResponse>(key, out var cached))
-            return cached;
-
-        var result = await next();
-        _cache.Set(key, result, _options.Duration);
-        return result;
-    }
-}
-```
-
-### Transaction Pipeline
-
-```csharp
-public class TransactionPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
+public sealed class GetOrderHandler
+    : IQueryHandler<GetOrderQuery, OrderDto>
 {
     private readonly OrdersDbContext _db;
 
-    public TransactionPipeline(OrdersDbContext db) => _db = db;
+    public GetOrderHandler(OrdersDbContext db) => _db = db;
 
-    public async Task<TResponse> Handle(TRequest request, CancellationToken ct, Func<Task<TResponse>> next)
+    public async Task<OrderDto> Handle(
+        GetOrderQuery request,
+        CancellationToken cancellationToken)
     {
-        using var tx = await _db.Database.BeginTransactionAsync(ct);
-        try
-        {
-            var response = await next();
-            await tx.CommitAsync(ct);
-            return response;
-        }
-        catch
-        {
-            await tx.RollbackAsync(ct);
-            throw;
-        }
+        var order = await _db.Orders
+            .AsNoTracking()
+            .SingleAsync(x => x.Id == request.OrderId, cancellationToken);
+
+        return new OrderDto(order.Id, order.Total);
     }
 }
 ```
 
----
+The example assumes an application-owned `OrdersDbContext` and `Order` model. Persistence registration and transaction ownership remain application concerns.
 
-## 3. Dependency Injection Setup
+## 3. Register Mediator
 
-```csharp
-services.AddDbContext<OrdersDbContext>(...);
-services.AddMemoryCache();
-
-services.AddFranzMediator(typeof(CreateOrderHandler).Assembly, options =>
-{
-    options.Retry.MaxRetries = 3;
-    options.Retry.Delay = TimeSpan.FromMilliseconds(200);
-    options.Caching.Duration = TimeSpan.FromMinutes(1);
-});
-
-services.AddScoped(typeof(IPipeline<,>), typeof(LoggingPipeline<,>));
-services.AddScoped(typeof(IPipeline<,>), typeof(PollyRetryPipeline<,>));
-services.AddScoped(typeof(IPipeline<,>), typeof(CachingPipeline<,>));
-services.AddScoped(typeof(IPipeline<,>), typeof(TransactionPipeline<,>));
-```
-
----
-
-## 4. Using the Mediator
+For the generated, closed-generic default pipeline composition, select an assembly through a marker type:
 
 ```csharp
-[ApiController]
-[Route("orders")]
-public class OrdersController : ControllerBase
-{
-    private readonly IDispatcher _dispatcher;
-    public OrdersController(IDispatcher dispatcher) => _dispatcher = dispatcher;
+using Franz.Common.Mediator.Extensions;
 
-    [HttpPost]
-    public async Task<IActionResult> CreateOrder(CreateOrderCommand command, CancellationToken ct)
-    {
-        var success = await _dispatcher.Dispatch(command, ct);
-        return success ? Ok() : BadRequest();
-    }
-}
+builder.Services.AddFranzMediatorDefault<OrdersApplicationAssembly>();
 ```
 
----
+The marker type can be an otherwise empty type declared in the assembly containing the handlers. The source generator contributes handler registrations at build time; the application references `Franz.Common.Mediator`, which carries the generator as an analyzer asset.
 
-## 5. Execution Flow
+This default composition includes request logging, validation, Serilog logging, transaction pipelines, and the built-in logging/audit pre- and post-processors. Notifications receive notification logging and validation. It does not add event validation or resilience pipelines.
 
-Dispatching `CreateOrderCommand` triggers pipelines in order:
+If you need only core infrastructure and explicit generated registration, use:
 
-1. Logging → logs before/after  
-2. Retry → retries on transient errors  
-3. Caching → short-circuits if already cached  
-4. Transaction → wrap DB in transaction  
-5. Handler → executes logic  
-
----
-
-## 6. Visual Diagram
-
-```mermaid
-flowchart TD
-    A[Request] --> B[LoggingPipeline]
-    B --> C[PollyRetryPipeline]
-    C --> D[CachingPipeline]
-    D --> E[TransactionPipeline]
-    E --> F[Handler]
-    F --> G[Response]
+```csharp
+builder.Services.AddFranzMediator(
+    new[] { typeof(OrdersApplicationAssembly).Assembly });
 ```
 
----
+See [pipelines.md](pipelines.md) before choosing a different pipeline composition. In particular, `AddFranzMediatorV2Default` and `AddFranzMediatorStandard` use open-generic pipelines and are not Native AOT compositions.
 
-✅ Clone this example, run it, and extend with your own pipelines (e.g., metrics, validation, telemetry).
+## 4. Dispatch from an application scope
+
+Resolve the scoped dispatcher from the request scope:
+
+```csharp
+var dispatcher = scope.ServiceProvider
+    .GetRequiredService<IDispatcher>();
+
+var created = await dispatcher.SendAsync<bool>(
+    new CreateOrderCommand(orderId, total),
+    cancellationToken);
+
+var order = await dispatcher.SendAsync<OrderDto>(
+    new GetOrderQuery(orderId),
+    cancellationToken);
+```
+
+Use `PublishNotificationAsync` for notifications and `PublishEventAsync` for domain/integration events. These are separate contracts; do not substitute one for the other.
+
+## 5. Verify the consuming application
+
+The package's generated registration and invoker path is designed for trimming and Native AOT. Keep the following checks in the application:
+
+- Build the consuming application with the same SDK and publish settings used in deployment.
+- Publish with trimming and Native AOT enabled when those are deployment requirements.
+- Execute the published artifact; a successful build alone does not prove runtime compatibility.
+- Add integration tests for the application's actual persistence, validation, transaction, and handler-lifetime behavior.
+
+The repository's AOT smoke test covers selected generated Mediator paths. It does not make the open-generic V2-default or standard pipeline compositions AOT-compatible.

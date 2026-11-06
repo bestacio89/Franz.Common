@@ -1,287 +1,102 @@
-# 🧩 Full Example: Pipelines with Franz.Common.Mediator
+# Mediator pipeline composition
 
-This example shows how to use **multiple pipelines together** — logging, retry, caching, and transactions — wrapped around a single command.
+This guide describes the pipeline registration options exposed by `Franz.Common.Mediator`. For a complete request/handler example, see [example.md](example.md). For the full public contract and AOT matrix, see the [package README](readme.md).
 
----
+## Pipeline contracts
 
-## 📦 Step 1. Define a Command + Handler
+Mediator separates request, notification, and event execution:
 
-```csharp
-// A simple command
-public record CreateOrderCommand(Guid OrderId, decimal Amount) : ICommand<bool>;
+| Concern | Contract |
+|---|---|
+| Request/response behavior | `IPipeline<TRequest, TResponse>` |
+| Request pre-processing | `IPreProcessor<TRequest>` |
+| Request post-processing | `IPostProcessor<TRequest, TResponse>` |
+| Notification behavior | `INotificationPipeline<TNotification>` |
+| Event behavior | `IEventPipeline<TEvent>` |
+| Event pre-processing | `IEventPreProcessor<TEvent>` |
+| Event post-processing | `IEventPostProcessor<TEvent>` |
 
-// The handler that saves to DB
-public class CreateOrderHandler : ICommandHandler<CreateOrderCommand, bool>
-{
-    private readonly OrdersDbContext _db;
+Do not assume that a request pipeline also wraps event or notification dispatch. Register the corresponding pipeline contract for the message type being handled.
 
-    public CreateOrderHandler(OrdersDbContext db) => _db = db;
+## Built-in registration extensions
 
-    public async Task<bool> Handle(CreateOrderCommand request, CancellationToken ct)
-    {
-        _db.Orders.Add(new Order { Id = request.OrderId, Amount = request.Amount });
-        await _db.SaveChangesAsync(ct);
-        return true;
-    }
-}
-```
+The core package exposes these opt-in registration methods:
 
----
+| Extension | Registration |
+|---|---|
+| `AddFranzLoggingPipeline()` | Request and notification logging, plus logging pre/post-processors |
+| `AddFranzValidationPipeline()` | Request and notification validation, plus audit pre-processing |
+| `AddFranzBulkheadPipeline()` | Bulkhead request pipeline |
+| `AddFranzCircuitBreakerPipeline()` | Circuit-breaker request pipeline |
+| `AddFranzRetryPipeline()` | Retry request pipeline |
+| `AddFranzTimeoutPipeline()` | Timeout request pipeline |
+| `AddFranzEventValidationPipeline()` | Event validation/logging pipelines and event audit/logging processors |
+| `AddFranzTransactionPipeline(configure)` | Transaction request pipeline and its `TransactionOptions` |
+| `AddFranzSerilogLoggingPipeline()` | Serilog request/notification logging and processors |
+| `AddFranzSerilogAuditPipeline()` | Validation pipelines and Serilog audit processors |
 
-## 🛠 Step 2. Add Pipelines
+Register only the modules the application needs. Resilience modules are not automatically enabled by the standard or default helpers described below. Configure their options using the option types exposed by the corresponding module; do not copy configuration keys from older examples without checking the current package contract.
 
-### Logging
+## Registration profiles and AOT
 
-```csharp
-public class LoggingPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
-{
-    private readonly ILogger<LoggingPipeline<TRequest, TResponse>> _logger;
+Choose the registration profile based on the required behavior and deployment model.
 
-    public LoggingPipeline(ILogger<LoggingPipeline<TRequest, TResponse>> logger) 
-        => _logger = logger;
-
-    public async Task<TResponse> Handle(TRequest request, CancellationToken ct, Func<Task<TResponse>> next)
-    {
-        _logger.LogInformation("Handling {Request}", typeof(TRequest).Name);
-        var response = await next();
-        _logger.LogInformation("Handled {Request} with {Response}", typeof(TRequest).Name, typeof(TResponse).Name);
-        return response;
-    }
-}
-```
-
-### Retry (Polly)
+### Generated closed-generic default pipelines
 
 ```csharp
-public class PollyRetryPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
-{
-    private readonly AsyncPolicy _policy;
-
-    public PollyRetryPipeline(RetryOptions options)
-    {
-        _policy = Policy
-            .Handle<Exception>()
-            .WaitAndRetryAsync(options.MaxRetries, _ => options.Delay);
-    }
-
-    public Task<TResponse> Handle(TRequest request, CancellationToken ct, Func<Task<TResponse>> next)
-        => _policy.ExecuteAsync(() => next());
-}
+services.AddFranzMediatorDefault<OrdersApplicationAssembly>();
 ```
 
-### Caching
+This registers generated handlers from the marker assembly and applies generator-emitted closed-generic request and notification pipelines. It is the AOT-oriented default-pipeline composition. It includes request logging, validation, Serilog logging, transaction behavior, built-in logging/audit processors, and notification logging/validation. It does not include event validation or resilience pipelines.
+
+### V2 default pipelines
 
 ```csharp
-public class CachingPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
-{
-    private readonly IMemoryCache _cache;
-    private readonly CachingOptions _options;
-
-    public CachingPipeline(IMemoryCache cache, CachingOptions options)
-    {
-        _cache = cache;
-        _options = options;
-    }
-
-    public async Task<TResponse> Handle(TRequest request, CancellationToken ct, Func<Task<TResponse>> next)
-    {
-        var key = $"{typeof(TRequest).Name}:{request.GetHashCode()}";
-        if (_cache.TryGetValue<TResponse>(key, out var cached))
-            return cached;
-
-        var result = await next();
-        _cache.Set(key, result, _options.Duration);
-        return result;
-    }
-}
+services.AddFranzMediatorV2Default(
+    handlerAssembly: typeof(OrdersApplicationAssembly).Assembly);
 ```
 
-### Transaction
+This applies open-generic request logging, validation, Serilog logging, and transaction pipelines, with matching request processors. Notifications receive logging and validation. This composition is not Native AOT compatible because it relies on open-generic pipeline registrations.
+
+### Full standard composition
 
 ```csharp
-public class TransactionPipeline<TRequest, TResponse> : IPipeline<TRequest, TResponse>
-{
-    private readonly OrdersDbContext _db;
-
-    public TransactionPipeline(OrdersDbContext db) => _db = db;
-
-    public async Task<TResponse> Handle(TRequest request, CancellationToken ct, Func<Task<TResponse>> next)
-    {
-        using var tx = await _db.Database.BeginTransactionAsync(ct);
-        try
-        {
-            var response = await next();
-            await tx.CommitAsync(ct);
-            return response;
-        }
-        catch
-        {
-            await tx.RollbackAsync(ct);
-            throw;
-        }
-    }
-}
+services.AddFranzMediatorStandard(
+    new[] { typeof(OrdersApplicationAssembly).Assembly });
 ```
 
----
+The standard helper is provided by the Mediator bootstrap package. It composes generated handler registration with request logging, validation, event validation, Serilog logging/audit, and transaction pipelines. It uses open-generic pipeline registrations and is not the Native AOT path. It does not automatically add retry, circuit-breaker, bulkhead, or timeout behavior.
 
-## 🧩 Step 3. Register in DI
+### Explicit composition
+
+For an application that needs a tailored set of behaviors, register core Mediator infrastructure and generated handlers, then add the required modules:
 
 ```csharp
-services.AddDbContext<OrdersDbContext>(...);
-services.AddMemoryCache();
+services.AddFranzMediator(
+    new[] { typeof(OrdersApplicationAssembly).Assembly });
 
-services.AddFranzMediator(typeof(CreateOrderHandler).Assembly, options =>
-{
-    options.Retry.MaxRetries = 3;
-    options.Retry.Delay = TimeSpan.FromMilliseconds(200);
-    options.Caching.Duration = TimeSpan.FromMinutes(1);
-});
-
-services.AddScoped(typeof(IPipeline<,>), typeof(LoggingPipeline<,>));
-services.AddScoped(typeof(IPipeline<,>), typeof(PollyRetryPipeline<,>));
-services.AddScoped(typeof(IPipeline<,>), typeof(CachingPipeline<,>));
-services.AddScoped(typeof(IPipeline<,>), typeof(TransactionPipeline<,>));
-```
-
----
-
-## 🚀 Step 4. Use the Mediator
-
-```csharp
-public class OrdersController : ControllerBase
-{
-    private readonly IDispatcher _dispatcher;
-
-    public OrdersController(IDispatcher dispatcher) => _dispatcher = dispatcher;
-
-    [HttpPost("orders")]
-    public async Task<IActionResult> CreateOrder([FromBody] CreateOrderCommand command, CancellationToken ct)
-    {
-        var success = await _dispatcher.Dispatch(command, ct);
-        return success ? Ok() : BadRequest();
-    }
-}
-```
-
----
-
-## 🔄 Execution Order
-
-When `CreateOrderCommand` is dispatched, the pipeline chain executes as:
-
-1. **LoggingPipeline** → logs start
-2. **PollyRetryPipeline** → retries on transient errors
-3. **CachingPipeline** → short-circuits if cached
-4. **TransactionPipeline** → wraps DB in transaction
-5. **Handler** → actually executes
-
----
-
-
-# Franz Mediator with Resilience Pipelines
-
-Franz Mediator allows you to compose request/response pipelines with opt-in behaviors like validation, logging, transactions, and resilience (retry, circuit breaker, timeout, bulkhead).
-
-## 🔧 Installation
-
-```csharp
-dotnet add package Franz.Common.Mediator
-```
-
----
-
-## 📑 Configuration (appsettings.json)
-
-```jsonc
-{
-  "Resilience": {
-    "Retry": {
-      "MaxAttempts": 3,
-      "BaseDelay": "00:00:02",     // 2 seconds
-      "VerboseLogging": true,
-      "Disabled": false
-    },
-    "CircuitBreaker": {
-      "FailureThreshold": 5,
-      "OpenDuration": "00:00:10", // stays open 10s after trip
-      "VerboseLogging": true,
-      "Disabled": false
-    },
-    "Timeout": {
-      "Duration": "00:00:05",
-      "VerboseLogging": true,
-      "Disabled": false
-    },
-    "Bulkhead": {
-      "MaxConcurrentRequests": 10,
-      "MaxQueueLength": 50,
-      "VerboseLogging": true,
-      "Disabled": false
-    }
-  }
-}
-```
-
----
-
-## 🏗 Program.cs Setup
-
-```csharp
-using Franz.Common.Mediator.Extensions;
-using Franz.Common.Mediator.Pipelines.Resilience;
-using Microsoft.Extensions.DependencyInjection;
-
-var builder = WebApplication.CreateBuilder(args);
-
-// Bind resilience options from configuration
-builder.Services.Configure<RetryOptions>(
-    builder.Configuration.GetSection("Resilience:Retry"));
-builder.Services.Configure<CircuitBreakerOptions>(
-    builder.Configuration.GetSection("Resilience:CircuitBreaker"));
-builder.Services.Configure<TimeoutOptions>(
-    builder.Configuration.GetSection("Resilience:Timeout"));
-builder.Services.Configure<BulkheadOptions>(
-    builder.Configuration.GetSection("Resilience:Bulkhead"));
-
-// Register Franz Mediator + pipelines
-builder.Services.AddFranzMediator(
-    new[] { typeof(Program).Assembly } // scan handlers in this assembly
-);
-
-builder.Services
-    .AddFranzRetryPipeline()
-    .AddFranzCircuitBreakerPipeline()
-    .AddFranzTimeoutPipeline()
-    .AddFranzBulkheadPipeline()
+services
+    .AddFranzLoggingPipeline()
     .AddFranzValidationPipeline()
-    .AddFranzLoggingPipeline();
-
-var app = builder.Build();
-app.Run();
+    .AddFranzTransactionPipeline();
 ```
 
----
+Add event validation and resilience explicitly when required. Confirm that each selected module's dependencies and options are registered by the application or its integration package.
 
-## 📊 Example Logs (with a chaos exception)
+## Execution semantics
 
-```txt
-[Pipeline:Retry] Attempt 1/3 after 2s due to 🍌 Banana Republic Exception: simulated DB meltdown!
-[Pipeline:Retry] Attempt 2/3 after 4s due to 🍌 Banana Republic Exception: simulated DB meltdown!
-[Pipeline:CircuitBreaker] OPEN after 5 consecutive failures
-[Pipeline:Timeout] Request failed after 5s (timeout exceeded)
-[Pipeline:Bulkhead] Rejected request — too many concurrent executions
-```
+Pipeline continuations are repeatable: each call to `next()` executes the downstream pipeline and handler chain again. This enables retry-style middleware, but it also means that a retry can repeat side effects.
 
----
+Only retry operations whose side effects are safe to repeat, or protect them with idempotency and transaction/outbox strategies appropriate to the application. A transaction pipeline does not make an external side effect atomic with a database commit.
 
-## ✅ Summary
+Pipeline registration order is an application composition detail. Verify the effective order with an integration test when behavior depends on nesting; do not infer transactional or retry ordering from the order of extension calls alone.
 
-* **Config-driven** resilience options (`appsettings.json`).
-* **Opt-in pipelines** via `AddFranzXxxPipeline()` extension methods.
-* **Unified logging** integrated with `ILogger`/Serilog.
-* Perfect for demos, tests, or chaos engineering (with “Banana Republic Exception” 😅).
+## Operational guidance
 
----
+- Propagate the supplied `CancellationToken` through handlers and downstream I/O.
+- Set bounded retry counts, delays, timeouts, and concurrency limits based on service-level objectives.
+- Avoid retrying validation failures, permanent business errors, or non-idempotent side effects.
+- Keep transaction boundaries around database work; do not hold database transactions open across slow remote calls.
+- Test failure, cancellation, retry, timeout, and concurrency behavior against the actual pipeline composition.
+- Use the generated closed-generic default composition when Native AOT is required. The V2-default and standard open-generic compositions are not AOT-compatible.
 
-👉 Do you want me to also include a **short handler example** (`GetBookByIdQueryHandler`) that throws one of your chaos exceptions so the retries/circuit breaker demo makes sense right in the README?
