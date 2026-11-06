@@ -1,6 +1,8 @@
 ﻿using FluentAssertions;
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Providers;
+using Franz.Common.Caching.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -31,6 +33,18 @@ public sealed class MemoryCacheProviderTests : IDisposable
     _optionsMock.Setup(m => m.CurrentValue).Returns(_globalOptions);
 
     _provider = new MemoryCacheProvider(_memoryCache, _optionsMock.Object);
+  }
+
+  [Fact]
+  public void AddFranzMemoryCaching_Should_Expose_ICacheWriterCapability()
+  {
+    var services = new ServiceCollection();
+    services.AddFranzMemoryCaching();
+
+    using var provider = services.BuildServiceProvider();
+
+    provider.GetRequiredService<ICacheWriter>()
+        .Should().BeOfType<MemoryCacheProvider>();
   }
 
   [Fact]

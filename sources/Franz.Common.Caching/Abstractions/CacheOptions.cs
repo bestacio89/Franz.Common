@@ -14,8 +14,10 @@ public sealed record CacheOptions
   [SetsRequiredMembers]
   public CacheOptions() { }
 
+  [Required]
   public required TimeSpan DefaultAbsoluteExpiration { get; set; } = TimeSpan.FromMinutes(60);
 
+  [Required]
   public required TimeSpan DefaultSlidingExpiration { get; init; } = TimeSpan.FromMinutes(20);
 
   [RegularExpression(
