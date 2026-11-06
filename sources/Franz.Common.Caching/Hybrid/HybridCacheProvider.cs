@@ -36,6 +36,7 @@ public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
   {
     ArgumentException.ThrowIfNullOrWhiteSpace(key);
     ArgumentNullException.ThrowIfNull(factory);
+    ct.ThrowIfCancellationRequested();
 
     var options = overrideOptions ?? CurrentOptions;
     CacheOptionsValidator.ThrowIfInvalid(options);
@@ -63,6 +64,7 @@ public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
       CancellationToken ct = default)
   {
     ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    ct.ThrowIfCancellationRequested();
 
     var effectiveOptions = options ?? CurrentOptions;
     CacheOptionsValidator.ThrowIfInvalid(effectiveOptions);

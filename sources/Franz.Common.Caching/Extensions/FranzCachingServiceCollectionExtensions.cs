@@ -78,8 +78,10 @@ public static class FranzCachingServiceCollectionExtensions
   }
 
   /// <summary>
-  /// Registers the .NET HybridCache provider. Register an IDistributedCache
-  /// implementation separately when a distributed L2 store is required.
+  /// Registers the .NET HybridCache provider with a metadata-only serializer.
+  /// This replaces existing serializer factories; register custom factories after
+  /// this call if they must take precedence. Register IDistributedCache separately
+  /// when a distributed L2 store is required.
   /// </summary>
   public static IServiceCollection AddFranzHybridCaching(
       this IServiceCollection services,
@@ -101,8 +103,10 @@ public static class FranzCachingServiceCollectionExtensions
   }
 
   /// <summary>
-  /// Registers HybridCache and binds Franz cache options from configuration.
-  /// An IDistributedCache implementation may be registered separately for L2.
+  /// Registers HybridCache, binds Franz cache options, and installs the metadata-only
+  /// serializer factory. Existing serializer factories are replaced; register custom
+  /// factories after this call if they must take precedence. An IDistributedCache
+  /// implementation may be registered separately for L2.
   /// </summary>
   public static IServiceCollection AddFranzHybridCaching(
       this IServiceCollection services,

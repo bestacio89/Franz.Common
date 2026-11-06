@@ -233,6 +233,8 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
     ct.ThrowIfCancellationRequested();
 
     var serialized = JsonSerializer.Serialize(value, GetTypeInfo<T>());
+    ct.ThrowIfCancellationRequested();
+
     var absoluteMilliseconds = options.DefaultAbsoluteExpiration > TimeSpan.Zero
         ? Math.Max(1L, (long)options.DefaultAbsoluteExpiration.TotalMilliseconds)
         : 0L;
