@@ -141,10 +141,8 @@ public sealed class RedisCacheProviderTests : IClassFixture<RedisCacheFixture>
     var differentReadOptions = new CacheOptions
     {
       DefaultAbsoluteExpiration = TimeSpan.FromSeconds(30),
-      DefaultSlidingExpiration = TimeSpan.FromSeconds(30)
+      DefaultSlidingExpiration = TimeSpan.FromMilliseconds(100)
     };
-
-    differentReadOptions.DefaultSlidingExpiration = TimeSpan.FromMilliseconds(100);
 
     for (var access = 0; access < 6; access++)
     {

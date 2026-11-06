@@ -18,7 +18,7 @@ public sealed record CacheOptions
   public required TimeSpan DefaultAbsoluteExpiration { get; set; } = TimeSpan.FromMinutes(60);
 
   [Required]
-  public required TimeSpan DefaultSlidingExpiration { get; init; } = TimeSpan.FromMinutes(20);
+  public required TimeSpan DefaultSlidingExpiration { get; set; } = TimeSpan.FromMinutes(20);
 
   [RegularExpression(
       @"^[a-zA-Z0-9:_-]*$",
@@ -33,14 +33,14 @@ public sealed record CacheOptions
   /// <summary>
   /// Legacy compatibility flag. Provider selection is controlled by the DI registration method.
   /// </summary>
-  public bool EnableDistributedCache { get; init; } = true;
+  public bool EnableDistributedCache { get; set; } = true;
 
   public TimeSpan? LocalCacheHint { get; set; }
 
-  public CacheItemPriority DefaultPriority { get; init; } = CacheItemPriority.Normal;
+  public CacheItemPriority DefaultPriority { get; set; } = CacheItemPriority.Normal;
 
   [Range(0, long.MaxValue)]
-  public long DefaultEstimatedSizeInBytes { get; init; } = 1024;
+  public long DefaultEstimatedSizeInBytes { get; set; } = 1024;
 
   public override string ToString()
       => $"{nameof(CacheOptions)} {{ " +
