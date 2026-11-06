@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -13,6 +14,11 @@ using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.Redis;
+
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
+CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
 
 var providerName = Environment.GetEnvironmentVariable("FRANZ_CACHE_LOAD_PROVIDER") ?? "memory";
 if (!Enum.TryParse<CacheProviderKind>(providerName, true, out var providerKind))
@@ -737,6 +743,7 @@ internal sealed record LoadTestSummary(
 internal sealed record LoadRequest(int KeyId);
 internal sealed record LoadPayload(Guid TenantId, int KeyId, string Content);
 
+[JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(LoadRequest))]
 [JsonSerializable(typeof(LoadPayload))]
 [JsonSerializable(typeof(LoadTestSummary))]
