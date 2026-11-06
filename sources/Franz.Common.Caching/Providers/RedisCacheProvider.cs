@@ -179,9 +179,9 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
     var fullKey = ApplyPrefix(key);
     using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
-      // A single DEL removes both the value and its absolute-expiration metadata.
-      await _db.KeyDeleteAsync(new RedisKey[] { fullKey, GetAbsoluteExpirationKey(fullKey) })
-          .ConfigureAwait(false);
+      // Both keys share a Redis Cluster hash tag, so this multi-key DEL is cluster-safe.
+      var keys = GetRedisKeys(fullKey);
+      await _db.KeyDeleteAsync(new[] { keys.ValueKey, keys.MetadataKey }).ConfigureAwait(false);
     }
   }
 
@@ -199,9 +199,10 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
         ? Math.Max(1L, (long)options.DefaultSlidingExpiration.TotalMilliseconds)
         : 0L;
 
+    var keys = GetRedisKeys(fullKey);
     var result = await _db.ScriptEvaluateAsync(
         ReadAndRefreshScript,
-        new RedisKey[] { fullKey, GetAbsoluteExpirationKey(fullKey) },
+        new[] { keys.ValueKey, keys.MetadataKey },
         new RedisValue[] { slidingMilliseconds }).ConfigureAwait(false);
 
     if (result.IsNull)
@@ -236,9 +237,10 @@ public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
         ? Math.Max(1L, (long)options.DefaultSlidingExpiration.TotalMilliseconds)
         : 0L;
 
+    var keys = GetRedisKeys(fullKey);
     await _db.ScriptEvaluateAsync(
         WriteScript,
-        new RedisKey[] { fullKey, GetAbsoluteExpirationKey(fullKey) },
+        new[] { keys.ValueKey, keys.MetadataKey },
         new RedisValue[] { serialized, absoluteMilliseconds, slidingMilliseconds })
         .ConfigureAwait(false);
   }
