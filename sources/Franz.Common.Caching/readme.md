@@ -14,19 +14,16 @@ applications.
 dotnet add package Franz.Common.Caching
 ```
 
-Excel export is optional and is distributed separately:
-
-```bash
-dotnet add package Franz.Common.Caching.Excel
-```
-
 ## Provider contract
 
-`ICacheProvider` exposes three operations:
+`ICacheProvider` exposes lookup and removal operations:
 
 - `GetOrSetAsync<T>`: read an existing entry or create and cache the factory result.
-- `SetAsync<T>`: unconditionally replace an entry; the factory is never invoked.
 - `RemoveAsync`: remove an entry.
+
+Providers that support unconditional replacement also implement the separate
+`ICacheWriter` capability. `SetAsync<T>` always replaces an entry and never
+invokes a factory. Built-in providers implement both interfaces.
 
 A JSON `null` is a value, not a cache miss. Distributed and Redis providers
 treat malformed serialized entries as misses and replace them after the factory
@@ -158,8 +155,9 @@ and can use the default key strategy without requiring tenant infrastructure.
 ## Settings cache
 
 `ISettingsCache` uses a 12-hour cache policy. `SetSettingAsync` performs an
-explicit replacement write, including when a previous read cached the default
-value for a missing setting.
+explicit replacement write through `ICacheWriter`, including when a previous
+read cached the default value for a missing setting. Custom providers used with
+settings writes must implement `ICacheWriter`.
 
 ## Observability
 
@@ -177,12 +175,11 @@ contract. Observer exceptions are isolated and written to `Trace`; they do not
 change the outcome of the cache operation. No unbounded fire-and-forget task
 queue is created.
 
-### Optional Excel export
+### Excel export
 
-Install `Franz.Common.Caching.Excel` to use `ExcelCacheObserver`. The optional
-package owns the EPPlus dependency; the core caching package does not. EPPlus 8
-requires the consuming application to configure its license according to its
-own licensing terms before exporting.
+`ExcelCacheObserver` is included in the core package and uses EPPlus 8.
+EPPlus 8 requires the consuming application to configure its license according
+to its own licensing terms before exporting.
 
 ## Configuration
 

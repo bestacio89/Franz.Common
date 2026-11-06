@@ -5,7 +5,7 @@ using System.Collections.Concurrent;
 namespace Franz.Common.Caching.Observability.Observers;
 
 /// <summary>
-/// Optional EPPlus-backed export of cache observer statistics.
+/// EPPlus-backed export of cache observer statistics.
 /// </summary>
 public sealed class ExcelCacheObserver : ICacheObserver
 {
@@ -14,42 +14,28 @@ public sealed class ExcelCacheObserver : ICacheObserver
   public void OnCacheHit(CacheAccessDescriptor access)
   {
     if (string.IsNullOrEmpty(access.Key))
-    {
       return;
-    }
 
-    var stats = _stats.GetOrAdd(access.Key, static _ => new CacheStats());
-    stats.RecordHit(access.LookupLatencyMs);
+    _stats.GetOrAdd(access.Key, static _ => new CacheStats()).RecordHit(access.LookupLatencyMs);
   }
 
   public void OnCacheSet(CacheEntryDescriptor entry)
   {
     if (string.IsNullOrEmpty(entry.Key))
-    {
       return;
-    }
 
-    var stats = _stats.GetOrAdd(entry.Key, static _ => new CacheStats());
-    stats.RecordSet(entry.EstimatedSizeInBytes);
+    _stats.GetOrAdd(entry.Key, static _ => new CacheStats()).RecordSet(entry.EstimatedSizeInBytes);
   }
 
-  public void OnCacheRemove(string key)
-  {
-    _stats.TryRemove(key, out _);
-  }
+  public void OnCacheRemove(string key) => _stats.TryRemove(key, out _);
 
   public void OnCacheRemoveByTag(string tag)
   {
     if (string.IsNullOrEmpty(tag))
-    {
       return;
-    }
 
-    foreach (var key in _stats.Keys.Where(key =>
-                 key.Contains(tag, StringComparison.OrdinalIgnoreCase)))
-    {
+    foreach (var key in _stats.Keys.Where(key => key.Contains(tag, StringComparison.OrdinalIgnoreCase)))
       _stats.TryRemove(key, out _);
-    }
   }
 
   public void ExportToExcel(string path)
@@ -116,7 +102,6 @@ public sealed class ExcelCacheObserver : ICacheObserver
     public void RecordHit(double? latencyMilliseconds)
     {
       Interlocked.Increment(ref _hits);
-
       if (latencyMilliseconds is >= 0)
       {
         var microseconds = (long)Math.Round(latencyMilliseconds.Value * 1000d);

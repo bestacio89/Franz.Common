@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Caching.Providers;
 
-public sealed class MemoryCacheProvider : ICacheProvider
+public sealed class MemoryCacheProvider : ICacheProvider, ICacheWriter
 {
   private readonly IMemoryCache _cache;
   private readonly IOptionsMonitor<CacheOptions> _optionsMonitor;

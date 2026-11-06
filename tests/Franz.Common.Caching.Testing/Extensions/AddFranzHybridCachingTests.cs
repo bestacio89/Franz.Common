@@ -21,7 +21,8 @@ public sealed class AddFranzHybridCachingTests
     using var serviceProvider = services.BuildServiceProvider();
     var cache = serviceProvider.GetRequiredService<ICacheProvider>();
 
-    await cache.SetAsync<string?>("nullable-entry", null);
+    var writer = (ICacheWriter)cache;
+    await writer.SetAsync<string?>("nullable-entry", null);
 
     var factoryCalls = 0;
     var result = await cache.GetOrSetAsync<string?>("nullable-entry", _ =>

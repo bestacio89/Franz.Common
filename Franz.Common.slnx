@@ -18,7 +18,6 @@
     <Project Path="sources/Franz.Common.Bootstrap/Franz.Common.Bootstrap.csproj" />
     <Project Path="sources/Franz.Common.Business/Franz.Common.Business.csproj" />
     <Project Path="sources/Franz.Common.Caching/Franz.Common.Caching.csproj" />
-    <Project Path="sources/Franz.Common.Caching.Excel/Franz.Common.Caching.Excel.csproj" />
     <Project Path="sources/Franz.Common.DependencyInjection/Franz.Common.DependencyInjection.csproj" />
     <Project Path="sources/Franz.Common.EntityFramework.MariaDB/Franz.Common.EntityFramework.MariaDB.csproj" />
     <Project Path="sources/Franz.Common.EntityFramework.Oracle/Franz.Common.EntityFramework.Oracle.csproj" />

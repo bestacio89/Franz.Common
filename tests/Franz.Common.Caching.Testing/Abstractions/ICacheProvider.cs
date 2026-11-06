@@ -8,21 +8,12 @@ public sealed class ICacheProviderTests
   [Fact]
   public void Interface_Should_Expose_GetOrSetAsync()
   {
-    typeof(ICacheProvider).GetMethod("GetOrSetAsync")
-        .Should().NotBeNull();
-  }
-
-  [Fact]
-  public void Interface_Should_Expose_SetAsync()
-  {
-    typeof(ICacheProvider).GetMethod("SetAsync")
-        .Should().NotBeNull();
+    typeof(ICacheProvider).GetMethod("GetOrSetAsync").Should().NotBeNull();
   }
 
   [Fact]
   public void Interface_Should_Expose_RemoveAsync()
   {
-    typeof(ICacheProvider).GetMethod("RemoveAsync")
-        .Should().NotBeNull();
+    typeof(ICacheProvider).GetMethod("RemoveAsync").Should().NotBeNull();
   }
 }

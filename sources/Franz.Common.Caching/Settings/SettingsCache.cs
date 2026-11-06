@@ -5,6 +5,7 @@ namespace Franz.Common.Caching.Settings;
 public sealed class SettingsCache : ISettingsCache
 {
   private readonly ICacheProvider _cache;
+  private readonly ICacheWriter? _writer;
   private static readonly CacheOptions SettingsOptions = new()
   {
     DefaultAbsoluteExpiration = TimeSpan.FromHours(12),
@@ -15,6 +16,7 @@ public sealed class SettingsCache : ISettingsCache
   public SettingsCache(ICacheProvider cache)
   {
     _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+    _writer = cache as ICacheWriter;
   }
 
   /// <summary>
@@ -39,6 +41,8 @@ public sealed class SettingsCache : ISettingsCache
   public Task SetSettingAsync<T>(string key, T value, CancellationToken ct = default)
   {
     ArgumentException.ThrowIfNullOrWhiteSpace(key);
-    return _cache.SetAsync($"settings:{key}", value, SettingsOptions, ct);
+    return _writer?.SetAsync($"settings:{key}", value, SettingsOptions, ct)
+        ?? Task.FromException(new InvalidOperationException(
+            "The configured cache provider does not implement ICacheWriter, which is required to update settings."));
   }
 }

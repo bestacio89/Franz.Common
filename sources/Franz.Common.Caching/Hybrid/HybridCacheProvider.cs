@@ -8,10 +8,17 @@ namespace Franz.Common.Caching.Hybrid;
 /// Adapts the .NET HybridCache API to Franz.Common's provider contract.
 /// HybridCache supplies its own local stampede protection and L1/L2 coordination.
 /// </summary>
-public sealed class HybridCacheProvider : ICacheProvider
+public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
 {
   private readonly HybridCache _cache;
-  private readonly IOptionsMonitor<CacheOptions> _optionsMonitor;
+  private readonly IOptionsMonitor<CacheOptions>? _optionsMonitor;
+  private readonly CacheOptions? _fixedOptions;
+
+  public HybridCacheProvider(HybridCache cache, CacheOptions options)
+  {
+    _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+    _fixedOptions = options ?? throw new ArgumentNullException(nameof(options));
+  }
 
   public HybridCacheProvider(HybridCache cache, IOptionsMonitor<CacheOptions> optionsMonitor)
   {
@@ -39,7 +46,7 @@ public sealed class HybridCacheProvider : ICacheProvider
           isHit = false;
           return await f(cancellationToken).ConfigureAwait(false);
         },
-        CreateEntryOptions(overrideOptions ?? _optionsMonitor.CurrentValue),
+        CreateEntryOptions(overrideOptions ?? CurrentOptions),
         cancellationToken: ct).ConfigureAwait(false);
 
     return new CacheResult<T>(value, isHit);
@@ -65,6 +72,8 @@ public sealed class HybridCacheProvider : ICacheProvider
     ArgumentException.ThrowIfNullOrWhiteSpace(key);
     return _cache.RemoveAsync(ApplyPrefix(key), ct).AsTask();
   }
+
+  private CacheOptions CurrentOptions => _optionsMonitor?.CurrentValue ?? _fixedOptions!;
 
   private string ApplyPrefix(string key) => $"{_optionsMonitor.CurrentValue.KeyPrefix}{key}";
 

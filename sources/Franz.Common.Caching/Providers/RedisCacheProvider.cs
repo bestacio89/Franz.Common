@@ -13,7 +13,7 @@ namespace Franz.Common.Caching.Providers;
 /// Redis-backed cache provider. Per-key factory coordination is process-local;
 /// Redis itself remains the shared source of truth across application nodes.
 /// </summary>
-public sealed class RedisCacheProvider : ICacheProvider
+public sealed class RedisCacheProvider : ICacheProvider, ICacheWriter
 {
   private const string ReadAndRefreshScript = """
       local value = redis.call('GET', KEYS[1])
@@ -104,8 +104,15 @@ public sealed class RedisCacheProvider : ICacheProvider
 
   public RedisCacheProvider(
       IConnectionMultiplexer connection,
+      IOptionsMonitor<CacheOptions> optionsMonitor)
+      : this(connection, optionsMonitor, null)
+  {
+  }
+
+  public RedisCacheProvider(
+      IConnectionMultiplexer connection,
       IOptionsMonitor<CacheOptions> optionsMonitor,
-      IOptions<JsonSerializerOptions>? serializerOptions = null)
+      IOptions<JsonSerializerOptions>? serializerOptions)
   {
     ArgumentNullException.ThrowIfNull(connection);
     _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));

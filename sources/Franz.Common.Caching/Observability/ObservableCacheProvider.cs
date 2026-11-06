@@ -3,9 +3,10 @@ using Franz.Common.Caching.Abstractions;
 
 namespace Franz.Common.Caching.Observability;
 
-public sealed class ObservableCacheProvider : ICacheProvider
+public sealed class ObservableCacheProvider : ICacheProvider, ICacheWriter
 {
   private readonly ICacheProvider _inner;
+  private readonly ICacheWriter? _writer;
   private readonly ICacheObserver[] _observers;
 
   public ObservableCacheProvider(
@@ -13,6 +14,7 @@ public sealed class ObservableCacheProvider : ICacheProvider
       IEnumerable<ICacheObserver> observers)
   {
     _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+    _writer = inner as ICacheWriter;
     _observers = observers?.ToArray() ?? Array.Empty<ICacheObserver>();
   }
 
@@ -49,7 +51,12 @@ public sealed class ObservableCacheProvider : ICacheProvider
       CacheOptions? options = null,
       CancellationToken ct = default)
   {
-    await _inner.SetAsync(key, value, options, ct).ConfigureAwait(false);
+    if (_writer is null)
+    {
+      throw new NotSupportedException("The wrapped cache provider does not implement ICacheWriter.");
+    }
+
+    await _writer.SetAsync(key, value, options, ct).ConfigureAwait(false);
     NotifySet(key, options);
   }
 
@@ -81,9 +88,6 @@ public sealed class ObservableCacheProvider : ICacheProvider
       }
       catch (Exception exception)
       {
-        // Observer failures must not change the result of a cache operation.
-        // Notifications are synchronous because ICacheObserver is a synchronous
-        // contract; no unbounded Task.Run queue or unobserved exception is created.
         Trace.TraceError(
             "Cache observer {0} failed: {1}",
             observer.GetType().FullName,
