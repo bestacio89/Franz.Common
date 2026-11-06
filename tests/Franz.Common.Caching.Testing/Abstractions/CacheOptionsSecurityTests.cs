@@ -74,14 +74,14 @@ public sealed class CacheOptionsSecurityTests
     using var provider = services.BuildServiceProvider();
     var cache = provider.GetRequiredService<ICacheProvider>();
     using var cancellation = new CancellationTokenSource();
-    var factoryStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-    var releaseFactory = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var factoryStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+    var releaseFactory = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
     var pending = cache.GetOrSetAsync(
         "cancelled-factory",
         async _ =>
         {
-          factoryStarted.SetResult();
+          factoryStarted.SetResult(true);
           await releaseFactory.Task.ConfigureAwait(false);
           return "stale";
         },
@@ -89,7 +89,7 @@ public sealed class CacheOptionsSecurityTests
 
     await factoryStarted.Task.ConfigureAwait(false);
     cancellation.Cancel();
-    releaseFactory.SetResult();
+    releaseFactory.SetResult(true);
 
     await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
 
