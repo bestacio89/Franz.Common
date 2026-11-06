@@ -12,7 +12,7 @@ namespace Franz.Common.Caching.Estrategies;
 /// Native AOT applications should register source-generated metadata for every
 /// cached request type.
 /// </summary>
-public sealed class DefaultCacheKeyStrategy : ICacheKeyStrategy
+public class DefaultCacheKeyStrategy : ICacheKeyStrategy
 {
     private readonly JsonSerializerOptions _serializerOptions;
 

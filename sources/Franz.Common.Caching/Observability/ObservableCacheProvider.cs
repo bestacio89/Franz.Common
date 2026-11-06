@@ -14,8 +14,15 @@ public sealed class ObservableCacheProvider : ICacheProvider, ICacheWriter
 
   public ObservableCacheProvider(
       ICacheProvider inner,
+      IEnumerable<ICacheObserver> observers)
+      : this(inner, observers, null)
+  {
+  }
+
+  public ObservableCacheProvider(
+      ICacheProvider inner,
       IEnumerable<ICacheObserver> observers,
-      IOptionsMonitor<CacheOptions>? optionsMonitor = null)
+      IOptionsMonitor<CacheOptions>? optionsMonitor)
   {
     _inner = inner ?? throw new ArgumentNullException(nameof(inner));
     _writer = inner as ICacheWriter;
