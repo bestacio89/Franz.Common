@@ -1,10 +1,6 @@
 # Franz.Common.Serialization
 
-> JSON serialization contracts and reusable serializer configuration for consistent application and messaging payloads.
-
-## Overview
-
-JSON serialization contracts and reusable serializer configuration for consistent application and messaging payloads.
+> System.Text.Json serialization contracts with explicit converter composition and UTF-8 byte-array support.
 
 ## Installation
 
@@ -12,171 +8,66 @@ JSON serialization contracts and reusable serializer configuration for consisten
 dotnet add package Franz.Common.Serialization
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A serialization utility library within the **Franz Framework** that simplifies JSON and byte array serialization. This package includes custom JSON converters, serializers, and extensions for seamless integration into .NET applications.
-
----
-
-## **Features**
-
-- **Custom JSON Converters**:
-  - `DateTimeJsonConverter` and `DateTimeOffsetJsonConverter` for handling specific datetime formats.
-  - `EnumerationJsonConverter` for serializing and deserializing enumerations.
-- **Byte Array Serialization**:
-  - `ByteArraySerializer` and `IByteArraySerializer` for efficient byte array serialization and deserialization.
-- **JSON Serialization**:
-  - `JsonSerializer` and `JsonCreationConverter` for custom JSON serialization logic.
-- **Service Registration**:
-  - `ServiceCollectionExtensions` to streamline serializer setup and dependency injection.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package is lightweight and has no external dependencies beyond the .NET runtime.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Serialization
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Serialization
-```
-
----
-
-## **Usage**
-
-### **1. Register Serialization Services**
-
-Use `ServiceCollectionExtensions` to register the serializers:
+## Register serializer services
 
 ```csharp
 using Franz.Common.Serialization.Extensions;
 
-public class Startup
+builder.Services.AddSerializers();
+```
+
+The extension registers:
+
+- `IJsonSerializer` → `SystemTextJsonSerializer` as a singleton.
+- `IByteArraySerializer` → `ByteArraySerializer` as a singleton.
+
+Both registrations use the Franz no-duplicate registration strategy. The JSON serializer receives the registered `IEnumerable<JsonConverter>`; add converters explicitly when the application requires them.
+
+## JSON contract
+
+`IJsonSerializer` exposes:
+
+```csharp
+string? Serialize(object? content);
+T? Deserialize<T>(string? content);
+object? Deserialize(string? content, Type targetType);
+```
+
+The current implementation uses `System.Text.Json`, not Newtonsoft.Json. Its options use camel-case property naming, case-insensitive property matching, omit null-valued properties when writing, and produce compact JSON. Null input serializes to null; blank input deserializes to the default value/null.
+
+```csharp
+using Franz.Common.Serialization;
+
+public sealed class EventPublisher(IJsonSerializer serializer)
 {
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddSerialization();
-    }
+    public string? Serialize(OrderCreated message) =>
+        serializer.Serialize(message);
+
+    public OrderCreated? Deserialize(string payload) =>
+        serializer.Deserialize<OrderCreated>(payload);
 }
 ```
 
-### **2. Serialize and Deserialize JSON**
+## Default options
 
-Leverage `JsonSerializer` for JSON operations:
+`FranzJson.Default` exposes a static `JsonSerializerOptions` instance with the same camel-case, case-insensitive, null-omitting, compact defaults. It intentionally does not enable polymorphic type-name deserialization or add custom converters by default.
 
-```csharp
-using Franz.Common.Serialization;
+The registered `SystemTextJsonSerializer` creates its own options instance and adds the converters supplied through DI; it does not use `FranzJson.Default` directly.
 
-var jsonSerializer = new JsonSerializer();
-var jsonData = jsonSerializer.Serialize(new { Name = "John", Age = 30 });
-var person = jsonSerializer.Deserialize<Person>(jsonData);
-```
+## Custom converters
 
-### **3. Use Custom JSON Converters**
+The assembly contains converter types such as `DateTimeJsonConverter`, `DateTimeOffsetJsonConverter`, and `EnumerationJsonConverter`. Their presence does not mean they are automatically registered. Register the required `JsonConverter` instances with DI before calling `AddSerializers()`, or configure a serializer instance explicitly where appropriate.
 
-Register and use custom converters like `DateTimeJsonConverter`:
+## Byte-array contract
 
-```csharp
-var options = new JsonSerializerOptions();
-options.Converters.Add(new DateTimeJsonConverter());
+`ByteArraySerializer` serializes an object through `IJsonSerializer`, then encodes the JSON as UTF-8 bytes. Deserialization decodes UTF-8 and delegates to the JSON serializer. A null object produces an empty byte array; null byte input produces the default result.
 
-var json = JsonSerializer.Serialize(DateTime.Now, options);
-var dateTime = JsonSerializer.Deserialize<DateTime>(json, options);
-```
+This is JSON encoded as UTF-8, not a binary object serializer or a compression format. Do not use it when a protocol requires a distinct binary schema.
 
-### **4. Byte Array Serialization**
+## Security and compatibility
 
-Utilize `ByteArraySerializer` for byte array operations:
-
-```csharp
-using Franz.Common.Serialization;
-
-var byteArraySerializer = new ByteArraySerializer();
-var data = new byte[] { 1, 2, 3, 4 };
-var serialized = byteArraySerializer.Serialize(data);
-var deserialized = byteArraySerializer.Deserialize<byte[]>(serialized);
-```
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Serialization** package integrates seamlessly with the **Franz Framework**, providing utilities for efficient serialization and deserialization in distributed systems. Combine it with other Franz packages for enhanced functionality.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+Do not add polymorphic type activation for untrusted payloads without a strict allow-list and a reviewed threat model. Treat converter behavior, naming policy, null handling, and date/time representation as wire-contract decisions; cover changes with compatibility tests.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Added `DateTimeJsonConverter`, `DateTimeOffsetJsonConverter`, and `EnumerationJsonConverter`.
-- Introduced `ByteArraySerializer` and `IByteArraySerializer`.
-- Enhanced JSON serialization with `JsonSerializer` and `JsonCreationConverter`.
-- Provided `ServiceCollectionExtensions` for streamlined DI setup.
-
----
-
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-
-### Version 1.7.4
-- Minor bug fixes and performance improvements
-- Updated dependencies to latest versions of System.Text.Json
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See [LICENSE](../../LICENSE).

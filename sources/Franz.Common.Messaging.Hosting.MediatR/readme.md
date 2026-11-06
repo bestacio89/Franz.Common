@@ -1,10 +1,6 @@
 # Franz.Common.Messaging.Hosting.MediatR
 
-> Hosting integration that connects MediatR application dispatch with Franz.Common messaging workers.
-
-## Overview
-
-Hosting integration that connects MediatR application dispatch with Franz.Common messaging workers.
+> A hosted-messaging strategy executor that deserializes message envelopes and dispatches commands, queries, or integration events through the Franz dispatcher.
 
 ## Installation
 
@@ -12,177 +8,45 @@ Hosting integration that connects MediatR application dispatch with Franz.Common
 dotnet add package Franz.Common.Messaging.Hosting.MediatR
 ```
 
-## Design principles
+## What the package actually integrates
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+Despite the historical package name and older README examples, the current `MessagingStrategyExecuter` uses `Franz.Common.Mediator.Dispatchers.IDispatcher`. It does not use MediatR's `IMediator` or `IRequestHandler` APIs in the implementation shown.
 
-## Usage and configuration
+The executor implements `IMessagingStrategyExecuter` from the Franz messaging-hosting contracts. Its `CanExecuteAsync` method returns true when the message headers contain the messaging class-name metadata.
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+## Dispatch behavior
 
-## Package-specific guide
+The executor reads the class name from the message headers, resolves it with `Type.GetType`, deserializes the message body with Newtonsoft.Json, and dispatches according to the resulting runtime type:
 
-An extension library within the **Franz Framework** that integrates **MediatR** with hosted messaging services. This package provides support for dispatching messages using **MediatR** pipelines within hosted services, enabling clean, decoupled, and testable messaging workflows.
+| Runtime type | Dispatch operation |
+|---|---|
+| `IIntegrationEvent` | `IDispatcher.PublishNotificationAsync` |
+| `ICommand` | `IDispatcher.SendAsync` |
+| `IQuery<object>` | `IDispatcher.SendAsync` |
+| Any other type | Throws `TechnicalException` |
 
----
+The package's `IIntegrationEvent` contract extends the Franz mediator `ICommand` contract. The executor checks integration events before commands so that they are published as notifications.
 
-## **Features**
+## Message envelope requirements
 
-- **MediatR Integration**:
-  - Leverages **MediatR** for handling messaging strategies and execution.
-- **Hosted Messaging Service Support**:
-  - Extends the **Franz.Common.Messaging.Hosting** package to include **MediatR**-based message processing.
-- **JSON Serialization**:
-  - Supports **Newtonsoft.Json** for handling message payloads during MediatR operations.
+The message must contain:
+- A class-name header resolvable by the running process.
+- A non-null JSON body compatible with the resolved type.
 
----
+Missing bodies, unresolved types, failed deserialization, and unsupported message types produce `TechnicalException`. The executor runs the configured `IAsyncMessageActionFilter` chain around dispatch and propagates the captured base exception after the filter pipeline completes.
 
-## **Version Information**
+## Trust boundary
 
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
+The class name is resolved dynamically from message metadata and the body is deserialized into that runtime type. Only process messages from trusted producers and enforce broker-level authentication/authorization, schema governance, and payload validation. Do not accept arbitrary externally supplied type names as safe dispatch instructions.
 
----
+## Concurrency and lifecycle caveat
 
-## **Dependencies**
+The current implementation stores an `IEnumerator<IAsyncMessageActionFilter>` and per-message execution contexts as instance fields. It does not recreate the filter enumerator for each message. Do not register or share this executor as a concurrent singleton without addressing that lifecycle behavior; verify the hosting registration lifetime and concurrent-consumption model.
 
-This package relies on:
-- **MediatR** (12.2.0): Provides in-process messaging with pipelines.
-- **Newtonsoft.Json** (13.0.3): Facilitates JSON serialization for message payloads.
-- **Franz.Common.Messaging.Hosting**: Adds hosting support for messaging workflows.
+## Registration
 
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Messaging.Hosting.MediatR
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Messaging.Hosting.MediatR
-```
-
----
-
-## **Usage**
-
-### **1. Configure MediatR for Hosted Messaging**
-
-Use the `MessagingStrategyExecuter` class to implement MediatR pipelines in hosted messaging workflows:
-
-```csharp
-using Franz.Common.Messaging.Hosting.MediatR;
-
-public class MyMessagingStrategyExecuter : IMessagingStrategyExecuter
-{
-    private readonly IMediator _mediator;
-
-    public MyMessagingStrategyExecuter(IMediator mediator)
-    {
-        _mediator = mediator;
-    }
-
-    public async Task ExecuteAsync(MessageContext context)
-    {
-        // Dispatch the message using MediatR
-        await _mediator.Send(new MyMessageCommand { Payload = context.Message });
-    }
-}
-```
-
-### **2. Register MediatR Services**
-
-Add **MediatR** and messaging services in the `Startup` class:
-
-```csharp
-using Franz.Common.Messaging.Hosting.MediatR;
-
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddMediatR(typeof(MyMessageHandler).Assembly);
-        services.AddMessagingWithMediatR();
-    }
-}
-```
-
-### **3. Implement MediatR Handlers**
-
-Define message handlers using MediatR's `IRequestHandler`:
-
-```csharp
-using MediatR;
-
-public class MyMessageCommand : IRequest
-{
-    public string Payload { get; set; }
-}
-
-public class MyMessageHandler : IRequestHandler<MyMessageCommand>
-{
-    public Task<Unit> Handle(MyMessageCommand request, CancellationToken cancellationToken)
-    {
-        // Handle the message
-        Console.WriteLine($"Processing message: {request.Payload}");
-        return Unit.Task;
-    }
-}
-```
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Messaging.Hosting.MediatR** package integrates seamlessly with:
-- **Franz.Common.Messaging.Hosting**: Provides hosted services for messaging workflows.
-- **MediatR**: Enables in-process messaging and pipelines.
-- **Newtonsoft.Json**: Supports serialization of message payloads.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+This project contains the strategy implementation; it does not expose the historical `AddMessagingWithMediatR()` registration extension described by the previous guide. Register the executor through the hosting strategy mechanism supported by the current messaging-hosting package.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Added `MessagingStrategyExecuter` for integrating MediatR pipelines into messaging workflows.
-- Introduced support for JSON serialization using **Newtonsoft.Json**.
-- Full compatibility with **Franz.Common.Messaging.Hosting**.
-
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See [LICENSE](../../LICENSE).
