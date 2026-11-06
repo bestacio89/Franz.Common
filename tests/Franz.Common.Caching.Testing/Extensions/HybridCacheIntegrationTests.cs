@@ -2,6 +2,7 @@ using FluentAssertions;
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Extensions;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -125,7 +126,7 @@ public sealed class HybridCacheIntegrationTests
   private sealed class SharedDistributedCache : IDistributedCache
   {
     private readonly MemoryDistributedCache _inner = new(
-        Options.Create(new MemoryDistributedCacheOptions()));
+        Microsoft.Extensions.Options.Options.Create(new MemoryDistributedCacheOptions()));
 
     public byte[]? Get(string key) => _inner.Get(key);
 
