@@ -56,7 +56,7 @@ internal sealed class AsyncKeyedLock<TKey> where TKey : notnull
     }
   }
 
-  private sealed class Entry
+  internal sealed class Entry
   {
     public SemaphoreSlim Semaphore { get; } = new(1, 1);
     public int ReferenceCount { get; set; }
@@ -68,7 +68,7 @@ internal sealed class AsyncKeyedLock<TKey> where TKey : notnull
     private readonly TKey _key;
     private readonly Entry _entry;
 
-    private Releaser(AsyncKeyedLock<TKey> owner, TKey key, Entry entry)
+    internal Releaser(AsyncKeyedLock<TKey> owner, TKey key, Entry entry)
     {
       _owner = owner;
       _key = key;

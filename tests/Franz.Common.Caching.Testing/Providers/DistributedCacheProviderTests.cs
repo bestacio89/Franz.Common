@@ -28,7 +28,6 @@ public sealed class DistributedCacheProviderTests
 
     _optionsMock = new Mock<IOptionsMonitor<CacheOptions>>();
     _optionsMock.Setup(m => m.CurrentValue).Returns(_globalOptions);
-
     _provider = new DistributedCacheProvider(_cacheMock.Object, _optionsMock.Object);
   }
 
@@ -46,32 +45,23 @@ public sealed class DistributedCacheProviderTests
 
     result.IsHit.Should().BeFalse();
     result.Value.Should().Be(expectedValue);
-
-    _cacheMock.Verify(c => c.SetAsync(
-        key,
-        It.IsAny<byte[]>(),
-        It.IsAny<DistributedCacheEntryOptions>(),
-        It.IsAny<CancellationToken>()),
-        Times.Once);
+    _cacheMock.Verify(c => c.SetAsync(key, It.IsAny<byte[]>(),
+        It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
   }
 
   [Fact]
   public async Task GetOrSetAsync_ConcurrentRequests_ShouldInvokeFactoryOnce()
   {
     const string key = "dist:stampede";
-    int factoryCalls = 0;
+    var factoryCalls = 0;
     byte[]? internalCache = null;
 
     _cacheMock.Setup(c => c.GetAsync(key, It.IsAny<CancellationToken>()))
-              .Returns(() => Task.FromResult(internalCache));
-
-    _cacheMock.Setup(c => c.SetAsync(
-                key,
-                It.IsAny<byte[]>(),
-                It.IsAny<DistributedCacheEntryOptions>(),
-                It.IsAny<CancellationToken>()))
-              .Callback<string, byte[], DistributedCacheEntryOptions, CancellationToken>((k, v, o, c) => internalCache = v)
-              .Returns(Task.CompletedTask);
+        .Returns(() => Task.FromResult(internalCache));
+    _cacheMock.Setup(c => c.SetAsync(key, It.IsAny<byte[]>(),
+        It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
+        .Callback<string, byte[], DistributedCacheEntryOptions, CancellationToken>((_, value, _, _) => internalCache = value)
+        .Returns(Task.CompletedTask);
 
     var tasks = Enumerable.Range(0, 10).Select(_ =>
         _provider.GetOrSetAsync(key, async _ =>
@@ -93,8 +83,8 @@ public sealed class DistributedCacheProviderTests
     var bytes = System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload));
 
     _cacheMock.SetupSequence(c => c.GetAsync(key, It.IsAny<CancellationToken>()))
-              .ReturnsAsync((byte[]?)null)
-              .ReturnsAsync(bytes);
+        .ReturnsAsync((byte[]?)null)
+        .ReturnsAsync(bytes);
 
     var result = await _provider.GetOrSetAsync(key, _ => Task.FromResult(new TestPayload(Guid.CreateVersion7(), "new")));
 
@@ -112,10 +102,9 @@ public sealed class DistributedCacheProviderTests
     var bytes = System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload));
 
     _cacheMock.Setup(cache => cache.GetAsync(fullKey, It.IsAny<CancellationToken>()))
-      .ReturnsAsync(bytes);
+        .ReturnsAsync(bytes);
 
     var result = await _provider.GetOrSetAsync<TestPayload>(key, _ => throw new InvalidOperationException("Factory must not run."));
-
     result.IsHit.Should().BeTrue();
     result.Value.Should().Be(payload);
 
@@ -127,8 +116,8 @@ public sealed class DistributedCacheProviderTests
   public async Task GetOrSetAsync_ShouldTreatJsonNullAsAHit()
   {
     const string key = "dist:null";
-    _cacheMock.Setup(cache => cache.GetStringAsync(key, It.IsAny<CancellationToken>()))
-      .ReturnsAsync("null");
+    _cacheMock.Setup(cache => cache.GetAsync(key, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(System.Text.Encoding.UTF8.GetBytes("null"));
 
     var factoryCalls = 0;
     var result = await _provider.GetOrSetAsync<string?>(key, _ =>
@@ -146,12 +135,13 @@ public sealed class DistributedCacheProviderTests
   public async Task SetAsync_ShouldReplaceAnExistingEntry()
   {
     const string key = "settings:theme";
-    var stored = new Dictionary<string, byte[]>();
+    byte[]? stored = null;
     _cacheMock.Setup(cache => cache.GetAsync(key, It.IsAny<CancellationToken>()))
-      .Returns((string _, CancellationToken _) => Task.FromResult(stored.TryGetValue(key, out var value) ? value : null));
-    _cacheMock.Setup(cache => cache.SetAsync(key, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
-      .Callback<string, byte[], DistributedCacheEntryOptions, CancellationToken>((_, value, _, _) => stored[key] = value)
-      .Returns(Task.CompletedTask);
+        .Returns(() => Task.FromResult(stored));
+    _cacheMock.Setup(cache => cache.SetAsync(key, It.IsAny<byte[]>(),
+        It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
+        .Callback<string, byte[], DistributedCacheEntryOptions, CancellationToken>((_, value, _, _) => stored = value)
+        .Returns(Task.CompletedTask);
 
     await _provider.SetAsync(key, "new-value");
     var result = await _provider.GetOrSetAsync(key, _ => Task.FromResult("factory-value"));

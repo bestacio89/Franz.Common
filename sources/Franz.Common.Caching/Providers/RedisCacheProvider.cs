@@ -2,6 +2,8 @@ using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Internal;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace Franz.Common.Caching.Providers;
@@ -66,16 +68,18 @@ public sealed class RedisCacheProvider : ICacheProvider
     var fullKey = ApplyPrefix(key);
     var options = requestOptions ?? _optionsMonitor.CurrentValue;
 
-    if (await TryGetAsync<T>(fullKey, options, ct, out var cached).ConfigureAwait(false))
+    var cached = await TryGetAsync<T>(fullKey, options, ct).ConfigureAwait(false);
+    if (cached.Found)
     {
-      return new CacheResult<T>(cached!, IsHit: true);
+      return new CacheResult<T>(cached.Value!, IsHit: true);
     }
 
     using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
-      if (await TryGetAsync<T>(fullKey, options, ct, out cached).ConfigureAwait(false))
+      cached = await TryGetAsync<T>(fullKey, options, ct).ConfigureAwait(false);
+      if (cached.Found)
       {
-        return new CacheResult<T>(cached!, IsHit: true);
+        return new CacheResult<T>(cached.Value!, IsHit: true);
       }
 
       var value = await factory(ct).ConfigureAwait(false);
@@ -122,11 +126,10 @@ public sealed class RedisCacheProvider : ICacheProvider
     }
   }
 
-  private async Task<bool> TryGetAsync<T>(
+  private async Task<(bool Found, T? Value)> TryGetAsync<T>(
       string fullKey,
       CacheOptions options,
-      CancellationToken ct,
-      out T? value)
+      CancellationToken ct)
   {
     ct.ThrowIfCancellationRequested();
 
@@ -134,7 +137,7 @@ public sealed class RedisCacheProvider : ICacheProvider
     // is honored before issuing the command and by keyed-lock/factory waits; an
     // already-issued Redis command cannot be interrupted by this provider.
     var slidingMilliseconds = options.DefaultSlidingExpiration > TimeSpan.Zero
-        ? (long)options.DefaultSlidingExpiration.TotalMilliseconds
+        ? Math.Max(1L, (long)options.DefaultSlidingExpiration.TotalMilliseconds)
         : 0L;
 
     var result = await _db.ScriptEvaluateAsync(
@@ -143,21 +146,20 @@ public sealed class RedisCacheProvider : ICacheProvider
         new RedisValue[] { slidingMilliseconds, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() })
         .ConfigureAwait(false);
 
-    value = default;
     if (result.IsNull)
     {
-      return false;
+      return (false, default);
     }
 
     var serialized = ((RedisValue)result).ToString();
     try
     {
-      value = JsonSerializer.Deserialize<T>(serialized);
-      return true;
+      // A JSON null is a valid value. Found is independent of Value.
+      return (true, JsonSerializer.Deserialize<T>(serialized));
     }
     catch (JsonException)
     {
-      return false;
+      return (false, default);
     }
   }
 
@@ -185,6 +187,11 @@ public sealed class RedisCacheProvider : ICacheProvider
         (!initialExpiration.HasValue || slidingExpiration.Value < initialExpiration.Value))
     {
       initialExpiration = slidingExpiration;
+    }
+
+    if (initialExpiration <= TimeSpan.Zero)
+    {
+      initialExpiration = TimeSpan.FromMilliseconds(1);
     }
 
     var transaction = _db.CreateTransaction();
@@ -215,5 +222,8 @@ public sealed class RedisCacheProvider : ICacheProvider
   private string ApplyPrefix(string key) => $"{_optionsMonitor.CurrentValue.KeyPrefix}{key}";
 
   private static RedisKey GetAbsoluteExpirationKey(string fullKey)
-      => $"__franz_internal__:cache-absolute:{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(fullKey)))}";
+  {
+    var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fullKey)));
+    return $"__franz_internal__:cache-absolute:{digest}";
+  }
 }
