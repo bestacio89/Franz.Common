@@ -9,7 +9,7 @@ This executable is the repeatable production-style workload harness for Franz.Co
 - hybrid: Franz HybridCache provider with Redis as its distributed L2 store.
 - redis: Franz Redis provider using StackExchange.Redis directly.
 
-Distributed, Hybrid, and Redis runs provision an isolated Redis 7.2 container with Testcontainers. No external Redis service or developer-managed compose stack is required.
+Distributed, Hybrid, and Redis runs provision an isolated Redis 7.2 container with Testcontainers. No external Redis service or developer-managed compose stack is required. The harness explicitly pins patched transitive MessagePack and SSH.NET versions so its load-test dependency graph does not reintroduce known advisories.
 
 ## Workload model
 

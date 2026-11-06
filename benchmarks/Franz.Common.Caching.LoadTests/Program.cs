@@ -10,6 +10,7 @@ using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
 using Microsoft.Extensions.DependencyInjection;
 using NBomber.Contracts;
+using NBomber.Contracts.Stats;
 using NBomber.CSharp;
 using Testcontainers.Redis;
 
