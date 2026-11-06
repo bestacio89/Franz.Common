@@ -1,10 +1,6 @@
 # Franz.Common.Aras
 
-> ARAS Innovator persistence integration for domain entities and aggregates, including mapping, unit-of-work commits, snapshots, and diagnostics.
-
-## Overview
-
-ARAS Innovator persistence integration for domain entities and aggregates, including mapping, unit-of-work commits, snapshots, and diagnostics.
+> ARAS Innovator adapter contracts, REST-backed contexts, mapping factories, and repository base classes.
 
 ## Installation
 
@@ -12,317 +8,50 @@ ARAS Innovator persistence integration for domain entities and aggregates, inclu
 dotnet add package Franz.Common.Aras
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-````markdown
-# Franz.Common.Aras – v1.5.0 ??
-
-**Franz.Common.Aras** integrates **ARAS Innovator** into the **Franz Framework** with clean, DDD-driven abstractions.
-It lets you treat ARAS as just another persistence provider — with **Entities**, **Aggregates**, **Unit of Work**, **Snapshots**, **Diagnostics**, and an **InMemory provider for testing**.
-
----
-
-## ?? What’s New in v1.5.0
-
-- ? **Concrete ARAS Innovator provider** (REST API)
-- ? **Fluent mapping layer** (field ? property, ignores, conversions)
-- ? **Unit of Work** (commit entities + aggregates atomically)
-- ? **Snapshotting** (optimize large aggregates, replay only post-snapshot events)
-- ? **Diagnostics decorators** (logging + OpenTelemetry tracing)
-- ? **InMemory provider** (unit testing without ARAS)
-- ? **AddArasInnovator bootstrapper** (EF-style DI registration)
-- ? **Full samples** for Entities, Aggregates, UoW, Testing, and Snapshots
-````
----
-**Current Version:** v3.0.0
----
-## ?? Installation
-
-```bash
-dotnet add package Franz.Common.Aras
-````
-
-If you’re in a class library (not ASP.NET Core), also add:
-
-```bash
-dotnet add package Microsoft.Extensions.Http
-```
-
----
-
-## ?? Setup
-
-Register ARAS Innovator with dependency injection:
+## Register the Innovator adapter
 
 ```csharp
-using Franz.Common.Aras.Innovator;
-using Microsoft.Extensions.DependencyInjection;
+using Franz.Common.Aras.Extensions.Options;
+using Franz.Common.Aras.Innovator.Extensions;
 
-var services = new ServiceCollection();
-
-services.AddArasInnovator(options =>
+builder.Services.AddArasInnovator(options =>
 {
-    options.BaseUrl = "https://aras.server/InnovatorServer";
-    options.Database = "InnovatorSolutions";
-    options.UserName = "admin";
-    options.Password = "innovator";
-
-    // Optional:
-    options.UseDiagnostics = true;
-    options.SnapshotFrequency = 50; // every 50 events
+    options.BaseUrl = configuration["Aras:BaseUrl"]
+        ?? throw new InvalidOperationException("Missing Aras:BaseUrl.");
+    options.AuthToken = configuration["Aras:AuthToken"];
+    options.UseDiagnostics = false;
+    options.SnapshotFrequency = 50;
 });
 ```
 
----
+The registration extension binds `ArasInnovatorOptions`, registers the entity and aggregate mapper factories as singletons, registers `IArasEntityContext` and `IArasAggregateContext` as scoped services, and configures typed HttpClients for the Innovator entity and aggregate contexts. Both clients use `BaseUrl` as their base address and add a Bearer authorization header when `AuthToken` is non-empty.
 
-## ?? Entities (CRUD)
+The options type also exposes `UseDiagnostics` (default `false`) and `SnapshotFrequency` (default `50`). The registration method shown does not itself register diagnostic decorators or apply the snapshot frequency; verify the context/decorator composition before relying on those settings.
 
-Entities are simple `Entity<Guid>` models.
+## Entity context and repository contract
 
-```csharp
-public class PartEntity : Entity<Guid>
-{
-    public string PartNumber { get; set; } = default!;
-    public string Description { get; set; } = default!;
-}
-```
+`IArasEntityContext` provides asynchronous query, get-by-ID, save, and delete operations for `Entity<Guid>` models. The generic repository contract exposes:
 
-Define a repository:
+- `GetByIdAsync(Guid, CancellationToken)`
+- `ListAsync(CancellationToken)`
+- `AddAsync(TEntity, CancellationToken)`
+- `UpdateAsync(TEntity, CancellationToken)`
+- `DeleteAsync(Guid, CancellationToken)`
 
-```csharp
-public class PartRepository : ArasEntityRepository<PartEntity>
-{
-    public PartRepository(IArasEntityContext context) : base(context) { }
-}
-```
+The abstract `ArasEntityRepository<TEntity>` delegates add and update to the context's `SaveEntityAsync`. Its list implementation issues an empty query string; confirm that convention against the target ARAS endpoint and mapping before using it as a general-purpose query.
 
-Usage sample:
+## Aggregate context and repository contract
 
-```csharp
-var repo = provider.GetRequiredService<PartRepository>();
+`IArasAggregateContext` supports tracking, loading, saving, committing aggregate changes, and retrieving an aggregate snapshot store. The repository contract constrains aggregates to `AggregateRoot<TEvent>` and domain events to `IDomainEvent`. The abstract repository delegates load/save to the context and skips persistence when the aggregate has no uncommitted changes.
 
-// Create
-var part = new PartEntity { PartNumber = "PN-1000", Description = "Widget" };
-await repo.AddAsync(part);
+## Unit-of-work boundary
 
-// Read
-var fetched = await repo.GetByIdAsync(part.Id);
-Console.WriteLine($"Fetched {fetched.PartNumber} - {fetched.Description}");
+`IArasUnitOfWork` defines entity and aggregate contexts plus `CommitAsync` and `RollbackAsync`. The `AddArasInnovator` registration method currently shown does not register an `IArasUnitOfWork` implementation. Do not assume the interface is resolvable from DI without an application-specific implementation or additional registration.
 
-// Update
-fetched.Description = "Updated Widget";
-await repo.UpdateAsync(fetched);
+## Configuration and security
 
-// Delete
-await repo.DeleteAsync(fetched.Id);
-```
-
----
-
-## ?? Aggregates (DDD + Events)
-
-Aggregates inherit from `AggregateRoot<TEvent>` and model behavior with domain events.
-
-```csharp
-public record PartCreated(Guid PartId, string PartNumber) : BaseDomainEvent;
-
-public class PartAggregate : AggregateRoot<PartCreated>
-{
-    public string PartNumber { get; private set; } = default!;
-
-    public void Create(string number)
-    {
-        ApplyChange(new PartCreated(Id, number));
-    }
-
-    protected override void When(PartCreated e)
-    {
-        Id = e.PartId;
-        PartNumber = e.PartNumber;
-    }
-}
-```
-
-Usage sample:
-
-```csharp
-var aggregates = provider.GetRequiredService<IArasAggregateContext>();
-
-var partAgg = new PartAggregate();
-partAgg.Create("PN-2000");
-
-await aggregates.SaveAggregateAsync(partAgg);
-
-// Load again (replay events or snapshot)
-var loaded = await aggregates.GetAggregateAsync<PartAggregate, PartCreated>(partAgg.Id);
-
-Console.WriteLine($"Loaded aggregate with PartNumber = {loaded.PartNumber}");
-```
-
----
-
-## ?? Unit of Work
-
-Commit entities + aggregates in one go:
-
-```csharp
-using var uow = provider.GetRequiredService<IArasUnitOfWork>();
-
-// Entities
-uow.Entities.Add(new PartEntity { PartNumber = "PN-3000", Description = "Bolt" });
-
-// Aggregates
-var partAgg = new PartAggregate();
-partAgg.Create("PN-4000");
-uow.Aggregates.TrackAggregate(partAgg);
-
-// Commit atomically
-await uow.CommitAsync();
-Console.WriteLine("UoW committed successfully");
-```
-
-Rollback clears tracked changes:
-
-```csharp
-await uow.RollbackAsync();
-Console.WriteLine("UoW rolled back");
-```
-
----
-
-## ?? InMemory Provider (Testing)
-
-Use the in-memory contexts without ARAS server:
-
-```csharp
-services.AddInMemoryAras();
-
-var context = provider.GetRequiredService<IArasEntityContext>();
-
-await context.SaveEntityAsync(new PartEntity { PartNumber = "TEST-1" });
-
-var parts = await context.QueryEntitiesAsync<PartEntity>("all");
-
-foreach (var part in parts)
-    Console.WriteLine($"InMemory part: {part.PartNumber}");
-```
-
-Aggregate testing:
-
-```csharp
-var aggregates = provider.GetRequiredService<IArasAggregateContext>();
-
-var agg = new PartAggregate();
-agg.Create("TEST-AGG");
-await aggregates.SaveAggregateAsync(agg);
-
-var reloaded = await aggregates.GetAggregateAsync<PartAggregate, PartCreated>(agg.Id);
-Console.WriteLine($"Reloaded aggregate: {reloaded.PartNumber}");
-```
-
----
-
-## ?? Snapshots (Performance)
-
-Aggregates are snapshotted automatically every *N* events (default 50):
-
-```csharp
-var agg = await aggregates.GetAggregateAsync<PartAggregate, PartCreated>(id);
-// Replays only events after last snapshot
-```
-
-You can configure snapshot frequency in `ArasInnovatorOptions`:
-
-```csharp
-options.SnapshotFrequency = 25;
-```
-
----
-
-## ?? Diagnostics
-
-Enable structured logging + tracing with decorators:
-
-```csharp
-services.AddLogging(b => b.AddConsole());
-services.AddOpenTelemetryTracing();
-
-services.Decorate<IArasEntityContext, DiagnosticEntityContextDecorator>();
-services.Decorate<IArasAggregateContext, DiagnosticAggregateContextDecorator>();
-```
-
-You’ll get logs for:
-
-* Entity queries, saves, deletes
-* Aggregate tracking, saving, committing
-* Event publishing
-* Snapshot operations
-
-Sample log:
-
-```
-[INF] Querying entities of type PartEntity
-[INF] Saving aggregate PartAggregate/PN-2000 with 1 new events
-[INF] Published event PartCreated { PartId = ..., PartNumber = "PN-2000" }
-```
-
----
-
-## ? Summary
-
-* **Entities** ? simple CRUD
-* **Aggregates** ? DDD + event sourcing
-* **Unit of Work** ? atomic batch commit
-* **InMemory** ? testing without ARAS
-* **Snapshots** ? scalable performance
-* **Diagnostics** ? enterprise observability
-* **Bootstrapper** ? one-liner service registration
-
----
-
-## ?? Samples
-
-This repo includes a `samples/` folder with ready-to-run console apps:
-
-* `Sample.Entities` ? CRUD with PartEntity
-* `Sample.Aggregates` ? Domain events with PartAggregate
-* `Sample.UoW` ? Entities + aggregates in one transaction
-* `Sample.InMemory` ? Tests without ARAS
-* `Sample.Diagnostics` ? Logs + tracing
-
----
-
-Franz.Common.Aras v1.5.0 — **bringing ARAS into the DDD world.**
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
----
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+Store the base URL and authentication token in a secret provider or environment-specific configuration. The adapter sends the token as a Bearer credential; do not log it or expose it in diagnostics. Validate connectivity, authorization, mapping, and failure behavior against a non-production Innovator environment.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See [LICENSE](../../LICENSE).
