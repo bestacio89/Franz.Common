@@ -1,6 +1,24 @@
 
 # 📈 **Franz Framework – Full Changelog**
 
+## v3.0.0 — Major platform release (planned)
+
+### Caching and performance validation
+- Introduce provider-neutral cache contracts with MemoryCache, DistributedCache, Redis and HybridCache implementations.
+- Enforce deterministic SHA-256 cache keys, explicit JSON metadata, tenant-scoped isolation and process-local same-key single-flight coordination.
+- Define provider-specific expiration, cancellation, malformed-entry recovery, null-hit and failure semantics.
+- Centralize cache metrics and observer behavior; bound diagnostic state and isolate observer failures.
+- Add Native AOT smoke coverage for Franz-owned caching paths while documenting upstream HybridCache limitations.
+- Add BenchmarkDotNet microbenchmarks and a BCL production-style workload runner covering all supported cache providers, multi-tenant keyspaces, hot-key skew, mixed payload sizes, warm-up, ramp-up, sustained load and ramp-down.
+- Publish machine-readable and human-readable CI reports; keep hosted-runner performance thresholds disabled until controlled baselines exist.
+
+### Release metadata
+- Set all framework NuGet packages to version 3.0.0, with assembly and file versions aligned to 3.0.0.0.
+- Keep package API compatibility validation anchored to the last published stable baseline (2.3.4); this baseline is deliberately distinct from the new package version.
+- Package publication remains gated on full Release validation and explicit release approval.
+
+---
+
 ## v2.3.5 — Tenant-aware HTTP, document persistence and gRPC
 
 ### HTTP request lifecycle

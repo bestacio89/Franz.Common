@@ -308,7 +308,7 @@ SQL Server, Postgres, Oracle, MariaDB, MongoDB, CosmosDB — all behind unified 
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 2.3.3
+dotnet add package Franz.Common --version 3.0.0
 ```
 
 Messaging example:
@@ -369,14 +369,15 @@ These reports provide reproducible regression evidence. Absolute performance thr
 
 Full version history lives in [`changelog.md`](changelog.md). Recent highlights:
 
-## v2.3.3 — RabbitMQ Operational Hardening
+## v3.0.0 — Enterprise Architecture and Caching Hardening
 
-- Supervised consumer startup and runtime failure through the generic host.
-- Defined single-owner acknowledgement and replay behavior, bounded delivery buffering, and safer channel/connection lifecycle management.
-- Enforced strict TLS validation by default and clarified transaction-channel ownership.
-- Documented operational contracts and added real-broker dead-letter routing coverage.
+- Introduces the hardened Caching 3.0.0 provider contracts and deterministic key/serialization behavior.
+- Adds MemoryCache, DistributedCache, Redis and HybridCache integrations with explicit expiration, failure and cancellation semantics.
+- Adds tenant-scoped cache keys, process-local single-flight coordination, centralized observability and Native AOT smoke coverage.
+- Adds BenchmarkDotNet microbenchmarks and automated production-style multi-provider workload simulation with CI reports.
+- Continues the framework's broader messaging, persistence, multitenancy and architecture-governance hardening.
 
-The shared build target sets package version 2.3.3 and file version 2.3.3.0 while retaining assembly version 2.3.0.0. NuGet publication remains a separate release step.
+The shared build target sets package, assembly and file versions to 3.0.0 / 3.0.0.0. NuGet publication remains a separate release operation after validation and approval.
 
 ## v2.3.2 — Release Baseline
 
@@ -466,7 +467,7 @@ The dependency baseline and compatibility notes are tracked in [the October 2026
 
 ## Versioning and compatibility
 
-- **Framework packages:** versioned together through `common.targets`; the current documentation baseline targets **2.3.3**.
+- **Framework packages:** versioned together through `common.targets`; the current coordinated release target is **3.0.0**.
 - **Target framework:** supported library projects target .NET 10 (`net10.0`). The repository pins SDK `10.0.403` in `global.json`; CI should use that same SDK.
 - **Third-party dependencies:** package versions are selected independently according to compatibility and security requirements. A package's version number is not the Franz.Common release version.
 - **Publishing:** the Azure DevOps publishing pipeline validates package metadata before publishing. Publish only after restore/audit, Release build, and full tests pass.

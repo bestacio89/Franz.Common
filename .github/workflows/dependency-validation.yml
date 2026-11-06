@@ -101,7 +101,7 @@ jobs:
               <Nullable>enable</Nullable>
             </PropertyGroup>
             <ItemGroup>
-              <PackageReference Include="Franz.Common.Mediator" Version="2.3.5" />
+              <PackageReference Include="Franz.Common.Mediator" Version="3.0.0" />
             </ItemGroup>
           </Project>
           EOF
