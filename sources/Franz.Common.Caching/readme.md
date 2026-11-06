@@ -1,10 +1,9 @@
 # Franz.Common.Caching
 
-> Caching abstractions and provider integrations for in-memory and distributed caching, including hybrid L1/L2 strategies and observability.
-
-## Overview
-
-Caching abstractions and provider integrations for in-memory and distributed caching, including hybrid L1/L2 strategies and observability.
+Provider-neutral caching for Franz.Common and .NET 10 applications. The package
+contains memory, `IDistributedCache`, Redis, and .NET HybridCache adapters,
+Mediator query caching, settings caching, tenant-aware key strategies, and
+provider observability.
 
 ## Installation
 
@@ -12,278 +11,201 @@ Caching abstractions and provider integrations for in-memory and distributed cac
 dotnet add package Franz.Common.Caching
 ```
 
-## Design principles
-
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-Here’s an updated **README** for version **1.7.8**, including all the **observability improvements, metrics observer, logging + metrics observer, and Excel/export-ready observer** you’ve just implemented:
-
----
-
-# Franz.Common.Caching
-
-A full-featured caching module for the **Franz Framework**.
-Provides **unified cache abstractions**, **hybrid caching (L1 + L2)**, Mediator request caching, settings cache, and **first-class observability** via Serilog, OpenTelemetry, and custom metrics/log observers.
-
----
-
-* **Current Version:** v2.3.4
-* **Target Framework**: **.NET 10.0**
-
----
-
-## ✨ Features
-
-* 🧱 **Unified abstractions**
-
-  * `ICacheProvider`
-  * `ICacheKeyStrategy`
-  * `ISettingsCache`
-  * **Single cache options model** (TTL, sliding, priority)
-
-* ⚡ **Hybrid caching support**
-
-  * L1: In-memory (fast, local)
-  * L2: Distributed / Redis (durable, shared)
-  * Read-through + write-through behavior
-  * Optional local cache hinting
-
-* 🧩 **Pluggable providers**
-
-  * `MemoryCacheProvider`
-  * `DistributedCacheProvider`
-  * `RedisCacheProvider`
-
-* 🔑 **Flexible cache key strategies**
-
-  * Default (type + normalized payload)
-  * Namespaced (domain separation)
-  * Custom strategies (drop-in)
-
-* 🔁 **Mediator pipeline integration**
-
-  * Automatic cache HIT / MISS detection
-  * Transparent response caching
-  * Per-request cache options (TTL, sliding, bypass)
-  * CQRS-aware (queries cached, commands skipped)
-  * **Null response caching supported**
-
-* 📈 **Observability out of the box**
-
-  * **Serilog enrichment**
-
-    * `FranzCorrelationId`
-    * `FranzCacheKey`
-    * `FranzCacheHit`
-
-  * **OpenTelemetry metrics**
-
-    * cache hits / misses
-    * lookup latency
-
-  * **OpenTelemetry trace tags**
-
-    * `franz.cache.*`
-
-  * **Observers**
-
-    * `MetricsCacheObserver` – in-memory metrics, hits, sets, total cache weight
-    * `LoggingMetricsObserver` – combines Serilog logging + metrics
-    * `ExcelCacheObserver` – export cache statistics (hits, misses, size) to Excel
-
----
-
-## 🔌 Plug-and-play DI extensions
-
-* `AddFranzMemoryCaching()`
-* `AddFranzDistributedCaching<T>()`
-* `AddFranzRedisCaching()`
-* `AddFranzHybridCaching()`
-* `AddFranzMediatorCaching()`
-* `AddObservableCaching()` – **enables any combination of observers**
-* `AddLoggingCacheObserver()`
-* `AddMetricsCacheObserver()`
-* `AddLoggingMetricsObserver()`
-* `AddExcelCacheObserver()` – opt-in for Excel exports
-
-> Observers are **opt-in**. You can register any combination depending on telemetry/logging needs.
-
----
-
-## 📦 Installation
+Excel export is optional and is distributed separately:
 
 ```bash
-dotnet add package Franz.Common.Caching --version 1.7.8
+dotnet add package Franz.Common.Caching.Excel
 ```
 
----
+## Provider contract
 
-## 🚀 Quickstart
+`ICacheProvider` exposes three operations:
+
+- `GetOrSetAsync<T>`: read an existing entry or create and cache the factory result.
+- `SetAsync<T>`: unconditionally replace an entry; the factory is never invoked.
+- `RemoveAsync`: remove an entry.
+
+A JSON `null` is a value, not a cache miss. Distributed and Redis providers
+treat malformed serialized entries as misses and replace them after the factory
+succeeds.
+
+Memory, distributed, and Redis providers coordinate concurrent factories with a
+process-local keyed lock. HybridCache uses its own stampede protection. These
+mechanisms do not provide a cross-process or cross-node distributed lock.
+
+### Expiration behavior
+
+| Provider | Absolute expiration | Sliding expiration |
+| --- | --- | --- |
+| Memory | Supported | Supported |
+| `IDistributedCache` adapter | Supported | Supported by the underlying provider |
+| Redis | Enforced as a maximum lifetime | Refreshed on access, never beyond the absolute deadline |
+| HybridCache | Maps to HybridCache entry expiration | Maps to local-cache expiration; it is not a distributed sliding TTL |
+
+A zero expiration disables that expiration dimension. Negative values are
+rejected during options validation.
+
+## Registration
+
+### Memory cache
 
 ```csharp
-// Program.cs
-builder.Services.AddFranzHybridCaching();
-
-// Mediator caching
-builder.Services.AddFranzMediatorCaching(opts =>
+services.AddFranzMemoryCaching(options =>
 {
-    opts.DefaultTtl = TimeSpan.FromMinutes(10);
-    opts.ShouldCache = req => !req.GetType().Name.EndsWith("Command");
+    options.KeyPrefix = "orders:";
+    options.DefaultAbsoluteExpiration = TimeSpan.FromMinutes(30);
+    options.DefaultSlidingExpiration = TimeSpan.FromMinutes(5);
 });
-
-// Observers
-builder.Services.AddObservableCaching()
-    .AddLoggingCacheObserver()
-    .AddMetricsCacheObserver()
-    .AddLoggingMetricsObserver()
-    .AddExcelCacheObserver(); // optional Excel export
 ```
 
----
+### Distributed cache adapter
 
-## 📊 Observability Examples
-
-### Metrics Observer
-
-Tracks per-key stats:
-
-* Hits / Misses
-* Last access / set time
-* Estimated size in bytes
-* Total cache weight
+Register an `IDistributedCache` implementation first, then add the Franz
+adapter:
 
 ```csharp
-var snapshot = metricsObserver.Snapshot();
-var totalWeight = snapshot.Values.Sum(x => x.EstimatedSizeBytes);
-```
-
-### Logging + Metrics Observer
-
-Combines Serilog logs + OpenTelemetry metrics:
-
-```json
+services.AddStackExchangeRedisCache(options =>
 {
-  "FranzCorrelationId": "af42c6...",
-  "FranzPipeline": "CachingPipeline",
-  "FranzCacheKey": "GetUserById:{\"Id\":42}",
-  "FranzCacheHit": true,
-  "Message": "Cache HIT for GetUserByIdQuery in 0.6ms"
+    options.Configuration = configuration.GetConnectionString("Redis");
+});
+services.AddFranzDistributedCaching(configuration);
+```
+
+### Direct Redis provider
+
+```csharp
+services.AddFranzRedisCaching(options =>
+{
+    options.ConnectionString = configuration.GetConnectionString("Redis");
+    options.KeyPrefix = "orders:";
+});
+```
+
+The Redis provider uses StackExchange.Redis commands and Lua scripts for atomic
+sliding-expiration refresh and absolute-expiration enforcement. StackExchange.Redis
+does not expose cancellation-token overloads for these commands: cancellation
+is observed before issuing a command and while waiting for the local keyed lock
+or running the factory, but an already-issued Redis command cannot be aborted by
+the provider.
+
+### HybridCache
+
+```csharp
+services.AddFranzHybridCaching(options =>
+{
+    options.KeyPrefix = "orders:";
+    options.DefaultAbsoluteExpiration = TimeSpan.FromMinutes(30);
+    options.LocalCacheHint = TimeSpan.FromMinutes(2);
+});
+```
+
+HybridCache uses its local cache by default. Register an `IDistributedCache`
+implementation separately when a distributed L2 store is required.
+
+## Cache-key serialization and Native AOT
+
+The default key strategy hashes the serialized request payload with SHA-256 and
+includes the runtime request type in the key. The payload itself is not placed
+in the cache key.
+
+For trimming and Native AOT, register source-generated JSON metadata for every
+request or cached value type used by the configured providers:
+
+```csharp
+[JsonSerializable(typeof(GetCustomerQuery))]
+[JsonSerializable(typeof(CustomerDto))]
+internal partial class ApplicationJsonContext : JsonSerializerContext
+{
 }
+
+// Register before resolving the cache provider or key strategy.
+services.AddFranzCachingJsonTypeInfoResolver(ApplicationJsonContext.Default);
+services.AddFranzMemoryCaching();
 ```
 
-### Excel Observer
+The resolver is shared by the default key strategy and the JSON-based
+Distributed/Redis providers. Missing metadata fails explicitly instead of
+silently falling back to runtime reflection.
 
-Exports relevant stats only (hits/misses/size) to Excel for **offline analysis**.
+## Mediator integration
 
----
-
-## 📝 Changelog
-### V2.2.14 - Enhanced Configuration
-- Configuration section is now Caching instea "Franz:Caching" for clarity and consistency.
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
-### **1.7.8**
-
-* Added **MetricsCacheObserver** – in-memory hit/miss, per-key stats, total cache weight
-* Added **LoggingMetricsObserver** – combines Serilog + metrics, tracks hits, sets, latency
-* Added **ExcelCacheObserver** – export relevant cache stats to Excel
-* Updated DI extensions – opt-in observer registration methods
-* Exposed **CurrentKeys** property on observers for testability
-* Observers integrated with **Redis, Distributed, Memory** caches
-* Internal improvements for latency tracking in `CacheAccessDescriptor`
-
-### **1.7.7**
-
-* Unified cache options across all providers
-* Key-based invalidation is the supported cache removal contract; tag invalidation is not exposed
-* Hybrid cache provider stabilized (L1 + L2)
-* Removed legacy entry options
-* Provider internals aligned with Mediator pipeline
-* Improved null caching semantics
-* Documentation refresh
-
-### **1.7.6**
-
-* Lazy infrastructure loading
-* Redis startup stability improvements
-
-### **1.6.20**
-
-* Upgraded to **.NET 10.0**
-
----
-
-Perfect — we can make a **small ASCII/flow diagram** for the README that’s simple, readable, and shows the **cache → observers → outputs** flow. Here’s a suggestion you can drop right under the Observability section:
-
-```
-Cache Operation Flow
--------------------
-
-        ┌───────────────┐
-        │ ICacheProvider│
-        └───────┬───────┘
-                │ OnCacheSet / OnCacheHit / OnCacheRemove
-                ▼
-        ┌────────────────────┐
-        │ ObservableCacheProvider │
-        └───────┬────────────┘
-                │
-      ┌─────────┼─────────┐
-      ▼         ▼         ▼
-┌───────────┐ ┌──────────────┐ ┌───────────────┐
-│ Logging   │ │ Metrics      │ │ Excel Export  │
-│ Observer  │ │ Observer     │ │ Observer      │
-└───────────┘ └──────────────┘ └───────────────┘
-
+```csharp
+services.AddFranzMediatorCaching(configuration);
 ```
 
+The configuration section is `Mediator:Caching`. Only requests implementing
+`IQuery<TResponse>` are eligible. Commands bypass the cache even if they also
+implement a query interface. Registered metadata providers may veto caching or
+supply a request-specific TTL.
 
-* `ICacheProvider` → executes cache operations (set, get, remove).
-* `ObservableCacheProvider` → wraps the cache provider and broadcasts to **all registered observers**.
-* Observers can be:
+## Tenant-scoped keys
 
-  * **LoggingCacheObserver** → Serilog / log enrichment
-  * **MetricsCacheObserver** → in-memory stats, hits, misses, cache weight
-  * **LoggingMetricsObserver** → combined logs + metrics
-  * **ExcelCacheObserver** → exports relevant stats to Excel
-
-This makes it **instantly clear** how any cache action flows through the system and where the data ends up.
-
-If you want, I can **also make a slightly fancier Markdown/mermaid diagram** that will render nicely on GitHub and looks professional in the README. Do you want me to do that too?
-
----
-
-## Dependency maintenance — October 2026
-
-EPPlus is upgraded to 8.7.2, which includes fixes for the current System.Security.Cryptography.Xml advisories. Snappier is pinned to patched 1.3.1 and Pkcs to 10.0.13. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
-
-## Tenant-isolated cache keys
-
-For applications that use the validated tenant execution context, register the tenant-aware strategy after the cache provider:
+Tenant isolation is opt-in:
 
 ```csharp
 services.AddFranzMemoryCaching();
 services.AddTenantScopedCacheKeys();
 ```
 
-Keys are prefixed with `tenant:{tenantId}:` when a validated tenant context exists and `global:` otherwise. This prevents identical requests from sharing cache entries across tenants. The tenant context accessor must be registered by the HTTP, messaging, or application execution adapter before the cache strategy is resolved. Do not use the global namespace for data that is logically tenant-owned.
+When this strategy is registered, a validated tenant execution context is
+mandatory. Missing context throws; it never falls back to a shared global
+namespace. Tenant-less services should not register the tenant-scoped strategy
+and can use the default key strategy without requiring tenant infrastructure.
 
+## Settings cache
+
+`ISettingsCache` uses a 12-hour cache policy. `SetSettingAsync` performs an
+explicit replacement write, including when a previous read cached the default
+value for a missing setting.
+
+## Observability
+
+Register observers after the provider and then decorate it:
+
+```csharp
+services.AddFranzMemoryCaching();
+services.AddCacheObserver<LoggingCacheObserver>();
+services.AddCacheObserver<MetricsCacheObserver>();
+services.AddObservableCaching();
+```
+
+Observer callbacks are synchronous because `ICacheObserver` is a synchronous
+contract. Observer exceptions are isolated and written to `Trace`; they do not
+change the outcome of the cache operation. No unbounded fire-and-forget task
+queue is created.
+
+### Optional Excel export
+
+Install `Franz.Common.Caching.Excel` to use `ExcelCacheObserver`. The optional
+package owns the EPPlus dependency; the core caching package does not. EPPlus 8
+requires the consuming application to configure its license according to its
+own licensing terms before exporting.
+
+## Configuration
+
+The cache options section is `Caching`:
+
+```json
+{
+  "Caching": {
+    "KeyPrefix": "orders:",
+    "DefaultAbsoluteExpiration": "00:30:00",
+    "DefaultSlidingExpiration": "00:05:00"
+  },
+  "Mediator": {
+    "Caching": {
+      "Enabled": true,
+      "DefaultTtl": "00:05:00",
+      "DefaultSlidingExpiration": "00:02:00"
+    }
+  }
+}
+```
+
+The default key prefix is `franz:`. Redis connection strings should come from
+a secret store or environment configuration. `CacheOptions.ToString()` redacts
+the connection string.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).
