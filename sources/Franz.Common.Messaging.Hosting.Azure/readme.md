@@ -56,7 +56,7 @@ The endpoint accepts an Event Grid event batch, parses it, and forwards each eve
 
 ## Event Grid subscription-validation limitation
 
-The built-in MapFranzAzureEventGrid endpoint currently ignores the SubscriptionValidationResult returned by IAzureEventGridIngress and responds with an empty 200 OK. Azure Event Grid subscription creation requires a response body containing validationResponse. The ingress service extracts and returns the validation code, but the built-in endpoint does not serialize it into the required response. Do not use this endpoint for subscription creation until that host-level response handling is corrected; use a custom endpoint that maps ValidationCode to validationResponse in the meantime.
+The built-in MapFranzAzureEventGrid endpoint currently ignores the SubscriptionValidationResult returned by IAzureEventGridIngress and responds with an empty 200 OK. Azure Event Grid subscription creation requires a response body containing validationResponse. The ingress service extracts and returns the validation code, but the built-in endpoint does not serialize it into the required response. It also does not forward HttpContext.RequestAborted to IngestAsync. Do not use this endpoint for subscription creation until the host-level response handling is corrected; use a custom endpoint that maps ValidationCode to validationResponse and propagates request cancellation in the meantime.
 
 ## Lifecycle boundaries
 
