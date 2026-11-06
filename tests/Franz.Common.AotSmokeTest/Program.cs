@@ -1,4 +1,17 @@
 using Franz.Common.Mapping.Abstractions;
+using Franz.Common.Caching.Estrategies;
+using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Distributed;
+using Franz.Common.Caching.Extensions;
+using Franz.Common.Caching.Options;
+using Franz.Common.Caching.Pipelines;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Collections.Concurrent;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Extensions;
 using Franz.Common.Mediator.Handlers;
@@ -6,7 +19,6 @@ using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Processors;
 using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.DependencyInjection;
 using System.Runtime.CompilerServices;
 
 namespace Franz.Common.AotSmokeTest;
@@ -15,6 +27,54 @@ public static class Program
 {
     public static async Task<int> Main()
     {
+        var cacheKeyStrategy = new DefaultCacheKeyStrategy(new JsonSerializerOptions
+        {
+            TypeInfoResolver = AotCacheKeyJsonContext.Default
+        });
+        var cacheKey = cacheKeyStrategy.BuildKey(new AotCacheKeyRequest(42, "source-generated"));
+        if (!cacheKey.StartsWith($"{typeof(AotCacheKeyRequest).FullName}:"))
+            return 13;
+
+        var distributedCache = new DistributedCacheProvider(
+            new AotDistributedCache(),
+            new AotCacheOptionsMonitor(new CacheOptions()),
+            Options.Create(new JsonSerializerOptions
+            {
+                TypeInfoResolver = AotCacheKeyJsonContext.Default
+            }));
+        await distributedCache.SetAsync("aot-payload", new AotCacheKeyRequest(42, "source-generated"));
+        var distributedResult = await distributedCache.GetOrSetAsync(
+            "aot-payload",
+            _ => Task.FromResult(new AotCacheKeyRequest(0, "must-not-run")));
+        if (!distributedResult.IsHit || distributedResult.Value.Id != 42)
+            return 14;
+
+        var cachingServices = new ServiceCollection();
+        cachingServices.AddFranzCachingJsonTypeInfoResolver(AotCacheKeyJsonContext.Default);
+        cachingServices.AddFranzMemoryCaching();
+
+        using (var cachingProvider = cachingServices.BuildServiceProvider())
+        {
+            var pipeline = new CachingPipeline<AotCachingQuery, AotCachingResponse>(
+                cachingProvider.GetRequiredService<ICacheProvider>(),
+                new AotMediatorCachingOptionsMonitor(new MediatorCachingOptions()),
+                cachingProvider.GetRequiredService<ICacheKeyStrategy>(),
+                NullLogger<CachingPipeline<AotCachingQuery, AotCachingResponse>>.Instance,
+                Array.Empty<ICacheMetadataProvider>());
+
+            var factoryCalls = 0;
+            Task<AotCachingResponse> Next()
+            {
+                factoryCalls++;
+                return Task.FromResult(new AotCachingResponse(73));
+            }
+
+            var first = await pipeline.Handle(new AotCachingQuery(73), Next);
+            var second = await pipeline.Handle(new AotCachingQuery(73), Next);
+            if (factoryCalls != 1 || first.Value != 73 || second.Value != 73)
+                return 17;
+        }
+
         var source = new AotSource("Franz", 10);
         var destination = new AotMapper().Map(source);
         if (destination.Name != source.Name || destination.Version != source.Version)
@@ -207,5 +267,56 @@ public sealed class AotStreamQueryHandler : IStreamQueryHandler<AotStreamQuery, 
             await Task.Yield();
             yield return index;
         }
+    }
+}
+
+public sealed record AotCacheKeyRequest(int Id, string Name);
+
+[JsonSerializable(typeof(AotCacheKeyRequest))]
+[JsonSerializable(typeof(AotCachingQuery))]
+[JsonSerializable(typeof(AotCachingResponse))]
+internal partial class AotCacheKeyJsonContext : JsonSerializerContext
+{
+}
+
+public sealed record AotCachingQuery(int Id) : IQuery<AotCachingResponse>;
+public sealed record AotCachingResponse(int Value);
+
+public sealed class AotMediatorCachingOptionsMonitor(MediatorCachingOptions currentValue)
+    : IOptionsMonitor<MediatorCachingOptions>
+{
+    public MediatorCachingOptions CurrentValue { get; } = currentValue;
+    public MediatorCachingOptions Get(string? name) => CurrentValue;
+    public IDisposable? OnChange(Action<MediatorCachingOptions, string?> listener) => null;
+}
+
+public sealed class AotCacheOptionsMonitor(CacheOptions currentValue) : IOptionsMonitor<CacheOptions>
+{
+    public CacheOptions CurrentValue { get; } = currentValue;
+    public CacheOptions Get(string? name) => CurrentValue;
+    public IDisposable? OnChange(Action<CacheOptions, string?> listener) => null;
+}
+
+public sealed class AotDistributedCache : IDistributedCache
+{
+    private readonly ConcurrentDictionary<string, byte[]> _entries = new();
+
+    public byte[]? Get(string key) => _entries.TryGetValue(key, out var value) ? value : null;
+    public Task<byte[]?> GetAsync(string key, CancellationToken token = default)
+        => Task.FromResult(Get(key));
+    public void Refresh(string key) { }
+    public Task RefreshAsync(string key, CancellationToken token = default) => Task.CompletedTask;
+    public void Remove(string key) => _entries.TryRemove(key, out _);
+    public Task RemoveAsync(string key, CancellationToken token = default)
+    {
+        Remove(key);
+        return Task.CompletedTask;
+    }
+    public void Set(string key, byte[] value, DistributedCacheEntryOptions options)
+        => _entries[key] = value;
+    public Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default)
+    {
+        Set(key, value, options);
+        return Task.CompletedTask;
     }
 }

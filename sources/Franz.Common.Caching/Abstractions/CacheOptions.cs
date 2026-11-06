@@ -1,12 +1,13 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using Microsoft.Extensions.Caching.Memory;
+using System.Diagnostics.CodeAnalysis;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Franz.Common.Caching.Abstractions;
 
 public sealed record CacheOptions
 {
   public const string SectionName = "Franz:Caching";
+  public const string ConfigurationSectionName = "Caching";
 
   [SetsRequiredMembers]
   public CacheOptions() { }
@@ -15,23 +16,37 @@ public sealed record CacheOptions
   public required TimeSpan DefaultAbsoluteExpiration { get; set; } = TimeSpan.FromMinutes(60);
 
   [Required]
-  public required TimeSpan DefaultSlidingExpiration { get; init; } = TimeSpan.FromMinutes(20);
+  public required TimeSpan DefaultSlidingExpiration { get; set; } = TimeSpan.FromMinutes(20);
 
-  [RegularExpression(@"^[a-zA-Z0-9_-]*$", ErrorMessage = "Prefix must be alphanumeric.")]
+  [RegularExpression(
+      @"^[a-zA-Z0-9:_-]*$",
+      ErrorMessage = "Prefix may contain only letters, digits, colon, underscore, and hyphen.")]
   public string KeyPrefix { get; set; } = "franz:";
 
   /// <summary>
-  /// Explicit connection string for Redis. 
-  /// Used primarily in Test Fixtures or code-first configurations.
+  /// Redis connection string. Treat this value as a secret; ToString redacts it.
   /// </summary>
   public string? ConnectionString { get; set; }
 
-  public bool EnableDistributedCache { get; init; } = true;
+  /// <summary>
+  /// Legacy compatibility flag. Provider selection is controlled by the DI registration method.
+  /// </summary>
+  public bool EnableDistributedCache { get; set; } = true;
 
   public TimeSpan? LocalCacheHint { get; set; }
-
-  public CacheItemPriority DefaultPriority { get; init; } = CacheItemPriority.Normal;
+  public CacheItemPriority DefaultPriority { get; set; } = CacheItemPriority.Normal;
 
   [Range(0, long.MaxValue)]
-  public long DefaultEstimatedSizeInBytes { get; init; } = 1024;
+  public long DefaultEstimatedSizeInBytes { get; set; } = 1024;
+
+  public override string ToString()
+      => $"{nameof(CacheOptions)} {{ " +
+         $"{nameof(DefaultAbsoluteExpiration)} = {DefaultAbsoluteExpiration}, " +
+         $"{nameof(DefaultSlidingExpiration)} = {DefaultSlidingExpiration}, " +
+         $"{nameof(KeyPrefix)} = {KeyPrefix}, " +
+         $"{nameof(ConnectionString)} = {(ConnectionString is null ? "null" : "[REDACTED]")}, " +
+         $"{nameof(EnableDistributedCache)} = {EnableDistributedCache}, " +
+         $"{nameof(LocalCacheHint)} = {LocalCacheHint}, " +
+         $"{nameof(DefaultPriority)} = {DefaultPriority}, " +
+         $"{nameof(DefaultEstimatedSizeInBytes)} = {DefaultEstimatedSizeInBytes} }}";
 }

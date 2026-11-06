@@ -182,7 +182,7 @@ if (!await _inboxStore.HasProcessedAsync(message.Id))
 
 ## 📝 Version Information
 
-* **Current Version:** v2.3.5
+* **Current Version:** v3.0.0
 * Part of the open-source Franz.Common ecosystem.
 
 ---

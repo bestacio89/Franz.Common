@@ -1,24 +1,31 @@
-﻿using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Internal;
 using Microsoft.Extensions.Caching.Hybrid;
-using System.Diagnostics.CodeAnalysis;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Caching.Hybrid;
 
 /// <summary>
-/// A high-performance HybridCache implementation for Franz.Common.
-/// Optimized for .NET 10 and aligned with the simplified CacheOptions schema.
+/// Adapts the .NET HybridCache API to Franz.Common's provider contract.
+/// HybridCache supplies its own local stampede protection and L1/L2 coordination.
 /// </summary>
-public sealed class HybridCacheProvider : ICacheProvider
+public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
 {
+  private static readonly TimeSpan NoExpiration = TimeSpan.FromDays(36500);
   private readonly HybridCache _cache;
-  private readonly CacheOptions _defaultOptions;
+  private readonly IOptionsMonitor<CacheOptions>? _optionsMonitor;
+  private readonly CacheOptions? _fixedOptions;
 
   public HybridCacheProvider(HybridCache cache, CacheOptions options)
   {
     _cache = cache ?? throw new ArgumentNullException(nameof(cache));
-    _defaultOptions = options ?? throw new ArgumentNullException(nameof(options));
+    _fixedOptions = options ?? throw new ArgumentNullException(nameof(options));
+  }
+
+  public HybridCacheProvider(HybridCache cache, IOptionsMonitor<CacheOptions> optionsMonitor)
+  {
+    _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+    _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
   }
 
   public async Task<CacheResult<T>> GetOrSetAsync<T>(
@@ -27,13 +34,13 @@ public sealed class HybridCacheProvider : ICacheProvider
       CacheOptions? overrideOptions = null,
       CancellationToken ct = default)
   {
-    if (string.IsNullOrWhiteSpace(key))
-      throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
-    if (factory is null)
-      throw new ArgumentNullException(nameof(factory));
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    ArgumentNullException.ThrowIfNull(factory);
+    ct.ThrowIfCancellationRequested();
 
-    // Apply KeyPrefix from the "Correct Cereal" options
-    var effectiveKey = $"{_defaultOptions.KeyPrefix}{key}";
+    var options = overrideOptions ?? CurrentOptions;
+    CacheOptionsValidator.ThrowIfInvalid(options);
+    var effectiveKey = ApplyPrefix(key);
     var isHit = true;
 
     var value = await _cache.GetOrCreateAsync<Func<CancellationToken, Task<T>>, T>(
@@ -41,34 +48,66 @@ public sealed class HybridCacheProvider : ICacheProvider
         factory,
         async (f, cancellationToken) =>
         {
-          isHit = false; // Factory invoked → Cache MISS
-          return await f(cancellationToken);
+          isHit = false;
+          var created = await f(cancellationToken).ConfigureAwait(false);
+          cancellationToken.ThrowIfCancellationRequested();
+          return created;
         },
-        CreateEntryOptions(overrideOptions ?? _defaultOptions),
-        cancellationToken: ct
-    );
+        CreateEntryOptions(options),
+        cancellationToken: ct).ConfigureAwait(false);
 
     return new CacheResult<T>(value, isHit);
   }
 
-  public Task RemoveAsync(string key, CancellationToken ct = default)
+  public async Task SetAsync<T>(
+      string key,
+      T value,
+      CacheOptions? options = null,
+      CancellationToken ct = default)
   {
-    if (string.IsNullOrWhiteSpace(key))
-      throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    ct.ThrowIfCancellationRequested();
 
-    var effectiveKey = $"{_defaultOptions.KeyPrefix}{key}";
-
-    // Use native ValueTask conversion for hot-path efficiency
-    return _cache.RemoveAsync(effectiveKey, ct).AsTask();
+    var effectiveOptions = options ?? CurrentOptions;
+    CacheOptionsValidator.ThrowIfInvalid(effectiveOptions);
+    await _cache.SetAsync(
+        ApplyPrefix(key),
+        value,
+        CreateEntryOptions(effectiveOptions),
+        cancellationToken: ct).ConfigureAwait(false);
   }
 
-  private static HybridCacheEntryOptions CreateEntryOptions(CacheOptions options)
-      => new()
-      {
-        // Mapping Absolute Expiration to HybridCache
-        Expiration = options.DefaultAbsoluteExpiration,
+  public Task RemoveAsync(string key, CancellationToken ct = default)
+  {
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    return _cache.RemoveAsync(ApplyPrefix(key), ct).AsTask();
+  }
 
-        // LocalCacheHint allows for L1 (Memory) vs L2 (Distributed) tiering
-        LocalCacheExpiration = options.LocalCacheHint ?? options.DefaultSlidingExpiration
-      };
+  private CacheOptions CurrentOptions => _optionsMonitor?.CurrentValue ?? _fixedOptions!;
+
+  private string ApplyPrefix(string key) => $"{CurrentOptions.KeyPrefix}{key}";
+
+  private static HybridCacheEntryOptions CreateEntryOptions(CacheOptions options)
+  {
+    var absoluteExpiration = options.DefaultAbsoluteExpiration > TimeSpan.Zero
+        ? options.DefaultAbsoluteExpiration
+        : NoExpiration;
+    var localExpiration = options.LocalCacheHint is { } localHint
+        ? (localHint > TimeSpan.Zero ? localHint : NoExpiration)
+        : (options.DefaultSlidingExpiration > TimeSpan.Zero
+            ? options.DefaultSlidingExpiration
+            : NoExpiration);
+
+    // L1 must never retain an entry beyond the configured absolute lifetime.
+    if (localExpiration > absoluteExpiration)
+    {
+      localExpiration = absoluteExpiration;
+    }
+
+    return new HybridCacheEntryOptions
+    {
+      Expiration = absoluteExpiration,
+      LocalCacheExpiration = localExpiration
+    };
+  }
 }

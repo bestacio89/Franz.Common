@@ -1,22 +1,33 @@
-﻿using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Diagnostics;
 using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Metrics;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Caching.Observability;
 
-public sealed class ObservableCacheProvider : ICacheProvider
+public sealed class ObservableCacheProvider : ICacheProvider, ICacheWriter
 {
   private readonly ICacheProvider _inner;
+  private readonly ICacheWriter? _writer;
   private readonly ICacheObserver[] _observers;
+  private readonly IOptionsMonitor<CacheOptions>? _optionsMonitor;
 
   public ObservableCacheProvider(
       ICacheProvider inner,
       IEnumerable<ICacheObserver> observers)
+      : this(inner, observers, null)
+  {
+  }
+
+  public ObservableCacheProvider(
+      ICacheProvider inner,
+      IEnumerable<ICacheObserver> observers,
+      IOptionsMonitor<CacheOptions>? optionsMonitor)
   {
     _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+    _writer = inner as ICacheWriter;
     _observers = observers?.ToArray() ?? Array.Empty<ICacheObserver>();
+    _optionsMonitor = optionsMonitor;
   }
 
   public async Task<CacheResult<T>> GetOrSetAsync<T>(
@@ -25,89 +36,75 @@ public sealed class ObservableCacheProvider : ICacheProvider
       CacheOptions? options = null,
       CancellationToken ct = default)
   {
-    // Use ValueStopwatch or a simple long-based timestamp for sub-ms precision if needed
     var timestamp = Stopwatch.GetTimestamp();
-
-    var result = await _inner.GetOrSetAsync(key, factory, options, ct);
-
+    var result = await _inner.GetOrSetAsync(key, factory, options, ct).ConfigureAwait(false);
     var elapsedMs = Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds;
 
     if (result.IsHit)
     {
-      NotifyHit(key, elapsedMs);
+      CacheMetrics.Hits.Add(1);
+      Notify(observer => observer.OnCacheHit(new CacheAccessDescriptor
+      {
+        Key = key,
+        AccessedAt = DateTimeOffset.UtcNow,
+        LookupLatencyMs = elapsedMs
+      }));
     }
     else
     {
-      NotifySet(key, result.Value, options);
+      CacheMetrics.Misses.Add(1);
+      NotifySet(key, options);
     }
 
+    CacheMetrics.LookupLatencyMs.Record(elapsedMs);
     return result;
+  }
+
+  public async Task SetAsync<T>(
+      string key,
+      T value,
+      CacheOptions? options = null,
+      CancellationToken ct = default)
+  {
+    if (_writer is null)
+      throw new NotSupportedException("The wrapped cache provider does not implement ICacheWriter.");
+
+    await _writer.SetAsync(key, value, options, ct).ConfigureAwait(false);
+    NotifySet(key, options);
   }
 
   public async Task RemoveAsync(string key, CancellationToken ct = default)
   {
-    await _inner.RemoveAsync(key, ct);
-    NotifyRemove(key);
+    await _inner.RemoveAsync(key, ct).ConfigureAwait(false);
+    Notify(observer => observer.OnCacheRemove(key));
   }
 
-  #region Observer Notifications
-
-  private void NotifySet<T>(string key, T value, CacheOptions? options)
+  private void NotifySet(string key, CacheOptions? options)
   {
-    if (_observers.Length == 0) return;
+    var effectiveOptions = options ?? _optionsMonitor?.CurrentValue;
+    var ttl = effectiveOptions?.DefaultAbsoluteExpiration ?? TimeSpan.FromMinutes(60);
+    if (ttl == TimeSpan.Zero && effectiveOptions?.DefaultSlidingExpiration > TimeSpan.Zero)
+      ttl = effectiveOptions.DefaultSlidingExpiration;
 
     var entry = new CacheEntryDescriptor
     {
       Key = key,
-      // Leverage the new 'DefaultEstimatedSizeInBytes' from your CacheOptions
-      EstimatedSizeInBytes = options?.DefaultEstimatedSizeInBytes ?? 1024,
-      Ttl = options?.DefaultAbsoluteExpiration ?? TimeSpan.FromMinutes(30)
-      // Tags removed: Clean Cereal approach.
+      EstimatedSizeInBytes = effectiveOptions?.DefaultEstimatedSizeInBytes ?? 1024,
+      Ttl = ttl
     };
 
-    // Fire-and-forget to avoid blocking the request thread. 
-    // In a real Principal-level system, we would use a Channel<T> for background processing.
-    _ = Task.Run(() =>
-    {
-      foreach (var observer in _observers)
-      {
-        try { observer.OnCacheSet(entry); } catch { /* Swallow to protect pipeline */ }
-      }
-    });
+    Notify(observer => observer.OnCacheSet(entry));
   }
 
-  private void NotifyHit(string key, double latencyMs)
+  private void Notify(Action<ICacheObserver> notification)
   {
-    if (_observers.Length == 0) return;
-
-    var access = new CacheAccessDescriptor
+    foreach (var observer in _observers)
     {
-      Key = key,
-      AccessedAt = DateTimeOffset.UtcNow,
-      LookupLatencyMs = latencyMs
-    };
-
-    _ = Task.Run(() =>
-    {
-      foreach (var observer in _observers)
+      try { notification(observer); }
+      catch (Exception exception)
       {
-        try { observer.OnCacheHit(access); } catch { }
+        Trace.TraceError("Cache observer {0} failed: {1}", observer.GetType().FullName, exception);
       }
-    });
+    }
   }
-
-  private void NotifyRemove(string key)
-  {
-    if (_observers.Length == 0) return;
-
-    _ = Task.Run(() =>
-    {
-      foreach (var observer in _observers)
-      {
-        try { observer.OnCacheRemove(key); } catch { }
-      }
-    });
-  }
-
-  #endregion
 }

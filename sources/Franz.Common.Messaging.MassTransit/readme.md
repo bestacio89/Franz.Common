@@ -42,7 +42,7 @@ A library within the **Franz Framework** that integrates **MassTransit** with me
 
 ## **Version Information**
 
-**Current Version:** v2.3.5
+**Current Version:** v3.0.0
 - Part of the open-source Franz.Common ecosystem.
 
 ---

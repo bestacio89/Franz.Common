@@ -44,7 +44,7 @@ A specialized library within the **Franz Framework** that extends **Entity Frame
 
 ## **Version Information**
 
-**Current Version:** v2.3.4
+**Current Version:** v3.0.0
 - Part of the open-source Franz.Common ecosystem.
 
 ---

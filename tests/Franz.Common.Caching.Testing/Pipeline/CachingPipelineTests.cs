@@ -3,6 +3,7 @@ using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Pipelines;
+using Franz.Common.Mediator.Messages;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -18,7 +19,7 @@ namespace Franz.Common.Caching.Tests.Pipelines;
 
 public sealed class CachingPipelineTests
 {
-  public sealed record TestRequest(int Id);
+  public sealed record TestRequest(int Id) : IQuery<TestResponse>;
   public sealed record TestResponse(string Value);
 
   /// <summary>
@@ -173,13 +174,17 @@ public sealed class CachingPipelineTests
     var options = new CacheOptions
     {
       DefaultAbsoluteExpiration = TimeSpan.FromMinutes(5),
-      DefaultSlidingExpiration = TimeSpan.FromMinutes(1)
+      DefaultSlidingExpiration = TimeSpan.FromMinutes(1),
+      KeyPrefix = string.Empty
     };
 
     var optionsMonitorMock = new Mock<IOptionsMonitor<CacheOptions>>();
     optionsMonitorMock.Setup(m => m.CurrentValue).Returns(options);
 
-    var provider = new DistributedCacheProvider(cacheMock.Object, optionsMonitorMock.Object);
+    var provider = new DistributedCacheProvider(
+        cacheMock.Object,
+        optionsMonitorMock.Object,
+        Microsoft.Extensions.Options.Options.Create(TestJsonSerializerOptions.Create()));
     bool factoryWasCalled = false;
 
     // Act

@@ -1,4 +1,6 @@
 ﻿using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Hybrid;
+using Franz.Common.Caching.Internal;
 using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Estrategies;
 using Franz.Common.Caching.Observability;
@@ -10,17 +12,21 @@ using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.MultiTenancy;
 using Franz.Common.Caching.MultiTenancy;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Franz.Common.Caching.Extensions;
 
 public static class FranzCachingServiceCollectionExtensions
 {
-  private const string CachingSection = "Caching";
+  private const string CachingSection = CacheOptions.ConfigurationSectionName;
 
 
   /// <summary>
@@ -28,10 +34,30 @@ public static class FranzCachingServiceCollectionExtensions
   /// </summary>
   public static IServiceCollection AddFranzCachingOptions(this IServiceCollection services, IConfiguration configuration)
   {
-    services.AddOptions<CacheOptions>()
-        .Bind(configuration.GetSection(CachingSection))
-        .ValidateDataAnnotations()
-        .ValidateOnStart();
+    AddValidatedCacheOptions(services)
+        .Bind(configuration.GetSection(CachingSection));
+
+    return services;
+  }
+
+  /// <summary>
+  /// Adds source-generated JSON metadata to cache serialization. Register
+  /// the application's JsonSerializerContext so cache keys remain compatible
+  /// with trimming and Native AOT.
+  /// </summary>
+  public static IServiceCollection AddFranzCachingJsonTypeInfoResolver(
+      this IServiceCollection services,
+      IJsonTypeInfoResolver resolver)
+  {
+    ArgumentNullException.ThrowIfNull(services);
+    ArgumentNullException.ThrowIfNull(resolver);
+
+    services.Configure<JsonSerializerOptions>(options =>
+    {
+      options.TypeInfoResolver = options.TypeInfoResolver is null
+          ? resolver
+          : JsonTypeInfoResolver.Combine(resolver, options.TypeInfoResolver);
+    });
 
     return services;
   }
@@ -43,10 +69,63 @@ public static class FranzCachingServiceCollectionExtensions
       Action<CacheOptions>? configure = null)
   {
     services.AddMemoryCache();
+    AddValidatedCacheOptions(services);
 
     if (configure != null) services.Configure(configure);
 
     services.TryAddSingleton<ICacheProvider, MemoryCacheProvider>();
+    return services.AddFranzCachingCore();
+  }
+
+  /// <summary>
+  /// Registers the .NET HybridCache provider with a metadata-only serializer.
+  /// This replaces existing serializer factories; register custom factories after
+  /// this call if they must take precedence. Register IDistributedCache separately
+  /// when a distributed L2 store is required.
+  /// </summary>
+  public static IServiceCollection AddFranzHybridCaching(
+      this IServiceCollection services,
+      Action<CacheOptions>? configure = null)
+  {
+    ArgumentNullException.ThrowIfNull(services);
+    services.AddHybridCache();
+    services.RemoveAll<IHybridCacheSerializerFactory>();
+    services.AddSingleton<IHybridCacheSerializerFactory, JsonTypeInfoHybridCacheSerializerFactory>();
+    AddValidatedCacheOptions(services);
+
+    if (configure is not null)
+    {
+      services.Configure(configure);
+    }
+
+    services.TryAddSingleton<ICacheProvider, HybridCacheProvider>();
+    return services.AddFranzCachingCore();
+  }
+
+  /// <summary>
+  /// Registers HybridCache, binds Franz cache options, and installs the metadata-only
+  /// serializer factory. Existing serializer factories are replaced; register custom
+  /// factories after this call if they must take precedence. An IDistributedCache
+  /// implementation may be registered separately for L2.
+  /// </summary>
+  public static IServiceCollection AddFranzHybridCaching(
+      this IServiceCollection services,
+      IConfiguration configuration,
+      Action<CacheOptions>? configure = null)
+  {
+    ArgumentNullException.ThrowIfNull(services);
+    ArgumentNullException.ThrowIfNull(configuration);
+    services.AddHybridCache();
+    services.RemoveAll<IHybridCacheSerializerFactory>();
+    services.AddSingleton<IHybridCacheSerializerFactory, JsonTypeInfoHybridCacheSerializerFactory>();
+    services.AddFranzCachingOptions(configuration);
+
+    if (configure is not null)
+    {
+      services.Configure(configure);
+    }
+
+    services.TryAddSingleton<ICacheProvider, HybridCacheProvider>();
     return services.AddFranzCachingCore();
   }
 
@@ -58,7 +137,7 @@ public static class FranzCachingServiceCollectionExtensions
       this IServiceCollection services,
       Action<CacheOptions> configure)
   {
-    services.AddOptions<CacheOptions>();
+    AddValidatedCacheOptions(services);
     services.Configure(configure);
 
     return services.RegisterRedisInternal();
@@ -73,10 +152,8 @@ public static class FranzCachingServiceCollectionExtensions
       Action<CacheOptions>? configure = null)
   {
     // 1. Bind from appsettings.json
-    services.AddOptions<CacheOptions>()
-        .Bind(configuration.GetSection(CachingSection))
-        .ValidateDataAnnotations()
-        .ValidateOnStart();
+    AddValidatedCacheOptions(services)
+        .Bind(configuration.GetSection(CachingSection));
 
     // 2. Apply optional code-based overrides
     if (configure != null) services.Configure(configure);
@@ -94,15 +171,12 @@ public static class FranzCachingServiceCollectionExtensions
           ?? configuration?.GetSection($"{CachingSection}:Redis:ConnectionString").Value
           ?? throw new InvalidOperationException("Redis ConnectionString is missing.");
 
-      // FIX: Use ConfigurationOptions to enforce better defaults for internal tools
+      // StackExchange.Redis exposes synchronous multiplexer creation through
+      // this DI factory. Keep the initial connection timeout bounded and allow
+      // the multiplexer to reconnect if Redis is temporarily unavailable.
       var redisOptions = ConfigurationOptions.Parse(connectionString);
-
-      // Ensure that we don't stall the thread pool during heavy load/reconnects
       redisOptions.AbortOnConnectFail = false;
       redisOptions.ConnectTimeout = 5000;
-
-      // Still eager, but AbortOnConnectFail = false allows the object to be created 
-      // even if the server is offline. It will reconnect in the background.
       return ConnectionMultiplexer.Connect(redisOptions);
     });
 
@@ -119,8 +193,11 @@ public static class FranzCachingServiceCollectionExtensions
       Action<MediatorCachingOptions>? configure = null)
   {
     services.AddOptions<MediatorCachingOptions>()
-        .BindConfiguration(MediatorCachingOptions.SectionName)
-        .ValidateDataAnnotations()
+        .Bind(configuration.GetSection(MediatorCachingOptions.SectionName))
+        .Validate(
+            options => CacheOptionsValidator.IsValidLifetime(options.DefaultTtl) &&
+                       CacheOptionsValidator.IsValidLifetime(options.DefaultSlidingExpiration),
+            "Mediator cache expirations must be between zero and 100 years.")
         .ValidateOnStart();
 
     if (configure != null) services.Configure(configure);
@@ -145,13 +222,14 @@ public static class FranzCachingServiceCollectionExtensions
     services.Decorate<ICacheProvider>((inner, sp) =>
     {
       var observers = sp.GetServices<ICacheObserver>();
-      return new ObservableCacheProvider(inner, observers);
+      return new ObservableCacheProvider(inner, observers, sp.GetService<IOptionsMonitor<CacheOptions>>());
     });
 
     return services;
   }
 
-  public static IServiceCollection AddCacheObserver<T>(this IServiceCollection services)
+  public static IServiceCollection AddCacheObserver<
+      [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>(this IServiceCollection services)
       where T : class, ICacheObserver
   {
     services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, T>());
@@ -160,10 +238,23 @@ public static class FranzCachingServiceCollectionExtensions
 
   #endregion
 
+  private static OptionsBuilder<CacheOptions> AddValidatedCacheOptions(IServiceCollection services)
+  {
+    return services.AddOptions<CacheOptions>()
+        .Validate(
+            CacheOptionsValidator.IsValid,
+            "Cache options contain an invalid expiration, key prefix, priority, or estimated size.")
+        .ValidateOnStart();
+  }
+
   private static IServiceCollection AddFranzCachingCore(this IServiceCollection services)
   {
+    services.AddOptions<JsonSerializerOptions>();
     services.TryAddSingleton<ICacheKeyStrategy, DefaultCacheKeyStrategy>();
     services.TryAddSingleton<ISettingsCache, SettingsCache>();
+    services.TryAddTransient<ICacheWriter>(sp =>
+        sp.GetRequiredService<ICacheProvider>() as ICacheWriter
+        ?? throw new InvalidOperationException("The configured cache provider does not implement ICacheWriter."));
     return services;
   }
 
@@ -175,7 +266,7 @@ public static class FranzCachingServiceCollectionExtensions
       Action<CacheOptions>? configure = null)
   {
     // 1. Ensure the Options record is available in the DI container
-    services.AddOptions<CacheOptions>();
+    AddValidatedCacheOptions(services);
 
     // 2. Apply code-based overrides if provided
     if (configure != null) services.Configure(configure);

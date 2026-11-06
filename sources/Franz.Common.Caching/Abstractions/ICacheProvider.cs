@@ -1,5 +1,8 @@
-﻿using Franz.Common.Caching.Abstractions;
+namespace Franz.Common.Caching.Abstractions;
 
+/// <summary>
+/// Provider-neutral cache lookup and removal operations.
+/// </summary>
 public interface ICacheProvider
 {
   Task<CacheResult<T>> GetOrSetAsync<T>(

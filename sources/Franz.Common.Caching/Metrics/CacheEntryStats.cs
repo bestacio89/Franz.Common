@@ -1,70 +1,110 @@
-﻿using System;
 using System.Collections.Concurrent;
 
-namespace Franz.Common.Caching.Metrics
+namespace Franz.Common.Caching.Metrics;
+
+public sealed class CacheEntryStats
 {
-  /// <summary>
-  /// Statistics for a single cache entry.
-  /// </summary>
-  public sealed class CacheEntryStats
+  private const int MaximumTagsPerEntry = 64;
+  private readonly object _tagsGate = new();
+  private int _sets;
+  private int _hits;
+  private long _lastSetBinary = long.MinValue;
+  private long _lastAccessBinary = long.MinValue;
+  private long _estimatedSizeBytes;
+
+  public int Sets { get => Volatile.Read(ref _sets); set => Interlocked.Exchange(ref _sets, value); }
+  public int Hits { get => Volatile.Read(ref _hits); set => Interlocked.Exchange(ref _hits, value); }
+
+  public DateTime? LastSet
   {
-    /// <summary>
-    /// Number of times this entry was set/written.
-    /// </summary>
-    public int Sets { get; set; }
+    get { var value = Interlocked.Read(ref _lastSetBinary); return value == long.MinValue ? null : DateTime.FromBinary(value); }
+    set => Interlocked.Exchange(ref _lastSetBinary, value?.ToBinary() ?? long.MinValue);
+  }
 
-    /// <summary>
-    /// Number of times this entry was accessed (cache hits).
-    /// </summary>
-    public int Hits { get; set; }
+  public DateTime? LastAccess
+  {
+    get { var value = Interlocked.Read(ref _lastAccessBinary); return value == long.MinValue ? null : DateTime.FromBinary(value); }
+    set => Interlocked.Exchange(ref _lastAccessBinary, value?.ToBinary() ?? long.MinValue);
+  }
 
-    /// <summary>
-    /// Last time this entry was set.
-    /// </summary>
-    public DateTime? LastSet { get; set; }
+  public long EstimatedSizeBytes
+  {
+    get => Interlocked.Read(ref _estimatedSizeBytes);
+    set => Interlocked.Exchange(ref _estimatedSizeBytes, value);
+  }
 
-    /// <summary>
-    /// Last time this entry was accessed.
-    /// </summary>
-    public DateTime? LastAccess { get; set; }
+  public ConcurrentBag<string> Tags { get; } = new();
 
-    /// <summary>
-    /// Estimated size of this entry in bytes.
-    /// </summary>
-    public long EstimatedSizeBytes { get; set; }
-
-    /// <summary>
-    /// Tags associated with this entry.
-    /// </summary>
-    public ConcurrentBag<string> Tags { get; } = new();
-
-    /// <summary>
-    /// Hit rate for this entry (hits / (hits + sets)), safely handles zero.
-    /// </summary>
-    public double HitRate => (Hits + Sets) == 0 ? 0 : (double)Hits / (Hits + Sets);
-
-    /// <summary>
-    /// Add one or multiple tags to this entry.
-    /// </summary>
-    /// <param name="tags">Tags to associate</param>
-    public void AddTags(IEnumerable<string>? tags)
+  public double HitRate
+  {
+    get
     {
-      if (tags == null) return;
-      foreach (var t in tags)
-        Tags.Add(t);
+      var hits = Hits;
+      var sets = Sets;
+      return hits + sets == 0 ? 0 : (double)hits / (hits + sets);
     }
+  }
 
-    /// <summary>
-    /// Clears all stats for this entry.
-    /// </summary>
-    public void Reset()
+  public void RecordSet(long estimatedSizeBytes, IEnumerable<string>? tags = null)
+  {
+    Interlocked.Increment(ref _sets);
+    EstimatedSizeBytes = estimatedSizeBytes;
+    LastSet = DateTime.UtcNow;
+    lock (_tagsGate)
     {
-      Sets = 0;
-      Hits = 0;
-      LastSet = null;
-      LastAccess = null;
-      EstimatedSizeBytes = 0;
       Tags.Clear();
+      AddBoundedTags(tags);
+    }
+  }
+
+  public void RecordHit()
+  {
+    Interlocked.Increment(ref _hits);
+    LastAccess = DateTime.UtcNow;
+  }
+
+  public void AddTags(IEnumerable<string>? tags)
+  {
+    if (tags is null) return;
+    lock (_tagsGate) AddBoundedTags(tags);
+  }
+
+  public void Reset()
+  {
+    Interlocked.Exchange(ref _sets, 0);
+    Interlocked.Exchange(ref _hits, 0);
+    LastSet = null;
+    LastAccess = null;
+    EstimatedSizeBytes = 0;
+    lock (_tagsGate) Tags.Clear();
+  }
+
+  public CacheEntryStats Snapshot()
+  {
+    var snapshot = new CacheEntryStats
+    {
+      Sets = Sets,
+      Hits = Hits,
+      LastSet = LastSet,
+      LastAccess = LastAccess,
+      EstimatedSizeBytes = EstimatedSizeBytes
+    };
+    snapshot.AddTags(Tags);
+    return snapshot;
+  }
+
+  private void AddBoundedTags(IEnumerable<string>? tags)
+  {
+    if (tags is null) return;
+
+    var inspected = 0;
+    foreach (var tag in tags)
+    {
+      if (inspected++ >= MaximumTagsPerEntry || Tags.Count >= MaximumTagsPerEntry)
+        break;
+
+      if (!string.IsNullOrWhiteSpace(tag) && !Tags.Contains(tag, StringComparer.Ordinal))
+        Tags.Add(tag);
     }
   }
 }

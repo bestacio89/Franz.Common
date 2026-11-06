@@ -23,6 +23,7 @@
     <ProjectReference Include="../../sources/Franz.Common.Reflection/Franz.Common.Reflection.csproj" />
     <ProjectReference Include="../../sources/Franz.Common.Mapping/Franz.Common.Mapping.csproj" />
     <ProjectReference Include="../../sources/Franz.Common.Mediator/Franz.Common.Mediator.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Caching/Franz.Common.Caching.csproj" />
     <ProjectReference
       Include="../../sources/Franz.Common.Mediator.SourceGenerator/Franz.Common.Mediator.SourceGenerator.csproj"
       OutputItemType="Analyzer"

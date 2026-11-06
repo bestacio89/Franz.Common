@@ -17,7 +17,7 @@ public sealed class LoggingCacheObserver : ICacheObserver
   public void OnCacheHit(CacheAccessDescriptor access)
   {
 
-    if (!_logger.IsEnabled(LogLevel.Information))
+    if (!_logger.IsEnabled(LogLevel.Debug))
       return;
 
     _logger.LogDebug(

@@ -1,13 +1,15 @@
-﻿using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Internal;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Caching.Providers;
 
-public sealed class MemoryCacheProvider : ICacheProvider
+public sealed class MemoryCacheProvider : ICacheProvider, ICacheWriter
 {
   private readonly IMemoryCache _cache;
   private readonly IOptionsMonitor<CacheOptions> _optionsMonitor;
+  private readonly AsyncKeyedLock<string> _locks = new();
 
   public MemoryCacheProvider(
       IMemoryCache cache,
@@ -23,62 +25,90 @@ public sealed class MemoryCacheProvider : ICacheProvider
       CacheOptions? requestOptions = null,
       CancellationToken ct = default)
   {
-    if (string.IsNullOrWhiteSpace(key))
-      throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    ArgumentNullException.ThrowIfNull(factory);
+    ct.ThrowIfCancellationRequested();
 
-    if (factory is null)
-      throw new ArgumentNullException(nameof(factory));
+    var effectiveOptions = requestOptions ?? _optionsMonitor.CurrentValue;
+    CacheOptionsValidator.ThrowIfInvalid(effectiveOptions);
+    var fullKey = ApplyPrefix(key);
 
-    // 🔹 1. Try cache
-    if (_cache.TryGetValue(key, out var existing))
+    if (_cache.TryGetValue(fullKey, out T? cached))
     {
-      return new CacheResult<T>((T)existing!, IsHit: true);
+      return new CacheResult<T>(cached!, IsHit: true);
     }
 
-    // 🔹 2. Cache miss → compute
-    var value = await factory(ct);
+    using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
+    {
+      ct.ThrowIfCancellationRequested();
+      if (_cache.TryGetValue(fullKey, out cached))
+      {
+        return new CacheResult<T>(cached!, IsHit: true);
+      }
 
-    // 🔹 3. Create entry options using Reactive Monitor for defaults
-    var entryOptions = CreateMemoryCacheOptions(requestOptions);
-
-    _cache.Set(key, value!, entryOptions);
-
-    return new CacheResult<T>(value, IsHit: false);
+      var value = await factory(ct).ConfigureAwait(false);
+      ct.ThrowIfCancellationRequested();
+      SetCore(fullKey, value, effectiveOptions);
+      return new CacheResult<T>(value, IsHit: false);
+    }
   }
 
-  public Task RemoveAsync(string key, CancellationToken ct = default)
+  public async Task SetAsync<T>(
+      string key,
+      T value,
+      CacheOptions? requestOptions = null,
+      CancellationToken ct = default)
   {
-    if (string.IsNullOrWhiteSpace(key))
-      throw new ArgumentException("Cache key cannot be null or empty.", nameof(key));
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    ct.ThrowIfCancellationRequested();
 
-    _cache.Remove(key);
-    return Task.CompletedTask;
+    var effectiveOptions = requestOptions ?? _optionsMonitor.CurrentValue;
+    CacheOptionsValidator.ThrowIfInvalid(effectiveOptions);
+    var fullKey = ApplyPrefix(key);
+    using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
+    {
+      ct.ThrowIfCancellationRequested();
+      SetCore(fullKey, value, effectiveOptions);
+    }
   }
 
-  private MemoryCacheEntryOptions CreateMemoryCacheOptions(CacheOptions? requestOptions)
+  public async Task RemoveAsync(string key, CancellationToken ct = default)
   {
-    var globalSettings = _optionsMonitor.CurrentValue;
-    var memoryOptions = new MemoryCacheEntryOptions();
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    ct.ThrowIfCancellationRequested();
 
-    // Use global monitor defaults if no specific request options provided
-    if (requestOptions is null)
+    var fullKey = ApplyPrefix(key);
+    using (await _locks.AcquireAsync(fullKey, ct).ConfigureAwait(false))
     {
-      memoryOptions.AbsoluteExpirationRelativeToNow = globalSettings.DefaultAbsoluteExpiration;
-      memoryOptions.SlidingExpiration = globalSettings.DefaultSlidingExpiration;
-      memoryOptions.Priority = globalSettings.DefaultPriority;
-      return memoryOptions;
+      ct.ThrowIfCancellationRequested();
+      _cache.Remove(fullKey);
+    }
+  }
+
+  private string ApplyPrefix(string key) => $"{_optionsMonitor.CurrentValue.KeyPrefix}{key}";
+
+  private void SetCore<T>(string fullKey, T value, CacheOptions options)
+  {
+    var entryOptions = new MemoryCacheEntryOptions
+    {
+      Priority = options.DefaultPriority
+    };
+
+    if (options.DefaultAbsoluteExpiration > TimeSpan.Zero)
+    {
+      entryOptions.AbsoluteExpirationRelativeToNow = options.DefaultAbsoluteExpiration;
     }
 
-    // Map request-specific overrides with reactive fallbacks
-    memoryOptions.AbsoluteExpirationRelativeToNow = requestOptions.DefaultAbsoluteExpiration;
-    memoryOptions.SlidingExpiration = requestOptions.DefaultSlidingExpiration;
-    memoryOptions.Priority = requestOptions.DefaultPriority;
-
-    if (requestOptions.DefaultEstimatedSizeInBytes!=0)
+    if (options.DefaultSlidingExpiration > TimeSpan.Zero)
     {
-      memoryOptions.Size = requestOptions.DefaultEstimatedSizeInBytes;
+      entryOptions.SlidingExpiration = options.DefaultSlidingExpiration;
     }
 
-    return memoryOptions;
+    if (options.DefaultEstimatedSizeInBytes > 0)
+    {
+      entryOptions.Size = options.DefaultEstimatedSizeInBytes;
+    }
+
+    _cache.Set(fullKey, value, entryOptions);
   }
 }

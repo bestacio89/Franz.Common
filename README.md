@@ -308,7 +308,7 @@ SQL Server, Postgres, Oracle, MariaDB, MongoDB, CosmosDB — all behind unified 
 ### Install the core package:
 
 ```bash
-dotnet add package Franz.Common --version 2.3.3
+dotnet add package Franz.Common --version 3.0.0
 ```
 
 Messaging example:
@@ -346,12 +346,22 @@ dotnet build
 dotnet test
 ```
 
-Kafka integration tests (real broker via Testcontainers, not mocks):
+Kafka integration tests use real brokers through Testcontainers rather than mocks:
 
 ```bash
-docker-compose up -d
 dotnet test --filter Category=Integration
 ```
+
+## Caching performance and production workload validation
+
+Caching changes automatically trigger two independent validation layers:
+
+- **Microbenchmarks** — BenchmarkDotNet measures isolated provider operations, deterministic key generation, payload-size sensitivity and concurrent access. See [the benchmark methodology](benchmarks/Franz.Common.Caching.Benchmarks/README.md).
+- **Production-style workload simulation** — a self-contained .NET workload runner exercises MemoryCache, Redis-backed DistributedCache, HybridCache with Redis L2, and direct Redis. It models multi-tenant access, hot-key skew, mixed payloads, partial warm-up, think time, ramp-up, sustained concurrency and ramp-down. See [the workload methodology and profiles](benchmarks/Franz.Common.Caching.LoadTests/README.md).
+
+The PR profile runs on relevant caching, multitenancy and caching-test changes. A longer profile runs nightly and an extended stress profile runs weekly. Each provider publishes HTML, Markdown, CSV and JSON reports as GitHub Actions artifacts. The workload checks tenant isolation, same-key factory single-flight and expiration before measuring; it also reports throughput, sampled p50/p95/p99 latency, CPU time, allocations and GC activity.
+
+These reports provide reproducible regression evidence. Absolute performance thresholds remain disabled on variable hosted runners until controlled-runner baselines are established.
 
 ---
 
@@ -359,14 +369,15 @@ dotnet test --filter Category=Integration
 
 Full version history lives in [`changelog.md`](changelog.md). Recent highlights:
 
-## v2.3.3 — RabbitMQ Operational Hardening
+## v3.0.0 — Enterprise Architecture and Caching Hardening
 
-- Supervised consumer startup and runtime failure through the generic host.
-- Defined single-owner acknowledgement and replay behavior, bounded delivery buffering, and safer channel/connection lifecycle management.
-- Enforced strict TLS validation by default and clarified transaction-channel ownership.
-- Documented operational contracts and added real-broker dead-letter routing coverage.
+- Introduces the hardened Caching 3.0.0 provider contracts and deterministic key/serialization behavior.
+- Adds MemoryCache, DistributedCache, Redis and HybridCache integrations with explicit expiration, failure and cancellation semantics.
+- Adds tenant-scoped cache keys, process-local single-flight coordination, centralized observability and Native AOT smoke coverage.
+- Adds BenchmarkDotNet microbenchmarks and automated production-style multi-provider workload simulation with CI reports.
+- Continues the framework's broader messaging, persistence, multitenancy and architecture-governance hardening.
 
-The shared build target sets package version 2.3.3 and file version 2.3.3.0 while retaining assembly version 2.3.0.0. NuGet publication remains a separate release step.
+The shared build target sets package, assembly and file versions to 3.0.0 / 3.0.0.0. NuGet publication remains a separate release operation after validation and approval.
 
 ## v2.3.2 — Release Baseline
 
@@ -456,8 +467,8 @@ The dependency baseline and compatibility notes are tracked in [the October 2026
 
 ## Versioning and compatibility
 
-- **Framework packages:** versioned together through `common.targets`; the current documentation baseline targets **2.3.3**.
-- **Target framework:** supported library projects target .NET 10 (`net10.0`). The repository pins SDK `10.0.400` in `global.json`; CI should use that same SDK.
+- **Framework packages:** versioned together through `common.targets`; the current coordinated release target is **3.0.0**.
+- **Target framework:** supported library projects target .NET 10 (`net10.0`). The repository pins SDK `10.0.403` in `global.json`; CI should use that same SDK.
 - **Third-party dependencies:** package versions are selected independently according to compatibility and security requirements. A package's version number is not the Franz.Common release version.
 - **Publishing:** the Azure DevOps publishing pipeline validates package metadata before publishing. Publish only after restore/audit, Release build, and full tests pass.
 
