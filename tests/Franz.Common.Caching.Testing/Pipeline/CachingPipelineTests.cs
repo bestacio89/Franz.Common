@@ -184,7 +184,7 @@ public sealed class CachingPipelineTests
     var provider = new DistributedCacheProvider(
         cacheMock.Object,
         optionsMonitorMock.Object,
-        Microsoft.Extensions.Options.Options.Create(TestJsonSerializerMicrosoft.Extensions.Options.Options.Create()));
+        Microsoft.Extensions.Options.Options.Create(TestJsonSerializerOptions.Create()));
     bool factoryWasCalled = false;
 
     // Act

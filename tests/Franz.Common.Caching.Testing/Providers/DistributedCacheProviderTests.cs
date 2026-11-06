@@ -31,7 +31,7 @@ public sealed class DistributedCacheProviderTests
     _provider = new DistributedCacheProvider(
         _cacheMock.Object,
         _optionsMock.Object,
-        Microsoft.Extensions.Options.Options.Create(TestJsonSerializerMicrosoft.Extensions.Options.Options.Create()));
+        Microsoft.Extensions.Options.Options.Create(TestJsonSerializerOptions.Create()));
   }
 
   [Fact]
