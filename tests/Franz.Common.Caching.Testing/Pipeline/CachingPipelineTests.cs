@@ -3,6 +3,7 @@ using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Distributed;
 using Franz.Common.Caching.Options;
 using Franz.Common.Caching.Pipelines;
+using Franz.Common.Mediator.Messages;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
