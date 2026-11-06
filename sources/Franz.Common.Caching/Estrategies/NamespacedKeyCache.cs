@@ -1,22 +1,35 @@
-﻿using Franz.Common.Caching.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
+using Franz.Common.Caching.Abstractions;
 
 namespace Franz.Common.Caching.Estrategies;
+
 public class NamespacedCacheKeyStrategy : ICacheKeyStrategy
 {
   private readonly string _namespace;
-  public NamespacedCacheKeyStrategy(string ns) => _namespace = ns;
-  public string GetKey(object request) => $"{_namespace}:{request.GetType().Name}:{request.GetHashCode()}";
+  private readonly ICacheKeyStrategy _inner;
+
+  public NamespacedCacheKeyStrategy(string ns)
+      : this(ns, new DefaultCacheKeyStrategy())
+  {
+  }
+
+  public NamespacedCacheKeyStrategy(string ns, ICacheKeyStrategy inner)
+  {
+    ArgumentException.ThrowIfNullOrWhiteSpace(ns);
+    _namespace = ns;
+    _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+  }
+
+  public string GetKey(object request)
+  {
+    ArgumentNullException.ThrowIfNull(request);
+    return Prefix(_inner.GetKey(request));
+  }
+
   public string BuildKey<TRequest>(TRequest request)
   {
-    var type = typeof(TRequest).Name;
-    var payload = JsonSerializer.Serialize(request);
-
-    return $"{_namespace}:{type}:{payload}";
+    ArgumentNullException.ThrowIfNull(request);
+    return Prefix(_inner.BuildKey(request));
   }
+
+  private string Prefix(string key) => $"{_namespace}:{key}";
 }

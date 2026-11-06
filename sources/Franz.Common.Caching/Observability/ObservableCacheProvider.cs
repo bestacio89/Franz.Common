@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Franz.Common.Caching.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Caching.Observability;
 
@@ -8,14 +9,17 @@ public sealed class ObservableCacheProvider : ICacheProvider, ICacheWriter
   private readonly ICacheProvider _inner;
   private readonly ICacheWriter? _writer;
   private readonly ICacheObserver[] _observers;
+  private readonly IOptionsMonitor<CacheOptions>? _optionsMonitor;
 
   public ObservableCacheProvider(
       ICacheProvider inner,
-      IEnumerable<ICacheObserver> observers)
+      IEnumerable<ICacheObserver> observers,
+      IOptionsMonitor<CacheOptions>? optionsMonitor = null)
   {
     _inner = inner ?? throw new ArgumentNullException(nameof(inner));
     _writer = inner as ICacheWriter;
     _observers = observers?.ToArray() ?? Array.Empty<ICacheObserver>();
+    _optionsMonitor = optionsMonitor;
   }
 
   public async Task<CacheResult<T>> GetOrSetAsync<T>(
@@ -52,9 +56,7 @@ public sealed class ObservableCacheProvider : ICacheProvider, ICacheWriter
       CancellationToken ct = default)
   {
     if (_writer is null)
-    {
       throw new NotSupportedException("The wrapped cache provider does not implement ICacheWriter.");
-    }
 
     await _writer.SetAsync(key, value, options, ct).ConfigureAwait(false);
     NotifySet(key, options);
@@ -68,11 +70,16 @@ public sealed class ObservableCacheProvider : ICacheProvider, ICacheWriter
 
   private void NotifySet(string key, CacheOptions? options)
   {
+    var effectiveOptions = options ?? _optionsMonitor?.CurrentValue;
+    var ttl = effectiveOptions?.DefaultAbsoluteExpiration ?? TimeSpan.FromMinutes(60);
+    if (ttl == TimeSpan.Zero && effectiveOptions?.DefaultSlidingExpiration > TimeSpan.Zero)
+      ttl = effectiveOptions.DefaultSlidingExpiration;
+
     var entry = new CacheEntryDescriptor
     {
       Key = key,
-      EstimatedSizeInBytes = options?.DefaultEstimatedSizeInBytes ?? 1024,
-      Ttl = options?.DefaultAbsoluteExpiration ?? TimeSpan.FromMinutes(30)
+      EstimatedSizeInBytes = effectiveOptions?.DefaultEstimatedSizeInBytes ?? 1024,
+      Ttl = ttl
     };
 
     Notify(observer => observer.OnCacheSet(entry));
@@ -82,16 +89,10 @@ public sealed class ObservableCacheProvider : ICacheProvider, ICacheWriter
   {
     foreach (var observer in _observers)
     {
-      try
-      {
-        notification(observer);
-      }
+      try { notification(observer); }
       catch (Exception exception)
       {
-        Trace.TraceError(
-            "Cache observer {0} failed: {1}",
-            observer.GetType().FullName,
-            exception);
+        Trace.TraceError("Cache observer {0} failed: {1}", observer.GetType().FullName, exception);
       }
     }
   }

@@ -6,9 +6,7 @@ namespace Franz.Common.Caching.Abstractions;
 
 public sealed record CacheOptions
 {
-  // Retained for source/binary compatibility with earlier package versions.
   public const string SectionName = "Franz:Caching";
-
   public const string ConfigurationSectionName = "Caching";
 
   [SetsRequiredMembers]
@@ -36,7 +34,6 @@ public sealed record CacheOptions
   public bool EnableDistributedCache { get; set; } = true;
 
   public TimeSpan? LocalCacheHint { get; set; }
-
   public CacheItemPriority DefaultPriority { get; set; } = CacheItemPriority.Normal;
 
   [Range(0, long.MaxValue)]
@@ -44,12 +41,12 @@ public sealed record CacheOptions
 
   public override string ToString()
       => $"{nameof(CacheOptions)} {{ " +
-         $"DefaultAbsoluteExpiration = {DefaultAbsoluteExpiration}, " +
-         $"DefaultSlidingExpiration = {DefaultSlidingExpiration}, " +
-         $"KeyPrefix = {KeyPrefix}, " +
-         $"ConnectionString = {(ConnectionString is null ? "null" : "[REDACTED]")}, " +
-         $"EnableDistributedCache = {EnableDistributedCache}, " +
-         $"LocalCacheHint = {LocalCacheHint}, " +
-         $"DefaultPriority = {DefaultPriority}, " +
-         $"DefaultEstimatedSizeInBytes = {DefaultEstimatedSizeInBytes} }}";
+         $"{nameof(DefaultAbsoluteExpiration)} = {DefaultAbsoluteExpiration}, " +
+         $"{nameof(DefaultSlidingExpiration)} = {DefaultSlidingExpiration}, " +
+         $"{nameof(KeyPrefix)} = {KeyPrefix}, " +
+         $"{nameof(ConnectionString)} = {(ConnectionString is null ? "null" : "[REDACTED]")}, " +
+         $"{nameof(EnableDistributedCache)} = {EnableDistributedCache}, " +
+         $"{nameof(LocalCacheHint)} = {LocalCacheHint}, " +
+         $"{nameof(DefaultPriority)} = {DefaultPriority}, " +
+         $"{nameof(DefaultEstimatedSizeInBytes)} = {DefaultEstimatedSizeInBytes} }}";
 }

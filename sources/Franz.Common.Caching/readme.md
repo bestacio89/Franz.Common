@@ -102,7 +102,12 @@ services.AddFranzHybridCaching(options =>
 ```
 
 HybridCache uses its local cache by default. Register an `IDistributedCache`
-implementation separately when a distributed L2 store is required.
+implementation separately when a distributed L2 store is required. Franz replaces
+HybridCache's reflection-based default serializer factory with a metadata-only
+factory. Register `AddFranzCachingJsonTypeInfoResolver` for every cached value
+type before the provider is resolved; missing metadata fails explicitly. You may
+register additional HybridCache serializers after `AddFranzHybridCaching` so
+they take precedence for their supported types.
 
 ## Cache-key serialization and Native AOT
 
@@ -175,7 +180,7 @@ services.AddObservableCaching();
 Observer callbacks are synchronous because `ICacheObserver` is a synchronous
 contract. Observer exceptions are isolated and written to `Trace`; they do not
 change the outcome of the cache operation. No unbounded fire-and-forget task
-queue is created.
+queue is created. Per-key diagnostic tracking and tag history are bounded.
 
 ### Excel export
 

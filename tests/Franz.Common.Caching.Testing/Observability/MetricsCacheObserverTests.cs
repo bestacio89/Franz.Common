@@ -21,6 +21,22 @@ public sealed class MetricsCacheObserverTests
   }
 
   [Fact]
+  public void PerKeyTagTracking_ShouldBeBounded()
+  {
+    var observer = new MetricsCacheObserver();
+    var tags = Enumerable.Range(0, 100).Select(index => $"tag-{index}").ToArray();
+
+    observer.OnCacheSet(new CacheEntryDescriptor
+    {
+      Key = "tagged",
+      EstimatedSizeInBytes = 100,
+      Tags = tags
+    });
+
+    Assert.Equal(64, observer.Snapshot()["tagged"].Tags.Count);
+  }
+
+  [Fact]
   public void ConcurrentUpdates_ShouldNotLosePerKeyHits()
   {
     var observer = new MetricsCacheObserver();

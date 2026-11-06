@@ -4,6 +4,7 @@ namespace Franz.Common.Caching.Metrics;
 
 public sealed class CacheEntryStats
 {
+  private const int MaximumTagsPerEntry = 64;
   private readonly object _tagsGate = new();
   private int _sets;
   private int _hits;
@@ -52,8 +53,7 @@ public sealed class CacheEntryStats
     lock (_tagsGate)
     {
       Tags.Clear();
-      if (tags is not null)
-        foreach (var tag in tags) Tags.Add(tag);
+      AddBoundedTags(tags);
     }
   }
 
@@ -66,8 +66,7 @@ public sealed class CacheEntryStats
   public void AddTags(IEnumerable<string>? tags)
   {
     if (tags is null) return;
-    lock (_tagsGate)
-      foreach (var tag in tags) Tags.Add(tag);
+    lock (_tagsGate) AddBoundedTags(tags);
   }
 
   public void Reset()
@@ -92,5 +91,20 @@ public sealed class CacheEntryStats
     };
     snapshot.AddTags(Tags);
     return snapshot;
+  }
+
+  private void AddBoundedTags(IEnumerable<string>? tags)
+  {
+    if (tags is null) return;
+
+    var inspected = 0;
+    foreach (var tag in tags)
+    {
+      if (inspected++ >= MaximumTagsPerEntry || Tags.Count >= MaximumTagsPerEntry)
+        break;
+
+      if (!string.IsNullOrWhiteSpace(tag) && !Tags.Contains(tag, StringComparer.Ordinal))
+        Tags.Add(tag);
+    }
   }
 }

@@ -1,5 +1,8 @@
 using FluentAssertions;
 using Franz.Common.Caching.Abstractions;
+using Franz.Common.Caching.Extensions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Caching.Tests;
 
@@ -24,5 +27,29 @@ public sealed class CacheOptionsSecurityTests
   {
     CacheOptions.SectionName.Should().Be("Franz:Caching");
     CacheOptions.ConfigurationSectionName.Should().Be("Caching");
+  }
+
+  [Fact]
+  public void Registration_Should_RejectInvalidKeyPrefix()
+  {
+    var services = new ServiceCollection();
+    services.AddFranzMemoryCaching(options => options.KeyPrefix = "invalid prefix");
+    using var provider = services.BuildServiceProvider();
+
+    var action = () => provider.GetRequiredService<IOptions<CacheOptions>>().Value;
+
+    action.Should().Throw<OptionsValidationException>();
+  }
+
+  [Fact]
+  public void Registration_Should_RejectNegativeEstimatedSize()
+  {
+    var services = new ServiceCollection();
+    services.AddFranzMemoryCaching(options => options.DefaultEstimatedSizeInBytes = -1);
+    using var provider = services.BuildServiceProvider();
+
+    var action = () => provider.GetRequiredService<IOptions<CacheOptions>>().Value;
+
+    action.Should().Throw<OptionsValidationException>();
   }
 }

@@ -17,6 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
@@ -84,7 +85,9 @@ public static class FranzCachingServiceCollectionExtensions
       Action<CacheOptions>? configure = null)
   {
     ArgumentNullException.ThrowIfNull(services);
-    services.AddHybridCache().AddSerializerFactory<JsonTypeInfoHybridCacheSerializerFactory>();
+    services.AddHybridCache();
+    services.RemoveAll<IHybridCacheSerializerFactory>();
+    services.AddSingleton<IHybridCacheSerializerFactory, JsonTypeInfoHybridCacheSerializerFactory>();
     AddValidatedCacheOptions(services);
 
     if (configure is not null)
@@ -107,7 +110,9 @@ public static class FranzCachingServiceCollectionExtensions
   {
     ArgumentNullException.ThrowIfNull(services);
     ArgumentNullException.ThrowIfNull(configuration);
-    services.AddHybridCache().AddSerializerFactory<JsonTypeInfoHybridCacheSerializerFactory>();
+    services.AddHybridCache();
+    services.RemoveAll<IHybridCacheSerializerFactory>();
+    services.AddSingleton<IHybridCacheSerializerFactory, JsonTypeInfoHybridCacheSerializerFactory>();
     services.AddFranzCachingOptions(configuration);
 
     if (configure is not null)
@@ -184,7 +189,10 @@ public static class FranzCachingServiceCollectionExtensions
   {
     services.AddOptions<MediatorCachingOptions>()
         .Bind(configuration.GetSection(MediatorCachingOptions.SectionName))
-        .ValidateDataAnnotations()
+        .Validate(
+            options => IsValidLifetime(options.DefaultTtl) &&
+                       IsValidLifetime(options.DefaultSlidingExpiration),
+            "Mediator cache expirations must be between zero and 100 years.")
         .ValidateOnStart();
 
     if (configure != null) services.Configure(configure);
@@ -209,13 +217,14 @@ public static class FranzCachingServiceCollectionExtensions
     services.Decorate<ICacheProvider>((inner, sp) =>
     {
       var observers = sp.GetServices<ICacheObserver>();
-      return new ObservableCacheProvider(inner, observers);
+      return new ObservableCacheProvider(inner, observers, sp.GetService<IOptionsMonitor<CacheOptions>>());
     });
 
     return services;
   }
 
-  public static IServiceCollection AddCacheObserver<T>(this IServiceCollection services)
+  public static IServiceCollection AddCacheObserver<
+      [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>(this IServiceCollection services)
       where T : class, ICacheObserver
   {
     services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheObserver, T>());
@@ -226,19 +235,33 @@ public static class FranzCachingServiceCollectionExtensions
 
   private static readonly TimeSpan MaximumCacheLifetime = TimeSpan.FromDays(36500);
 
+  private static bool IsValidLifetime(TimeSpan value)
+      => value >= TimeSpan.Zero && value <= MaximumCacheLifetime;
+
+  private static bool IsValidKeyPrefix(string? value)
+  {
+    if (value is null) return false;
+
+    foreach (var character in value)
+    {
+      if (!char.IsAsciiLetterOrDigit(character) && character is not ':' and not '_' and not '-')
+        return false;
+    }
+
+    return true;
+  }
+
   private static OptionsBuilder<CacheOptions> AddValidatedCacheOptions(IServiceCollection services)
   {
     return services.AddOptions<CacheOptions>()
-        .ValidateDataAnnotations()
         .Validate(
-            options => options.DefaultAbsoluteExpiration >= TimeSpan.Zero &&
-                       options.DefaultAbsoluteExpiration <= MaximumCacheLifetime &&
-                       options.DefaultSlidingExpiration >= TimeSpan.Zero &&
-                       options.DefaultSlidingExpiration <= MaximumCacheLifetime &&
-                       (!options.LocalCacheHint.HasValue ||
-                        (options.LocalCacheHint.Value >= TimeSpan.Zero &&
-                         options.LocalCacheHint.Value <= MaximumCacheLifetime)),
-            "Cache expirations and local-cache hints must be between zero and 100 years.")
+            options => IsValidLifetime(options.DefaultAbsoluteExpiration) &&
+                       IsValidLifetime(options.DefaultSlidingExpiration) &&
+                       (!options.LocalCacheHint.HasValue || IsValidLifetime(options.LocalCacheHint.Value)) &&
+                       options.DefaultEstimatedSizeInBytes >= 0 &&
+                       Enum.IsDefined(options.DefaultPriority) &&
+                       IsValidKeyPrefix(options.KeyPrefix),
+            "Cache options contain an invalid expiration, key prefix, priority, or estimated size.")
         .ValidateOnStart();
   }
 

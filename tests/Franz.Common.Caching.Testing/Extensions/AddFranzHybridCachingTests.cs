@@ -2,6 +2,7 @@ using FluentAssertions;
 using Franz.Common.Caching.Extensions;
 using Franz.Common.Caching.Abstractions;
 using Franz.Common.Caching.Hybrid;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Franz.Common.Caching.Tests.Extensions;
@@ -50,5 +51,17 @@ public sealed class AddFranzHybridCachingTests
 
     provider.GetRequiredService<ICacheProvider>()
         .Should().BeOfType<HybridCacheProvider>();
+  }
+
+  [Fact]
+  public void Should_Replace_ReflectionBased_DefaultSerializerFactory()
+  {
+    var services = new ServiceCollection();
+    services.AddFranzHybridCaching();
+
+    using var provider = services.BuildServiceProvider();
+
+    provider.GetServices<IHybridCacheSerializerFactory>()
+        .Should().ContainSingle();
   }
 }
