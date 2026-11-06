@@ -25,6 +25,8 @@ public sealed class DistributedCacheProvider(
     ArgumentException.ThrowIfNullOrWhiteSpace(key);
     ArgumentNullException.ThrowIfNull(factory);
 
+    var fullKey = $"{optionsMonitor.CurrentValue.KeyPrefix}{key}";
+
     // 1. Optimistic Fast Path (No Lock)
     var cached = await cache.GetStringAsync(fullKey, ct);
     if (TryDeserialize(cached, out T? result))
@@ -33,13 +35,13 @@ public sealed class DistributedCacheProvider(
     }
 
     // 2. Cache Miss or Corrupt Data -> Prepare for healing
-    var semaphore = _locks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+    var semaphore = _locks.GetOrAdd(fullKey, _ => new SemaphoreSlim(1, 1));
     await semaphore.WaitAsync(ct);
 
     try
     {
       // 3. Double-Check Locking (Check cache again after acquiring lock)
-      cached = await cache.GetStringAsync(key, ct);
+      cached = await cache.GetStringAsync(fullKey, ct);
       if (TryDeserialize(cached, out result))
       {
         return new CacheResult<T>(result!, IsHit: true);
@@ -94,7 +96,12 @@ public sealed class DistributedCacheProvider(
     };
   }
 
-  public Task RemoveAsync(string key, CancellationToken ct = default)\n  {\n    ArgumentException.ThrowIfNullOrWhiteSpace(key);\n    var fullKey = $"{optionsMonitor.CurrentValue.KeyPrefix}{key}";\n    return cache.RemoveAsync(fullKey, ct);\n  }
+  public Task RemoveAsync(string key, CancellationToken ct = default)
+  {
+    ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    var fullKey = $"{optionsMonitor.CurrentValue.KeyPrefix}{key}";
+    return cache.RemoveAsync(fullKey, ct);
+  }
 
   public void Dispose()
   {
