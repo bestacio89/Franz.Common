@@ -79,14 +79,25 @@ public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
   private string ApplyPrefix(string key) => $"{CurrentOptions.KeyPrefix}{key}";
 
   private static HybridCacheEntryOptions CreateEntryOptions(CacheOptions options)
-      => new()
-      {
-        Expiration = options.DefaultAbsoluteExpiration > TimeSpan.Zero
-            ? options.DefaultAbsoluteExpiration
-            : NoExpiration,
-        LocalCacheExpiration = options.LocalCacheHint ??
-            (options.DefaultSlidingExpiration > TimeSpan.Zero
-                ? options.DefaultSlidingExpiration
-                : NoExpiration)
-      };
+  {
+    var absoluteExpiration = options.DefaultAbsoluteExpiration > TimeSpan.Zero
+        ? options.DefaultAbsoluteExpiration
+        : NoExpiration;
+    var localExpiration = options.LocalCacheHint ??
+        (options.DefaultSlidingExpiration > TimeSpan.Zero
+            ? options.DefaultSlidingExpiration
+            : NoExpiration);
+
+    // L1 must never retain an entry beyond the configured absolute lifetime.
+    if (localExpiration > absoluteExpiration)
+    {
+      localExpiration = absoluteExpiration;
+    }
+
+    return new HybridCacheEntryOptions
+    {
+      Expiration = absoluteExpiration,
+      LocalCacheExpiration = localExpiration
+    };
+  }
 }

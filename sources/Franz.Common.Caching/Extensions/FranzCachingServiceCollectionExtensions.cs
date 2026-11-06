@@ -223,15 +223,21 @@ public static class FranzCachingServiceCollectionExtensions
 
   #endregion
 
+  private static readonly TimeSpan MaximumCacheLifetime = TimeSpan.FromDays(36500);
+
   private static OptionsBuilder<CacheOptions> AddValidatedCacheOptions(IServiceCollection services)
   {
     return services.AddOptions<CacheOptions>()
         .ValidateDataAnnotations()
         .Validate(
             options => options.DefaultAbsoluteExpiration >= TimeSpan.Zero &&
+                       options.DefaultAbsoluteExpiration <= MaximumCacheLifetime &&
                        options.DefaultSlidingExpiration >= TimeSpan.Zero &&
-                       (!options.LocalCacheHint.HasValue || options.LocalCacheHint.Value >= TimeSpan.Zero),
-            "Cache expirations and local-cache hints must be zero (disabled) or positive.")
+                       options.DefaultSlidingExpiration <= MaximumCacheLifetime &&
+                       (!options.LocalCacheHint.HasValue ||
+                        (options.LocalCacheHint.Value >= TimeSpan.Zero &&
+                         options.LocalCacheHint.Value <= MaximumCacheLifetime)),
+            "Cache expirations and local-cache hints must be between zero and 100 years.")
         .ValidateOnStart();
   }
 

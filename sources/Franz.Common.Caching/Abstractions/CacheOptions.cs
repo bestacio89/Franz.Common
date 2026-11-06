@@ -30,6 +30,9 @@ public sealed record CacheOptions
   /// </summary>
   public string? ConnectionString { get; set; }
 
+  /// <summary>
+  /// Legacy compatibility flag. Provider selection is controlled by the DI registration method.
+  /// </summary>
   public bool EnableDistributedCache { get; init; } = true;
 
   public TimeSpan? LocalCacheHint { get; set; }

@@ -42,8 +42,10 @@ mechanisms do not provide a cross-process or cross-node distributed lock.
 | Redis | Enforced as a maximum lifetime | Refreshed on access, never beyond the absolute deadline |
 | HybridCache | Maps to HybridCache entry expiration | Maps to local-cache expiration; it is not a distributed sliding TTL |
 
-A zero expiration disables that expiration dimension. Negative values are
-rejected during options validation.
+A zero expiration disables that expiration dimension. Negative values and
+lifetimes above 100 years are rejected during options validation. HybridCache
+uses an explicit long-lived entry option for disabled expiration and caps its
+L1 lifetime at the absolute expiration.
 
 ## Registration
 
@@ -204,7 +206,8 @@ The cache options section is `Caching`:
 
 The default key prefix is `franz:`. Redis connection strings should come from
 a secret store or environment configuration. `CacheOptions.ToString()` redacts
-the connection string.
+the connection string. The legacy `EnableDistributedCache` flag does not select
+a provider; provider selection is explicit through the registration methods.
 
 ## License
 
