@@ -133,7 +133,7 @@ public sealed class DistributedCacheProviderTests : IDisposable
     _cacheMock.Setup(cache => cache.GetAsync(fullKey, It.IsAny<CancellationToken>()))
       .ReturnsAsync(bytes);
 
-    var result = await _provider.GetOrSetAsync(key, _ => throw new InvalidOperationException("Factory must not run."));
+    var result = await _provider.GetOrSetAsync<TestPayload>(key, _ => throw new InvalidOperationException("Factory must not run."));
 
     result.IsHit.Should().BeTrue();
     result.Value.Should().Be(payload);
