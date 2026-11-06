@@ -23,7 +23,7 @@ namespace Franz.Common.Caching.Extensions;
 
 public static class FranzCachingServiceCollectionExtensions
 {
-  private const string CachingSection = "Caching";
+  private const string CachingSection = CacheOptions.SectionName;
 
 
   /// <summary>
@@ -31,16 +31,14 @@ public static class FranzCachingServiceCollectionExtensions
   /// </summary>
   public static IServiceCollection AddFranzCachingOptions(this IServiceCollection services, IConfiguration configuration)
   {
-    services.AddOptions<CacheOptions>()
-        .Bind(configuration.GetSection(CachingSection))
-        .ValidateDataAnnotations()
-        .ValidateOnStart();
+    AddValidatedCacheOptions(services)
+        .Bind(configuration.GetSection(CachingSection));
 
     return services;
   }
 
   /// <summary>
-  /// Adds source-generated JSON metadata to the cache-key serializer. Register
+  /// Adds source-generated JSON metadata to cache serialization. Register
   /// the application's JsonSerializerContext so cache keys remain compatible
   /// with trimming and Native AOT.
   /// </summary>
@@ -68,6 +66,7 @@ public static class FranzCachingServiceCollectionExtensions
       Action<CacheOptions>? configure = null)
   {
     services.AddMemoryCache();
+    AddValidatedCacheOptions(services);
 
     if (configure != null) services.Configure(configure);
 
@@ -85,7 +84,7 @@ public static class FranzCachingServiceCollectionExtensions
   {
     ArgumentNullException.ThrowIfNull(services);
     services.AddHybridCache();
-    services.AddOptions<CacheOptions>();
+    AddValidatedCacheOptions(services);
 
     if (configure is not null)
     {
@@ -127,7 +126,7 @@ public static class FranzCachingServiceCollectionExtensions
       this IServiceCollection services,
       Action<CacheOptions> configure)
   {
-    services.AddOptions<CacheOptions>();
+    AddValidatedCacheOptions(services);
     services.Configure(configure);
 
     return services.RegisterRedisInternal();
@@ -142,10 +141,8 @@ public static class FranzCachingServiceCollectionExtensions
       Action<CacheOptions>? configure = null)
   {
     // 1. Bind from appsettings.json
-    services.AddOptions<CacheOptions>()
-        .Bind(configuration.GetSection(CachingSection))
-        .ValidateDataAnnotations()
-        .ValidateOnStart();
+    AddValidatedCacheOptions(services)
+        .Bind(configuration.GetSection(CachingSection));
 
     // 2. Apply optional code-based overrides
     if (configure != null) services.Configure(configure);
@@ -188,7 +185,7 @@ public static class FranzCachingServiceCollectionExtensions
       Action<MediatorCachingOptions>? configure = null)
   {
     services.AddOptions<MediatorCachingOptions>()
-        .BindConfiguration(MediatorCachingOptions.SectionName)
+        .Bind(configuration.GetSection(MediatorCachingOptions.SectionName))
         .ValidateDataAnnotations()
         .ValidateOnStart();
 
@@ -229,6 +226,17 @@ public static class FranzCachingServiceCollectionExtensions
 
   #endregion
 
+  private static OptionsBuilder<CacheOptions> AddValidatedCacheOptions(IServiceCollection services)
+  {
+    return services.AddOptions<CacheOptions>()
+        .ValidateDataAnnotations()
+        .Validate(
+            options => options.DefaultAbsoluteExpiration >= TimeSpan.Zero &&
+                       options.DefaultSlidingExpiration >= TimeSpan.Zero,
+            "Cache expirations must be zero (disabled) or positive.")
+        .ValidateOnStart();
+  }
+
   private static IServiceCollection AddFranzCachingCore(this IServiceCollection services)
   {
     services.AddOptions<JsonSerializerOptions>();
@@ -245,7 +253,7 @@ public static class FranzCachingServiceCollectionExtensions
       Action<CacheOptions>? configure = null)
   {
     // 1. Ensure the Options record is available in the DI container
-    services.AddOptions<CacheOptions>();
+    AddValidatedCacheOptions(services);
 
     // 2. Apply code-based overrides if provided
     if (configure != null) services.Configure(configure);
