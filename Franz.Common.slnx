@@ -75,6 +75,7 @@
   </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/Franz.Common.Caching.Benchmarks/Franz.Common.Caching.Benchmarks.csproj" />
+    <Project Path="benchmarks/Franz.Common.Caching.LoadTests/Franz.Common.Caching.LoadTests.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj" />

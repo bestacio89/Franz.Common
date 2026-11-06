@@ -37,8 +37,9 @@ jobs:
           dotnet run
           --project benchmarks/Franz.Common.Caching.Benchmarks/Franz.Common.Caching.Benchmarks.csproj
           --configuration Release
+          -p:EnablePackageValidation=false
           --
-          --filter "*CacheProviderBenchmarks*" "*CacheKeyGenerationBenchmarks*"
+          --filter "*Cache*"
           --exporters json markdown
           --artifacts ./BenchmarkDotNet.Artifacts
 

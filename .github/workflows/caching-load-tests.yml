@@ -1,0 +1,73 @@
+name: Caching production workload simulation
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - "sources/Franz.Common.Caching/**"
+      - "sources/Franz.Common.MultiTenancy/**"
+      - "tests/Franz.Common.Caching.Testing/**"
+      - "benchmarks/Franz.Common.Caching.LoadTests/**"
+      - ".github/workflows/caching-load-tests.yml"
+  schedule:
+    - cron: "0 2 * * *"
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: caching-load-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulate:
+    name: Simulate ${{ matrix.provider }} cache workload
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        provider:
+          - memory
+          - distributed
+          - hybrid
+          - redis
+    env:
+      FRANZ_CACHE_LOAD_PROVIDER: ${{ matrix.provider }}
+      FRANZ_CACHE_LOAD_PROFILE: ${{ github.event_name == 'schedule' && github.event.schedule == '0 2 * * *' && 'full' || (github.event_name == 'schedule' && 'stress' || 'ci') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.403
+
+      - name: Execute production workload
+        run: >-
+          dotnet run
+          --project benchmarks/Franz.Common.Caching.LoadTests/Franz.Common.Caching.LoadTests.csproj
+          --configuration Release
+          -p:EnablePackageValidation=false
+
+      - name: Add report summary to workflow
+        if: always()
+        shell: bash
+        run: |
+          if [ -d reports ]; then
+            find reports -type f -name '*.md' -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
+            find reports -type f -name 'load-summary.json' -print
+          fi
+
+      - name: Upload production workload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: caching-load-${{ matrix.provider }}-${{ github.run_id }}
+          path: reports/**
+          if-no-files-found: warn
