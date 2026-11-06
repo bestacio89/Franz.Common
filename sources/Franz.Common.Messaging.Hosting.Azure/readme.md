@@ -1,301 +1,78 @@
 # Franz.Common.Messaging.Hosting.Azure
 
-> Hosted-service lifecycle integration for Azure messaging consumers and publishers in .NET worker applications.
+> Combined generic-host lifecycle and ASP.NET Core ingress integration for Azure Service Bus, Event Hubs, and Event Grid.
 
 ## Overview
 
-Hosted-service lifecycle integration for Azure messaging consumers and publishers in .NET worker applications.
+This package composes the Franz Azure transport registrations and starts the long-running Service Bus and Event Hubs consumers with the generic host. It also exposes an ASP.NET Core endpoint extension for Azure Event Grid ingress.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Messaging.Hosting.Azure
-```
+~~~
 
-## Design principles
+## Register Azure transports and hosted services
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+~~~csharp
+using Franz.Common.Messaging.Hosting.Azure.DependencyInjection;
 
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-`Franz.Common.Messaging.Hosting.Azure` is the **Azure hosting orchestration layer** for the **Franz Framework messaging stack**.
-
-It provides an **opinionated, batteries-included runtime** that wires Azure messaging transports into the **.NET Generic Host**, while preserving Franz’s core principles:
-
-* transport purity
-* mediator-driven execution
-* explicit lifecycle management
-* extensibility through composition
-
-This package **does not implement messaging transports**.
-It **orchestrates** them.
-
----
-
-## 🎯 Purpose
-
-This package answers one simple question:
-
-> *“I want to run Franz messaging on Azure — just make it work.”*
-
-It does so by:
-
-* starting and stopping Azure background consumers
-* mapping HTTP endpoints for Azure Event Grid
-* reusing the core Franz hosting abstractions
-* leaving transport adapters fully reusable and hosting-agnostic
-
----
-
-## 🧩 What This Package Orchestrates
-
-`Franz.Common.Messaging.Hosting.Azure` coordinates the following transport adapters:
-
-* **Azure Service Bus**
-  `Franz.Common.Messaging.AzureEventBus`
-
-* **Azure Event Hubs (streaming)**
-  `Franz.Common.Messaging.AzureEventHubs`
-
-* **Azure Event Grid (HTTP ingress)**
-  `Franz.Common.Messaging.AzureEventGrid`
-
-Each transport remains **independently usable** outside of this hosting package.
-
----
-
-## ✨ Features
-
-### 🟦 Azure-Native Hosting
-
-* Uses **.NET Generic Host**
-* Registers background listeners as `IHostedService`
-* Clean startup / shutdown semantics
-* No custom loops or hidden threads
-
----
-
-### 🧠 Franz Hosting Abstractions Reused
-
-* Builds on **Franz.Common.Messaging.Hosting**
-* Reuses:
-
-  * hosting lifecycle conventions
-  * Outbox / Inbox listeners
-  * mediator dispatch semantics
-* No duplication of hosting logic
-
----
-
-### 🌐 Event Grid HTTP Ingress
-
-* Maps **Azure Event Grid** to HTTP endpoints
-* Minimal API–friendly
-* Supports subscription validation
-* Dispatches events through Franz mediator
-
----
-
-### 🔌 Transport-Pure Design
-
-* No Azure SDK usage at the business layer
-* No transport logic duplicated
-* Hosting and transport concerns remain strictly separated
-
----
-
-## 📦 Dependencies
-
-This package depends on:
-
-### Franz packages
-
-```
-Franz.Common.Messaging.Hosting
-Franz.Common.Messaging.AzureEventBus
-Franz.Common.Messaging.AzureEventHubs
-Franz.Common.Messaging.AzureEventGrid
-Franz.Common.Logging
-Franz.Common.Errors
-```
-
-### .NET / ASP.NET
-
-```
-Microsoft.Extensions.Hosting
-Microsoft.Extensions.DependencyInjection
-Microsoft.Extensions.Logging
-Microsoft.AspNetCore.Http.Abstractions
-```
-
-❌ No business dependencies
-❌ No direct Azure SDK usage (delegated to transport packages)
-
----
-
-## 📂 Project Structure
-
-```
-Franz.Common.Messaging.Hosting.Azure/
-├── DependencyInjection/
-│   └── ServiceCollectionExtensions.cs
-│
-├── EventBus/
-│   └── AzureEventBusHostedService.cs
-│
-├── EventHubs/
-│   └── AzureEventHubsHostedService.cs
-│
-├── EventGrid/
-│   ├── AzureEventGridEndpointOptions.cs
-│   └── EndpointRouteBuilderExtensions.cs
-│
-└── README.md
-```
-
----
-
-## ⚙️ Registration
-
-### Service registration
-
-```csharp
-builder.Services.AddFranzAzureHosting(options =>
+services.AddFranzAzureHosting(options =>
 {
-  options.EventBus = bus =>
-  {
-    bus.ConnectionString = configuration["Azure:ServiceBus"]!;
-    bus.EntityName = "franz-events";
-  };
+    options.EventBus = bus =>
+    {
+        bus.ConnectionString = configuration["Azure:ServiceBus"]!;
+        bus.EntityName = "orders";
+        bus.MaxConcurrentCalls = 8;
+    };
 
-  options.EventHubs = hubs =>
-  {
-    hubs.ConnectionString = configuration["Azure:EventHubs"]!;
-    hubs.EventHubName = "orders-stream";
-    hubs.ConsumerGroup = "$Default";
-    hubs.BlobConnectionString = configuration["Azure:Storage"]!;
-    hubs.BlobContainerName = "eventhub-checkpoints";
-  };
-
-  options.EventGrid = grid =>
-  {
-    grid.Route = "/events/eventgrid";
-  };
+    options.EventHubs = hubs =>
+    {
+        hubs.ConnectionString = configuration["Azure:EventHubs:ConnectionString"]!;
+        hubs.EventHubName = "orders";
+        hubs.ConsumerGroup = "$Default";
+        hubs.BlobConnectionString = configuration["Azure:Storage:ConnectionString"]!;
+        hubs.BlobContainerName = "eventhub-checkpoints";
+    };
 });
-```
+~~~
 
----
+AddFranzAzureHosting accepts Action<FranzAzureHostingOptions>. It invokes the Azure Service Bus and Event Hubs transport registrations, registers their hosted services, and registers the Azure Event Grid ingress integration.
 
-### Event Grid endpoint mapping
+The Event Bus and Event Hubs options are configured through their respective delegates. Event Grid route configuration is applied when mapping the endpoint; the EventGrid delegate on FranzAzureHostingOptions is not currently consumed by AddFranzAzureHosting and should not be relied on.
 
-```csharp
-app.MapFranzAzureEventGrid();
-```
+## Map the Event Grid endpoint
 
-Or with customization:
+~~~csharp
+using Franz.Common.Messaging.Hosting.Azure.EventGrid;
 
-```csharp
 app.MapFranzAzureEventGrid(options =>
 {
-  options.Route = "/integrations/azure/eventgrid";
+    options.Route = "/api/events";
 });
-```
+~~~
 
----
+The endpoint accepts an Event Grid event batch, parses it, and forwards each event to the built-in IAzureEventGridIngress registered by AddFranzAzureHosting. The application remains responsible for protecting the route and applying its ingress network/authentication policy.
 
-## 🔄 Runtime Behavior
+## Event Grid subscription-validation limitation
 
-### Background listeners
+The built-in MapFranzAzureEventGrid endpoint currently ignores the SubscriptionValidationResult returned by IAzureEventGridIngress and responds with an empty 200 OK. Azure Event Grid subscription creation requires a response body containing validationResponse. The ingress service extracts and returns the validation code, but the built-in endpoint does not serialize it into the required response. Do not use this endpoint for subscription creation until that host-level response handling is corrected; use a custom endpoint that maps ValidationCode to validationResponse in the meantime.
 
-On application startup:
+## Lifecycle boundaries
 
-* Azure Service Bus processor starts
-* Azure Event Hubs processor starts
-* Franz Outbox listeners (if registered) start
+- Azure Service Bus transport registration creates its consumer and hosted service.
+- Event Hubs transport registration creates the processor; this package adds its hosted service.
+- Event Grid is an HTTP ingress endpoint, not a background listener.
+- Tenant-scoped message execution requires Franz.Common.Messaging.MultiTenancy and its trusted producer authorization dependencies.
+- Broker retries/checkpoints do not make external database effects exactly-once.
 
-On shutdown:
+## Related packages
 
-* Processors are stopped gracefully
-* In-flight messages are completed or retried by Azure
-
----
-
-### Event Grid ingress
-
-* Azure Event Grid posts events to HTTP endpoint
-* Subscription validation handled automatically
-* Events mapped to Franz `Message`
-* Dispatched through Franz mediator pipelines
-
----
-
-## 🧠 Design Philosophy
-
-This package is **opinionated but optional**.
-
-You may choose to:
-
-* use this hosting package for rapid Azure adoption
-* host Azure transports manually in custom runtimes
-* embed Franz messaging in Azure Functions or workers
-
-The transport packages remain **fully reusable** without this hosting layer.
-
-> **Hosting.Azure orchestrates — transports integrate.**
-
----
-
-## 🚀 Extensibility
-
-This package is designed to evolve:
-
-* Additional Azure transports can be added
-* Hosting behavior can be overridden
-* Event Grid routing can be customized
-* Outbox / Inbox listeners remain transport-agnostic
-
----
-
-## 📝 Version Information
-
-* **Current Version:** v3.0.0
-* Target Framework: **.NET 10**
-* Part of the **Franz Framework**
-
----
-
-## 📜 License
-
-MIT License — see `LICENSE`.
-
----
-
-## ✅ Status
-
-This package completes the **Azure runtime layer** for the Franz messaging ecosystem.
-
-Together with:
-
-* `AzureEventBus`
-* `AzureEventHubs`
-* `AzureEventGrid`
-
-it provides a **full, production-ready Azure messaging stack** with clean separation of concerns and long-term extensibility.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+- Franz.Common.Messaging.AzureEventBus — Service Bus transport.
+- Franz.Common.Messaging.AzureEventHubs — Event Hubs transport.
+- Franz.Common.Messaging.AzureEventGrid — Event Grid ingress contracts.
+- Franz.Common.Messaging.MultiTenancy — validated tenant context for message processing.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

@@ -1,207 +1,82 @@
 # Franz.Common.Testing
 
-> Reusable test dispatchers, fixtures, and test-support utilities for verifying Franz.Common application components.
+> Test base class, strict Moq verification, and a lightweight Mediator test dispatcher.
 
 ## Overview
 
-Reusable test dispatchers, fixtures, and test-support utilities for verifying Franz.Common application components.
+The package provides a reusable unit-test base class and a lightweight in-memory Mediator dispatcher for focused handler and pipeline tests. Its dispatcher is intentionally test-only and does not implement the complete production dispatch surface.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Testing
-```
+~~~
 
-## Design principles
+## Included utilities
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+### UnitTest
 
-## Usage and configuration
+UnitTest is a disposable base class that creates a strict Moq MockRepository and sets the current thread's CurrentCulture and CurrentUICulture. The default constructor uses the package's configured default culture; the string constructor accepts an explicit culture name.
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+On disposal, UnitTest calls MockRepository.VerifyAll(). Tests must configure and verify the expected interactions before the test fixture is disposed.
 
-## Package-specific guide
-
-A library within the **Franz Framework** designed to enhance unit testing in .NET applications. This package simplifies test development by integrating with popular testing frameworks and providing utilities for mock setups and fluent assertions.
-
----
-
-## **Features**
-
-- **Unit Testing Simplification**:
-  - Includes `UnitTest` base class to standardize test setup and execution.
-- **Fluent Assertions**:
-  - Integrates **FluentAssertions** for writing readable and expressive assertions.
-- **Mocking Support**:
-  - Utilizes **Moq** and **MockQueryable.Moq** for creating and managing mock objects.
-  - Includes **Moq.AutoMock** for automatic mock generation.
-- **Resource Management**:
-  - Provides `Resources.resx` for managing test-specific resources.
-
----
-
-## **Version Information**
-
--**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package leverages the following dependencies:
-- **FluentAssertions** (6.12.0): For fluent and expressive test assertions.
-- **MockQueryable.Moq** (7.0.0): Simplifies mocking IQueryable and LINQ queries.
-- **Moq.AutoMock** (3.5.0): Automates the creation of mocks for dependency injection scenarios.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Testing
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Testing
-```
-
----
-
-## **Usage**
-
-### **1. Create Unit Tests Using the Base Class**
-
-Leverage the `UnitTest` base class for consistent test initialization:
-
-```csharp
+~~~csharp
+using FluentAssertions;
 using Franz.Common.Testing;
+using Xunit;
 
-public class MyUnitTest : UnitTest
+public sealed class OrderServiceTests : UnitTest
 {
     [Fact]
-    public void TestExample()
+    public void Example()
     {
-        // Arrange
         var value = 1;
 
-        // Act
-        value++;
-
-        // Assert
-        value.Should().Be(2);
+        value.Should().Be(1);
     }
 }
-```
+~~~
 
-### **2. Use Fluent Assertions**
+### TestDispatcher
 
-Write expressive and readable assertions with **FluentAssertions**:
+TestDispatcher is a lightweight in-memory IDispatcher implementation for focused unit tests. It is configured fluently with handlers and pipeline components:
 
-```csharp
-[Fact]
-public void String_ShouldContainExpectedValue()
-{
-    // Arrange
-    var result = "Hello, Franz Framework!";
+~~~csharp
+using Franz.Common.Testing.Mediator;
 
-    // Assert
-    result.Should().Contain("Franz");
-}
-```
+var dispatcher = new TestDispatcher()
+    .WithHandler<GetOrderQuery, OrderDto>(new GetOrderHandler())
+    .WithHandler<OrderCreatedNotification>(new OrderCreatedHandler())
+    .WithPipeline<GetOrderQuery, OrderDto>(new TestLoggingPipeline());
+~~~
 
-### **3. Mock LINQ Queries**
+Supported configuration methods include WithHandler, WithPipeline, WithPreProcessor, WithPostProcessor, and WithNotificationPipeline.
 
-Use **MockQueryable.Moq** to mock IQueryable data sources:
+The current implementation supports typed command/query dispatch, notification publication, and stream query enumeration for the corresponding registered handler types. It uses dynamic invocation and is explicitly test-only; it is annotated with RequiresDynamicCode and RequiresUnreferencedCode.
 
-```csharp
-using MockQueryable.Moq;
-using Moq;
+## Current dispatcher coverage limitations
 
-[Fact]
-public void ShouldReturnFilteredData()
-{
-    // Arrange
-    var mockData = new List<string> { "Alice", "Bob", "Charlie" }.AsQueryable().BuildMock();
-    var repository = new Mock<IRepository>();
-    repository.Setup(r => r.GetData()).Returns(mockData.Object);
+TestDispatcher is not a complete implementation of every IDispatcher member:
 
-    // Act
-    var result = repository.Object.GetData().Where(x => x.Contains("a"));
+- PublishEventAsync currently throws NotImplementedException.
+- Send(INotification) currently throws NotImplementedException.
+- The non-generic SendAsync(ICommand) wrapper path is not a supported void-command test path in the current implementation.
 
-    // Assert
-    result.Should().Contain("Charlie").And.NotContain("Bob");
-}
-```
+Use the real FranzDispatcher with generated registrations for event dispatch, void-command integration tests, and behavior that depends on the full Mediator runtime. Do not use TestDispatcher as evidence of Native AOT compatibility.
 
-### **4. Automate Mock Creation**
+## Dependencies
 
-Simplify mock setups with **Moq.AutoMock**:
+The package references:
 
-```csharp
-using Moq.AutoMock;
+- FluentAssertions 8.10.0;
+- Moq.AutoMock 4.0.2;
+- MockQueryable.Moq 10.0.8;
+- Franz.Common.Mediator.
 
-[Fact]
-public void ShouldInjectDependenciesAutomatically()
-{
-    // Arrange
-    var mocker = new AutoMocker();
-    var service = mocker.CreateInstance<MyService>();
+## Testing guidance
 
-    // Act
-    service.DoSomething();
-
-    // Assert
-    mocker.GetMock<IDependency>().Verify(d => d.PerformAction(), Times.Once);
-}
-```
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.Testing** package integrates seamlessly with other **Franz Framework** packages, providing consistent and efficient testing utilities for the ecosystem.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+Use TestDispatcher for isolated handler/pipeline tests where its supported dispatch surface is sufficient. Use the production DI registration and generated Mediator invokers for integration tests. Use real persistence and transport adapters for their respective integration tests rather than relying on mocked IQueryable behavior as a substitute for provider translation.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Added `UnitTest` base class for standardized test setup.
-- Integrated **FluentAssertions** for fluent and expressive assertions.
-- Added support for **MockQueryable.Moq** and **Moq.AutoMock** for efficient mocking.
-- Provided `Resources.resx` for managing test-specific resources.
-
----
-
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
+MIT. See the repository [LICENSE](../../LICENSE).

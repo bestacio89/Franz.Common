@@ -1,451 +1,92 @@
 # Franz.Common.Business
 
-> Domain and application-layer building blocks for DDD and CQRS, including business abstractions, contracts, and execution helpers.
+> Domain model, entity/aggregate factories, identity generation, and repository contracts for Franz applications.
 
 ## Overview
 
-Domain and application-layer building blocks for DDD and CQRS, including business abstractions, contracts, and execution helpers.
+This package contains the DDD-oriented business abstractions used by Franz applications: entities, aggregate roots, value objects, domain events, identity generators, factories, and persistence-facing repository contracts.
+
+It does not provide an EF Core repository implementation; that belongs to Franz.Common.EntityFramework.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Business
-```
+~~~
 
-## Design principles
+## Business registration
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+~~~csharp
+using Franz.Common.Business.Extensions;
 
-## Usage and configuration
+services.AddBusiness(typeof(ApplicationAssemblyMarker).Assembly);
+services.AddBusinessPlatform();
+~~~
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+AddBusiness requires an explicit application assembly. It registers the Guid V7 ID generator, the open generic entity factory, Franz Mediator infrastructure, and generated handler registration for the selected assembly.
 
-## Package-specific guide
+AddBusinessPlatform is optional. It adds the Serilog logging, retry, circuit-breaker, timeout, and bulkhead Mediator pipelines. It does not register the validation or transaction pipelines.
 
-A core infrastructure library of the **Franz Framework**, designed to support **Domain-Driven Design (DDD)**, **CQRS**, and **Event-Sourcing-ready architectures** in modern .NET applications.
+TryAddBusiness accepts a nullable assembly and leaves the service collection unchanged when it is null.
 
-It provides a **clean, deterministic, and production-grade foundation** for building scalable business systems with strong separation of concerns.
+## Entity identity
 
----
+Entity<TKey> exposes a strongly typed Id with a private setter. Domain code cannot assign identity after construction. Infrastructure has an internal identity setter for persistence/factory scenarios.
 
-## 🚀 Version
+The default AddBusiness registration provides IIdGenerator<Guid> backed by Guid.CreateVersion7(). Other ID generator implementations exist, but they are not selected automatically by AddBusiness.
 
-**Current Version:** v3.0.0
+## Entity factory
 
----
+IEntityFactory<TKey,TEntity> creates entities using an IIdGenerator<TKey>. EntityFactory<TKey,TEntity> requires a public or protected constructor that accepts exactly one TKey argument:
 
-## 🧠 Core Philosophy
-
-Franz.Common.Business enforces the following principles:
-
-- Identity is **factory-controlled**
-- Domain logic is **persistence-agnostic**
-- Repositories are **storage-only abstractions**
-- Entities are **immutable in identity after creation**
-- DI is **deterministic and explicit**
-- No hidden service locator or runtime DI construction
-
----
-
-## ✨ Key Features
-
----
-
-## 1. Domain Model (DDD Core)
-
-### ✔ Entity Model
-
-All domain entities derive from a unified base:
-
-```csharp
-public abstract class Entity<TId> : IEntity
-{
-    public TId Id { get; private set; } = default!;
-
-    protected Entity() { }
-
-    protected Entity(TId id)
-    {
-        Id = id;
-    }
-
-    public object GetId() => Id!;
-}
-```
-
-### ✔ Key characteristics:
-
-* Strongly typed identity (`Guid` or `int`)
-* Factory-controlled identity assignment
-* Immutable identity after creation
-* Equality based on identity
-* EF Core compatible design
-
----
-
-## 2. Identity System
-
-### ✔ Supported ID strategies
-
-* `Guid V7` (default standard)
-* `int` (database-generated identities)
-
-### ✔ Centralized ID generation
-
-```csharp
-public interface IIdGenerator<TId>
-{
-    TId Create();
-}
-```
-
-### ✔ Default implementation:
-
-```csharp
-public sealed class GuidV7Generator : IIdGenerator<Guid>
-{
-    public Guid Create() => Guid.CreateVersion7();
-}
-```
-
----
-
-## 3. Entity Factories
-
-Entities must be created through controlled factories.
-
-```csharp
-public interface IEntityFactory<TId, TEntity>
-    where TEntity : Entity<TId>
-{
-    TEntity Create();
-}
-```
-
-### ✔ Responsibilities:
-
-* Generate entity identity via `IIdGenerator<TId>`
-* Ensure consistent creation rules
-* Enforce domain construction invariants
-* Prevent identity bypass (e.g. `new Entity()` misuse)
-
-### ✔ Implementation: `EntityFactory<TKey, TEntity>`
-
-The default implementation uses a **compiled expression tree delegate**, cached statically per closed generic type, to invoke the entity's protected constructor with zero reflection overhead after startup.
-
-```csharp
-public sealed class EntityFactory<TKey, TEntity> : IEntityFactory<TKey, TEntity>
-    where TEntity : Entity<TKey>
-{
-    public TEntity Create() => _activator(_idGenerator.Create());
-}
-```
-
-#### How it works
-
-| Concern | Mechanism |
-|---|---|
-| Constructor discovery | `BindingFlags.NonPublic \| Public` — resolves `protected` constructors |
-| Delegate compilation | `Expression.Lambda<Func<TKey, TEntity>>(...).Compile()` |
-| Caching | Static field — compiled once per `TEntity` type, shared for the application lifetime |
-| Null guard | `ArgumentNullException.ThrowIfNull` on the injected `IIdGenerator<TKey>` |
-| Misconfiguration | Throws `TypeInitializationException` with an actionable inner message if the required constructor is absent |
-| Eager validation | `EntityFactory<TKey, TEntity>.Validate()` triggers the static constructor at DI registration time |
-
-#### Required entity constructor
-
-Every entity must expose a constructor accepting its key type:
-
-```csharp
-public class Order : Entity<Guid>
+~~~csharp
+public sealed class Order : Entity<Guid>
 {
     protected Order(Guid id) : base(id) { }
 }
-```
+~~~
 
-#### Eager validation at startup
+The factory discovers the constructor once per closed generic type, compiles a delegate, and reuses that delegate for subsequent Create calls. Call EntityFactory<TKey,TEntity>.Validate() during explicit application registration when eager constructor validation is required.
 
-Call `Validate()` from your DI registration extension to surface misconfigured entity types immediately, rather than on first use:
+The factory uses reflection and Expression.Compile during type initialization. Do not treat it as a warning-clean Native AOT path.
 
-```csharp
-services.AddSingleton<IEntityFactory<Guid, Order>, EntityFactory<Guid, Order>>();
-EntityFactory<Guid, Order>.Validate();
-```
+## Aggregate roots
 
----
+AggregateRoot<TEvent> uses Guid identity and tracks uncommitted domain events. Derived aggregates register event application handlers with Register<TEvent>(Action<TEvent>) and raise new events through RaiseEvent.
 
-## 4. Aggregate Factories
+The base type exposes:
 
-Aggregate roots follow the same factory pattern via `AggregateFactory<TAggregate, TEvent>`.
+- GetUncommittedChanges() to inspect pending events;
+- MarkChangesAsCommitted() to clear the pending collection;
+- Rehydrate(Guid, IEnumerable<TEvent>) to set identity and replay persisted events;
+- ReplayEvents(IEnumerable<TEvent>) to apply events without creating new uncommitted changes;
+- Version for aggregate event-version tracking.
 
-```csharp
-public interface IAggregateFactory<TAggregate>
-{
-    TAggregate Create();
-}
-```
+AggregateFactory<TAggregate,TEvent> creates Guid-based aggregate roots using a protected/public Guid constructor. AddBusiness does not register this aggregate factory automatically; register it explicitly when the application needs it.
 
-### ✔ Implementation: `AggregateFactory<TAggregate, TEvent>`
+## Domain events
 
-Mirrors `EntityFactory` exactly — compiled delegate, static cache, fail-fast error messages, and eager validation support — but is scoped to `AggregateRoot<TEvent>` and hardcoded to `Guid` identity, consistent with the event-sourcing model.
+IDomainEvent extends IEvent and exposes EventId, nullable Guid CorrelationId, nullable Guid AggregateId, AggregateType, and EventType. It does not define an OccurredOn property in this package's current contract.
 
-```csharp
-public sealed class AggregateFactory<TAggregate, TEvent> : IAggregateFactory<TAggregate>
-    where TAggregate : AggregateRoot<TEvent>
-    where TEvent : IEvent
-{
-    public TAggregate Create() => _activator(_idGenerator.Create());
-}
-```
+## Repository contracts
 
-#### Required aggregate constructor
+The business repository contract is IEntityRepository<TEntity,TId> in Franz.Common.Business.Repositories. It is identity-aware and exposes:
 
-```csharp
-public class OrderAggregate : AggregateRoot<OrderEvent>
-{
-    protected OrderAggregate(Guid id) : base(id) { }
-}
-```
+- GetByIdAsync and GetAllAsync;
+- AddAsync and AddRangeAsync;
+- UpdateAsync and UpdateRangeAsync;
+- DeleteAsync and DeleteRangeAsync, with an explicit hardDelete argument.
 
-#### Eager validation at startup
+The EF Core implementation and its provider-specific capabilities are supplied by Franz.Common.EntityFramework. Bulk operations are separate EF-specific contracts, not additions to this business interface.
 
-```csharp
-services.AddSingleton<IAggregateFactory<OrderAggregate>, AggregateFactory<OrderAggregate, OrderEvent>>();
-AggregateFactory<OrderAggregate, OrderEvent>.Validate();
-```
+## Architectural boundaries
 
----
-
-## 5. Repositories (Persistence Layer)
-
-Repositories are **identity-agnostic and persistence-only abstractions**.
-
-```csharp
-public interface IEntityRepository<TEntity>
-    where TEntity : class, IEntity
-{
-    Task<TEntity> GetByIdAsync(object id, CancellationToken cancellationToken = default);
-    Task AddAsync(TEntity entity, CancellationToken cancellationToken = default);
-    Task UpdateAsync(TEntity entity, CancellationToken cancellationToken = default);
-    Task DeleteAsync(TEntity entity, CancellationToken cancellationToken = default);
-}
-```
-
-### ✔ Design principles:
-
-* No dependency on `TId`
-* No domain logic
-* EF Core handles identity resolution
-* Supports both `Guid` and `int` primary keys
-
----
-
-## 6. Aggregates & Event Sourcing
-
-### ✔ Aggregate Root
-
-Supports event-driven state mutation:
-
-```csharp
-public abstract class AggregateRoot<TEvent> : Entity<Guid>
-    where TEvent : IEvent
-{
-    protected void RaiseEvent(TEvent @event) { }
-    public void ReplayEvents(IEnumerable<TEvent> events) { }
-    public void Rehydrate(Guid id, IEnumerable<TEvent> events) { }
-}
-```
-
-### ✔ Features:
-
-* Event-based state changes
-* Automatic version tracking
-* Uncommitted event collection
-* Full rehydration support
-
----
-
-## 7. Domain Events
-
-All events implement:
-
-```csharp
-public interface IDomainEvent : IEvent
-{
-    Guid EventId { get; }
-    DateTimeOffset OccurredOn { get; }
-    string? CorrelationId { get; }
-    Guid? AggregateId { get; }
-    string AggregateType { get; }
-    string EventType { get; }
-}
-```
-
-### ✔ Benefits:
-
-* Full auditability
-* Distributed tracing support
-* Event correlation across services
-
----
-
-## 8. CQRS Support
-
-Built-in support for:
-
-* Commands (`ICommandHandler`)
-* Queries (`IQueryHandler`)
-* Mediator-based execution pipeline
-
----
-
-## 9. Resilience Pipelines
-
-Production-ready pipeline support:
-
-* Retry
-* Circuit Breaker
-* Timeout
-* Bulkhead Isolation
-
----
-
-## 10. Dependency Injection Bootstrap
-
-### ✔ Single entry point:
-
-```csharp
-services.AddBusiness(applicationAssembly);
-services.AddBusinessPlatform();
-```
-
-### ✔ What it registers:
-
-#### Domain layer
-
-* `IIdGenerator<Guid>`
-* `IEntityFactory<,>`
-* `IAggregateFactory<>`
-
-#### Mediator layer
-
-* Command/query pipeline
-* Event dispatching
-
-#### Handler discovery
-
-* Automatic handler registration
-
----
-
-## ⚠️ Important Design Rules
-
-### ❌ Do NOT:
-
-* Generate IDs manually (`Guid.NewGuid()`)
-* Bypass factories for entity creation
-* Define entities without a `protected T(TKey id)` constructor
-* Use service locator inside startup/configuration
-* Introduce custom repository identity types
-
-### ✔ Always:
-
-* Use factories for entity creation
-* Use `IIdGenerator<TId>` for identity
-* Define the required single-parameter constructor on every entity and aggregate
-* Call `Validate()` at DI registration time to catch constructor mismatches at startup
-* Treat repositories as persistence-only abstractions
-
----
-
-## 🧩 Architecture Overview
-
-```
-Domain Layer
-    ├── Entities (Entity<TId>)
-    ├── Aggregates (AggregateRoot<TEvent>)
-    ├── Value Objects
-    └── Domain Events
-
-Factory Layer
-    ├── IEntityFactory<TId, TEntity>      → EntityFactory<TKey, TEntity>
-    └── IAggregateFactory<TAggregate>     → AggregateFactory<TAggregate, TEvent>
-
-Identity Layer
-    └── IIdGenerator<TId>
-
-Persistence Layer
-    └── IEntityRepository<TEntity>
-
-Application Layer
-    └── CQRS + Mediator
-
-Bootstrap Layer
-    └── AddBusiness()
-```
-
----
-
-## 🧪 Version History
-
-### v2.2.09 – Factory Hardening
-
-* Replaced reflection-on-every-call pattern with **compiled expression tree delegates** in both `EntityFactory` and `AggregateFactory`
-* Delegates are compiled **once per closed generic type** and cached in a static field for the application lifetime — near-native instantiation performance
-* Removed the injected `Func<Guid, TAggregate> activator` from `AggregateFactory` — the factory now owns constructor resolution entirely, eliminating a class of registration-site errors
-* Added `TypeInitializationException` with a descriptive inner message when the required single-parameter constructor is absent, replacing the previous opaque CLR failure
-* Added `ArgumentNullException.ThrowIfNull` guard on injected `IIdGenerator<TKey>` instances
-* Added static `Validate()` method to both factories — call at DI registration time to surface misconfigured types at startup rather than on first use
-* Removed unused `System.Collections.Concurrent`, `System.Collections.Generic`, and `System.Text` imports from factory files
-
-### v2.0.3 – Architecture Stabilization
-
-* Enforced factory-driven identity model
-* Removed mutable identity assignment (`SetId` eliminated)
-* Introduced immutable entity identity lifecycle
-* Simplified repository abstraction (identity-agnostic)
-* Consolidated DI bootstrap into single deterministic entry point
-* Removed ServiceProvider creation from configuration pipeline
-* Improved EF Core compatibility and consistency
-* Strengthened DDD alignment across domain layer
-
----
-
-## 📌 Summary
-
-Franz.Common.Business v2.2.13 provides a:
-
-> ✔ deterministic
-> ✔ factory-driven
-> ✔ EF Core compatible
-> ✔ DDD-aligned
-> ✔ CQRS-ready
-
-foundation for enterprise-grade .NET applications.
-
----
-
-## 🧠 Final Note
-
-This library enforces **architectural discipline by design**, not convention.
-
-It ensures that:
-
-* identity is always controlled
-* domain logic remains pure
-* persistence remains isolated
-* system composition is deterministic
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+- Domain entities and aggregates do not depend on EF Core or a database provider.
+- Factories own identity initialization.
+- Repository contracts describe persistence operations; implementations belong to infrastructure packages.
+- Mediator dispatch and handler registration are composed by AddBusiness for the explicitly selected application assembly.
+- Runtime factory construction uses reflection/expression compilation; the generated Mediator handler registration does not make the factory path Native AOT-safe.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

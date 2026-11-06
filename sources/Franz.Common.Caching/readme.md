@@ -202,7 +202,7 @@ services.AddObservableCaching();
 Observer callbacks are synchronous because `ICacheObserver` is a synchronous
 contract. Observer exceptions are isolated and written to `Trace`; they do not
 change the outcome of the cache operation. No unbounded fire-and-forget task
-queue is created. Per-key diagnostic tracking and tag history are bounded.
+queue is created. Per-key diagnostic tracking is bounded; the 3.0.0 provider-neutral contract does not expose tag-based invalidation.
 
 ### Excel export
 

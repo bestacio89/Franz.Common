@@ -1,235 +1,78 @@
 # Franz.Common.Messaging
 
-> Transport-agnostic messaging contracts, dispatch policies, delivery context, and integration points for transport adapters.
+> Transport-neutral message envelopes, publisher/sender contracts, serializers, builders, storage contracts, and outbox primitives.
 
 ## Overview
 
-Transport-agnostic messaging contracts, dispatch policies, delivery context, and integration points for transport adapters.
+This package defines the application-facing messaging contracts. Broker-specific connections, topology, consumers, and hosted listener lifecycles belong to transport and hosting packages.
+
+The package exposes explicit registration helpers for shared messaging primitives. Broker configuration and hosted execution belong to the corresponding transport adapters.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Messaging
-```
+~~~
 
-## Design principles
+## Core contracts
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+- IMessageSender sends a transport-level Franz Message.
+- IMessagingPublisher publishes IIntegrationEvent instances through the configured messaging pipeline.
+- IMessagingTransaction represents a transport transaction boundary.
+- IMessageBuilder and IMessageBuilderStrategy define message enrichment/building responsibilities.
+- IMessageFactory creates message envelopes for commands, queries, integration events, and execution faults.
+- IMessageSerializer abstracts message payload serialization.
+- IMessageStore and IInboxStore define outbox and inbox persistence contracts.
+- IListener defines the asynchronous transport listener contract.
 
-## Usage and configuration
+The package also provides Message/MessageKind envelopes, message context contracts, header propagation helpers, and transport capability/provisioning option types.
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+## Explicit registration helpers
 
-## Package-specific guide
+Register only the primitives the application uses:
 
-A messaging abstraction library within the **Franz Framework** that provides a unified foundation for building reliable, resilient, and extensible distributed messaging systems.
+~~~csharp
+using Franz.Common.Messaging.Extensions;
 
-It supports **outbox**, **inbox**, **retries**, **dead-letter queues**, and **multiple transports** (starting with **Kafka** and **MongoDB**).
+services
+    .AddMessagingHeaderContext()
+    .AddMessagingSerialization()
+    .AddMessagingFactories();
+~~~
 
----
+- AddMessagingHeaderContext registers the messaging header context accessor.
+- AddMessagingSerialization registers the default JsonMessageSerializer.
+- AddMessagingFactories registers the message factory and built-in command/query/event/fault builder strategies.
 
-## ✨ Features
+Transport packages register their own broker-specific services and options. Do not use a generic MessagingOptions section to configure Kafka or Azure; use each transport's options contract.
 
-- **📦 Outbox Pattern**
-  - Reliable delivery with `OutboxPublisherService`.
-  - Retries with exponential backoff.
-  - Moves failed messages to a **Dead Letter Queue (DLQ)** after max retries.
-  - MongoDB-backed implementation (`MongoMessageStore`).
+## Serialization
 
-- **📥 Inbox Pattern**
-  - Prevents duplicate processing with `IInboxStore`.
-  - MongoDB-backed implementation (`MongoInboxStore`).
-  - Guarantees **idempotency** under retries or replays.
+JsonMessageSerializer is the default IMessageSerializer implementation. Applications may register another serializer where the transport and stored-message format support it. Serializer compatibility is part of the message contract: producer and consumer must agree on payload representation and type metadata.
 
-- **🧩 Serializer Abstraction**
-  - Unified `IMessageSerializer` contract.
-  - Default `JsonMessageSerializer` (camelCase, ignore nulls).
-  - Shared across Kafka, Mongo, and Outbox.
+## Inbox and outbox contracts
 
-- **📊 Observability & Monitoring**
-  - Structured logging (with emojis ✅⚠️🔥).
-  - OpenTelemetry-friendly hooks.
-  - Covers retries, DLQ moves, dispatch, and consumption.
+IMessageStore provides pending-message retrieval, sent-state updates, retry updates, and dead-letter movement. IInboxStore records processed message identities so a delivery can be recognized if it is repeated.
 
-- **🎧 Listeners & Hosting**
-  - Transport-agnostic `IListener` interface.
-  - Dedicated listeners:
-    - `KafkaListener` (transport-only)
-    - `OutboxListener` (transport-only)
-  - Hosted service wrappers:
-    - `KafkaHostedService`
-    - `OutboxHostedService`
-  - Clean **separation of transport vs hosting concerns**.
+The stores are abstractions. Persistence adapters such as Franz.Common.MongoDB and Franz.Common.Messaging.EntityFramework provide implementations. Their tenant isolation and transaction guarantees must be evaluated independently; the generic interfaces do not automatically add tenant filtering.
 
-- **⚡ MongoDB Integration**
-  - `MongoMessageStore` with automatic index creation:
-    - `SentOn`
-    - `RetryCount`
-    - `CreatedOn`
-  - `MongoInboxStore` with unique index on message IDs.
-  - DI extensions: `AddMongoMessageStore`, `AddMongoInboxStore`.
+Outbox processing is not exactly-once execution. A process can complete a business operation and fail before its inbox/outbox state is committed. Design handlers to be idempotent and use a shared transaction or explicit outbox/inbox coordination where the persistence provider supports it.
 
----
+## Outbox publisher
 
-## 📂 Project Structure
+AddOutboxPublisher(Action<OutboxOptions>) is the current hosted publisher registration helper. The worker requires IMessageStore and IMessagingSender and supports polling interval, batch size, retry count, exponential retry bounds, and dead-letter configuration.
 
-```
+**Registration caveat:** the current helper registers a concrete OutboxOptions instance, while OutboxPublisherService consumes IOptions<OutboxOptions>. The configured instance is therefore not reliably bound to the worker's options wrapper. Do not rely on custom AddOutboxPublisher options until that registration contract is corrected. This is an implementation issue, not a documentation convention.
 
-Franz.Common.Messaging/
-├── Configuration/
-├── Contexting/
-├── Delegating/
-├── Extensions/
-├── Factories/
-├── Headers/
-├── Outboxes/
-│    ├── OutboxOptions.cs
-│    ├── OutboxPublisherService.cs
-│    └── ServiceCollectionExtensions.cs
-├── Serialization/
-│    ├── ISerializer.cs
-│    ├── JsonMessageSerializer.cs
-│    └── ServiceCollectionExtensions.cs
-├── Storage/
-│    ├── InboxStore.cs
-│    ├── IMessageStore.cs
-│    ├── StoredMessage.cs
-│    ├── Mappings/MessageMappingExtensions.cs
-│    └── …
-├── Message.cs
-├── IMessageSender.cs
-└── …
+## Transport packages
 
-````
-
-Hosting-specific projects:
-- **Franz.Common.Messaging.Hosting** → defines `IListener`, `MessageContext`, base services.
-- **Franz.Common.Messaging.Hosting.Kafka** → `KafkaHostedService`.
-- **Franz.Common.Messaging.Hosting.Mongo** → `OutboxHostedService`, `InboxHostedService`.
-
----
-
-## ⚙️ Configuration
-
-`MessagingOptions` in `appsettings.json`:
-
-```json
-"Messaging": {
-  "BootstrapServers": "localhost:9092",
-  "GroupId": "my-service",
-  "OutboxCollection": "OutboxMessages",
-  "DeadLetterCollection": "DeadLetterMessages",
-  "InboxCollection": "InboxMessages"
-}
-````
-
----
-
-## ⚡ Dependency Injection Setup
-
-```csharp
-builder.Services.AddMessagingCore();
-builder.Services.AddMongoMessageStore(configuration);
-builder.Services.AddMongoInboxStore(configuration);
-builder.Services.AddKafkaHostedListener();
-builder.Services.AddOutboxHostedListener();
-```
-
----
-
-## 🔄 Typical Flow
-
-1. **Send Command/Event** → via `IMessagingSender`.
-2. **Persist in Outbox** → `MongoMessageStore`.
-3. **Publisher Service** → retries + DLQ if needed.
-4. **Transport** → Kafka.
-5. **Listener** → consumes message.
-6. **Inbox Check** → skip if already processed.
-7. **Dispatcher** → `SendAsync` (command) / `PublishAsync` (event).
-
----
-
-## 🚀 Extensibility
-
-* Add new transports (RabbitMQ, Azure Service Bus, etc.):
-
-  * Implement `IListener` + HostedService in `Hosting.[Transport]`.
-  * Add DI registration extensions.
-* Swap Mongo for SQL by implementing `IMessageStore` and `IInboxStore`.
-* Replace JSON with custom serializers via `IMessageSerializer`.
-
----
-
-## 📊 Observability
-
-* Emoji-style structured logs for clarity:
-
-  * ✅ Success
-  * ⚠️ Retry
-  * 🔁 Skipped (Inbox)
-  * 🔥 Dead Letter
-* Compatible with OpenTelemetry for tracing message lifecycles.
-
----
-
-## 📌 Roadmap
-
-* Batch consumption support.
-* Message expiration / cleanup.
-* RabbitMQ transport (`Franz.Common.Messaging.Hosting.RabbitMq`).
-
----
-
-## 📝 Version Information
-
-* **Current Version:** v3.0.0
-* Part of the open-source Franz.Common ecosystem.
-
----
-
-## 📜 License
-
-This library is licensed under the MIT License. See the `LICENSE` file for details.
-
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.3.6
-- Integrated with Franz.Mediator (no MediatR).
-- MessagingPublisher.Publish is now async Task.
-- MessagingInitializer scans INotificationHandler<> for events.
-- Kafka topics auto-created for all integration events.
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-The messaging core dependency references were reviewed as part of the repository-wide .NET 10 servicing update. The intended public messaging contracts remain unchanged. Verify all transport, serialization, and persistence integration tests against the resolved dependency graph before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+- Franz.Common.Messaging.Kafka — Kafka producer/consumer and topic provisioning.
+- Franz.Common.Messaging.RabbitMQ — RabbitMQ connections, publishing confirms, topology, and replay.
+- Franz.Common.Messaging.AzureEventBus — Azure Service Bus transport.
+- Franz.Common.Messaging.AzureEventHubs — Azure Event Hubs transport.
+- Franz.Common.Messaging.Hosting.Kafka and Franz.Common.Messaging.Hosting.RabbitMQ — transport-specific hosted execution.
+- Franz.Common.Messaging.Hosting.Azure — Azure hosted execution and Event Grid ingress.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

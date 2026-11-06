@@ -1,300 +1,101 @@
 # Franz.Common.Mediator.Polly
 
-> Polly resilience integration for Mediator request pipelines, including retry, timeout, and circuit-breaker policies.
+> Polly policy-registry integration for HTTP resilience and Mediator request execution.
 
 ## Overview
 
-Polly resilience integration for Mediator request pipelines, including retry, timeout, and circuit-breaker policies.
+This package provides two registration entry points with different responsibilities. They must not be described as interchangeable.
+
+- AddFranzResilience registers configured HTTP policies in a Polly policy registry. It does not register a Mediator pipeline.
+- AddFranzResiliencev2 registers both HTTP and Mediator policies, composes named profiles, and registers PollyResiliencePipeline<TRequest, TResponse> as a Mediator pipeline.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Mediator.Polly
-```
+~~~
 
-## Design principles
+## Mediator and HTTP resilience
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-**Franz.Common.Mediator.Polly** extends [Franz.Common.Mediator](https://www.nuget.org/packages/Franz.Common.Mediator/) with **Polly-based resilience pipelines**.
-It gives you **retry, circuit breaker, advanced circuit breaker, timeout, and bulkhead isolation** for Mediator requests — all with **enriched Serilog logging, context-awareness, and resilience telemetry** built-in.
-
-> ⚡ No extra wiring. No boilerplate. Just plug it in.
-
----
-
-* **Current Version:** v3.0.0
-* **Target Frameworks**: .NET 9+
-* **Dependencies**: `Polly`, `Serilog`, `Franz.Common.Mediator`
-- Part of the open-source Franz.Common ecosystem.
----
-
-## ✨ Features
-
-* 🔁 **Retry Pipeline** — automatic retries with backoff & correlated telemetry.
-* 🚦 **Circuit Breaker Pipeline** — prevents cascading failures under load.
-* 📊 **Advanced Circuit Breaker Pipeline** — trips based on failure ratio in rolling window.
-* ⏱ **Timeout Pipeline** — cancels long-running requests automatically.
-* 📦 **Bulkhead Pipeline** — limits concurrent requests and queue pressure.
-* 🧠 **ResilienceContext** — shared state across all resilience pipelines:
-
-  * `RetryCount`, `CircuitOpen`, `TimeoutOccurred`, `BulkheadRejected`, `Duration`
-* 👁 **IResilienceObserver** — extensibility hooks for external telemetry, alerts, or dashboards.
-* 📝 **Enriched Serilog Logging** — all logs include:
-
-  * Correlation ID
-  * Request type
-  * Policy name
-  * Pipeline name
-  * Execution time
-  * Health indicators
-
----
-
-## 📦 Installation
-
-```bash
-dotnet add package Franz.Common.Mediator.Polly
-```
-
----
-
-## ⚙️ Setup
-
-### 1. Config-driven Entry Point (v1.6.2+)
-
-From **v1.6.2**, resilience is now **config-driven**.
-Define your policies in `appsettings.json`:
-
-```json
-"Resilience": {
-  "RetryPolicy": {
-    "Enabled": true,
-    "RetryCount": 3,
-    "RetryIntervalMilliseconds": 500
-  },
-  "CircuitBreaker": {
-    "Enabled": true,
-    "FailureThreshold": 0.5,
-    "MinimumThroughput": 10,
-    "DurationOfBreakSeconds": 30
-  },
-  "TimeoutPolicy": {
-    "Enabled": true,
-    "TimeoutSeconds": 5
-  },
-  "BulkheadPolicy": {
-    "Enabled": true,
-    "MaxParallelization": 10,
-    "MaxQueueSize": 20
-  }
-}
-```
-
-Then just call:
-
-```csharp
-builder.Services.AddFranzResilience(builder.Configuration);
-```
-
-✅ That’s it — retry, circuit breaker, timeout, and bulkhead are auto-registered from config and wired into Mediator pipelines.
-✅ Each policy injects structured logs and updates the `ResilienceContext`.
-
----
-
-### 2. Manual Registration (pre-1.6.2 style)
-
-If you prefer explicit registration:
-
-```csharp
+~~~csharp
 using Franz.Common.Mediator.Polly;
 
-builder.Services.AddFranzPollyPolicies(options =>
+services.AddFranzResiliencev2(configuration);
+~~~
+
+The configuration is read from the Resilience section. Base policy switches and values are shared by the HTTP and Mediator policy registration paths:
+
+~~~json
 {
-    options.AddRetry("DefaultRetry", retryCount: 3, intervalMs: 500);
-    options.AddCircuitBreaker("DefaultCircuitBreaker", 0.5, 10, 30);
-    options.AddTimeout("DefaultTimeout", 5);
-    options.AddBulkhead("DefaultBulkhead", 10, 20);
-});
-
-builder.Services
-    .AddFranzPollyRetry("DefaultRetry")
-    .AddFranzPollyCircuitBreaker("DefaultCircuitBreaker")
-    .AddFranzPollyTimeout("DefaultTimeout")
-    .AddFranzPollyBulkhead("DefaultBulkhead");
-```
-
----
-
-## 🧠 Observability Enhancements (v1.6.14)
-
-Version **1.6.14** introduces a **resilience-awareness layer** across all Mediator pipelines.
-
-### 🧩 `ResilienceContext`
-
-Carries runtime state between pipelines:
-
-```csharp
-public sealed class ResilienceContext
-{
-    public string PolicyName { get; init; } = string.Empty;
-    public int RetryCount { get; set; }
-    public bool CircuitOpen { get; set; }
-    public bool TimeoutOccurred { get; set; }
-    public bool BulkheadRejected { get; set; }
-    public TimeSpan Duration { get; set; }
-    public DateTimeOffset Timestamp { get; } = DateTimeOffset.UtcNow;
-
-    public bool IsHealthy => !CircuitOpen && !TimeoutOccurred && !BulkheadRejected;
+  "Resilience": {
+    "RetryPolicy": {
+      "Enabled": true,
+      "RetryCount": 3,
+      "RetryIntervalMilliseconds": 200
+    },
+    "TimeoutPolicy": {
+      "Enabled": true,
+      "TimeoutSeconds": 5
+    },
+    "CircuitBreaker": {
+      "Enabled": true,
+      "FailureThreshold": 0.5,
+      "MinimumThroughput": 10,
+      "DurationOfBreakSeconds": 30
+    },
+    "BulkheadPolicy": {
+      "Enabled": true,
+      "MaxParallelization": 10,
+      "MaxQueueSize": 20
+    },
+    "MediatorProfiles": {
+      "Default": {
+        "Policies": [
+          "mediator:Retry",
+          "mediator:Timeout",
+          "mediator:CircuitBreaker",
+          "mediator:Bulkhead"
+        ]
+      }
+    }
+  }
 }
-```
+~~~
 
-Each pipeline updates this context and emits structured logs through Serilog.
+The profile name used by the Mediator pipeline defaults to Default. AddFranzResiliencev2 creates a registry entry named mediator:{profileName}; it does not synthesize a Default profile. Configure MediatorProfiles:Default explicitly and ensure its Policies entries reference registered policy keys. An unregistered profile or policy fails explicitly during composition or execution. HttpProfiles can define corresponding HTTP composites using the registered http:* policy keys.
 
----
+The Mediator pipeline wraps the downstream handler execution in the selected composite policy. It preserves exceptions, records elapsed duration, adds request/correlation/profile properties to Serilog's LogContext, and notifies registered IResilienceObserver implementations after success or failure.
 
-### 👁 `IResilienceObserver`
+Register observers through dependency injection:
 
-Observers can listen to policy outcomes globally:
+~~~csharp
+services.AddSingleton<IResilienceObserver, ApplicationResilienceObserver>();
+~~~
 
-```csharp
-public interface IResilienceObserver
-{
-    void OnPolicyExecuted(string policyName, ResilienceContext context);
-}
-```
+Observers are diagnostic callbacks; they should not perform blocking work or alter the request result.
 
-You can implement custom observers for metrics or telemetry (e.g., Application Insights, Prometheus, Elastic APM).
+## HTTP-only policy registration
 
-Example:
+Use AddFranzResilience when only the HTTP policy registry is required:
 
-```csharp
-public sealed class ElasticResilienceObserver : IResilienceObserver
-{
-    private readonly ILogger<ElasticResilienceObserver> _logger;
+~~~csharp
+services.AddFranzResilience(configuration);
+~~~
 
-    public ElasticResilienceObserver(ILogger<ElasticResilienceObserver> logger)
-        => _logger = logger;
+It registers the HTTP policies in the policy registry. It does not add PollyResiliencePipeline<TRequest, TResponse> to the Mediator pipeline. Use the v2 entry point when Mediator resilience is required.
 
-    public void OnPolicyExecuted(string policyName, ResilienceContext context)
-        => _logger.LogInformation("🧠 {Policy} -> Healthy={Healthy} Duration={Duration}ms Retries={RetryCount}",
-            policyName, context.IsHealthy, context.Duration.TotalMilliseconds, context.RetryCount);
-}
-```
+## Policy behavior
 
-Register it once:
+The available base policies are retry, timeout, advanced circuit breaker, and bulkhead isolation. HTTP policies handle HTTP request exceptions and unsuccessful HTTP responses, but this package only places them in the Polly registry; it does not automatically attach them to HttpClientFactory or a typed client. The application must apply the selected HTTP policy/profile through its HTTP client integration. Mediator policies handle exceptions from the downstream request pipeline.
 
-```csharp
-builder.Services.AddSingleton<IResilienceObserver, ElasticResilienceObserver>();
-```
+Timeout uses Polly's optimistic cancellation model. The downstream operation must observe cancellation; synchronous or cancellation-ignoring work cannot be forcibly stopped.
 
----
+Retry can execute the downstream operation more than once. Apply it only where repeated execution is safe or where the operation is idempotent. Do not apply retry indiscriminately to commands with non-idempotent side effects.
 
-## 📊 Pipelines Overview
+## Scope and limitations
 
-| Pipeline                 | Options Class                        | Key                        | Observes Context |
-| ------------------------ | ------------------------------------ | -------------------------- | ---------------- |
-| Retry                    | `PollyRetryPipelineOptions`          | `"RetryPolicy"`            | ✅                |
-| Circuit Breaker          | `PollyCircuitBreakerPipelineOptions` | `"CircuitBreaker"`         | ✅                |
-| Advanced Circuit Breaker | `PollyAdvancedCircuitBreakerOptions` | `"AdvancedCircuitBreaker"` | ✅                |
-| Timeout                  | `PollyTimeoutPipelineOptions`        | `"TimeoutPolicy"`          | ✅                |
-| Bulkhead                 | `PollyBulkheadPipelineOptions`       | `"BulkheadPolicy"`         | ✅                |
-
-All pipelines automatically participate in **Franz’s logging & correlation system**.
-
----
-
-## 🧩 Example Logs (v1.6.14)
-
-### Success
-
-```plaintext
-[12:01:22 INF] ▶️ Executing GetBookQuery [abc123] with RetryPolicy
-[12:01:22 INF] ✅ GetBookQuery [abc123] succeeded after 47ms (policy RetryPolicy, retries=0)
-```
-
-### Retry + Timeout
-
-```plaintext
-[12:01:25 WRN] 🔁 GetBookQuery [abc123] retry attempt 2 (policy RetryPolicy)
-[12:01:25 ERR] ⏱️ GetBookQuery [abc123] timed out after 5s (policy TimeoutPolicy)
-```
-
-### Circuit Breaker Open
-
-```plaintext
-[12:01:27 ERR] ❌ GetBookQuery [abc123] failed after 3 retries (policy RetryPolicy)
-[12:01:27 WRN] 🚦 Circuit opened for 30s (policy CircuitBreaker)
-```
-
----
-
-## 🛠 Benefits
-
-* 🧩 **Composability-first** — pipelines remain orthogonal yet share context.
-* 🧠 **Self-aware architecture** — logs know what policies were triggered.
-* 📈 **Observer hooks** — tap into resilience events for monitoring or dashboards.
-* ⚡ **Zero boilerplate** — configured in <20 lines.
-* 🏢 **Enterprise-ready** — deterministic, auditable, and DI-safe.
-
----
-
-## 🗺 Roadmap
-
-* [ ] `FranzResilienceSummaryPipeline` — emits aggregated resilience telemetry per request.
-* [ ] OpenTelemetry integration via Activity tags.
-* [ ] Prebuilt “DefaultSets” (HTTP, Database, Messaging).
-
----
-
-## 📜 Changelog
-
-### v1.6.14
-
-* 🧠 Introduced `ResilienceContext` — unified runtime state for all pipelines.
-* 👁 Added `IResilienceObserver` for external resilience monitoring.
-* 🧾 Upgraded all pipelines to emit context-rich Serilog logs.
-* 🔗 Added correlation ID propagation across all resilience policies.
-* 🚀 Internal optimizations to reduce policy lookup overhead.
-
-### v1.6.2
-
-* ✨ Added `AddFranzResilience(IConfiguration)` for **config-driven resilience**.
-* ♻️ Unified policy registry and Mediator pipelines.
-* 🛡 Simplified startup — <20 lines bootstraps resilience + mediator.
-
----
-
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-⚡ With `Franz.Common.Mediator.Polly`, resilience is **first-class, observable, and deterministic**.
-Configure it once — and your Mediator pipelines automatically enforce retries, timeouts, bulkheads, and breakers **with total visibility**.
-
----
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+This package uses Polly's policy-registry model. It does not claim that every policy applies to every execution path: the HTTP registry and Mediator pipeline are separate integrations. Configure and test each path that the application uses.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

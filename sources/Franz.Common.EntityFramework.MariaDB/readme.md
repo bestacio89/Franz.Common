@@ -1,167 +1,42 @@
 # Franz.Common.EntityFramework.MariaDB
 
-> MariaDB provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
+> MariaDB EF Core provider dependency for the shared Franz persistence layer.
 
 ## Overview
 
-MariaDB provider integration for Franz.Common Entity Framework Core persistence, including provider configuration and model conventions.
+This package supplies the MariaDB/MySQL EF Core provider dependency used with Franz.Common.EntityFramework. It does not define a Franz-specific AddMariaDbDbContext extension or a separate tenant connection-string resolver.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.EntityFramework.MariaDB
-```
+dotnet add package Franz.Common.EntityFramework
+~~~
 
-## Design principles
+The package currently references Microting.EntityFrameworkCore.MySql 10.0.13 and Microsoft.EntityFrameworkCore.Relational 10.0.14. Microting.EntityFrameworkCore.MySql is a community-maintained provider fork; do not describe it as the original Pomelo package.
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+## DbContext configuration
 
-## Usage and configuration
+Configure the application's concrete DbContext with the provider's EF Core extension methods. A Franz persistence context should derive from DbContextBase and use the normal EF Core registration path:
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+Configure the application's concrete DbContext with EF Core's standard AddDbContext registration and the provider's UseMySql extension. Supply the server-version object required by the selected Microting provider release and select a version supported by the actual MariaDB deployment. The application's context constructor must also satisfy its Franz DI dependencies.
 
-## Package-specific guide
+The provider package itself contains no Franz service-collection extensions. Shared repository, unit-of-work, auditing, soft-delete, and tenant behavior is supplied by Franz.Common.EntityFramework.
 
-A library within the **Franz Framework** designed to extend **Entity Framework Core** support for **MariaDB** using the **Microting.EntityFrameworkCore.MySql** provider. This package simplifies the configuration and integration of MariaDB with EF Core in .NET applications.
+## Tenant and database isolation
 
----
+Database routing is controlled by DatabaseOptions.IsolationMode in Franz.Common.EntityFramework:
 
-## **Features**
+- SharedDatabase uses one configured database name and rejects the {dbName} token.
+- TenantDatabase requires a validated ITenantExecutionContextAccessor.Current.TenantId.
+- DomainDatabase is an explicit, separate mode requiring IDomainContextAccessor.GetCurrentDomainId().
 
-- **MariaDB Integration**:
-  - Leverages `Microting.EntityFrameworkCore.MySql` for robust MariaDB support.
-- **Service Registration**:
-  - `ServiceCollectionExtensions` to streamline dependency injection for MariaDB contexts.
-- **Compatibility**:
-  - Fully integrates with the **Franz.Common.EntityFramework** package for shared utilities and repositories.
+TenantDatabase never falls back to domain identity. Missing context fails closed. See the [shared EF Core guide](../Franz.Common.EntityFramework/readme.md).
 
----
+## Provider qualification
 
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package relies on:
-- **Microsoft.EntityFrameworkCore.Relational** (10.0.14): Provides relational database functionality for EF Core 10.
-- **Microting.EntityFrameworkCore.MySql** (10.0.13): MariaDB/MySQL provider aligned with EF Core 10. This is a community-maintained fork with renamed package/namespace identity, not the original Pomelo package; validate query translation, migrations, and runtime behavior against supported MariaDB versions before release.
-- **Franz.Common.EntityFramework**: Shared utilities and patterns for database integration.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.EntityFramework.MariaDB
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.EntityFramework.MariaDB
-```
-
----
-
-## **Usage**
-
-### **1. Configure MariaDB Context**
-
-Define a `DbContext` for MariaDB integration:
-
-```csharp
-using Microsoft.EntityFrameworkCore;
-
-public class MariaDbContext : DbContext
-{
-    public MariaDbContext(DbContextOptions<MariaDbContext> options) : base(options) { }
-
-    public DbSet<Order> Orders { get; set; }
-}
-```
-
-### **2. Dependency Injection**
-
-Use `ServiceCollectionExtensions` to register MariaDB contexts:
-
-```csharp
-using Franz.Common.EntityFramework.MariaDB.Extensions;
-
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddMariaDbContext<MariaDbContext>(options =>
-            options.UseMySql(
-                "Server=localhost;Database=MyDatabase;User=root;Password=my_password;",
-                new MariaDbServerVersion(new Version(10, 5, 12)) // Specify your MariaDB version
-            ));
-    }
-}
-```
-
-### **3. Multi-Database Support**
-
-This package integrates with `Franz.Common.EntityFramework` for managing multiple databases, enabling seamless operations across different database types.
-
----
-
-## **Integration with Franz Framework**
-
-The **Franz.Common.EntityFramework.MariaDB** package integrates seamlessly with:
-- **Franz.Common.EntityFramework**: Provides shared patterns for repositories and database management.
-- **Franz.Common**: Core utilities for the framework.
-
-Ensure these dependencies are installed to fully leverage the library's capabilities.
-
----
-
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+Validate model creation, migrations, CRUD, relationships, supported LINQ translation, transactions, concurrency, and bulk-operation behavior against the MariaDB versions deployed by the application. Do not assume that provider-specific translation behavior is identical to Npgsql, SQL Server, Oracle, or Cosmos.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.65
-- Upgrade version to .net 9
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-**Compatibility status:** `Microting.EntityFrameworkCore.MySql` 10.0.13 declares compatibility with EF Core 10 and MariaDB 11.4 LTS. This resolves the package-version mismatch, but does not prove behavioral equivalence with the former Pomelo provider. Run MariaDB integration tests for model creation, CRUD, relationships, LINQ translation, transactions, and migrations before publishing. See [the repository dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See the repository [LICENSE](../../LICENSE).

@@ -1,134 +1,73 @@
 # Franz.Common.Messaging.RabbitMQ
 
-> RabbitMQ transport adapter for Franz.Common messaging, including topology provisioning, acknowledgements, retries, and dead-letter routing.
+> RabbitMQ transport integration for Franz messaging, including confirmed publishing, topology policy, delivery, retries, and dead-letter routing.
 
 ## Overview
 
-RabbitMQ transport adapter for Franz.Common messaging, including topology provisioning, acknowledgements, retries, and dead-letter routing.
+This package owns RabbitMQ transport infrastructure: connection and channel management, publishing, sending, consumer construction, topology initialization, replay strategy, and transaction support. Hosted listener lifecycle is provided separately by Franz.Common.Messaging.Hosting.RabbitMQ.
+
+RabbitMQ and Kafka share Franz's transport-neutral message contracts, but their broker guarantees, topology, delivery, and transaction semantics are not identical.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Messaging.RabbitMQ
-```
+~~~
 
-## Design principles
+## Registration
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-Franz now speaks **RabbitMQ**.
-The same architectural contract used for Kafka applies here — **one pipeline, one model, zero spaghetti**.
-
-RabbitMQ is just a transport. Franz does the rest.
-
----
-
-## 🚀 Getting Started
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Messaging.RabbitMQ
-```
-
-Register RabbitMQ messaging:
-
-```csharp
+~~~csharp
 using Franz.Common.Messaging.RabbitMQ.Extensions;
 
-public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
-{
-    services.AddRabbitMQMessaging(configuration);
-}
-```
+services.AddRabbitMQMessaging(configuration);
+~~~
 
----
+The package binds RabbitMQ options from Messaging:RabbitMQ and registers publisher, sender, consumer, connection/channel pools, message serialization, initializer, and transaction services. The RabbitMQ configuration section is required.
 
-## 📦 Features
+## Configuration
 
-- **Publisher & Sender** via DI (`IMessagingPublisher`, `IMessagingSender`)
-- **Consumers** as hosted listeners
-- **Inbox / Outbox** support (MongoDB-backed)
-- **Transactional publishing** (`IMessagingTransaction`)
-- **Replay strategies** (default + extensible)
-- **Message context accessor** for scoped metadata
-- **Enforced lifetimes** to prevent invalid wiring
-- **Duplicate-safe DI registration**
+The Messaging:RabbitMQ section controls connection settings, queue/exchange names, provisioning mode, queue type, publisher-confirm timeout, concurrency, message TTL/limits, ordering, failure policy, and replay strategy.
 
-Kafka and RabbitMQ share the **exact same messaging semantics** in Franz.
+Connection configuration must use either an absolute amqp(s) URI with explicit credentials or the supported explicit host/username/password fields. When TLS is enabled with a URI, use amqps. Keep credentials in secret configuration.
 
----
+ProvisioningMode controls topology behavior. Development defaults to Create when no mode is specified; other environments default to Verify. Verify requires the management API URL so the configured topology can be inspected. Choose the mode explicitly for production deployments.
 
-## ⚖️ Philosophy
+## Publisher confirms and replay
 
-> *“We don’t care about MQ.
-> We make it behave.”*
+RabbitMQ replay strategies require publisher-confirm channels. Each replay operation uses the configured confirm-capable channel pool; replay is not performed through an unconfirmed publish path.
 
-Franz removes broker-specific complexity.
-Choose **Kafka** or **RabbitMQ** — your application code does not change.
+- NoReplayStrategy does not retry the message. When dead-letter-on-exhaustion is enabled, it publishes the failed delivery to the dead-letter queue.
+- ProgressiveFourStepReplayStrategy republishes through the configured retry topology using the progressive delay stages, then dead-letters after the configured retry budget when enabled.
 
----
+The original delivery must not be acknowledged as successfully processed until the replay/dead-letter publication has completed successfully. Confirm failures must remain visible to the caller/consumer lifecycle; a failed publication cannot be treated as a successful replay.
 
-**Current Version:** v3.0.0
+Publisher-confirm timeout is configured through RabbitMQMessagingOptions. Use a bounded timeout appropriate to broker latency and operational recovery.
 
----
+## Transactions
 
-## 🆕 v1.7.2 — Stability & Infrastructure Hardening
+The RabbitMQ transport exposes IMessagingTransaction for its supported transaction boundary. Use the canonical options-aware registration and constructor path; the removed legacy sender constructor is not supported. CompleteAsync rejects calls after transaction disposal.
 
-This release finalizes RabbitMQ as a **first-class transport** in Franz.
+Do not infer distributed atomicity between RabbitMQ and an external database. Use an outbox/inbox design when the workflow crosses those persistence boundaries.
 
-### ✔ Highlights
+## Hosted execution
 
-- Fully wired **RabbitMQ infrastructure** (publisher, consumers, hosted services)
-- **Inbox & Outbox** validated with real MongoDB containers
-- RabbitMQ now behaves **identically to Kafka** at the abstraction level
+Register background consumption through Franz.Common.Messaging.Hosting.RabbitMQ. This package's transport registration does not by itself start the generic-host listener.
 
-### 🔧 Improvements
+## Operational constraints
 
-- Correct **RabbitMQ.Client 7.x async channel handling**
-- Closed all **DI wiring gaps** in hosted services and tests
-- All **message builder strategies** registered by default
-- Deterministic startup / shutdown behavior
+- Configure queue type and topology consistently across deployment environments.
+- Keep MaxConcurrency at 1 when strict configured ordering is required.
+- FailurePolicy retries require ProgressiveFourStep replay.
+- Delivery limits are supported only for quorum queues.
+- Use idempotent handlers; redelivery remains possible.
+- Tenant-scoped consumers must establish validated delivery context through Franz.Common.Messaging.MultiTenancy. Headers are not authorization.
 
-### 🧪 Reliability
+## Related packages
 
-- Tested against **real RabbitMQ + MongoDB** using Testcontainers
-- No mocks. No shortcuts. Real brokers, real persistence.
-
-> **Result:** RabbitMQ is production-ready and battle-tested.
-
----
-
-### v1.6.20
-
-- Migration to **.NET 10**
-- Improved messaging DI patterns
-- Updated RabbitMQ client
-- Alignment of messaging abstractions across transports
-
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+- Franz.Common.Messaging — transport-neutral contracts.
+- Franz.Common.Messaging.Hosting.RabbitMQ — hosted listener and outbox execution.
+- Franz.Common.Messaging.MultiTenancy — validated tenant context for delivery.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

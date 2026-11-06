@@ -1,275 +1,73 @@
 # Franz.Common.Messaging.AzureEventBus
 
-> Azure Service Bus transport adapter for durable message publishing and consumption using Franz.Common messaging contracts.
+> Azure Service Bus producer and consumer integration for Franz messaging contracts.
 
 ## Overview
 
-Azure Service Bus transport adapter for durable message publishing and consumption using Franz.Common messaging contracts.
+This package integrates Azure Service Bus with Franz message envelopes and the Mediator dispatcher. It registers both the transport components and an Azure Event Bus hosted consumer. It is not a broker-neutral package and does not make Service Bus delivery exactly-once.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Messaging.AzureEventBus
-```
+~~~
 
-## Design principles
+## Registration
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+~~~csharp
+using Franz.Common.Messaging.AzureEventBus.DependencyInjection;
 
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-`Franz.Common.Messaging.AzureEventBus` is the **Azure Service Bus transport adapter** for the **Franz Framework messaging stack**.
-
-It implements Franz messaging abstractions to provide **durable, reliable, and mediator-driven event delivery** using **Azure Service Bus Topics & Subscriptions**, while preserving all Franz guarantees:
-
-* deterministic metadata
-* mediator pipelines
-* structured logging
-* retry & dead-letter semantics
-* transport isolation
-
-This package is the **Azure equivalent** of:
-
-* `Franz.Common.Messaging.Kafka`
-* `Franz.Common.Messaging.RabbitMQ`
-### 🟦 Azure Service Bus Transport
-
-* Native integration with **Azure Service Bus**
-* Topic / Subscription model
-* Queue support (for commands, if enabled)
-* Azure-native retry & DLQ semantics
-
----
-
-### 🧠 Franz-Native Semantics
-
-* Uses **Franz.Common.Messaging** abstractions
-* Dispatches messages through **Franz.Common.Mediator**
-* Fully compatible with Franz outbox / inbox patterns
-* Deterministic correlation & causation propagation
-
----
-
-### 🧩 Explicit Mapping Layer (No AutoMapper)
-
-* Uses **Franz.Common.Mapping**
-* Single authoritative translation layer:
-
-  * Franz message ⇄ Service Bus message
-* No reflection magic
-* Version-safe & auditable mappings
-
----
-
-### 🔁 Retry & Dead Letter Handling
-
-* Retries handled by **Azure Service Bus delivery counts**
-* Explicit dead-letter routing for:
-
-  * Deserialization failures
-  * Validation errors
-  * Poison messages
-* Clear separation between **business failure** and **transport failure**
-
----
-
-### 📊 Observability & Diagnostics
-
-* Integrated with **Franz.Common.Logging**
-* Structured logs with Franz conventions
-* CorrelationId & MessageId propagation
-* Compatible with OpenTelemetry (via mediator pipelines)
-
----
-
-## 📦 Dependencies
-
-This package intentionally depends only on **core Franz building blocks**:
-
-```
-Franz.Common.Messaging
-Franz.Common.Mediator
-Franz.Common.Mediator.Polly
-Franz.Common.Logging
-Franz.Common.Errors
-Franz.Common.Headers
-Franz.Common.Mapping
-Franz.Common.Serialization
-Azure.Messaging.ServiceBus
-```
-
-❌ No HTTP
-❌ No hosting logic
-❌ No business dependencies
-❌ No AutoMapper
-│   └── AzureEventBusOptions.cs
-│
-├── Constants/
-│   └── AzureEventBusHeaders.cs
-│
-├── Producers/
-│   └── AzureEventBusProducer.cs
-│
-├── Consumers/
-│   ├── AzureEventBusConsumer.cs
-│   └── AzureEventBusProcessor.cs
-│
-├── Mapping/
-│   └── AzureEventBusMessageMapper.cs
-│
-├── Infrastructure/
-│   ├── ServiceBusClientFactory.cs
-│   ├── ServiceBusSenderFactory.cs
-│   └── ServiceBusProcessorFactory.cs
-│
-├── DependencyInjection/
-│   └── ServiceCollectionExtensions.cs
-│
-└── README.md
-```
-## ⚙️ Configuration
-```csharp
 services.AddFranzAzureEventBus(options =>
 {
-    options.ConnectionString = "<service-bus-connection-string>";
-    options.Namespace = "my-namespace";
-
-    options.Retry.MaxDeliveryCount = 10;
-    options.DeadLetter.Enabled = true;
+    options.ConnectionString = configuration["Azure:ServiceBus"]!;
+    options.EntityName = "orders";
+    options.MaxConcurrentCalls = 8;
+    options.PrefetchCount = 0;
+    options.MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5);
 });
-```
+~~~
 
-Configuration is **explicit and strongly typed** — no magic strings.
-```json
-"Messaging": {
-  "BootstrapServers": "localhost:9092",
-  "GroupId": "my-service",
-  "OutboxCollection": "OutboxMessages",
-  "DeadLetterCollection": "DeadLetterMessages",
-  "InboxCollection": "InboxMessages"
-}
-````
-## ⚡ Dependency Injection
-builder.Services.AddFranzAzureEventBus(options =>
-{
-    options.ConnectionString = configuration["Azure:ServiceBus"];
-});
-```
+AddFranzAzureEventBus accepts an Action<AzureEventBusOptions>, validates the connection string and numeric processor settings, and registers the ServiceBusClient, sender, mapper, processor, consumer, and AzureEventBusHostedService. Supply a valid EntityName for the queue or topic/subscription; the options validator does not verify that entity against the broker.
 
-This registers:
+The producer is registered as IMessagingSender. The package does not register IMessagingPublisher or a generic outbox/inbox store as part of this method.
 
-* `ServiceBusClient`
-* `AzureEventBusProducer`
-* `AzureEventBusProcessor`
-* Mapping & serialization components
+## Configuration
 
-⚠️ **Hosting is intentionally NOT included**
-See `Franz.Common.Messaging.Azure.Hosting` (planned) for orchestration.
+AzureEventBusOptions includes:
 
-## 🔄 Message Flow
+- ConnectionString — required Azure Service Bus connection string.
+- EntityName — queue or topic/subscription entity consumed by the processor.
+- Namespace — optional diagnostic/naming label.
+- DefaultTopic — optional default destination for publishing.
+- EnableSessions and SessionIdleTimeout — session-enabled processing settings.
+- MaxConcurrentCalls, PrefetchCount, and MaxAutoLockRenewalDuration — processor controls.
+- Retry and DeadLetter — transport retry and dead-letter configuration.
 
-### Producer
+Keep connection strings in secret configuration. Configure Service Bus entities with session support when EnableSessions is enabled.
 
-1. Domain event published via Franz messaging API
-2. Mapped using `Franz.Common.Mapping`
-3. Serialized using Franz serializer
-4. Sent as `ServiceBusMessage`
-5. Headers mapped to `ApplicationProperties`
+## Delivery lifecycle
 
----
+The processor disables automatic message completion. Successful processing and failure handling remain under the transport consumer's explicit settlement path. The hosted service starts and stops the consumer with the generic host.
 
-### Consumer
+When the messaging tenant integration is registered, hosted startup validates the required tenant dependencies. Tenant context must be established from trusted producer identity and validated tenant data; a tenant header alone is not authorization.
 
-1. Azure Service Bus receives message
-2. Message mapped back to Franz envelope
-3. Metadata validated
-4. Dispatched through **Franz.Mediator**
-5. Result:
+Handlers must be idempotent. Service Bus delivery counts, lock renewal, retries, and dead-letter behavior are transport-level mechanisms and do not make external database side effects atomic.
 
-   * ✅ Complete
-   * ⚠️ Retry
-   * 🔥 Dead-letter
+## Mapping and serialization
 
----
+The package uses Franz.Common.Mapping for the transport payload mapping profile and a dedicated Azure Event Bus message mapper. The mapping registration is explicit to the package assembly; it still uses the runtime profile-discovery mechanism in Franz.Common.Mapping.
 
-## 📊 Header Mapping
+## Hosted composition
 
-| Franz Header  | Azure Service Bus                               |
-| ------------- | ----------------------------------------------- |
-| MessageId     | `MessageId`                                     |
-| CorrelationId | `CorrelationId`                                 |
-| EventType     | `ApplicationProperties["franz-event-type"]`     |
-| TenantId      | `ApplicationProperties["franz-tenant-id"]`      |
-| SchemaVersion | `ApplicationProperties["franz-schema-version"]` |
+For a combined Azure setup that includes Event Hubs and Event Grid ingress, use Franz.Common.Messaging.Hosting.Azure. Do not register the same transport twice through both the standalone and composite registration paths.
 
-All headers are defined in **`AzureEventBusHeaders`**.
----
+## Related packages
 
-## 🚀 Extensibility
-
-This package is designed to evolve without breaking contracts:
-
-* Add sessions support
-* Integrate Franz Outbox publishing
-* Extend DLQ routing strategies
-* Support schema evolution & version fallback
-
-Other Azure transports are implemented separately:
-
-* `Franz.Common.Messaging.AzureEventGrid`
-* `Franz.Common.Messaging.AzureEventHubs`
-
-## 🧭 Roadmap
-* Azure Service Bus sessions
-* Outbox publisher integration
-* Hosting orchestration package
-* Azure Event Grid receiver hosting
-* Event Hubs streaming adapter (Kafka-style)
-
-
-* **Current Version:** v3.0.0
-* Target Framework: **.NET 10**
-* Part of the **Franz Framework**
-
-##Licensing
-
-MIT License — see `LICENSE`.
-
----
-
-## ✅ Changelog
-
-### Version 1.7.0
-
-* Added **Azure Service Bus adapter**
-* Franz-native mapping via `Franz.Common.Mapping`
-* Mediator-driven consumption pipeline
-* Deterministic header & metadata propagation
-* Kafka / Rabbit parity for Azure environments
-
----
-
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+- Franz.Common.Messaging — transport-neutral messaging contracts.
+- Franz.Common.Messaging.MultiTenancy — validated tenant context for message delivery.
+- Franz.Common.Messaging.Hosting.Azure — combined Azure transport and hosted-service composition.
+- Franz.Common.Mediator — in-process message dispatch.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

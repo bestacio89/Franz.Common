@@ -1,265 +1,65 @@
 # Franz.Common.Messaging.AzureEventHubs
 
-> Azure Event Hubs transport adapter for high-throughput event streaming with Franz.Common messaging contracts.
+> Azure Event Hubs producer and checkpointed event-processing integration for Franz messaging.
 
 ## Overview
 
-Azure Event Hubs transport adapter for high-throughput event streaming with Franz.Common messaging contracts.
+This package integrates Azure Event Hubs with Franz serialization, message mapping, and Mediator dispatch. It uses EventProcessorClient with Blob Storage checkpointing. Event Hubs is an event-streaming service; it is not equivalent to Azure Service Bus queues or topics.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Messaging.AzureEventHubs
-```
+~~~
 
-## Design principles
+## Registration
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+~~~csharp
+using Franz.Common.Messaging.AzureEventHubs.DependencyInjection;
 
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-`Franz.Common.Messaging.AzureEventHubs` is the **Azure Event Hubs streaming transport adapter** for the **Franz Framework messaging stack**.
-
-It provides **high-throughput, partitioned, Kafka-style event streaming** backed by **Azure Event Hubs**, while preserving all Franz architectural guarantees:
-
-* mediator-driven execution
-* deterministic metadata propagation
-* transport isolation
-* cloud-native scalability
-* consistent observability
-
-This package is the **streaming counterpart** to:
-
-* `Franz.Common.Messaging.Kafka`
-* `Franz.Common.Messaging.AzureEventBus` (Azure Service Bus)
-* `Franz.Common.Messaging.AzureEventGrid`
-
----
-
-## ✨ Features
-
-### 🟦 Azure Event Hubs Streaming
-
-* Native integration with **Azure Event Hubs**
-* Partitioned, high-throughput event ingestion
-* Consumer-group based scaling
-* Azure-managed partition balancing
-* Blob-based checkpointing
-
----
-
-### 🧠 Franz-Native Semantics
-
-* Uses **Franz.Common.Messaging** envelopes
-* Dispatches messages through **Franz.Common.Mediator**
-* No business logic at the transport layer
-* Deterministic propagation of correlation and metadata
-* Kafka-parity execution model
-
----
-
-### 🧩 Explicit Mapping Layer (No AutoMapper)
-
-* Uses **Franz.Common.Mapping**
-
-* Single, authoritative transport boundary:
-
-  * Azure Event Hubs → Franz `Message`
-
-* No reflection magic
-
-* Auditable, version-safe mappings
-
----
-
-### 🔁 Reliability & Checkpointing
-
-* Uses **Azure Blob Storage** for checkpoints
-* Checkpoints updated **only after successful mediator dispatch**
-* At-least-once delivery semantics
-* Fully Azure-native retry and failure handling
-
----
-
-### 📊 Observability & Diagnostics
-
-* Integrated with **Franz.Common.Logging**
-* Structured logs with Franz conventions
-* Partition, offset, and sequence number propagation
-* OpenTelemetry compatible (via mediator pipelines)
-
----
-
-## 📦 Dependencies
-
-This package intentionally depends only on **core Franz building blocks** and Azure SDKs:
-
-```
-Franz.Common.Messaging
-Franz.Common.Mediator
-Franz.Common.Logging
-Franz.Common.Errors
-Franz.Common.Headers
-Franz.Common.Mapping
-Franz.Common.Serialization
-
-Azure.Messaging.EventHubs
-Azure.Messaging.EventHubs.Processor
-Azure.Storage.Blobs
-```
-
-❌ No HTTP
-❌ No ASP.NET dependencies
-❌ No hosting logic
-❌ No pull-based consumer APIs
-
----
-
-## 📂 Project Structure
-
-```
-Franz.Common.Messaging.AzureEventHubs/
-├── Configuration/
-│   └── AzureEventHubsOptions.cs
-│
-├── Constants/
-│   └── AzureEventHubsHeaders.cs
-│
-├── Consumers/
-│   └── AzureEventHubsProcessor.cs
-│
-├── Producers/
-│   └── AzureEventHubsProducer.cs
-│
-├── Mapping/
-│   └── AzureEventHubsMessageMapper.cs
-│
-├── Serialization/
-│   └── AzureEventHubsMessageSerializer.cs
-│
-├── Infrastructure/
-│   ├── EventHubClientFactory.cs
-│   └── EventHubProcessorFactory.cs
-│
-├── DependencyInjection/
-│   └── AzureEventHubsServiceCollectionExtensions.cs
-│
-└── README.md
-```
-
----
-
-## ⚙️ Configuration
-
-Configuration is **explicit and strongly typed** (no magic strings, no IConfiguration coupling):
-
-```csharp
 services.AddFranzAzureEventHubs(options =>
 {
-    options.ConnectionString = "<event-hubs-connection-string>";
-    options.EventHubName = "orders-stream";
+    options.ConnectionString = configuration["Azure:EventHubs:ConnectionString"]!;
+    options.EventHubName = "orders";
     options.ConsumerGroup = "$Default";
-
-    options.BlobConnectionString = "<storage-connection-string>";
-    options.BlobContainerName = "eventhubs-checkpoints";
+    options.BlobConnectionString = configuration["Azure:Storage:ConnectionString"]!;
+    options.BlobContainerName = "eventhub-checkpoints";
+    options.MaxBatchSize = 100;
 });
-```
+~~~
 
----
+AddFranzAzureEventHubs validates options and registers the Event Hubs client/processor factories, serializer, mapper, producer, and processor. It does not register a hosted service. Use Franz.Common.Messaging.Hosting.Azure to bind the processor lifecycle to the generic host.
 
-## 🔄 Message Flow
+## Required options
 
-### Consumer (Streaming)
+- ConnectionString — Event Hubs namespace connection string.
+- EventHubName — target Event Hub.
+- ConsumerGroup — consumer group; defaults to $Default.
+- BlobConnectionString — required Blob Storage connection string for checkpoint persistence.
+- BlobContainerName — checkpoint container name.
+- MaxBatchSize — maximum events processed per partition batch.
+- StartFromBeginning — controls initial position when no checkpoint exists.
 
-1. Azure Event Hubs receives an event
-2. `EventProcessorClient` pushes the event to the processor
-3. Event mapped to a Franz `Message`
-4. Message dispatched through **Franz.Mediator**
-5. On success:
+Keep Event Hubs and Storage credentials in secret configuration.
 
-   * Blob checkpoint updated
-6. On failure:
+## Processing and checkpoint semantics
 
-   * Event retried by Azure Event Hubs
+AzureEventHubsProcessor deserializes and maps each event, dispatches it through the Franz Mediator notification path, and updates the Event Hubs checkpoint only after dispatch completes successfully. A dispatch failure therefore leaves the checkpoint behind and allows the event to be processed again.
 
----
+When a DI scope factory and Franz messaging multitenancy integration are available, the processor creates a per-event async scope and establishes the validated tenant context before dispatch. Tenant headers are not authorization; register the tenant store and message authorizer required by Franz.Common.Messaging.MultiTenancy.
 
-### Producer
+Make handlers idempotent. Checkpointing does not create an atomic transaction between Event Hubs and an external database.
 
-1. Franz message published
-2. Payload serialized using Franz serialization
-3. Event sent via `EventHubProducerClient`
-4. Partitioning handled by Azure
+## Hosting
 
----
+Register the processor lifecycle through Franz.Common.Messaging.Hosting.Azure. This package's AddFranzAzureEventHubs method registers the processor but does not start it.
 
-## 📊 Header Mapping
+## Related packages
 
-| Franz Header   | Azure Event Hubs Source    |
-| -------------- | -------------------------- |
-| MessageId      | `EventData.MessageId`      |
-| CorrelationId  | `EventData.CorrelationId`  |
-| PartitionId    | Processor context          |
-| SequenceNumber | `EventData.SequenceNumber` |
-| Offset         | `EventData.Offset`         |
-| EnqueuedTime   | `EventData.EnqueuedTime`   |
-
-All headers are defined in **`AzureEventHubsHeaders`**.
-
----
-
-## 🚀 Extensibility
-
-This package is designed to evolve without breaking contracts:
-
-* Custom partitioning strategies
-* Schema evolution support
-* Outbox integration
-* Multi-hub consumption
-* Advanced checkpoint policies
-
-Hosting and orchestration are handled separately in a future package:
-
-* `Franz.Common.Messaging.Azure.Hosting`
-
----
-
-## 📝 Version Information
-
-* **Current Version:** v3.0.0
-* Target Framework: **.NET 10**
-* Part of the **Franz Framework**
-
----
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
-
----
-## 📜 License
-
-MIT License — see `LICENSE`.
-
----
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+- Franz.Common.Messaging.Hosting.Azure — hosted processor lifecycle and Event Grid endpoint support.
+- Franz.Common.Messaging.MultiTenancy — validated tenant context for message delivery.
+- Franz.Common.Mediator — in-process notification dispatch.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

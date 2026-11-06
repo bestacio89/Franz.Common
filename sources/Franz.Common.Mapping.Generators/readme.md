@@ -1,151 +1,75 @@
 # Franz.Common.Mapping.Generators
 
-> Roslyn incremental source generator for compile-time, strongly typed mapping implementations.
+> Roslyn incremental generator for compile-time implementations of Franz IMapper contracts.
 
 ## Overview
 
-Roslyn incremental source generator for compile-time, strongly typed mapping implementations.
+The generator finds partial classes implementing IMapper<TSource, TDestination> and emits a partial class implementation of Map(TSource). The generated mapper performs direct property assignments and does not invoke the runtime FranzMapper.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Mapping.Generators
-```
+dotnet add package Franz.Common.Mapping
+~~~
 
-## Design principles
+The generator is an analyzer. It runs during compilation; it is not a runtime mapping dependency.
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+## Usage
 
-## Usage and configuration
+Define source and destination types:
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+~~~csharp
+namespace Example;
 
-## Package-specific guide
+public sealed record UserSource(Guid Id, string Name, string Email);
 
-## Franz.Common.Mapping.Generators
-**Version 2.2.2**
-
-### Overview
-`Franz.Common.Mapping.Generators` is a high-performance **Incremental Source Generator** designed for .NET 10. It eliminates the boilerplate of manual object-to-object mapping by automatically implementing partial classes that inherit from `IMapper<TSource, TDestination>` or `IAsyncMapper<TSource, TDestination>`.
-
-Unlike reflection-based mappers (like AutoMapper), this generator produces **pure C# code at compile-time**, ensuring:
-* **Zero Runtime Overhead**: No reflection or IL emission at startup.
-* **Native AOT Compatibility**: Fully trim-friendly and ready for high-performance cloud-native environments.
-* **Compile-time Safety**: Errors are caught during development, not at runtime.
-
----
-
-### Key Features
-* **Incremental Generation**: Utilizes the modern `IIncrementalGenerator` API for optimal IDE performance and reduced build times.
-* **Property Matching**: Automatically matches properties based on **Name** and **Type Equality**.
-* **Async Support**: Native support for `IAsyncMapper` returning `ValueTask<T>`.
-* **Explicit Handling**: Uses `FullyQualifiedFormat` for types to avoid namespace collisions.
-
----
-
-### Installation
-Add the generator project as an analyzer to your target project:
-
-```xml
-<ItemGroup>
-  <ProjectReference Include="..\Franz.Common.Mapping.Generators.csproj"
-                    OutputItemType="Analyzer"
-                    ReferenceOutputAssembly="false" />
-</ItemGroup>
-```
-
----
-
-### Usage
-
-#### 1. Define your Models
-```csharp
-public record UserSource(int Id, string UserName, string Email);
-public class UserDto
+public sealed class UserDto
 {
-    public int Id { get; set; }
-    public string UserName { get; set; }
-    public string Email { get; set; }
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
 }
-```
+~~~
 
-#### 2. Create a Partial Mapper Class
-Simply define a `partial` class and implement the `IMapper` or `IAsyncMapper` interface. The generator will detect the generic arguments and do the rest.
+Declare a partial mapper implementing Franz's IMapper contract:
 
-**Synchronous Mapping:**
-```csharp
-namespace MyApp.Mappers;
+~~~csharp
+using Franz.Common.Mapping.Abstractions;
 
 public partial class UserMapper : IMapper<UserSource, UserDto>
 {
-    // The generator will implement:
-    // public partial UserDto Map(UserSource source) { ... }
+    public partial UserDto Map(UserSource source);
 }
-```
+~~~
 
-**Asynchronous Mapping:**
-```csharp
-public partial class UserAsyncMapper : IAsyncMapper<UserSource, UserDto>
-{
-    // The generator will implement:
-    // public partial async ValueTask<UserDto> MapAsync(UserSource source, CancellationToken ct) { ... }
-}
-```
+The generator emits the Map implementation. Register the generated mapper through normal dependency injection:
 
----
+~~~csharp
+services.AddSingleton<IMapper<UserSource, UserDto>, UserMapper>();
+~~~
 
-### How it Works
-1. **Discovery**: The generator scans for `partial` classes implementing `IMapper` or `IAsyncMapper`.
-2. **Analysis**: It extracts the `Source` and `Destination` type symbols via the Semantic Model.
-3. **Matching**: It performs an $O(N)$ lookup to find properties that exist in both types where the **Name** matches exactly and the **Types** are equal.
-4. **Generation**: It produces a `.g.cs` file containing the implementation of the `Map` or `MapAsync` method using object initializer syntax.
+## Matching rules
 
----
+The current generator:
 
-### Generated Code Example
-For the `UserMapper` above, the generator produces:
+- matches source and destination properties by exact name;
+- maps only properties whose types are exactly equal;
+- ignores static properties;
+- requires a destination setter (set or init); ensure the setter is accessible from the generated mapper code;
+- emits an object initializer, so the destination must have an accessible parameterless constructor;
+- returns default for a null source.
 
-```csharp
-// <auto-generated/>
-namespace MyApp.Mappers;
+It does not generate type conversions, custom member expressions, nested mapping plans, collection projections, constructor selection, or runtime profile discovery. Add explicit mapping code when the property-matching rules are insufficient.
 
-public partial class UserMapper
-{
-    public partial UserDto Map(UserSource source)
-    {
-        if (source is null) return default!;
-        var result = new UserDto
-        {
-            Id = source.Id,
-            UserName = source.UserName,
-            Email = source.Email,
-        };
-        return result;
-    }
-}
-```
+## AOT characteristics
 
----
+The generated mapper consists of ordinary compiled C# and does not require runtime reflection or expression compilation for its Map operation. Native AOT compatibility still depends on the rest of the application and its dependency graph; this generator alone does not make an application AOT-safe.
 
-### Implementation Notes
-* **Type Safety**: Only properties with matching types are mapped. If `Id` is `int` in Source and `long` in Destination, it will be skipped (use a manual partial method for conversion if needed).
-* **Static Members**: Static properties are ignored.
-* **Accessors**: Destination properties must have a setter (`set` or `init`) to be included in the mapping.
+## Boundaries
 
----
-
-### Version History
-**v2.0.1**
-* **Fix**: Improved symbol casting to `INamedTypeSymbol` to better resolve implemented interfaces.
-* **Optimization**: Switched to `record struct` for internal metadata to leverage better caching in the incremental pipeline.
-* **Support**: Added `ValueTask` support for `IAsyncMapper`.
-
-**Would you like me to add a section on how to handle custom property mapping using partial methods?**
-
+The generator targets the synchronous IMapper<TSource, TDestination> contract supplied by Franz.Common.Mapping.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

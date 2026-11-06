@@ -1,191 +1,54 @@
 # Franz.Common.Messaging.Hosting.RabbitMQ
 
-> Hosted-service integration for RabbitMQ consumers and publishers, including graceful startup and shutdown.
+> .NET hosted-service integration for RabbitMQ message consumption and outbox processing.
 
 ## Overview
 
-Hosted-service integration for RabbitMQ consumers and publishers, including graceful startup and shutdown.
+This package owns the generic-host lifecycle for RabbitMQ consumption and outbox processing. Broker connections, channels, publisher confirms, topology configuration, and transport behavior belong to Franz.Common.Messaging.RabbitMQ.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Messaging.Hosting.RabbitMQ
-```
+~~~
 
-## Design principles
+## Registration
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+Register the RabbitMQ transport separately, then register the hosted listeners:
 
-## Usage and configuration
+~~~csharp
+using Franz.Common.Messaging.RabbitMQ.Extensions;
+using Franz.Common.Messaging.Hosting.RabbitMQ;
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+services.AddRabbitMQMessaging(configuration);
 
-## Package-specific guide
-
-A dedicated hosting library within the **Franz Framework** that provides **RabbitMQ-specific hosted services** and **dependency injection extensions**.
-This package bridges the RabbitMQ transport layer (`Franz.Common.Messaging.RabbitMQ`) with the .NET hosting infrastructure (`Microsoft.Extensions.Hosting`).
-
----
-
-## ✨ Features
-
-* **Hosted Services**
-
-  * `RabbitMQHostedService` – continuously consumes RabbitMQ messages and dispatches them.
-  * `OutboxHostedService` – publishes stored outbox messages to RabbitMQ in the background.
-  * `MessagingHostedService` – general-purpose hosted message orchestrator.
-
-* **Dependency Injection Extensions**
-
-  * `RabbitMQHostingServiceCollectionExtensions` simplifies service registration in `Startup`/`Program.cs`.
-  * Provides one-liners like `AddRabbitMQHostedListener()` and `AddOutboxHostedListener()`.
-
-* **Separation of Concerns**
-
-  * Keeps transport logic (`Franz.Common.Messaging.RabbitMQ`) separate from hosting concerns.
-  * Makes testing listeners independent of the hosting runtime.
-
-* **Observability**
-
-  * Structured logging with emoji conventions (✅ success, ⚠️ retries, 🔥 DLQ).
-  * Compatible with OpenTelemetry for distributed tracing.
-
----
-
-## 📂 Project Structure
-
-```
-Franz.Common.Messaging.Hosting.RabbitMQ/
-├── Extensions/
-│    └── RabbitMQHostingServiceCollectionExtensions.cs
-├── HostedServices/
-│    ├── RabbitMQHostedService.cs
-│    ├── MessagingHostedService.cs
-│    └── OutboxHostedService.cs
-└── readme.md
-```
-
----
-
-## ⚙️ Dependencies
-
-* **Microsoft.Extensions.Hosting** (8.0.0)
-* **Microsoft.Extensions.DependencyInjection.Abstractions** (8.0.0)
-* **Franz.Common.Messaging** – core messaging abstractions
-* **Franz.Common.Messaging.RabbitMQ** – RabbitMQ transport adapter
-* **Franz.Common.Messaging.Hosting** – base hosting abstractions
-
----
-
-## 🚀 Usage
-
-### 1. Register RabbitMQ Hosted Services
-
-In `Program.cs` or `Startup.cs`:
-
-```csharp
-using Franz.Common.Messaging.Hosting.RabbitMQ.Extensions;
-
-var host = Host.CreateDefaultBuilder(args)
-    .ConfigureServices((context, services) =>
-    {
-        services.AddRabbitMQHostedListener(opts =>
-        {
-            opts.ConnectionString = context.Configuration["RabbitMQ:ConnectionString"];
-            opts.ExchangeName = context.Configuration["RabbitMQ:ExchangeName"];
-        });
-
-        services.AddOutboxHostedListener(opts =>
-        {
-            opts.OutboxTable = context.Configuration["Outbox:TableName"];
-        });
-    })
-    .Build();
-
-await host.RunAsync();
-```
-
-### 2. RabbitMQ Hosted Service
-
-Runs in the background to consume RabbitMQ messages and dispatch them via the mediator:
-
-```csharp
-public class RabbitMQHostedService : BackgroundService
+services.AddRabbitMQHostedListener(options =>
 {
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        // Consumes RabbitMQ messages and dispatches
-    }
-}
-```
+    // Configure the generic MessagingOptions used by RabbitMQListener.
+});
 
-### 3. Outbox Hosted Service
-
-Ensures pending messages in MongoDB/SQL outbox are published to RabbitMQ reliably:
-
-```csharp
-public class OutboxHostedService : BackgroundService
+services.AddOutboxHostedListener(options =>
 {
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        // Reads outbox, sends to RabbitMQ, handles retries/DLQ
-    }
-}
-```
+    // Configure the OutboxOptions used by the outbox listener.
+});
+~~~
 
----
+AddRabbitMQHostedListener accepts an Action<MessagingOptions>; it does not accept a RabbitMQ connection-string options object. Broker configuration is bound by AddRabbitMQMessaging from the Messaging:RabbitMQ section. AddOutboxHostedListener accepts an Action<OutboxOptions>.
 
-## 📊 Observability
+## Execution lifecycle
 
-* Emoji logging (✅ processed, ⚠️ retry, 🔥 DLQ, 💤 idle).
-* Integrated with `MessageContextAccessor` for correlation IDs.
-* Tracing compatible with **OpenTelemetry**.
+RabbitMQHostedService keeps the listener attached to the host lifecycle. It optionally provisions the configured queue before listening, remains alive while the consumer is active, and propagates unexpected consumer termination to the host. Shutdown stops the listener before completing the BackgroundService shutdown path.
 
----
+When the messaging tenant integration is registered, the hosted service validates tenant-scope requirements at startup and the listener execution path establishes a delivery-scoped tenant context. Configure the tenant authorization and store dependencies in Franz.Common.Messaging.MultiTenancy; a tenant header alone is not authorization.
 
-## 📝 Version Information
+## Operational boundaries
 
-* **Current Version:** v3.0.0
-* Part of the open-source Franz.Common ecosystem.
-
----
-
-## 📜 License
-
-This library is licensed under the MIT License. See the `LICENSE` file for details.
-
----
-
-## 📖 Changelog
-
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
-### Version 1.6.2
-
-* Introduced `RabbitMQHostedService` to run RabbitMQ listeners inside .NET host.
-* Added `OutboxHostedService` to bridge Mongo/SQL outbox with RabbitMQ publishing.
-* Added `RabbitMQHostingServiceCollectionExtensions` for simple DI registration.
-* Unified hosted services with `MessageContextAccessor` and inbox idempotency support.
-* Improved logging with emoji conventions and OpenTelemetry hooks.
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
+- Register the transport through AddRabbitMQMessaging(configuration).
+- Configure broker options in Messaging:RabbitMQ, not through AddRabbitMQHostedListener.
+- Use the hosted package only for listener lifecycle and outbox execution.
+- Keep message handlers scoped to one delivery and make side effects idempotent.
+- Queue provisioning and publisher-confirm behavior are transport concerns; consult the RabbitMQ transport package documentation for the selected provisioning and replay policy.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

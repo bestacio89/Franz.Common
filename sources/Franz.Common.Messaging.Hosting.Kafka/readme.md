@@ -1,274 +1,61 @@
 # Franz.Common.Messaging.Hosting.Kafka
 
-> Hosted-service integration for Kafka consumers and producers, including startup, shutdown, and consumer lifecycle management.
+> .NET hosted-service integration for Kafka message listeners and outbox processing.
 
 ## Overview
 
-Hosted-service integration for Kafka consumers and producers, including startup, shutdown, and consumer lifecycle management.
+This package owns the generic-host lifecycle for Kafka message consumption and outbox processing. Kafka transport configuration, producers, consumers, topic provisioning, and transaction infrastructure belong to Franz.Common.Messaging.Kafka.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Messaging.Hosting.Kafka
-```
+~~~
 
-## Design principles
+## Registration
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+Register Kafka transport first, then the hosted listeners:
 
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A **Kafka hosting integration** for the **Franz Framework** that connects the Kafka
-transport layer (`Franz.Common.Messaging.Kafka`) to the .NET hosting runtime
-(`Microsoft.Extensions.Hosting`).
-
-This package is responsible **only** for:
-- background execution
-- hosted listeners
-- message dispatch orchestration
-
-> 🧱 Kafka transport, producers, consumers, and configuration live in
-> **Franz.Common.Messaging.Kafka**
-
----
-
-## ✨ Features
-
-### Hosted Services
-- **`KafkaHostedService`**
-  Runs a Kafka listener inside a .NET `BackgroundService`.
-
-- **`MessagingHostedService`**
-  Orchestrates message dispatch:
-  - creates scoped execution contexts
-  - resolves messaging strategies
-  - dispatches messages safely
-
-- **`OutboxHostedService`**
-  Publishes messages stored in an outbox (SQL / Mongo) to Kafka reliably.
-
-### Dependency Injection Extensions
-- `KafkaHostingServiceCollectionExtensions`
-- Simple registration via:
-  - `AddKafkaHostedListener()`
-  - `AddOutboxHostedListener()`
-
-### Separation of Concerns
-- **No Kafka configuration here**
-- **No Kafka consumer creation here**
-- Hosting depends on abstractions only
-
-### Observability
-- Structured logging
-- Emoji-based lifecycle signals
-- Compatible with OpenTelemetry
-- Correlation via `MessageContextAccessor`
-
----
-
-## 📂 Project Structure
-
-```text
-Franz.Common.Messaging.Hosting.Kafka/
-├── Extensions/
-│   └── KafkaHostingServiceCollectionExtensions.cs
-├── HostedServices/
-│   ├── KafkaHostedService.cs
-│   ├── MessagingHostedService.cs
-│   └── OutboxHostedService.cs
-└── README.md
-````
-
----
-
-## ⚙️ Dependencies
-
-* **Microsoft.Extensions.Hosting** (10.0.14)
-* **Microsoft.Extensions.DependencyInjection.Abstractions** (10.0.14)
-* **Franz.Common.Messaging**
-* **Franz.Common.Messaging.Kafka**
-* **Franz.Common.Messaging.Hosting**
-
-> ⚠️ This package assumes Kafka transport is already registered via
-> `Franz.Common.Messaging.Kafka`.
-
----
-
-## 🚀 Usage
-
-### 1️⃣ Register Kafka Transport (required)
-
-```csharp
+~~~csharp
 using Franz.Common.Messaging.Kafka.Extensions;
+using Franz.Common.Messaging.Hosting.Kafka;
 
 services.AddKafkaMessaging(configuration);
-```
 
----
-
-### 2️⃣ Register Kafka Hosted Services
-
-```csharp
-using Franz.Common.Messaging.Hosting.Kafka.Extensions;
-
-services.AddKafkaHostedListener(configuration);
-services.AddOutboxHostedListener(configuration);
-```
-
-This will:
-
-* start background Kafka consumption
-* dispatch messages through Franz messaging strategies
-* process outbox messages reliably
-
----
-
-## 🔄 Kafka Hosted Service Lifecycle
-
-```csharp
-public sealed class KafkaHostedService : BackgroundService
+services.AddKafkaHostedListener(options =>
 {
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        // Subscribes to Kafka topics
-        // Listens until host shutdown
-        // Dispatches messages safely
-    }
-}
-```
+    options.BootstrapServers = configuration["Messaging:Kafka:BootstrapServers"]!;
+    options.GroupId = configuration["Messaging:Kafka:GroupId"];
+});
 
-Behavior:
-
-* graceful shutdown
-* no host crashes on bad messages
-* scope-per-message execution
-
----
-
-## 📦 Outbox Hosted Service
-
-```csharp
-public sealed class OutboxHostedService : BackgroundService
+services.AddOutboxHostedListener(options =>
 {
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        // Reads outbox
-        // Publishes to Kafka
-        // Handles retries & DLQ
-    }
-}
-```
+    // Configure the OutboxOptions used by the outbox listener.
+});
+~~~
 
-Guarantees:
+AddKafkaHostedListener accepts an Action<KafkaMessagingOptions>. It registers one KafkaMessageListener instance as the listener and starts KafkaMessagingHostedService. AddOutboxHostedListener accepts an Action<OutboxOptions>, registers OutboxMessageListener, and starts OutboxHostedService.
 
-* at-least-once delivery
-* retry control
-* no message loss on crashes
+Do not pass IConfiguration directly to these hosted-listener methods; their public signatures accept option configuration delegates.
 
----
+## Execution lifecycle
 
-## 📊 Observability
+KafkaMessagingHostedService attaches the message callback, listens until host shutdown, and clears the callback during shutdown. Each delivery is processed in a dependency-injection scope with a MessageContextAccessor. When messaging multi-tenancy is registered, the service establishes and disposes the validated tenant execution context around strategy execution.
 
-* Emoji logging conventions:
+Message execution failures are propagated to the listener so the transport does not treat the delivery as successful. The hosted service treats cancellation requested by host shutdown as expected; an unrecoverable listener failure is logged and rethrown so the host observes it.
 
-  * 🚀 startup
-  * 🛑 shutdown
-  * ⚠️ recoverable failure
-  * ❌ execution error
-  * 🔥 DLQ
-* Correlation IDs via `MessageContextAccessor`
-* OpenTelemetry-compatible spans
+## Tenant-scoped consumers
 
----
+For tenant-scoped processing, register Franz.Common.Messaging.MultiTenancy and enable RequireTenantScope. The hosted service validates the tenant boundary at startup. Register ITenantStore and ITenantMessageAuthorizer, and implement application-specific tenant validation where required. A tenant header alone is not authorization.
 
-## 🧭 Architectural Role
+## Operational boundaries
 
-| Concern                 | Package                              |
-| ----------------------- | ------------------------------------ |
-| Kafka transport         | Franz.Common.Messaging.Kafka         |
-| Kafka consumer creation | Franz.Common.Messaging.Kafka         |
-| Hosted execution        | Franz.Common.Messaging.Hosting.Kafka |
-| Dispatch orchestration  | Franz.Common.Messaging.Hosting.Kafka |
-
-This ensures:
-
-* clean Testcontainers integration
-* deterministic CI behavior
-* no hidden threads
-* safe message handling
-
----
-
-## 🧾 Version Information
-
-* **Current Version:** v3.0.0
-* **Target Framework**: **.NET 10.0**
-* Part of the **Franz Framework**
-
----
-
-## 📖 Changelog
-
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
-### **Version 1.7.01**
-
-* 🧱 Enforced strict separation between Kafka transport and hosting
-* 🔌 Removed Kafka consumer creation from hosting layer
-* 🔄 Hosting now depends exclusively on `IListener`
-* ♻️ Fixed lifecycle handling and graceful shutdown
-* 🧪 Improved Testcontainers and CI reliability
-* ⬆️ Upgraded to **.NET 10.0**
-
----
-
-### Version 1.6.20
-
-* Initial Kafka hosting support
-* Added `KafkaHostedService`
-* Added `OutboxHostedService`
-* Introduced hosting DI extensions
-* Integrated `MessageContextAccessor`
-* Emoji-based logging conventions
-
----
-
-## 📜 License
-
-MIT License
-See the `LICENSE` file for details.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
-
-
-## Kafka consumer delivery and rebalance contract
-
-- **Handlers must be bounded and cancellation-aware.** The listener continues polling Kafka while a handler runs. Configure `FailurePolicy.HandlerTimeout` to signal cancellation after the chosen duration, and ensure handlers observe the supplied cancellation token. This timeout is cooperative: .NET cannot forcibly terminate synchronous work or a handler that ignores cancellation. When no timeout is configured, options validation emits a warning because the retry budget cannot bound handler execution time.
-- **Keep the retry budget below the poll deadline.** The configured budget is `(MaxRetryAttempts + 1) × HandlerTimeout + MaxRetryAttempts × RetryBackoff`; it must remain below `KafkaConsumerOptions.MaxPollIntervalMs`. This calculation bounds only handlers that honor cancellation.
-- **Rebalance cancellation is cooperative.** Revoked and lost partition callbacks cancel the token for in-flight work on those partitions. Handlers must observe cancellation; a handler that ignores it can continue running even after the consumer has lost partition ownership.
-- **Cooperative assignment is optional.** Set `KafkaConsumerOptions.EnableCooperativeStickyAssignor` to use Kafka's cooperative-sticky assignor; the default remains the range assignor.
-- **Handlers must be idempotent.** A successful handler can be followed by a rebalance before its offset commit is accepted. The listener logs known rebalance-related commit rejections and continues; the record can be delivered again to the new partition owner. Make side effects idempotent or persist an inbox/deduplication key in the same transaction as the business update.
-- **Offsets are committed after processing.** Auto commit and auto offset storage are rejected by the consumer factory. A handler failure does not advance the original message's offset. Dead-letter publication must succeed before the original offset is committed.
-- **Rebalance observability.** Partition revocation and partition loss are logged separately. A lost partition is no longer owned by this consumer, so do not assume that an in-flight handler's eventual completion can be committed by the former owner.
-- **No exactly-once claim for external effects.** Kafka offset commits do not atomically include external database writes. Use an outbox/inbox or a Kafka transaction with the relevant consumer offsets when the workflow requires atomic Kafka-to-Kafka processing.
-
+- This package starts hosted execution; it does not own Kafka topic naming or transport registration.
+- Kafka transport must be registered independently through AddKafkaMessaging.
+- Handler dependencies must be resolved from the per-delivery scope.
+- Handlers should observe cancellation and make external side effects idempotent.
+- The outbox listener uses the OutboxOptions contract; configure its polling and execution policy through that options type.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
+MIT. See the repository [LICENSE](../../LICENSE).

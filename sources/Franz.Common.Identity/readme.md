@@ -1,153 +1,77 @@
 # Franz.Common.Identity
 
-> Identity execution-context abstractions for accessing the current authenticated principal and its claims across application services.
+> Provider-neutral identity context and accessor contracts for user, tenant, and domain identity.
 
 ## Overview
 
-Identity execution-context abstractions for accessing the current authenticated principal and its claims across application services.
+This package defines the application-facing identity model. It has no dependency on ASP.NET Core, HttpContext, JWT, OIDC, SAML, WS-Federation, or a specific identity provider.
 
 ## Installation
 
-```bash
+~~~bash
 dotnet add package Franz.Common.Identity
-```
+~~~
 
-## Design principles
+## Identity model
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+FranzIdentityContext is an immutable-init model with the following properties:
 
-## Usage and configuration
+- UserId — nullable GUID identifying the authenticated user.
+- Email — nullable email address.
+- FullName — nullable display name.
+- Roles — nullable role collection.
+- TenantId — nullable validated tenant identifier.
+- DomainId — nullable validated domain identifier.
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+## Accessor contract
 
-## Package-specific guide
+IIdentityContextAccessor exposes:
 
-A foundational library within the **Franz Framework** that provides contracts and utilities for managing **identity context** across applications.
-This package defines the **core abstractions** for accessing user identity information in a consistent, provider-agnostic way.
-
----
--**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
----
-## **Features**
-
-* **Identity Context Management**
-
-  * `FranzIdentityContext`: unified model (UserId, Email, FullName, Roles, TenantId, DomainId).
-  * `IIdentityContextAccessor`: contract for resolving identity across frameworks.
-
-* **Testing Support**
-
-  * `FakeIdentityContextAccessor`: simple stub for unit/integration tests.
-
-* **Framework-Agnostic**
-
-  * No dependency on ASP.NET Core or `HttpContext`.
-  * ASP.NET-specific implementation lives in [`Franz.Common.Http.Identity`](../Franz.Common.Http.Identity).
-
----
-
-## **Installation**
-
-```bash
-dotnet add package Franz.Common.Identity
-```
-
----
-
-## **Usage**
-
-### Access Identity Context
-
-```csharp
-using Franz.Common.Identity;
-
-public class MyService
+~~~csharp
+public interface IIdentityContextAccessor
 {
-    private readonly IIdentityContextAccessor _identityContext;
-
-    public MyService(IIdentityContextAccessor identityContext)
-    {
-        _identityContext = identityContext;
-    }
-
-    public FranzIdentityContext GetIdentity()
-        => _identityContext.GetCurrentIdentity();
+    string? GetCurrentEmail();
+    Guid? GetCurrentId();
+    string? GetCurrentFullName();
+    Guid? GetCurrentTenantId();
+    Guid? GetCurrentDomainId();
+    string[]? GetCurrentRoles();
+    FranzIdentityContext? GetCurrentIdentity();
 }
-```
+~~~
 
----
+The contract describes the current execution identity. It does not authenticate a caller, validate a tenant, or authorize tenant membership. Those responsibilities belong to the application authentication and tenant-boundary integrations.
 
-## **Integration with Franz Framework**
+The interface is currently declared in the global namespace; the FranzIdentityContext model is in Franz.Common.Identity.
 
-The **Franz.Common.Identity** package integrates seamlessly with:
+## Testing
 
-* **Franz.Common.Http.Identity**: ASP.NET Core implementation + SSO providers.
-* **Franz.Common.Headers**: standardized HTTP header propagation.
+FakeIdentityContextAccessor provides an in-memory implementation for unit tests:
 
----
+~~~csharp
+using Franz.Common.Identity;
+using Franz.Common.Identity.Testing;
 
-## **Contributing**
+var accessor = new FakeIdentityContextAccessor(new FranzIdentityContext
+{
+    UserId = Guid.NewGuid(),
+    Email = "user@example.test",
+    FullName = "Example User",
+    Roles = ["reader"],
+    TenantId = Guid.NewGuid()
+});
+~~~
 
-This package is part of the open-source Franz.Common ecosystem. Contributions are limited to the internal development team.
+The fake returns the supplied identity values and does not perform authentication or tenant validation.
 
-1. Clone the repository @ [Franz.Common](https://github.com/bestacio89/Franz.Common/)
-2. Create a feature branch.
-3. Submit a pull request for review.
+## ASP.NET Core integration
 
----
+Use Franz.Common.Http.Identity for the HttpContext-backed accessor and identity-provider integrations. That package owns its own registration extensions and provider-specific configuration. This core package does not contain HTTP identity registration methods.
+
+## Security boundary
+
+Identity values exposed by the accessor must originate from an authenticated principal and validated execution context. Do not populate this model directly from caller-controlled headers or query parameters. TenantId and DomainId are context values, not authorization decisions.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.6.2
-
-* Introduced **`FranzIdentityContext`** (UserId, Email, FullName, Roles, TenantId, DomainId).
-* Added **`IIdentityContextAccessor`** interface for framework-agnostic identity access.
-* Added **`FakeIdentityContextAccessor`** for testing.
-* Moved ASP.NET Core specifics into a new package: **Franz.Common.Http.Identity**, including:
-
-  * `IdentityContextAccessor` (HttpContext-based implementation).
-  * `AddFranzHttpIdentity()` DI extension.
-  * Provider extensions:
-
-    * `AddFranzWsFedIdentity()` (WS-Federation).
-    * `AddFranzOidcIdentity()` (OpenID Connect).
-    * `AddFranzSaml2Identity()` (SAML2 via Sustainsys).
-    * `AddFranzKeycloakIdentity()` (Keycloak OIDC with role normalization).
-* All providers normalize into **`FranzIdentityContext`**.
-* Config-driven setup via **appsettings.json** (no hardcoded values).
-
-### Version 1.3
-
-* Upgraded to **.NET 9.0.8**.
-* Added new features and improvements.
-* Separated business concepts from mediator concepts.
-* Now compatible with both in-house mediator and MediatR.
-
-### Version 1.2.65
-
-* Upgraded to **.NET 9**.
-
----
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See the repository [LICENSE](../../LICENSE).
