@@ -10,6 +10,7 @@ namespace Franz.Common.Caching.Hybrid;
 /// </summary>
 public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
 {
+  private static readonly TimeSpan NoExpiration = TimeSpan.FromDays(36500);
   private readonly HybridCache _cache;
   private readonly IOptionsMonitor<CacheOptions>? _optionsMonitor;
   private readonly CacheOptions? _fixedOptions;
@@ -82,10 +83,10 @@ public sealed class HybridCacheProvider : ICacheProvider, ICacheWriter
       {
         Expiration = options.DefaultAbsoluteExpiration > TimeSpan.Zero
             ? options.DefaultAbsoluteExpiration
-            : null,
+            : NoExpiration,
         LocalCacheExpiration = options.LocalCacheHint ??
             (options.DefaultSlidingExpiration > TimeSpan.Zero
                 ? options.DefaultSlidingExpiration
-                : null)
+                : NoExpiration)
       };
 }

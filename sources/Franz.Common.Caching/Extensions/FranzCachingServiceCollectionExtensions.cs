@@ -106,7 +106,7 @@ public static class FranzCachingServiceCollectionExtensions
   {
     ArgumentNullException.ThrowIfNull(services);
     ArgumentNullException.ThrowIfNull(configuration);
-    services.AddHybridCache();
+    services.AddHybridCache().AddSerializerFactory<JsonTypeInfoHybridCacheSerializerFactory>();
     services.AddFranzCachingOptions(configuration);
 
     if (configure is not null)
@@ -160,15 +160,12 @@ public static class FranzCachingServiceCollectionExtensions
           ?? configuration?.GetSection($"{CachingSection}:Redis:ConnectionString").Value
           ?? throw new InvalidOperationException("Redis ConnectionString is missing.");
 
-      // FIX: Use ConfigurationOptions to enforce better defaults for internal tools
+      // StackExchange.Redis exposes synchronous multiplexer creation through
+      // this DI factory. Keep the initial connection timeout bounded and allow
+      // the multiplexer to reconnect if Redis is temporarily unavailable.
       var redisOptions = ConfigurationOptions.Parse(connectionString);
-
-      // Ensure that we don't stall the thread pool during heavy load/reconnects
       redisOptions.AbortOnConnectFail = false;
       redisOptions.ConnectTimeout = 5000;
-
-      // Still eager, but AbortOnConnectFail = false allows the object to be created 
-      // even if the server is offline. It will reconnect in the background.
       return ConnectionMultiplexer.Connect(redisOptions);
     });
 
@@ -232,8 +229,9 @@ public static class FranzCachingServiceCollectionExtensions
         .ValidateDataAnnotations()
         .Validate(
             options => options.DefaultAbsoluteExpiration >= TimeSpan.Zero &&
-                       options.DefaultSlidingExpiration >= TimeSpan.Zero,
-            "Cache expirations must be zero (disabled) or positive.")
+                       options.DefaultSlidingExpiration >= TimeSpan.Zero &&
+                       (!options.LocalCacheHint.HasValue || options.LocalCacheHint.Value >= TimeSpan.Zero),
+            "Cache expirations and local-cache hints must be zero (disabled) or positive.")
         .ValidateOnStart();
   }
 
