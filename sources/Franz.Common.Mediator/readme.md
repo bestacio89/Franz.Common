@@ -58,7 +58,7 @@ services.AddFranzMediatorV2(
 
 It uses the same compile-time generated handler-registration model. `AddFranzMediatorV2Default` adds open-generic request logging, validation, Serilog logging, and transaction pipelines, plus the matching request pre/post-processors; notifications receive notification logging and validation. Those open-generic pipeline registrations are not supported by Native AOT, and the helper does not add event validation. V1 and V2 core registration are API-level entry points; neither falls back to runtime reflection-based handler discovery.
 
-#### Full standard composition
+### Full standard composition
 
 For the complete standard pipeline composition, including event validation, use the bootstrap helper:
 
