@@ -2,6 +2,10 @@
 
 > Ordered asynchronous initialization of scoped application services during host startup.
 
+## Overview
+
+Ordered asynchronous initialization of scoped application services during host startup.
+
 ## Installation
 
 ```bash

@@ -2,6 +2,10 @@
 
 > Refit typed-client registration with Franz header and optional authentication handlers.
 
+## Overview
+
+Refit typed-client registration with Franz header and optional authentication handlers.
+
 ## Installation
 
 ```bash

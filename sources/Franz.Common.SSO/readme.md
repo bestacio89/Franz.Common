@@ -2,6 +2,10 @@
 
 > Configuration binding and claims-normalization composition for Franz identity integrations.
 
+## Overview
+
+Configuration binding and claims-normalization composition for Franz identity integrations.
+
 ## Installation
 
 ```bash

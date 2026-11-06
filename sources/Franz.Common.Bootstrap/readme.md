@@ -2,6 +2,10 @@
 
 > A composition extension that registers the common Franz application architecture for a selected set of assemblies.
 
+## Overview
+
+A composition extension that registers the common Franz application architecture for a selected set of assemblies.
+
 ## Installation
 
 ```bash

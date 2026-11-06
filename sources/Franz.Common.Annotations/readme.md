@@ -2,6 +2,10 @@
 
 > Attribute metadata for declaring Kafka topic requirements on application types.
 
+## Overview
+
+Attribute metadata for declaring Kafka topic requirements on application types.
+
 ## Responsibilities
 
 This package currently exposes `RequiredKafkaTopicAttribute`. It is metadata only: it does not discover attributes, validate runtime configuration, create Kafka topics, or register producers and consumers. Those behaviors belong to the consuming package or application.

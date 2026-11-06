@@ -2,6 +2,10 @@
 
 > A hosted-messaging strategy executor that deserializes message envelopes and dispatches commands, queries, or integration events through the Franz dispatcher.
 
+## Overview
+
+A hosted-messaging strategy executor that deserializes message envelopes and dispatches commands, queries, or integration events through the Franz dispatcher.
+
 ## Installation
 
 ```bash

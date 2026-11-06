@@ -2,6 +2,10 @@
 
 > ASP.NET Core MVC integration for Kafka or RabbitMQ messaging transaction coordination and health checks.
 
+## Overview
+
+ASP.NET Core MVC integration for Kafka or RabbitMQ messaging transaction coordination and health checks.
+
 ## Installation
 
 ```bash

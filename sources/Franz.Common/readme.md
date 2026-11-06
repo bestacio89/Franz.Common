@@ -2,6 +2,10 @@
 
 > Foundational contracts and small cross-cutting utilities shared by Franz.Common applications.
 
+## Overview
+
+Foundational contracts and small cross-cutting utilities shared by Franz.Common applications.
+
 ## Responsibilities
 
 This package contains framework-neutral building blocks. It is not the dependency-injection scanner, hosting bootstrapper, mediator implementation, or persistence provider. Those capabilities live in their dedicated packages.

@@ -2,6 +2,10 @@
 
 > Transport-agnostic header contracts and configuration for propagating selected headers.
 
+## Overview
+
+Transport-agnostic header contracts and configuration for propagating selected headers.
+
 ## Installation
 
 ```bash

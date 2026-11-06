@@ -2,6 +2,10 @@
 
 > ARAS Innovator adapter contracts, REST-backed contexts, mapping factories, and repository base classes.
 
+## Overview
+
+ARAS Innovator adapter contracts, REST-backed contexts, mapping factories, and repository base classes.
+
 ## Installation
 
 ```bash

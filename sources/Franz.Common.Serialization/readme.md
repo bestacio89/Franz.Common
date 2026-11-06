@@ -2,6 +2,10 @@
 
 > System.Text.Json serialization contracts with explicit converter composition and UTF-8 byte-array support.
 
+## Overview
+
+System.Text.Json serialization contracts with explicit converter composition and UTF-8 byte-array support.
+
 ## Installation
 
 ```bash

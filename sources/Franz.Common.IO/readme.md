@@ -2,6 +2,10 @@
 
 > A temporary-file-backed stream that deletes its backing file when disposed.
 
+## Overview
+
+A temporary-file-backed stream that deletes its backing file when disposed.
+
 ## Installation
 
 ```bash

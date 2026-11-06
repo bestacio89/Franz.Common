@@ -2,6 +2,10 @@
 
 > Assembly scanning and explicit service-registration helpers built on Microsoft DI and Scrutor.
 
+## Overview
+
+Assembly scanning and explicit service-registration helpers built on Microsoft DI and Scrutor.
+
 ## Installation
 
 ```bash

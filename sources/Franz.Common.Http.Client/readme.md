@@ -2,6 +2,10 @@
 
 > A named-HttpClient-backed base service for outbound HTTP calls, request construction, serialization, and multipart content.
 
+## Overview
+
+A named-HttpClient-backed base service for outbound HTTP calls, request construction, serialization, and multipart content.
+
 ## Installation
 
 ```bash

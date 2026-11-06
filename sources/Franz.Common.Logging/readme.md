@@ -2,6 +2,10 @@
 
 > Serilog host-builder integration with environment-specific sinks, enrichment, and framework-noise filters.
 
+## Overview
+
+Serilog host-builder integration with environment-specific sinks, enrichment, and framework-noise filters.
+
 ## Installation
 
 ```bash

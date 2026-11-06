@@ -2,6 +2,10 @@
 
 > Assembly-scoped registration of AutoMapper profiles through Microsoft dependency injection.
 
+## Overview
+
+Assembly-scoped registration of AutoMapper profiles through Microsoft dependency injection.
+
 ## Installation
 
 ```bash

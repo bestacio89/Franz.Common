@@ -2,6 +2,10 @@
 
 > Exception types and a small error payload contract for expressing application failures.
 
+## Overview
+
+Exception types and a small error payload contract for expressing application failures.
+
 ## Installation
 
 ```bash

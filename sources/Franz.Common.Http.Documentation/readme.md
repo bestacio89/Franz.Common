@@ -2,6 +2,10 @@
 
 > ASP.NET Core API-versioning and native OpenAPI/Scalar endpoint registration.
 
+## Overview
+
+ASP.NET Core API-versioning and native OpenAPI/Scalar endpoint registration.
+
 ## Installation
 
 ```bash

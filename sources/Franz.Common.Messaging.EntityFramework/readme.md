@@ -2,6 +2,10 @@
 
 > Provider selection and persistence registration for messaging storage, with EF-specific repository and behavior setup for relational contexts.
 
+## Overview
+
+Provider selection and persistence registration for messaging storage, with EF-specific repository and behavior setup for relational contexts.
+
 ## Installation
 
 ```bash

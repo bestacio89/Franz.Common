@@ -2,6 +2,10 @@
 
 > Message-context identity access and authorization-header enrichment for Franz messaging envelopes.
 
+## Overview
+
+Message-context identity access and authorization-header enrichment for Franz messaging envelopes.
+
 ## Installation
 
 ```bash

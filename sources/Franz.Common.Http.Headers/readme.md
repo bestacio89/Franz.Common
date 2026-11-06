@@ -2,6 +2,10 @@
 
 > ASP.NET Core adapters for the transport-agnostic header context contract and required-header action constraints.
 
+## Overview
+
+ASP.NET Core adapters for the transport-agnostic header context contract and required-header action constraints.
+
 ## Installation
 
 ```bash

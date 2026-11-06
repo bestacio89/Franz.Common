@@ -2,6 +2,10 @@
 
 > Composition helper for common Franz architecture plus messaging identity, tenant, and header contexts.
 
+## Overview
+
+Composition helper for common Franz architecture plus messaging identity, tenant, and header contexts.
+
 ## Installation
 
 ```bash
