@@ -1,10 +1,6 @@
 # Franz.Common.Hosting
 
-> Host lifecycle and background-service utilities for composing and managing long-running .NET application components.
-
-## Overview
-
-Host lifecycle and background-service utilities for composing and managing long-running .NET application components.
+> Ordered asynchronous initialization of scoped application services during host startup.
 
 ## Installation
 
@@ -12,176 +8,55 @@ Host lifecycle and background-service utilities for composing and managing long-
 dotnet add package Franz.Common.Hosting
 ```
 
-## Design principles
+## Initializer contract
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
-
-## Usage and configuration
-
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
-
-## Package-specific guide
-
-A utility library within the **Franz Framework** designed to simplify and enhance hosting configurations for .NET applications. This package provides powerful extensions for working with hosts and service providers, offering flexibility and consistency in application startup and lifecycle management.
-
----
-
-## **Features**
-
-- **Host Utilities**:
-  - `HostExtensions` for managing and customizing host configurations.
-- **Service Provider Extensions**:
-  - `ServiceProviderExtensions` for streamlined service resolution and initialization.
-- **Hosting Initialization**:
-  - `IHostingInitializer` interface to define and manage hosting initialization logic.
-- **Compatibility**:
-  - Integrates seamlessly with **Franz.Common**, **Franz.Common.DependencyInjection**, and **Franz.Common.Reflection**.
-
----
-
-## **Version Information**
-
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
-
----
-
-## **Dependencies**
-
-This package relies on:
-- **Microsoft.Extensions.Hosting.Abstractions** (8.0.0): Core hosting abstractions for building and running .NET applications.
-- **Franz.Common**: Provides core utilities and shared functionality.
-- **Franz.Common.DependencyInjection**: Simplifies dependency injection patterns.
-- **Franz.Common.Reflection**: Offers advanced reflection utilities for host configuration and initialization.
-
----
-
-## **Installation**
-
-### Install from NuGet.org
-
-```bash
-dotnet add package Franz.Common.Hosting
-```
-
-```
-
-Install the package:
-
-```bash
-dotnet add package Franz.Common.Hosting
-```
-
----
-
-## **Usage**
-
-### **1. Customize Host Configuration**
-
-Use `HostExtensions` to configure the host:
-
-```csharp
-using Franz.Common.Hosting.Extensions;
-
-var host = Host.CreateDefaultBuilder(args)
-    .ConfigureServices((context, services) =>
-    {
-        // Register services here
-    })
-    .UseCustomConfiguration() // Custom extension method for host configuration
-    .Build();
-
-await host.RunAsync();
-```
-
-### **2. Service Resolution**
-
-Use `ServiceProviderExtensions` to resolve and manage services dynamically:
-
-```csharp
-using Franz.Common.Hosting.Extensions;
-
-var service = host.Services.GetRequiredServiceWithLogging<IMyService>();
-service.Execute();
-```
-
-### **3. Hosting Initialization**
-
-Implement the `IHostingInitializer` interface for initializing hosting environments:
+Implement `IHostingInitializer` for startup work that must run after the host's service provider is available.
 
 ```csharp
 using Franz.Common.Hosting;
 
-public class MyHostingInitializer : IHostingInitializer
+public sealed class ReferenceDataInitializer : IHostingInitializer
 {
-    public void Initialize(IHostBuilder hostBuilder)
+    public int Order => 100;
+
+    public Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        hostBuilder.ConfigureServices((context, services) =>
-        {
-            services.AddSingleton<IMyService, MyService>();
-        });
+        // Perform bounded, idempotent initialization.
+        return Task.CompletedTask;
     }
 }
 ```
 
-Register the initializer during application startup:
+The interface inherits `IScopedDependency`, so implementations participate in the marker-based scoped registration convention when their assemblies are scanned by `Franz.Common.DependencyInjection`.
+
+## Initialization lifecycle
+
+The package provides:
+
+- `IServiceProvider.InitializeAsync()`: creates a scope, resolves all `IHostingInitializer` implementations, orders them by ascending `Order`, and awaits them sequentially.
+- `IHost.Initialize()`: validates the host, invokes `host.Services.InitializeAsync()`, then returns the same host instance.
 
 ```csharp
-hostBuilder.UseHostingInitializer<MyHostingInitializer>();
+using Franz.Common.Hosting.Extensions;
+
+var host = builder.Build();
+
+await host.Initialize();
+await host.RunAsync();
 ```
 
----
+Initialization is sequential, not parallel. The implementation does not pass a cancellation token to each initializer; each initializer receives its optional token through its own contract, but the orchestration method currently invokes the parameterless call. Initializers should therefore be bounded, idempotent where possible, and explicit about their own cancellation and failure behavior.
 
-## **Integration with Franz Framework**
+If an initializer throws, the sequential loop stops and the exception propagates to the caller. The host should not proceed to serving traffic after failed mandatory initialization.
 
-The **Franz.Common.Hosting** package integrates seamlessly with:
-- **Franz.Common**: Provides foundational utilities.
-- **Franz.Common.DependencyInjection**: Simplifies dependency injection setup.
-- **Franz.Common.Reflection**: Enables dynamic discovery and registration of services and initializers.
+## Scope and disposal
 
-Ensure these dependencies are installed to leverage the full capabilities of the library.
+All initializers resolved by one call share the created scope. The scope is disposed when initialization completes, including when an initializer fails. Do not retain scoped dependencies beyond this lifecycle.
 
----
+## Registration
 
-## **Contributing**
-
-Contributions are welcome under the MIT License. To propose a change:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a feature branch.
-3. Submit a pull request for review.
-
----
+Register initializers through the scoped marker scan or explicitly as scoped services. The package does not scan assemblies or automatically invoke initialization merely because the host is built.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.3
-- Upgrade version to .net 9
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
----
-
-## Dependency maintenance — October 2026
-
-This project's dependency references were reviewed and updated as part of the repository-wide .NET 10 maintenance pass. The intended target framework and public API remain unchanged. Verify the resolved direct and transitive dependency graph through the repository's dependency validation workflow before publishing. See [the central dependency upgrade record](../../Docs/dependency-upgrade-2026-10.md).
+MIT. See [LICENSE](../../LICENSE).

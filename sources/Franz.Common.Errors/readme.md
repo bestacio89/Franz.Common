@@ -1,10 +1,6 @@
 # Franz.Common.Errors
 
-> Structured business and technical error contracts for consistent exception handling, diagnostics, and failure propagation.
-
-## Overview
-
-Structured business and technical error contracts for consistent exception handling, diagnostics, and failure propagation.
+> Exception types and a small error payload contract for expressing application failures.
 
 ## Installation
 
@@ -12,162 +8,69 @@ Structured business and technical error contracts for consistent exception handl
 dotnet add package Franz.Common.Errors
 ```
 
-## Design principles
+## Exception hierarchy
 
-- **Explicit composition:** register only the capabilities the application needs.
-- **Clear boundaries:** keep domain and application contracts independent from provider-specific infrastructure where the package's role permits it.
-- **Predictable behavior:** make configuration, failure modes, and lifecycle ownership visible rather than relying on hidden conventions.
-- **Operational readiness:** validate security, resilience, diagnostics, and compatibility for the actual deployment environment.
+The package contains two related groups:
 
-## Usage and configuration
+- `ExceptionBase` is an abstract serializable base class with parameterless, message, and message-plus-inner-exception constructors.
+- `NotFoundException`, `PreconditionFailedException`, `TechnicalException`, `UnauthorizedException`, and `FunctionalException` derive from `ExceptionBase`.
+- `ForbiddenException` derives directly from `Exception`.
+- `BusinessException` also derives directly from `Exception` and carries a stable `Code` plus read-only `Metadata`.
 
-Follow the package-specific setup, configuration, and code examples below. Only configure external services when this package requires them, and keep secrets outside source control.
+The exception types provide semantic classification. They do not themselves map to HTTP status codes, write logs, or serialize an API response. The application boundary must define that mapping.
 
-## Package-specific guide
-
-A library for handling and standardizing errors and exceptions in .NET applications. This library simplifies error management, making it easier to implement structured and meaningful error responses.
-
----
-**Current Version:** v3.0.0
-- Part of the open-source Franz.Common ecosystem.
----
-
-## **Features**
-
-- **Custom Exceptions**:
-  - `ForbiddenException`
-  - `FunctionalException`
-  - `NotFoundException`
-  - `PreconditionFailedException`
-  - `TechnicalException`
-  - `UnauthorizedException`
-- **Base Exception**:
-  - `ExceptionBase` for creating custom exceptions with consistent behavior.
-- **Error Response**:
-  - `ErrorResponse` for structuring API error responses.
-
----
-
-## **Installation**
-
-Install the package using NuGet Package Manager or the .NET CLI:
-
-```bash
-dotnet add package Franz.Common.Errors
-```
-
----
-
-## **Usage**
-
-### **1. Handling Custom Exceptions**
-
-Each exception is tailored for specific error scenarios. Here's an example of using `NotFoundException`:
+## Usage
 
 ```csharp
 using Franz.Common.Errors;
 
-public void FindResource(int id)
+public Order GetOrder(Guid id)
 {
-    var resource = GetResourceById(id);
-    if (resource == null)
+    var order = repository.Find(id);
+
+    if (order is null)
+        throw new NotFoundException($"Order '{id}' was not found.");
+
+    return order;
+}
+```
+
+For machine-readable business failures, use `BusinessException` and stable codes that clients can depend on:
+
+```csharp
+throw new BusinessException(
+    "order.state.invalid",
+    "The order cannot be confirmed in its current state.",
+    new Dictionary<string, object?>
     {
-        throw new NotFoundException($"Resource with ID {id} was not found.");
-    }
-}
+        ["orderId"] = orderId,
+        ["state"] = currentState
+    });
 ```
 
-### **2. Returning Structured Error Responses**
+Metadata is copied into an internal dictionary at construction. Treat it as diagnostic data: do not include credentials, tokens, personal secrets, or other sensitive values.
 
-Use `ErrorResponse` to provide consistent error information in your APIs:
+## ErrorResponse
+
+`ErrorResponse` is a minimal mutable payload with a required-by-convention `Message` string and optional `StackTrace`. It does not contain a status code, error code, details collection, or automatic exception conversion.
 
 ```csharp
-using Franz.Common.Errors;
-
-public IActionResult HandleException(Exception ex)
+var response = new ErrorResponse
 {
-    var errorResponse = new ErrorResponse
-    {
-        StatusCode = 500,
-        Message = ex.Message,
-        Details = "Additional details about the error."
-    };
-
-    return StatusCode(errorResponse.StatusCode, errorResponse);
-}
+    Message = "The requested resource was not found."
+};
 ```
 
-### **3. Creating Custom Exceptions**
+Do not expose stack traces to untrusted clients in production. Prefer a centrally defined exception-to-response policy at the API boundary.
 
-Extend the `ExceptionBase` class to create your own exceptions with additional metadata:
+## Test failure helpers
 
-```csharp
-using Franz.Common.Errors;
+`TestExceptions` provides named factories for intentionally throwing ordinary `Exception` instances in demonstrations and tests: `BananaRepublic()`, `Monster()`, `VodkaCoffeePot()`, and `FriendlyReminder()`, each with a French variant. These are not production exception types and carry no structured error contract.
 
-public class CustomException : ExceptionBase
-{
-    public CustomException(string message) : base(message) { }
-}
-```
+## Design guidance
 
----
-
-## **Exception Types Overview**
-
-| Exception Type                | Description                                                   |
-|-------------------------------|---------------------------------------------------------------|
-| `ForbiddenException`          | Use for actions the user is not permitted to perform.         |
-| `FunctionalException`         | Represents a domain or business logic error.                  |
-| `NotFoundException`           | Indicates that a requested resource could not be found.       |
-| `PreconditionFailedException` | Indicates a failed precondition for the request.              |
-| `TechnicalException`          | Represents an unexpected technical error.                     |
-| `UnauthorizedException`       | Indicates a lack of authorization to access a resource.       |
-
----
-
-## **Contributing**
-
-We welcome contributions! Please follow these steps:
-1. Clone the repository. @ https://github.com/bestacio89/Franz.Common/
-2. Create a new branch for your feature or bug fix.
-3. Submit a pull request for review.
-
----
+Use exceptions for exceptional control flow and boundary translation, not as a replacement for expected validation results. Keep business error codes stable, separate from transport-specific HTTP semantics.
 
 ## License
 
-Licensed under the MIT License. See the repository [LICENSE](../../LICENSE) for details.
-
-## **Changelog**
-
-### Version 1.2.065
-- Upgrade to .NET 9
-
-### Version 1.3
-- Upgraded to **.NET 9.0.8**
-- Added **new features and improvements**
-- Separated **business concepts** from **mediator concepts**
-- Now compatible with both the **in-house mediator** and **MediatR**
-
-### Version 1.4.1
-- ?? Introduced **TestExceptions** for chaos engineering & demos
-  - `BananaRepublicException` (EN/FR)
-  - `MonsterException` (EN/FR)
-  - `VodkaCoffeePotException` (EN/FR)
-  - `FriendlyReminderException` (EN/FR)
-- ?? **Bilingual Support**: every test exception available in **English & French**
-- ?? **Consistent API**: wrapped under `TestExceptions` static class
-- ?? Purpose: make resilience demos, test failures, and dev workshops **fun & obvious**
-- ?? No impact on production code — these are **opt-in chaos exceptions**
-
-### Version 1.6.20
-- Updated to **.NET 10.0**
-
-### v2.0.1 – Internal Modernization
-
-- Messaging and infrastructure refactored for async, thread-safety, and modern .NET 10 patterns.
-- All APIs remain fully backward compatible.
-- Tests, listeners, and pipeline components modernized.
-
-### v2.2.16 - Busines Exception Handling
-- addes Business Exception Handling to standardize error responses related to business operations and domain logic.
+MIT. See [LICENSE](../../LICENSE).
