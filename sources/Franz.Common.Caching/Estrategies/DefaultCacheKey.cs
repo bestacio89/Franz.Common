@@ -1,23 +1,28 @@
-﻿using Franz.Common.Caching.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using Franz.Common.Caching.Abstractions;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace Franz.Common.Caching.Estrategies;
-public class DefaultCacheKeyStrategy : ICacheKeyStrategy
+
+public sealed class DefaultCacheKeyStrategy : ICacheKeyStrategy
 {
-  public string GetKey(object request) =>
-      $"mediator:{request.GetType().Name}:{request.GetHashCode()}";
-  public string BuildKey<TRequest>(TRequest request)
-  {
-    var type = typeof(TRequest).FullName ?? typeof(TRequest).Name;
+    public string GetKey(object request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return BuildKey(request);
+    }
 
-    // Serialize request parameters to make the key unique
-    var payload = JsonSerializer.Serialize(request);
+    public string BuildKey<TRequest>(TRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
 
-    return $"{type}:{payload}";
-  }
+        var requestType = request.GetType();
+        var typeName = requestType.FullName ?? requestType.Name;
+        var payload = JsonSerializer.Serialize(request, requestType);
+        var payloadBytes = Encoding.UTF8.GetBytes(payload);
+        var digest = SHA256.HashData(payloadBytes);
+
+        return $"{typeName}:{Convert.ToHexString(digest)}";
+    }
 }
