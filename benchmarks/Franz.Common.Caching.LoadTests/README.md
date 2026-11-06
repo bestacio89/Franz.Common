@@ -9,7 +9,7 @@ This executable is a self-contained .NET workload generator for Franz.Common Cac
 - hybrid: Franz HybridCache provider with Redis as its distributed L2 store.
 - redis: Franz Redis provider using StackExchange.Redis directly.
 
-Distributed, Hybrid, and Redis runs provision an isolated Redis 7.2 container with Testcontainers. No external Redis service or developer-managed compose stack is required.
+Distributed, Hybrid, and Redis runs provision an isolated Redis 7.2 container with Testcontainers.Redis 4.16.0. This uses the upstream patched container dependency graph rather than carrying a direct SSH.NET security override. No external Redis service or developer-managed compose stack is required.
 
 ## Workload model
 

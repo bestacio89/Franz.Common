@@ -9,8 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.14" />
-    <PackageReference Include="SSH.NET" Version="2026.0.0" />
-    <PackageReference Include="Testcontainers.Redis" Version="4.13.0" />
+    <PackageReference Include="Testcontainers.Redis" Version="4.16.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../sources/Franz.Common.Caching/Franz.Common.Caching.csproj" AdditionalProperties="EnablePackageValidation=false" />
