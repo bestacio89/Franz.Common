@@ -75,7 +75,7 @@ jobs:
           fi
 
       - name: Build solution
-        run: dotnet build Franz.Common.slnx --configuration Release --no-restore -graphBuild -p:ApiCompatGenerateSuppressionFile=true -p:GeneratePackageOnBuild=false
+        run: dotnet build Franz.Common.slnx --configuration Release --no-restore -p:ApiCompatGenerateSuppressionFile=true -p:GeneratePackageOnBuild=false
 
       - name: Pack solution for package-consumer validation
         run: dotnet pack Franz.Common.slnx --configuration Release --no-build -p:GeneratePackageOnBuild=false
