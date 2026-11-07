@@ -8,19 +8,26 @@ using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Serialization;
+using Franz.Common.Messaging.Storage;
 
 namespace Franz.Common.Messaging.Sagas.Handlers;
 
 public sealed class SagaDispatchingMessageHandler(
     SagaOrchestrator orchestrator,
-    IMessageSerializer serializer) : IMessageHandler
+    IMessageSerializer serializer,
+    IInboxStore? inboxStore = null) : IMessageHandler
 {
   private readonly SagaOrchestrator _orchestrator = orchestrator;
   private readonly IMessageSerializer _serializer = serializer;
+  private readonly IInboxStore? _inboxStore = inboxStore;
 
   public async Task ProcessAsync(Message message, CancellationToken ct = default)
   {
     ArgumentNullException.ThrowIfNull(message);
+
+    if (_inboxStore is not null &&
+        await _inboxStore.HasProcessedAsync(message.Id, ct).ConfigureAwait(false))
+      return;
 
     var typeName = message.MessageType;
     if (string.IsNullOrWhiteSpace(typeName) &&
@@ -95,5 +102,10 @@ public sealed class SagaDispatchingMessageHandler(
         message.Id,
         tenantId,
         ct).ConfigureAwait(false);
+
+    // Register only after successful orchestration so handler failures remain retryable.
+    // The receipt is not transactionally coupled to saga/outbox persistence by this contract.
+    if (_inboxStore is not null)
+      _ = await _inboxStore.TryRegisterAsync(message.Id, ct).ConfigureAwait(false);
   }
 }

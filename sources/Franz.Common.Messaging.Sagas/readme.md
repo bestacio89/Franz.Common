@@ -55,7 +55,7 @@ The package also registers a hosted startup validator. Mapping validation requir
 - `SagaId` is the durable identity of one saga instance and the repository key.
 - `CorrelationId` groups related messages; it is not a saga repository key.
 - `CausationId` identifies the message that caused the current execution.
-- `MessageId` is transport-level message identity. The orchestrator records the latest processed ID but does not provide a durable inbox or general duplicate-detection guarantee.
+- `MessageId` is transport-level message identity. The orchestrator records the latest processed ID. When an `IInboxStore` is registered, the dispatch handler checks and registers completed message IDs. Registration occurs after orchestration succeeds, so handler failures remain retryable; concurrent deliveries can still race because the existing inbox contract does not expose a transaction shared with saga state and outbox writes.
 - `TenantId` scopes repository operations. `null` represents the default non-tenant scope; supplied values must not be empty or whitespace.
 
 A start handler creates the saga instance. For a non-start message, the saga must implement `ISagaIdResolver<TMessage>` and return the non-empty `SagaId` of the target instance. Do not derive this identity from correlation metadata.
@@ -92,7 +92,9 @@ Every successful transition is persisted with the repository's optimistic concur
 
 Supported repository selections are `Memory`, `EntityFramework`, `Mongo`, and `Cosmos`. The host supplies provider configuration. Repository adapters enforce tenant-scoped identity and optimistic concurrency; provider integration tests exercise the configured database implementations.
 
-State persistence and outgoing message publication are currently separate operations. The orchestrator saves the saga transition before publishing the outgoing integration event. This is a non-atomic dual write: if publication fails after the state commit, the saga may be advanced without the outgoing message. The package does not claim an atomic outbox, exactly-once delivery, or general duplicate suppression. A transactional outbox/inbox integration with a shared transaction boundary is required before those guarantees can be made.
+When `IMessageStore` is registered, outgoing integration events are converted through the Messaging package's canonical `IntegrationEventMessageBuilderStrategy` and persisted through the existing outbox contract. The existing `OutboxPublisherService` can then deliver them asynchronously and recover pending records after process restarts. Without `IMessageStore`, the orchestrator retains the direct-publish compatibility path.
+
+The saga state write and outbox `SaveAsync` call are not guaranteed to share a transaction by the current contracts. A failure between those operations can therefore still leave state advanced without its outgoing message. Likewise, inbox receipt registration follows successful orchestration and is not atomic with saga/outbox persistence. These integrations provide durable outbox delivery and best-effort post-success duplicate suppression, not atomic inbox/outbox semantics, exactly-once delivery, or protection against concurrent duplicate execution. Provider-specific transaction enlistment using the same database transaction/session/batch is required before stronger guarantees can be claimed.
 
 Retry is deliberately fail-fast until a durable scheduler can atomically coordinate the retry deadline and saga state. No in-process delay or best-effort timer is substituted for durable scheduling.
 

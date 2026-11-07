@@ -3,6 +3,8 @@
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Context;
 using Franz.Common.Messaging;
+using Franz.Common.Messaging.Factories;
+using Franz.Common.Messaging.Storage;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence;
@@ -25,6 +27,7 @@ public sealed class SagaOrchestrator
   private readonly ISagaRepository _repository;
   private readonly SagaExecutionPipeline _pipeline;
   private readonly IMessagingPublisher _publisher;
+  private readonly IMessageStore? _messageStore;
   private readonly IServiceProvider _services;
   private readonly IReadOnlyCollection<ISagaAuditSink> _auditSinks;
   private readonly FranzSagaOptions _options;
@@ -49,7 +52,8 @@ public sealed class SagaOrchestrator
       IServiceProvider services,
       IEnumerable<ISagaAuditSink> auditSinks,
       FranzSagaOptions options,
-      ILogger<SagaOrchestrator>? logger = null)
+      ILogger<SagaOrchestrator>? logger = null,
+      IMessageStore? messageStore = null)
   {
     _router = router ?? throw new ArgumentNullException(nameof(router));
     _repository = repository ?? throw new ArgumentNullException(nameof(repository));
@@ -59,6 +63,7 @@ public sealed class SagaOrchestrator
     _auditSinks = (auditSinks ?? throw new ArgumentNullException(nameof(auditSinks))).ToArray();
     _options = options ?? throw new ArgumentNullException(nameof(options));
     _logger = logger ?? NullLogger<SagaOrchestrator>.Instance;
+    _messageStore = messageStore;
   }
 
   internal bool TryResolveMessageType(string typeName, out Type? messageType)
@@ -338,9 +343,6 @@ public sealed class SagaOrchestrator
         duration,
         cancellationToken).ConfigureAwait(false);
 
-    // State persistence and outgoing publication are separate operations. This is a
-    // non-atomic dual write: a publish failure after the commit can leave the saga advanced
-    // without its outgoing message. A transactional outbox is required to close that gap.
     if (transition.OutgoingMessage is IIntegrationEvent outgoingEvent)
     {
       var outgoingContext = MediatorContext.Current
@@ -350,7 +352,23 @@ public sealed class SagaOrchestrator
         outgoingContext = outgoingContext.WithCausationId(messageId);
 
       using var contextScope = MediatorContext.BeginScope(outgoingContext);
-      await _publisher.Publish(outgoingEvent, cancellationToken).ConfigureAwait(false);
+
+      if (_messageStore is not null)
+      {
+        // Use the Messaging package's canonical event envelope and durable outbox contract.
+        // Provider-level transaction enlistment is required for atomic state/outbox commits.
+        var outgoingMessage = new IntegrationEventMessageBuilderStrategy().Build(outgoingEvent);
+        outgoingMessage.MessageType = outgoingEvent.GetType().AssemblyQualifiedName
+            ?? outgoingEvent.GetType().FullName
+            ?? outgoingEvent.GetType().Name;
+
+        await _messageStore.SaveAsync(outgoingMessage, cancellationToken).ConfigureAwait(false);
+      }
+      else
+      {
+        // Preserve compatibility for hosts that have not configured the Messaging outbox.
+        await _publisher.Publish(outgoingEvent, cancellationToken).ConfigureAwait(false);
+      }
     }
 
     if (transition.Type == SagaTransitionType.Fail)
