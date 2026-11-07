@@ -14,11 +14,16 @@ public sealed class CosmosSagaRepository : ISagaRepository
 {
   private readonly CosmosSagaDbContext _db;
   private readonly ISagaStateSerializer _serializer;
+  private readonly CosmosSagaUnitOfWork? _unitOfWork;
 
-  public CosmosSagaRepository(CosmosSagaDbContext db, ISagaStateSerializer serializer)
+  public CosmosSagaRepository(
+      CosmosSagaDbContext db,
+      ISagaStateSerializer serializer,
+      CosmosSagaUnitOfWork? unitOfWork = null)
   {
     _db = db ?? throw new ArgumentNullException(nameof(db));
     _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+    _unitOfWork = unitOfWork;
   }
 
   public async Task<SagaPersistenceRecord?> LoadAsync(
@@ -127,7 +132,8 @@ public sealed class CosmosSagaRepository : ISagaRepository
 
     try
     {
-      await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+      if (_unitOfWork?.IsActive != true)
+        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
     catch (DbUpdateConcurrencyException)
     {
@@ -173,7 +179,8 @@ public sealed class CosmosSagaRepository : ISagaRepository
 
     try
     {
-      await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+      if (_unitOfWork?.IsActive != true)
+        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
     catch (DbUpdateConcurrencyException)
     {

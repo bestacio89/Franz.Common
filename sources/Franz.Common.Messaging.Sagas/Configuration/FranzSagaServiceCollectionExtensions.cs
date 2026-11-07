@@ -96,6 +96,11 @@ public static class FranzSagaServiceCollectionExtensions
 
       case "COSMOS":
         RegisterRepository<CosmosSagaRepository>(services);
+        services.TryAddScoped<CosmosSagaUnitOfWork>();
+        services.AddScoped<Franz.Common.Mediator.Pipelines.Core.IUnitOfWork>(
+            provider => provider.GetRequiredService<CosmosSagaUnitOfWork>());
+        services.AddScoped<IInboxStore, CosmosSagaInboxStore>();
+        services.AddScoped<IMessageStore, CosmosSagaMessageStore>();
         break;
 
       default:
