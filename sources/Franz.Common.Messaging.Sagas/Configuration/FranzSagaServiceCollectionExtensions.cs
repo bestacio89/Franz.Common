@@ -1,5 +1,8 @@
 #nullable enable
 
+using Franz.Common.EntityFramework.Extensions;
+using Franz.Common.Messaging;
+using Franz.Common.Messaging.Storage;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Logging;
 using Franz.Common.Messaging.Sagas.Persistence;
@@ -77,6 +80,9 @@ public static class FranzSagaServiceCollectionExtensions
 
       case "ENTITYFRAMEWORK":
         RegisterRepository<EFSagaRepository>(services);
+        services.AddUnitOfWork<SagaDbContext>();
+        services.TryAddScoped<IInboxStore, EfSagaInboxStore>();
+        services.TryAddScoped<IMessageStore, EfSagaMessageStore>();
         break;
 
       case "MONGO":

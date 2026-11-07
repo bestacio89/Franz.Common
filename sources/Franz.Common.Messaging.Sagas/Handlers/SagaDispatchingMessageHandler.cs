@@ -3,6 +3,7 @@
 using Franz.Common.Headers;
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Context;
+using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
@@ -15,19 +16,17 @@ namespace Franz.Common.Messaging.Sagas.Handlers;
 public sealed class SagaDispatchingMessageHandler(
     SagaOrchestrator orchestrator,
     IMessageSerializer serializer,
-    IInboxStore? inboxStore = null) : IMessageHandler
+    IInboxStore? inboxStore = null,
+    IUnitOfWork? persistenceUnitOfWork = null) : IMessageHandler
 {
   private readonly SagaOrchestrator _orchestrator = orchestrator;
   private readonly IMessageSerializer _serializer = serializer;
   private readonly IInboxStore? _inboxStore = inboxStore;
+  private readonly IUnitOfWork? _persistenceUnitOfWork = persistenceUnitOfWork;
 
   public async Task ProcessAsync(Message message, CancellationToken ct = default)
   {
     ArgumentNullException.ThrowIfNull(message);
-
-    if (_inboxStore is not null &&
-        await _inboxStore.HasProcessedAsync(message.Id, ct).ConfigureAwait(false))
-      return;
 
     var typeName = message.MessageType;
     if (string.IsNullOrWhiteSpace(typeName) &&
@@ -88,6 +87,10 @@ public sealed class SagaDispatchingMessageHandler(
       tenantId = tenantValues[0];
     }
 
+    if (_inboxStore is not null && _persistenceUnitOfWork is null)
+      throw new InvalidOperationException(
+          "Saga inbox processing requires a persistence IUnitOfWork so the receipt and saga writes can commit atomically.");
+
     var executionContext = MediatorContext.Current
         .WithCorrelationId(correlationId)
         .WithCausationId(causationId)
@@ -95,17 +98,47 @@ public sealed class SagaDispatchingMessageHandler(
 
     using var contextScope = MediatorContext.BeginScope(executionContext);
 
-    await _orchestrator.HandleEventAsync(
-        integrationEvent,
-        correlationId,
-        causationId,
-        message.Id,
-        tenantId,
-        ct).ConfigureAwait(false);
+    if (_persistenceUnitOfWork is not null)
+      await _persistenceUnitOfWork.BeginAsync(ct).ConfigureAwait(false);
 
-    // Register only after successful orchestration so handler failures remain retryable.
-    // The receipt is not transactionally coupled to saga/outbox persistence by this contract.
-    if (_inboxStore is not null)
-      _ = await _inboxStore.TryRegisterAsync(message.Id, ct).ConfigureAwait(false);
+    try
+    {
+      if (_inboxStore is not null &&
+          !await _inboxStore.TryRegisterAsync(message.Id, ct).ConfigureAwait(false))
+      {
+        await _persistenceUnitOfWork!.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+        return;
+      }
+
+      await _orchestrator.HandleEventAsync(
+          integrationEvent,
+          correlationId,
+          causationId,
+          message.Id,
+          tenantId,
+          ct).ConfigureAwait(false);
+
+      if (_persistenceUnitOfWork is not null)
+        await _persistenceUnitOfWork.CommitAsync(ct).ConfigureAwait(false);
+    }
+    catch (Exception operationException)
+    {
+      if (_persistenceUnitOfWork is not null)
+      {
+        try
+        {
+          await _persistenceUnitOfWork.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception rollbackException)
+        {
+          throw new AggregateException(
+              "Saga message processing failed and its persistence transaction could not be rolled back.",
+              operationException,
+              rollbackException);
+        }
+      }
+
+      throw;
+    }
   }
 }
