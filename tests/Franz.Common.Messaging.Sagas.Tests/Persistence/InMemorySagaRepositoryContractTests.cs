@@ -127,6 +127,41 @@ public sealed class InMemorySagaRepositoryContractTests
         .Should().Contain(((ContractSagaState)persisted.State).Value);
   }
 
+  [Theory]
+  [InlineData("")]
+  [InlineData("   ")]
+  public async Task SaveAsync_RejectsBlankTenantIdentifiers(string tenantId)
+  {
+    var record = CreateRecord() with { TenantId = tenantId };
+
+    var act = () => _repository.SaveAsync(record, expectedVersion: null);
+
+    await act.Should().ThrowAsync<ArgumentException>()
+        .WithParameterName("tenantId");
+  }
+
+  [Theory]
+  [InlineData("")]
+  [InlineData("   ")]
+  public async Task LoadAsync_RejectsBlankTenantIdentifiers(string tenantId)
+  {
+    var act = () => _repository.LoadAsync(Guid.NewGuid(), tenantId, typeof(ContractSagaState));
+
+    await act.Should().ThrowAsync<ArgumentException>()
+        .WithParameterName("tenantId");
+  }
+
+  [Theory]
+  [InlineData("")]
+  [InlineData("   ")]
+  public async Task DeleteAsync_RejectsBlankTenantIdentifiers(string tenantId)
+  {
+    var act = () => _repository.DeleteAsync(Guid.NewGuid(), tenantId, expectedVersion: 1);
+
+    await act.Should().ThrowAsync<ArgumentException>()
+        .WithParameterName("tenantId");
+  }
+
   [Fact]
   public async Task SaveAsync_ObservesCancellationBeforeMutatingTheStore()
   {
