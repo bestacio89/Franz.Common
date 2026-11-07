@@ -1,112 +1,210 @@
-﻿#nullable enable
+#nullable enable
 
 using Franz.Common.Messaging.Sagas.Abstractions;
-using Franz.Common.Messaging.Sagas.Core;
-using Franz.Common.Messaging.Sagas.Persistence;
+using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
-using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.Sagas.Persistence.Mongo;
 
 /// <summary>
-/// A MongoDB-backed implementation of ISagaRepository.
-/// Stores saga states as JSON + metadata, and supports polymorphic saga state types.
+/// MongoDB saga repository using tenant-scoped document keys and atomic version-filtered updates.
 /// </summary>
-public sealed class MongoSagaRepository : ISagaRepository
+public sealed class MongoSagaRepository : ISagaRepository, ISagaLifecycleRepository
 {
   private readonly IMongoCollection<SagaStateDocument> _collection;
-  private readonly JsonSagaStateSerializer _serializer;
+  private readonly ISagaStateSerializer _serializer;
 
-  public MongoSagaRepository(
-      IMongoDatabase database,
-      JsonSagaStateSerializer serializer)
+  public MongoSagaRepository(IMongoDatabase database, ISagaStateSerializer serializer)
   {
+    ArgumentNullException.ThrowIfNull(database);
     _collection = database.GetCollection<SagaStateDocument>("sagaStates");
-    _serializer = serializer;
+    _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
   }
 
-  public async Task<object?> LoadStateAsync(
-      Guid sagaId,
-      Type stateType,
-      CancellationToken cancellationToken)
+  public async Task<object?> LoadStateAsync(Guid sagaId, Type stateType, CancellationToken cancellationToken)
   {
-    var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, sagaId);
+    var record = await LoadAsync(sagaId, tenantId: null, stateType, cancellationToken).ConfigureAwait(false);
+    return record?.State;
+  }
 
-    var doc = await _collection
-      .Find(filter)
-      .FirstOrDefaultAsync(cancellationToken);
+  public async Task SaveStateAsync(Guid sagaId, object state, CancellationToken cancellationToken)
+  {
+    var existing = await LoadAsync(sagaId, tenantId: null, state.GetType(), cancellationToken).ConfigureAwait(false);
+    var now = DateTimeOffset.UtcNow;
+    var record = new SagaPersistenceRecord
+    {
+      SagaId = sagaId,
+      SagaType = state.GetType().AssemblyQualifiedName ?? state.GetType().FullName ?? state.GetType().Name,
+      State = state,
+      Status = existing?.Status ?? SagaLifecycleStatus.Running,
+      CreatedAt = existing?.CreatedAt ?? now,
+      UpdatedAt = now,
+      CompletedAt = existing?.CompletedAt,
+      FailedAt = existing?.FailedAt,
+      NextAttemptAt = existing?.NextAttemptAt,
+      LastMessageId = existing?.LastMessageId,
+      LastError = existing?.LastError
+    };
 
-    if (doc == null)
+    await SaveAsync(record, existing?.Version, cancellationToken).ConfigureAwait(false);
+  }
+
+  public async Task DeleteStateAsync(Guid sagaId, CancellationToken cancellationToken)
+  {
+    var existing = await LoadAsync(sagaId, tenantId: null, typeof(object), cancellationToken).ConfigureAwait(false);
+    if (existing is not null)
+      await DeleteAsync(sagaId, tenantId: null, existing.Version, cancellationToken).ConfigureAwait(false);
+  }
+
+  public async Task<SagaPersistenceRecord?> LoadAsync(
+      Guid sagaId,
+      string? tenantId,
+      Type stateType,
+      CancellationToken cancellationToken = default)
+  {
+    ArgumentNullException.ThrowIfNull(stateType);
+    var document = await _collection.Find(
+        x => x.SagaId == sagaId && x.TenantId == tenantId)
+        .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+
+    if (document is null)
       return null;
 
-    return _serializer.Deserialize(doc.Payload, stateType);
+    var targetType = stateType == typeof(object)
+        ? Type.GetType(document.StateType, throwOnError: true)!
+        : stateType;
+
+    return new SagaPersistenceRecord
+    {
+      SagaId = document.SagaId,
+      TenantId = document.TenantId,
+      SagaType = document.SagaType,
+      State = _serializer.Deserialize(document.Payload, targetType),
+      Status = (SagaLifecycleStatus)document.Status,
+      Version = document.Version,
+      CreatedAt = document.CreatedAt,
+      UpdatedAt = document.UpdatedAt,
+      CompletedAt = document.CompletedAt,
+      FailedAt = document.FailedAt,
+      NextAttemptAt = document.NextAttemptAt,
+      LastMessageId = document.LastMessageId,
+      LastError = document.LastError
+    };
   }
 
-  public async Task SaveStateAsync(
-      Guid sagaId,
-      object state,
-      CancellationToken cancellationToken)
+  public async Task<SagaPersistenceRecord> SaveAsync(
+      SagaPersistenceRecord record,
+      long? expectedVersion,
+      CancellationToken cancellationToken = default)
   {
-    if (state is not ISagaState)
-      throw new InvalidOperationException("State must implement ISagaState.");
+    ArgumentNullException.ThrowIfNull(record);
+    if (record.SagaId == Guid.Empty)
+      throw new ArgumentException("SagaId cannot be empty.", nameof(record));
+    if (record.State is not ISagaState)
+      throw new ArgumentException("Saga state must implement ISagaState.", nameof(record));
 
-    // Serialize state to JSON
-    string json = _serializer.Serialize(state);
+    var now = DateTimeOffset.UtcNow;
+    var nextVersion = expectedVersion is null ? 1 : checked(expectedVersion.Value + 1);
+    var payload = _serializer.Serialize(record.State);
+    var stateType = record.State.GetType().AssemblyQualifiedName!;
 
-    string? concurrency =
-      state is ISagaState s ? s.ConcurrencyToken : null;
-
-    var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, sagaId);
-
-    if (concurrency != null)
+    if (expectedVersion is null)
     {
-      // Optimistic concurrency check
-      filter &= Builders<SagaStateDocument>.Filter.Eq(x => x.ConcurrencyToken, concurrency);
+      var document = new SagaStateDocument
+      {
+        Id = CreateDocumentId(record.TenantId, record.SagaId),
+        SagaId = record.SagaId,
+        TenantId = record.TenantId,
+        SagaType = record.SagaType,
+        StateType = stateType,
+        Payload = payload,
+        Status = (int)record.Status,
+        Version = nextVersion,
+        CreatedAt = record.CreatedAt,
+        UpdatedAt = now,
+        CompletedAt = record.CompletedAt,
+        FailedAt = record.FailedAt,
+        NextAttemptAt = record.NextAttemptAt,
+        LastMessageId = record.LastMessageId,
+        LastError = record.LastError
+      };
+
+      try
+      {
+        await _collection.InsertOneAsync(document, cancellationToken: cancellationToken).ConfigureAwait(false);
+      }
+      catch (MongoWriteException exception) when (
+          exception.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+      {
+        throw new SagaConcurrencyException(record.SagaId, expectedVersion);
+      }
+    }
+    else
+    {
+      var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, CreateDocumentId(record.TenantId, record.SagaId)) &
+                   Builders<SagaStateDocument>.Filter.Eq(x => x.Version, expectedVersion.Value);
+
+      var update = Builders<SagaStateDocument>.Update
+          .Set(x => x.SagaType, record.SagaType)
+          .Set(x => x.StateType, stateType)
+          .Set(x => x.Payload, payload)
+          .Set(x => x.Status, (int)record.Status)
+          .Set(x => x.Version, nextVersion)
+          .Set(x => x.UpdatedAt, now)
+          .Set(x => x.CompletedAt, record.CompletedAt)
+          .Set(x => x.FailedAt, record.FailedAt)
+          .Set(x => x.NextAttemptAt, record.NextAttemptAt)
+          .Set(x => x.LastMessageId, record.LastMessageId)
+          .Set(x => x.LastError, record.LastError);
+
+      var result = await _collection.UpdateOneAsync(
+          filter,
+          update,
+          cancellationToken: cancellationToken).ConfigureAwait(false);
+
+      if (result.MatchedCount != 1)
+        throw new SagaConcurrencyException(record.SagaId, expectedVersion);
     }
 
-    var update = Builders<SagaStateDocument>.Update
-      .Set(x => x.Id, sagaId)
-      .Set(x => x.StateType, state.GetType().AssemblyQualifiedName!)
-      .Set(x => x.Payload, json)
-      .Set(x => x.UpdatedAt, DateTime.UtcNow)
-      .Set(x => x.ConcurrencyToken, Guid.NewGuid().ToString("N")); // auto new token on write
-
-    var options = new UpdateOptions { IsUpsert = concurrency == null };
-
-    var result = await _collection.UpdateOneAsync(filter, update, options, cancellationToken);
-
-    if (result.MatchedCount == 0 && concurrency != null)
-      throw new InvalidOperationException(
-        $"Concurrency violation while saving saga '{sagaId}'.");
+    return record with { Version = nextVersion, UpdatedAt = now };
   }
 
-  public async Task DeleteStateAsync(
+  public async Task DeleteAsync(
       Guid sagaId,
-      CancellationToken cancellationToken)
+      string? tenantId,
+      long expectedVersion,
+      CancellationToken cancellationToken = default)
   {
-    var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, sagaId);
-    await _collection.DeleteOneAsync(filter, cancellationToken);
+    var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, CreateDocumentId(tenantId, sagaId)) &
+                 Builders<SagaStateDocument>.Filter.Eq(x => x.Version, expectedVersion);
+
+    var result = await _collection.DeleteOneAsync(filter, cancellationToken).ConfigureAwait(false);
+    if (result.DeletedCount != 1)
+      throw new SagaConcurrencyException(sagaId, expectedVersion);
   }
 
-  /// <summary>
-  /// Internal MongoDB document shape.
-  /// </summary>
+  private static string CreateDocumentId(string? tenantId, Guid sagaId)
+      => $"{tenantId ?? string.Empty}:{sagaId:N}";
+
   private sealed class SagaStateDocument
   {
     [BsonId]
-    public Guid Id { get; set; } = default!;
-
+    public string Id { get; set; } = default!;
+    public Guid SagaId { get; set; }
+    public string? TenantId { get; set; }
+    public string SagaType { get; set; } = default!;
     public string StateType { get; set; } = default!;
-
     public string Payload { get; set; } = default!;
-
-    public string? ConcurrencyToken { get; set; }
-
-    public DateTime UpdatedAt { get; set; }
+    public int Status { get; set; }
+    public long Version { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public DateTimeOffset? CompletedAt { get; set; }
+    public DateTimeOffset? FailedAt { get; set; }
+    public DateTimeOffset? NextAttemptAt { get; set; }
+    public Guid? LastMessageId { get; set; }
+    public string? LastError { get; set; }
   }
 }
