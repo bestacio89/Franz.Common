@@ -54,8 +54,8 @@ public sealed class InMemorySagaRepositoryContractTests
   public async Task LoadAsync_IsolatesRecordsByTenant()
   {
     var sagaId = Guid.NewGuid();
-    var tenantA = CreateRecord(sagaId, "tenant-a");
-    var tenantB = CreateRecord(sagaId, "tenant-b");
+    var tenantA = CreateRecord(sagaId, tenantId: "tenant-a", value: "tenant-a");
+    var tenantB = CreateRecord(sagaId, tenantId: "tenant-b", value: "tenant-b");
 
     await _repository.SaveAsync(tenantA, expectedVersion: null);
     await _repository.SaveAsync(tenantB, expectedVersion: null);
@@ -72,8 +72,9 @@ public sealed class InMemorySagaRepositoryContractTests
   [Fact]
   public async Task DeleteAsync_RequiresTheCurrentVersion_AndRemovesOnlyTheRequestedTenantRecord()
   {
-    var tenantA = CreateRecord(value: "tenant-a");
-    var tenantB = CreateRecord(tenantA.SagaId, "tenant-b");
+    var sagaId = Guid.NewGuid();
+    var tenantA = CreateRecord(sagaId, tenantId: "tenant-a", value: "tenant-a");
+    var tenantB = CreateRecord(sagaId, tenantId: "tenant-b", value: "tenant-b");
 
     var createdA = await _repository.SaveAsync(tenantA, expectedVersion: null);
     await _repository.SaveAsync(tenantB, expectedVersion: null);
@@ -142,13 +143,14 @@ public sealed class InMemorySagaRepositoryContractTests
 
   private static SagaPersistenceRecord CreateRecord(
       Guid? sagaId = null,
+      string? tenantId = "tenant-a",
       string? value = "initial")
   {
     var now = DateTimeOffset.UtcNow;
     return new SagaPersistenceRecord
     {
       SagaId = sagaId ?? Guid.NewGuid(),
-      TenantId = "tenant-a",
+      TenantId = tenantId,
       SagaType = "contract-saga",
       State = new ContractSagaState { Value = value ?? string.Empty },
       CreatedAt = now,
