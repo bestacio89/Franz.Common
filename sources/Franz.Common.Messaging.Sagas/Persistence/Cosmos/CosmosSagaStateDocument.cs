@@ -10,9 +10,7 @@ namespace Franz.Common.Messaging.Sagas.Persistence.Cosmos;
 public sealed class CosmosSagaStateDocument : Entity<Guid>
 {
   public CosmosSagaStateDocument() { }
-
   public CosmosSagaStateDocument(Guid sagaId) : base(sagaId) { }
-
   public string TenantId { get; set; } = string.Empty;
   public Guid CorrelationId { get; set; }
   public string SagaType { get; set; } = default!;
