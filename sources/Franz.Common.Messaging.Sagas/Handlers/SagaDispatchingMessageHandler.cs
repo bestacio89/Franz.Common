@@ -71,11 +71,15 @@ public sealed class SagaDispatchingMessageHandler(
         ? parsedCausationId
         : null;
 
-    var tenantId = message.Headers.TryGetValue(HeaderConstants.TenantId, out var tenantValues) &&
-                   tenantValues.Length > 0 &&
-                   !string.IsNullOrWhiteSpace(tenantValues[0])
-        ? tenantValues[0]
-        : null;
+    string? tenantId = null;
+    if (message.Headers.TryGetValue(HeaderConstants.TenantId, out var tenantValues))
+    {
+      if (tenantValues.Length != 1 || string.IsNullOrWhiteSpace(tenantValues[0]))
+        throw new PermanentMessagingException(
+            "Saga message tenant metadata must contain exactly one non-empty tenant identifier.");
+
+      tenantId = tenantValues[0];
+    }
 
     var executionContext = MediatorContext.Current
         .WithCorrelationId(correlationId)
