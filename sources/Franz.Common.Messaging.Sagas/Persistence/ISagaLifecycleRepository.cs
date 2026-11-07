@@ -5,14 +5,13 @@ namespace Franz.Common.Messaging.Sagas.Persistence;
 /// <summary>
 /// Persists saga state together with lifecycle metadata and an optimistic concurrency version.
 /// Implementations must atomically compare the expected version and write the new record.
+/// Tenant identity is part of every read and delete operation.
 /// </summary>
 public interface ISagaLifecycleRepository
 {
-  /// <summary>
-  /// Loads a saga record or returns null when no record exists.
-  /// </summary>
   Task<SagaPersistenceRecord?> LoadAsync(
       Guid sagaId,
+      string? tenantId,
       Type stateType,
       CancellationToken cancellationToken = default);
 
@@ -26,11 +25,9 @@ public interface ISagaLifecycleRepository
       long? expectedVersion,
       CancellationToken cancellationToken = default);
 
-  /// <summary>
-  /// Deletes a record only when its current version matches the expected version.
-  /// </summary>
   Task DeleteAsync(
       Guid sagaId,
+      string? tenantId,
       long expectedVersion,
       CancellationToken cancellationToken = default);
 }

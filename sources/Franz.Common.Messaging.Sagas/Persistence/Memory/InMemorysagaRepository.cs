@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Collections.Generic;
+using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 
@@ -21,34 +22,25 @@ public sealed class InMemorySagaRepository : ISagaRepository, ISagaLifecycleRepo
     _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
   }
 
-  public Task<object?> LoadStateAsync(
-      Guid sagaId,
-      Type stateType,
-      CancellationToken cancellationToken)
-      => LoadLegacyStateAsync(sagaId, stateType, cancellationToken);
-
-  private async Task<object?> LoadLegacyStateAsync(
+  public async Task<object?> LoadStateAsync(
       Guid sagaId,
       Type stateType,
       CancellationToken cancellationToken)
   {
-    var record = await LoadAsync(sagaId, stateType, cancellationToken).ConfigureAwait(false);
+    var record = await LoadAsync(sagaId, tenantId: null, stateType, cancellationToken).ConfigureAwait(false);
     return record?.State;
   }
 
-  public async Task SaveStateAsync(
-      Guid sagaId,
-      object state,
-      CancellationToken cancellationToken)
+  public async Task SaveStateAsync(Guid sagaId, object state, CancellationToken cancellationToken)
   {
-    var existing = await LoadAsync(sagaId, state.GetType(), cancellationToken).ConfigureAwait(false);
+    var existing = await LoadAsync(sagaId, tenantId: null, state.GetType(), cancellationToken).ConfigureAwait(false);
     var now = DateTimeOffset.UtcNow;
     var record = new SagaPersistenceRecord
     {
       SagaId = sagaId,
       SagaType = state.GetType().AssemblyQualifiedName ?? state.GetType().FullName ?? state.GetType().Name,
       State = state,
-      Status = existing?.Status ?? Franz.Common.Messaging.Sagas.Abstractions.SagaLifecycleStatus.Running,
+      Status = existing?.Status ?? SagaLifecycleStatus.Running,
       CreatedAt = existing?.CreatedAt ?? now,
       UpdatedAt = now,
       CompletedAt = existing?.CompletedAt,
@@ -63,24 +55,26 @@ public sealed class InMemorySagaRepository : ISagaRepository, ISagaLifecycleRepo
 
   public async Task DeleteStateAsync(Guid sagaId, CancellationToken cancellationToken)
   {
-    if (_store.Store.TryGetValue(sagaId, out var existing))
-      await DeleteAsync(sagaId, existing.Version, cancellationToken).ConfigureAwait(false);
+    var existing = await LoadAsync(sagaId, tenantId: null, typeof(object), cancellationToken).ConfigureAwait(false);
+    if (existing is not null)
+      await DeleteAsync(sagaId, tenantId: null, existing.Version, cancellationToken).ConfigureAwait(false);
   }
 
   public Task<SagaPersistenceRecord?> LoadAsync(
       Guid sagaId,
+      string? tenantId,
       Type stateType,
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(stateType);
     cancellationToken.ThrowIfCancellationRequested();
 
-    if (!_store.Store.TryGetValue(sagaId, out var record))
+    if (!_store.Store.TryGetValue((tenantId, sagaId), out var record))
       return Task.FromResult<SagaPersistenceRecord?>(null);
 
     var state = _serializer.Deserialize(
         _serializer.Serialize(record.State),
-        stateType);
+        stateType == typeof(object) ? record.State.GetType() : stateType);
 
     return Task.FromResult<SagaPersistenceRecord?>(record with { State = state });
   }
@@ -96,12 +90,11 @@ public sealed class InMemorySagaRepository : ISagaRepository, ISagaLifecycleRepo
     if (record.SagaId == Guid.Empty)
       throw new ArgumentException("SagaId cannot be empty.", nameof(record));
 
-    if (record.State is not Franz.Common.Messaging.Sagas.Abstractions.ISagaState)
+    if (record.State is not ISagaState)
       throw new ArgumentException("Saga state must implement ISagaState.", nameof(record));
 
-    var persistedState = _serializer.Deserialize(
-        _serializer.Serialize(record.State),
-        record.State.GetType());
+    var key = (record.TenantId, record.SagaId);
+    var persistedState = CloneState(record.State);
 
     if (expectedVersion is null)
     {
@@ -112,7 +105,7 @@ public sealed class InMemorySagaRepository : ISagaRepository, ISagaLifecycleRepo
         UpdatedAt = DateTimeOffset.UtcNow
       };
 
-      if (!_store.Store.TryAdd(record.SagaId, created))
+      if (!_store.Store.TryAdd(key, created))
         throw new SagaConcurrencyException(record.SagaId, expectedVersion);
 
       return Task.FromResult(CloneRecord(created));
@@ -122,7 +115,7 @@ public sealed class InMemorySagaRepository : ISagaRepository, ISagaLifecycleRepo
     {
       cancellationToken.ThrowIfCancellationRequested();
 
-      if (!_store.Store.TryGetValue(record.SagaId, out var current) ||
+      if (!_store.Store.TryGetValue(key, out var current) ||
           current.Version != expectedVersion.Value)
         throw new SagaConcurrencyException(record.SagaId, expectedVersion);
 
@@ -134,32 +127,32 @@ public sealed class InMemorySagaRepository : ISagaRepository, ISagaLifecycleRepo
         UpdatedAt = DateTimeOffset.UtcNow
       };
 
-      if (_store.Store.TryUpdate(record.SagaId, updated, current))
+      if (_store.Store.TryUpdate(key, updated, current))
         return Task.FromResult(CloneRecord(updated));
     }
   }
 
   public Task DeleteAsync(
       Guid sagaId,
+      string? tenantId,
       long expectedVersion,
       CancellationToken cancellationToken = default)
   {
     cancellationToken.ThrowIfCancellationRequested();
+    var key = (tenantId, sagaId);
 
-    if (!_store.Store.TryGetValue(sagaId, out var current) ||
+    if (!_store.Store.TryGetValue(key, out var current) ||
         current.Version != expectedVersion ||
-        !((ICollection<KeyValuePair<Guid, SagaPersistenceRecord>>)_store.Store)
-            .Remove(new KeyValuePair<Guid, SagaPersistenceRecord>(sagaId, current)))
+        !((ICollection<KeyValuePair<(string? TenantId, Guid SagaId), SagaPersistenceRecord>>)_store.Store)
+            .Remove(new KeyValuePair<(string? TenantId, Guid SagaId), SagaPersistenceRecord>(key, current)))
       throw new SagaConcurrencyException(sagaId, expectedVersion);
 
     return Task.CompletedTask;
   }
 
+  private object CloneState(object state)
+      => _serializer.Deserialize(_serializer.Serialize(state), state.GetType());
+
   private SagaPersistenceRecord CloneRecord(SagaPersistenceRecord record)
-      => record with
-      {
-        State = _serializer.Deserialize(
-            _serializer.Serialize(record.State),
-            record.State.GetType())
-      };
+      => record with { State = CloneState(record.State) };
 }

@@ -59,7 +59,7 @@ public sealed class InMemorySagaRepositoryConcurrencyTests
 
     await act.Should().ThrowAsync<SagaConcurrencyException>();
 
-    var loaded = await _repository.LoadAsync(sagaId, typeof(TestSagaState), CancellationToken.None);
+    var loaded = await _repository.LoadAsync(sagaId, tenantId: null, typeof(TestSagaState), CancellationToken.None);
     loaded.Should().NotBeNull();
     loaded!.Version.Should().Be(2);
     loaded.State.Should().BeOfType<TestSagaState>()
@@ -81,11 +81,28 @@ public sealed class InMemorySagaRepositoryConcurrencyTests
 
     await _repository.SaveAsync(record, expectedVersion: null, CancellationToken.None);
 
-    var loaded = await _repository.LoadAsync(sagaId, typeof(TestSagaState), CancellationToken.None);
+    var loaded = await _repository.LoadAsync(sagaId, tenantId: null, typeof(TestSagaState), CancellationToken.None);
 
     loaded.Should().NotBeNull();
     loaded!.Status.Should().Be(SagaLifecycleStatus.Completed);
     loaded.CompletedAt.Should().Be(now);
+  }
+
+  [Fact]
+  public async Task LoadAsync_IsolatesRecordsByTenant()
+  {
+    var sagaId = Guid.CreateVersion7();
+    var tenantA = CreateRecord(sagaId, new TestSagaState { Value = "tenant-a" }) with { TenantId = "tenant-a" };
+    var tenantB = tenantA with { TenantId = "tenant-b", State = new TestSagaState { Value = "tenant-b" } };
+
+    await _repository.SaveAsync(tenantA, expectedVersion: null, CancellationToken.None);
+    await _repository.SaveAsync(tenantB, expectedVersion: null, CancellationToken.None);
+
+    var loadedA = await _repository.LoadAsync(sagaId, "tenant-a", typeof(TestSagaState), CancellationToken.None);
+    var loadedB = await _repository.LoadAsync(sagaId, "tenant-b", typeof(TestSagaState), CancellationToken.None);
+
+    loadedA!.State.Should().BeOfType<TestSagaState>().Which.Value.Should().Be("tenant-a");
+    loadedB!.State.Should().BeOfType<TestSagaState>().Which.Value.Should().Be("tenant-b");
   }
 
   private static SagaPersistenceRecord CreateRecord(Guid sagaId, TestSagaState state)

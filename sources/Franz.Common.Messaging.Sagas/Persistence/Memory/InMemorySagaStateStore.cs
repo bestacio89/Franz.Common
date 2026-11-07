@@ -8,5 +8,5 @@ namespace Franz.Common.Messaging.Sagas.Persistence.Memory;
 /// </summary>
 public sealed class InMemorySagaStateStore
 {
-  public ConcurrentDictionary<Guid, SagaPersistenceRecord> Store { get; } = new();
+  public ConcurrentDictionary<(string? TenantId, Guid SagaId), SagaPersistenceRecord> Store { get; } = new();
 }
