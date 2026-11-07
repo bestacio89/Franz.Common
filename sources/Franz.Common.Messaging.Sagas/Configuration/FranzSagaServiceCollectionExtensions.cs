@@ -3,7 +3,10 @@
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Logging;
 using Franz.Common.Messaging.Sagas.Persistence;
+using Franz.Common.Messaging.Sagas.Persistence.Cosmos;
+using Franz.Common.Messaging.Sagas.Persistence.EntityFramework;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
+using Franz.Common.Messaging.Sagas.Persistence.Mongo;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -34,13 +37,7 @@ public static class FranzSagaServiceCollectionExtensions
     services.TryAddTransient<SagaOrchestrator>();
     services.TryAddScoped<ISagaStateSerializer, JsonSagaStateSerializer>();
 
-    if (options.Persistence.Equals("Memory", StringComparison.OrdinalIgnoreCase))
-    {
-      services.TryAddSingleton<InMemorySagaStateStore>();
-      services.TryAddScoped<InMemorySagaRepository>();
-      services.TryAddScoped<ISagaRepository>(
-          provider => provider.GetRequiredService<InMemorySagaRepository>());
-    }
+    RegisterPersistenceAdapter(services, options.Persistence);
 
     services.TryAddSingleton<ISagaAuditSink, DefaultSagaAuditSink>();
 
@@ -63,5 +60,44 @@ public static class FranzSagaServiceCollectionExtensions
     var builder = provider.GetRequiredService<FranzSagaBuilder>();
     var options = provider.GetRequiredService<FranzSagaOptions>();
     builder.Build(provider, options.ValidateMappings);
+  }
+
+  private static void RegisterPersistenceAdapter(
+      IServiceCollection services,
+      string persistence)
+  {
+    if (persistence.Equals("Memory", StringComparison.OrdinalIgnoreCase))
+      services.TryAddSingleton<InMemorySagaStateStore>();
+
+    switch (persistence.ToUpperInvariant())
+    {
+      case "MEMORY":
+        RegisterRepository<InMemorySagaRepository>(services);
+        break;
+
+      case "ENTITYFRAMEWORK":
+        RegisterRepository<EFSagaRepository>(services);
+        break;
+
+      case "MONGO":
+        RegisterRepository<MongoSagaRepository>(services);
+        break;
+
+      case "COSMOS":
+        RegisterRepository<CosmosSagaRepository>(services);
+        break;
+
+      default:
+        throw new NotSupportedException(
+            $"Saga persistence provider '{persistence}' is not supported.");
+    }
+  }
+
+  private static void RegisterRepository<TRepository>(IServiceCollection services)
+      where TRepository : class, ISagaRepository
+  {
+    services.TryAddScoped<TRepository>();
+    services.TryAddScoped<ISagaRepository>(
+        provider => provider.GetRequiredService<TRepository>());
   }
 }
