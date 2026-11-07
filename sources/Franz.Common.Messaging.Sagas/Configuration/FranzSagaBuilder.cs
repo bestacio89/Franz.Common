@@ -62,9 +62,9 @@ public sealed class FranzSagaBuilder
 
   internal void Build(IServiceProvider provider, bool validate)
   {
-    if (provider.GetService<ISagaLifecycleRepository>() is null)
+    if (provider.GetService<ISagaRepository>() is null)
       throw new InvalidOperationException(
-          "No ISagaLifecycleRepository is registered. Configure a supported saga persistence adapter.");
+          "No ISagaRepository is registered. Configure a supported saga persistence adapter.");
 
     if (provider.GetService<IMessagingPublisher>() is null)
       throw new InvalidOperationException(

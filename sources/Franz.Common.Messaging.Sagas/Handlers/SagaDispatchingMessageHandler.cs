@@ -66,12 +66,11 @@ public sealed class SagaDispatchingMessageHandler(
     if (correlationId == Guid.Empty)
       correlationId = Guid.CreateVersion7();
 
-    Guid? causationId =
-        message.Headers.TryGetValue(Message.CausationHeader, out var causationValues) &&
-        causationValues.Length > 0 &&
-        Guid.TryParse(causationValues[0], out var parsedCausationId)
-            ? parsedCausationId
-            : null;
+    Guid? causationId = message.Headers.TryGetValue(Message.CausationHeader, out var causationValues) &&
+                      causationValues.Length > 0 &&
+                      Guid.TryParse(causationValues[0], out var parsedCausationId)
+        ? parsedCausationId
+        : null;
 
     var tenantId = message.Headers.TryGetValue(HeaderConstants.TenantId, out var tenantValues) &&
                    tenantValues.Length > 0 &&

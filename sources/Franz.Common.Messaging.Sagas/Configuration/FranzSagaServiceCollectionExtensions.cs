@@ -25,7 +25,7 @@ public static class FranzSagaServiceCollectionExtensions
     if (!new[] { "Memory", "EntityFramework", "Mongo", "Cosmos" }
         .Contains(options.Persistence, StringComparer.OrdinalIgnoreCase))
       throw new NotSupportedException(
-          $"Saga persistence provider '{options.Persistence}' is not supported by the lifecycle repository contract.");
+          $"Saga persistence provider '{options.Persistence}' is not supported.");
 
     services.AddSingleton(options);
 
@@ -38,8 +38,6 @@ public static class FranzSagaServiceCollectionExtensions
     {
       services.TryAddSingleton<InMemorySagaStateStore>();
       services.TryAddScoped<InMemorySagaRepository>();
-      services.TryAddScoped<ISagaLifecycleRepository>(
-          provider => provider.GetRequiredService<InMemorySagaRepository>());
       services.TryAddScoped<ISagaRepository>(
           provider => provider.GetRequiredService<InMemorySagaRepository>());
     }

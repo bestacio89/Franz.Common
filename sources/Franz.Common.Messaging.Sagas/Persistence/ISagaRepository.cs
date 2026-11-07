@@ -1,31 +1,35 @@
-﻿#nullable enable
+#nullable enable
 
 using Franz.Common.DependencyInjection;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.Sagas.Persistence;
 
 /// <summary>
-/// Provides persistence for saga state. 
-/// Implementations can use EF, Redis, Kafka compacted topics, or memory.
+/// Persists saga state together with lifecycle metadata and an optimistic concurrency version.
+/// Reads and deletes are scoped by tenant identity. Save operations must atomically compare
+/// the expected version and write the new record.
 /// </summary>
 public interface ISagaRepository : IScopedDependency
 {
-  /// <summary>
-  /// Loads a saga state for the given ID and type, or returns null if not found.
-  /// </summary>
-  Task<object?> LoadStateAsync(Guid sagaId, Type stateType, CancellationToken cancellationToken);
+  Task<SagaPersistenceRecord?> LoadAsync(
+      Guid sagaId,
+      string? tenantId,
+      Type stateType,
+      CancellationToken cancellationToken = default);
 
   /// <summary>
-  /// Saves the saga state. Creates or updates the record.
+  /// Creates a record when <paramref name="expectedVersion"/> is null, or updates it only
+  /// when the stored version equals the supplied expected version.
+  /// The returned record contains the incremented version.
   /// </summary>
-  Task SaveStateAsync( Guid   sagaId, object state, CancellationToken cancellationToken);
+  Task<SagaPersistenceRecord> SaveAsync(
+      SagaPersistenceRecord record,
+      long? expectedVersion,
+      CancellationToken cancellationToken = default);
 
-  /// <summary>
-  /// Deletes a saga state when the saga completes.
-  /// Not all implementations must support delete.
-  /// </summary>
-  Task DeleteStateAsync(Guid sagaId, CancellationToken cancellationToken);
+  Task DeleteAsync(
+      Guid sagaId,
+      string? tenantId,
+      long expectedVersion,
+      CancellationToken cancellationToken = default);
 }

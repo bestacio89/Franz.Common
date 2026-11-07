@@ -11,7 +11,7 @@ namespace Franz.Common.Messaging.Sagas.Persistence.Memory;
 /// In-memory lifecycle repository for tests and development.
 /// Uses atomic dictionary compare-and-swap operations for optimistic concurrency.
 /// </summary>
-public sealed class InMemorySagaRepository : ISagaRepository, ISagaLifecycleRepository
+public sealed class InMemorySagaRepository : ISagaRepository
 {
   private readonly InMemorySagaStateStore _store;
   private readonly ISagaStateSerializer _serializer;

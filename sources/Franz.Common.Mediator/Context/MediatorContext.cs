@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Threading;
 
 namespace Franz.Common.Mediator.Context;
 
 /// <summary>
-/// Ambient context accessor (AsyncLocal backed).
+/// Ambient context accessor backed by AsyncLocal.
 /// </summary>
 public static class MediatorContext
 {
@@ -18,39 +18,47 @@ public static class MediatorContext
   }
 
   public static Guid CorrelationId => Current.CorrelationId;
+  public static Guid? CausationId => Current.CausationId;
   public static string? UserId => Current.UserId;
   public static string? TenantId => Current.TenantId;
   public static CultureInfo Culture => Current.Culture;
 
-  /// <summary>
-  /// Set context for current async flow.
-  /// </summary>
   public static void Set(MediatorExecutionContext context)
-  {
-    Current = context ?? MediatorExecutionContext.Empty;
-  }
+      => _current.Value = context ?? MediatorExecutionContext.Empty;
 
   /// <summary>
-  /// Reset context (call in middleware finally block).
+  /// Establishes an ambient context for the current async flow and restores the previous
+  /// value when the returned scope is disposed.
   /// </summary>
-  public static void Reset()
+  public static IDisposable BeginScope(MediatorExecutionContext context)
   {
-    _current.Value = null;
+    ArgumentNullException.ThrowIfNull(context);
+    var previous = _current.Value;
+    _current.Value = context;
+    return new ContextScope(previous);
   }
 
-  /// <summary>
-  /// Ensure a correlation ID exists (creates Guid v7 if missing).
-  /// </summary>
+  public static void Reset() => _current.Value = null;
+
   public static Guid EnsureCorrelationId()
   {
     var context = _current.Value ?? MediatorExecutionContext.Empty;
 
     if (context.CorrelationId == Guid.Empty)
-    {
       context = context.WithCorrelationId(Guid.CreateVersion7());
-    }
 
     _current.Value = context;
     return context.CorrelationId;
+  }
+
+  private sealed class ContextScope(MediatorExecutionContext? previous) : IDisposable
+  {
+    private int _disposed;
+
+    public void Dispose()
+    {
+      if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        _current.Value = previous;
+    }
   }
 }

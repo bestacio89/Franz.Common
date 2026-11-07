@@ -17,14 +17,14 @@ namespace Franz.Common.Messaging.Sagas.Core;
 public sealed class SagaOrchestrator
 {
   private readonly SagaRouter _router;
-  private readonly ISagaLifecycleRepository _repository;
+  private readonly ISagaRepository _repository;
   private readonly SagaExecutionPipeline _pipeline;
   private readonly IMessagingPublisher _publisher;
   private readonly IServiceProvider _services;
 
   public SagaOrchestrator(
       SagaRouter router,
-      ISagaLifecycleRepository repository,
+      ISagaRepository repository,
       SagaExecutionPipeline pipeline,
       IMessagingPublisher publisher,
       IServiceProvider services)
@@ -261,7 +261,11 @@ public sealed class SagaOrchestrator
     // required before state persistence and outgoing dispatch can be claimed atomic.
     if (transition.OutgoingMessage is IIntegrationEvent outgoingEvent)
     {
-      MediatorContext.EnsureCorrelationId();
+      var outgoingContext = MediatorContext.Current;
+      if (messageId.HasValue)
+        outgoingContext = outgoingContext.WithCausationId(messageId);
+
+      using var contextScope = MediatorContext.BeginScope(outgoingContext);
       await _publisher.Publish(outgoingEvent, cancellationToken).ConfigureAwait(false);
     }
 

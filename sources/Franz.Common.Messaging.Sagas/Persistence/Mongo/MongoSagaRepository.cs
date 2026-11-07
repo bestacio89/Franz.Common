@@ -11,7 +11,7 @@ namespace Franz.Common.Messaging.Sagas.Persistence.Mongo;
 /// <summary>
 /// MongoDB saga repository using tenant-scoped document keys and atomic version-filtered updates.
 /// </summary>
-public sealed class MongoSagaRepository : ISagaRepository, ISagaLifecycleRepository
+public sealed class MongoSagaRepository : ISagaRepository
 {
   private readonly IMongoCollection<SagaStateDocument> _collection;
   private readonly ISagaStateSerializer _serializer;
@@ -21,41 +21,6 @@ public sealed class MongoSagaRepository : ISagaRepository, ISagaLifecycleReposit
     ArgumentNullException.ThrowIfNull(database);
     _collection = database.GetCollection<SagaStateDocument>("sagaStates");
     _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
-  }
-
-  public async Task<object?> LoadStateAsync(Guid sagaId, Type stateType, CancellationToken cancellationToken)
-  {
-    var record = await LoadAsync(sagaId, tenantId: null, stateType, cancellationToken).ConfigureAwait(false);
-    return record?.State;
-  }
-
-  public async Task SaveStateAsync(Guid sagaId, object state, CancellationToken cancellationToken)
-  {
-    var existing = await LoadAsync(sagaId, tenantId: null, state.GetType(), cancellationToken).ConfigureAwait(false);
-    var now = DateTimeOffset.UtcNow;
-    var record = new SagaPersistenceRecord
-    {
-      SagaId = sagaId,
-      SagaType = state.GetType().AssemblyQualifiedName ?? state.GetType().FullName ?? state.GetType().Name,
-      State = state,
-      Status = existing?.Status ?? SagaLifecycleStatus.Running,
-      CreatedAt = existing?.CreatedAt ?? now,
-      UpdatedAt = now,
-      CompletedAt = existing?.CompletedAt,
-      FailedAt = existing?.FailedAt,
-      NextAttemptAt = existing?.NextAttemptAt,
-      LastMessageId = existing?.LastMessageId,
-      LastError = existing?.LastError
-    };
-
-    await SaveAsync(record, existing?.Version, cancellationToken).ConfigureAwait(false);
-  }
-
-  public async Task DeleteStateAsync(Guid sagaId, CancellationToken cancellationToken)
-  {
-    var existing = await LoadAsync(sagaId, tenantId: null, typeof(object), cancellationToken).ConfigureAwait(false);
-    if (existing is not null)
-      await DeleteAsync(sagaId, tenantId: null, existing.Version, cancellationToken).ConfigureAwait(false);
   }
 
   public async Task<SagaPersistenceRecord?> LoadAsync(

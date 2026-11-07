@@ -1,25 +1,23 @@
+using Franz.Common.Headers;
 using Franz.Common.Mediator;
+using Franz.Common.Mediator.Context;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Serialization;
-using Microsoft.Extensions.Primitives;
 using System.Text.Json;
 
 namespace Franz.Common.Messaging.Factories;
 
-public sealed class IntegrationEventMessageBuilderStrategy
-    : IMessageBuilderStrategy
+public sealed class IntegrationEventMessageBuilderStrategy : IMessageBuilderStrategy
 {
-  public bool CanBuild(object value)
-      => value is IIntegrationEvent;
+  public bool CanBuild(object value) => value is IIntegrationEvent;
 
   public Message Build(object value)
   {
-    var integrationEvent = (IIntegrationEvent)value;
+    ArgumentNullException.ThrowIfNull(value);
 
-    var body = JsonSerializer.Serialize(
-        integrationEvent,
-        FranzJson.Default);
+    var integrationEvent = (IIntegrationEvent)value;
+    var body = JsonSerializer.Serialize(integrationEvent, FranzJson.Default);
 
     var message = new Message(body)
     {
@@ -27,11 +25,18 @@ public sealed class IntegrationEventMessageBuilderStrategy
       Kind = MessageKind.IntegrationEvent
     };
 
-    var className = HeaderNamer.GetEventClassName(value.GetType());
+    var context = MediatorContext.Current;
+    if (context.CorrelationId != Guid.Empty)
+      message.CorrelationId = context.CorrelationId;
 
-    message.Headers.Add(
-        MessagingConstants.ClassName,
-        new[] { className });
+    if (context.CausationId.HasValue)
+      message.Headers[Message.CausationHeader] = [context.CausationId.Value.ToString()];
+
+    if (!string.IsNullOrWhiteSpace(context.TenantId))
+      message.Headers[HeaderConstants.TenantId] = [context.TenantId];
+
+    var className = HeaderNamer.GetEventClassName(value.GetType());
+    message.Headers.Add(MessagingConstants.ClassName, [className]);
 
     return message;
   }
