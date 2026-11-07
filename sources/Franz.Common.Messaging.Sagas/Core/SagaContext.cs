@@ -34,13 +34,13 @@ public sealed class SagaContext : ISagaContext
   public CancellationToken CancellationToken { get; }
 
   public ISagaTransition Continue(object? outgoingMessage = null)
-      => CreateTransition(SagaTransition.Continue(outgoingMessage));
+      => SagaTransition.Continue(outgoingMessage);
 
   public ISagaTransition Complete(object? outgoingMessage = null)
-      => CreateTransition(SagaTransition.Complete(outgoingMessage));
+      => SagaTransition.Complete(outgoingMessage);
 
   public ISagaTransition Compensate(object? compensationMessage, Exception? error = null)
-      => CreateTransition(SagaTransition.Compensate(compensationMessage, error));
+      => SagaTransition.Compensate(compensationMessage, error);
 
   public ISagaTransition Retry(TimeSpan? delay = null, Exception? error = null)
       => SagaTransition.Retry(delay, error);
@@ -48,6 +48,4 @@ public sealed class SagaContext : ISagaContext
   public ISagaTransition Fail(Exception error)
       => SagaTransition.Fail(error);
 
-  private static ISagaTransition CreateTransition(ISagaTransition transition)
-      => transition;
 }

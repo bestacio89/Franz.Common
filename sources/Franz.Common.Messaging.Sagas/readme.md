@@ -84,7 +84,7 @@ A handler returns an `ISagaTransition`:
 - `Fail(error)`: require an error, persist `Failed`, then surface `SagaFailedException`.
 - `Retry(delay?, error?)`: rejected before persistence because no durable retry scheduler is configured.
 
-Compensation order is application-defined and sequential. A compensation handler may emit the next compensation command/event; the next compensation handler runs only after that message is delivered. While the saga is `Compensating`, ordinary step messages are rejected. The orchestrator does not infer a compensation stack or execute compensations in reverse order automatically.
+Compensation order is application-defined and sequential. A compensation handler may emit the next compensation command/event; the next compensation handler runs only after that message is delivered. While the saga is `Compensating`, ordinary step messages are rejected. The orchestrator does not persist or validate the expected next compensation message, infer a compensation stack, or execute compensations in reverse order automatically. Saga implementations must validate domain-specific compensation ordering against their persisted state.
 
 Every successful transition is persisted with the repository's optimistic concurrency contract. Concurrent updates using the same expected version must not both succeed. A failed transition is surfaced only after its `Failed` state has been saved.
 
