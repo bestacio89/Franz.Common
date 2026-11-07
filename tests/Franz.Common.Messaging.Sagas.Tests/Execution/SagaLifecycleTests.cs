@@ -315,6 +315,7 @@ public sealed class SagaLifecycleTests
         services,
         Array.Empty<ISagaAuditSink>(),
         new FranzSagaOptions(),
+        logger: null,
         messageStore: messageStore);
   }
 
