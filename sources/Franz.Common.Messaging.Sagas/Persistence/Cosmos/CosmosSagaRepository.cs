@@ -148,6 +148,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
     return record with
     {
       TenantId = tenantId,
+      CreatedAt = document.CreatedAt,
       Version = document.Version,
       UpdatedAt = document.UpdatedAt
     };

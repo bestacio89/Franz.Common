@@ -150,6 +150,7 @@ public sealed class EFSagaRepository : ISagaRepository
     return record with
     {
       TenantId = tenantId,
+      CreatedAt = entity.CreatedAt,
       Version = entity.Version,
       UpdatedAt = entity.UpdatedAt
     };

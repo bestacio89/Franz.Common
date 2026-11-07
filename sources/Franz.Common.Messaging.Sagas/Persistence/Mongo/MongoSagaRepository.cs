@@ -77,6 +77,7 @@ public sealed class MongoSagaRepository : ISagaRepository
     var nextVersion = expectedVersion is null ? 1 : checked(expectedVersion.Value + 1);
     var payload = _serializer.Serialize(record.State);
     var stateType = record.State.GetType().AssemblyQualifiedName!;
+    var createdAt = record.CreatedAt;
 
     if (expectedVersion is null)
     {
@@ -115,6 +116,14 @@ public sealed class MongoSagaRepository : ISagaRepository
       var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, CreateDocumentId(tenantId, record.SagaId)) &
                    Builders<SagaStateDocument>.Filter.Eq(x => x.Version, expectedVersion.Value);
 
+      var existing = await _collection.Find(filter)
+          .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+
+      if (existing is null)
+        throw new SagaConcurrencyException(record.SagaId, expectedVersion);
+
+      createdAt = existing.CreatedAt;
+
       var update = Builders<SagaStateDocument>.Update
           .Set(x => x.CorrelationId, record.CorrelationId)
           .Set(x => x.SagaType, record.SagaType)
@@ -138,7 +147,7 @@ public sealed class MongoSagaRepository : ISagaRepository
         throw new SagaConcurrencyException(record.SagaId, expectedVersion);
     }
 
-    return record with { Version = nextVersion, UpdatedAt = now };
+    return record with { CreatedAt = createdAt, Version = nextVersion, UpdatedAt = now };
   }
 
   public async Task DeleteAsync(
