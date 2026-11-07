@@ -196,15 +196,24 @@ public sealed class SagaOrchestrator
 
     var effectiveExistingCorrelationId = ResolveCorrelationId(existingRecord, correlationId);
 
-    if (existingRecord.Status is SagaLifecycleStatus.Completed or SagaLifecycleStatus.Failed)
-      throw new SagaLifecycleException(sagaIdExisting, existingRecord.Status);
+    switch (existingRecord.Status)
+    {
+      case SagaLifecycleStatus.Running:
+        if (!registration.CanHandle(messageType) && registration.CanCompensate(messageType))
+          throw new SagaLifecycleException(sagaIdExisting, existingRecord.Status);
+        break;
 
-    if (existingRecord.Status == SagaLifecycleStatus.RetryScheduled)
-      throw new SagaLifecycleException(sagaIdExisting, existingRecord.Status);
+      case SagaLifecycleStatus.Compensating:
+        if (!registration.CanCompensate(messageType))
+          throw new SagaLifecycleException(sagaIdExisting, existingRecord.Status);
+        break;
 
-    if (existingRecord.Status == SagaLifecycleStatus.Compensating &&
-        !registration.CanCompensate(messageType))
-      throw new SagaLifecycleException(sagaIdExisting, existingRecord.Status);
+      case SagaLifecycleStatus.RetryScheduled:
+      case SagaLifecycleStatus.Completed:
+      case SagaLifecycleStatus.Failed:
+      default:
+        throw new SagaLifecycleException(sagaIdExisting, existingRecord.Status);
+    }
 
     SetSagaState(saga, registration, (ISagaState)existingRecord.State);
 
@@ -312,7 +321,7 @@ public sealed class SagaOrchestrator
       FailedAt = nextStatus == SagaLifecycleStatus.Failed ? now : record.FailedAt,
       NextAttemptAt = null,
       LastMessageId = messageId,
-      LastError = transition.Error?.Message
+      LastError = transition.Error?.Message ?? record.LastError
     };
 
     await _repository.SaveAsync(updatedRecord, expectedVersion, cancellationToken).ConfigureAwait(false);
@@ -329,8 +338,9 @@ public sealed class SagaOrchestrator
         duration,
         cancellationToken).ConfigureAwait(false);
 
-    // This direct publish is at-least-once only. A transactional outbox integration is
-    // required before state persistence and outgoing dispatch can be claimed atomic.
+    // State persistence and outgoing publication are separate operations. This is a
+    // non-atomic dual write: a publish failure after the commit can leave the saga advanced
+    // without its outgoing message. A transactional outbox is required to close that gap.
     if (transition.OutgoingMessage is IIntegrationEvent outgoingEvent)
     {
       var outgoingContext = MediatorContext.Current

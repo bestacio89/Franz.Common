@@ -3,7 +3,7 @@ using Franz.Common.Messaging.Sagas.Abstractions;
 namespace Franz.Common.Messaging.Sagas.Exceptions;
 
 /// <summary>
-/// Raised when an incoming message targets a saga that is already terminal.
+/// Raised when an incoming message is incompatible with the saga's current lifecycle state.
 /// </summary>
 public sealed class SagaLifecycleException : InvalidOperationException
 {
