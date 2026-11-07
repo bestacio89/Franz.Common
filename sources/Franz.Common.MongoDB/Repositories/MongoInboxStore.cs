@@ -1,48 +1,90 @@
-﻿#nullable enable
+#nullable enable
+
 using Franz.Common.Messaging.Storage;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 
 namespace Franz.Common.MongoDB.Repositories;
 
-public class MongoInboxStore : IInboxStore
+/// <summary>
+/// MongoDB-backed inbox with a unique message identifier.
+/// </summary>
+public sealed class MongoInboxStore : IInboxStore
 {
   private readonly IMongoCollection<ProcessedMessage> _collection;
 
   public MongoInboxStore(IMongoDatabase db)
   {
-    _collection = db.GetCollection<ProcessedMessage>("ProcessedMessages");
+    ArgumentNullException.ThrowIfNull(db);
 
-    // ✅ UNIQUE INDEX: Using Guid v7 here is elite.
-    // It ensures no two messages with the same ID are processed,
-    // while keeping the index inserts sequential and fast.
+    _collection = db.GetCollection<ProcessedMessage>("ProcessedMessages");
     _collection.Indexes.CreateOne(
         new CreateIndexModel<ProcessedMessage>(
             Builders<ProcessedMessage>.IndexKeys.Ascending(x => x.MessageId),
             new CreateIndexOptions { Unique = true }));
   }
 
-  // 🛠️ FIX: Changed parameter from string to Guid
-  public async Task<bool> HasProcessedAsync(Guid messageId, CancellationToken ct = default)
-      => await _collection.Find(x => x.MessageId == messageId).AnyAsync(ct);
-
-  // 🛠️ FIX: Changed parameter from string to Guid
-  public async Task MarkProcessedAsync(Guid messageId, CancellationToken ct = default)
+  public Task<bool> HasProcessedAsync(Guid messageId, CancellationToken ct = default)
   {
+    ValidateMessageId(messageId);
+    return _collection.Find(x => x.MessageId == messageId).AnyAsync(ct);
+  }
+
+  /// <summary>
+  /// Uses the unique index as the concurrency primitive. No read-before-write
+  /// check is performed, so concurrent duplicate deliveries cannot both win.
+  /// </summary>
+  public async Task<bool> TryRegisterAsync(Guid messageId, CancellationToken ct = default)
+  {
+    ValidateMessageId(messageId);
+
     var processed = new ProcessedMessage
     {
       MessageId = messageId,
       ProcessedOn = DateTime.UtcNow
     };
 
-    // If a duplicate arrives, the unique index will throw a MongoWriteException,
-    // which is exactly what we want to prevent double-processing.
-    await _collection.InsertOneAsync(processed, cancellationToken: ct);
+    try
+    {
+      await _collection.InsertOneAsync(
+          processed,
+          cancellationToken: ct).ConfigureAwait(false);
+      return true;
+    }
+    catch (MongoWriteException exception) when (
+        exception.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+    {
+      return false;
+    }
+  }
+
+  public async Task MarkProcessedAsync(Guid messageId, CancellationToken ct = default)
+  {
+    ValidateMessageId(messageId);
+
+    var processed = new ProcessedMessage
+    {
+      MessageId = messageId,
+      ProcessedOn = DateTime.UtcNow
+    };
+
+    await _collection.InsertOneAsync(
+        processed,
+        cancellationToken: ct).ConfigureAwait(false);
+  }
+
+  private static void ValidateMessageId(Guid messageId)
+  {
+    if (messageId == Guid.Empty)
+      throw new ArgumentException("Message ID cannot be empty.", nameof(messageId));
   }
 }
 
-public class ProcessedMessage
+public sealed class ProcessedMessage
 {
-  // 🛠️ FIX: MessageId is now a native Guid
+  [BsonGuidRepresentation(GuidRepresentation.Standard)]
   public Guid MessageId { get; set; }
+
   public DateTime ProcessedOn { get; set; }
 }
