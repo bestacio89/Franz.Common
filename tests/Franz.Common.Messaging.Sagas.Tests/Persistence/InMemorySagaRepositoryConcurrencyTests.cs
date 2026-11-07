@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Franz.Common.Messaging.Sagas.Abstractions;
+using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
