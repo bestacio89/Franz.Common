@@ -115,11 +115,11 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
 
     using var contextScope = MediatorContext.BeginScope(executionContext);
 
-    if (_persistenceUnitOfWork is not null)
-      await _persistenceUnitOfWork.BeginAsync(ct).ConfigureAwait(false);
-
     try
     {
+      if (_persistenceUnitOfWork is not null)
+        await _persistenceUnitOfWork.BeginAsync(ct).ConfigureAwait(false);
+
       if (_inboxStore is not null &&
           !await _inboxStore.TryRegisterAsync(message.Id, ct).ConfigureAwait(false))
       {

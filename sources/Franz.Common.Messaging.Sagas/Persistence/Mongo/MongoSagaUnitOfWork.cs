@@ -29,11 +29,20 @@ public sealed class MongoSagaUnitOfWork : IUnitOfWork, IAsyncDisposable
     if (_session is not null)
       throw new InvalidOperationException("A MongoDB saga transaction is already active.");
 
-    _session = await _client.StartSessionAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-    _session.StartTransaction(new TransactionOptions(
-        readConcern: ReadConcern.Snapshot,
-        readPreference: ReadPreference.Primary,
-        writeConcern: WriteConcern.WMajority));
+    var session = await _client.StartSessionAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+    try
+    {
+      session.StartTransaction(new TransactionOptions(
+          readConcern: ReadConcern.Snapshot,
+          readPreference: ReadPreference.Primary,
+          writeConcern: WriteConcern.WMajority));
+      _session = session;
+    }
+    catch
+    {
+      session.Dispose();
+      throw;
+    }
   }
 
   public async Task CommitAsync(CancellationToken cancellationToken = default)
