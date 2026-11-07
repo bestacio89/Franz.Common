@@ -10,44 +10,62 @@ namespace Franz.Common.Messaging.Sagas.Tests.Execution;
 public sealed class SagaCorrelationTests
 {
   [Fact]
-  public async Task HandleEventAsync_ResolvesCorrelationOnSagaInstance()
+  public async Task HandleEventAsync_ResolvesSagaIdOnSagaInstance_AndKeepsCorrelationSeparate()
   {
-    var saga = new CorrelatedSaga();
+    var expectedSagaId = Guid.CreateVersion7();
+    var correlationId = Guid.CreateVersion7();
+    var state = new CorrelatedSagaState();
+    var saga = new CorrelatedSaga(expectedSagaId);
+    var repository = new TestSagaRepository(state);
     var services = new TestServiceProvider(saga);
     var router = new SagaRouter(services);
     router.RegisterSaga<CorrelatedSaga>();
 
     var orchestrator = new SagaOrchestrator(
       router,
-      new TestSagaRepository(),
+      repository,
       new SagaExecutionPipeline(),
       new TestMessagingPublisher(),
       services);
 
-    await Record.ExceptionAsync(
-      () => orchestrator.HandleEventAsync(new StepEvent(), Guid.NewGuid(), null));
+    await orchestrator.HandleEventAsync(
+      new StepEvent(),
+      correlationId,
+      Guid.CreateVersion7());
 
-    saga.CorrelationResolverCalled.Should().BeTrue();
+    saga.SagaIdResolverCalled.Should().BeTrue();
+    saga.HandlerCalled.Should().BeTrue();
+    repository.LoadedSagaId.Should().Be(expectedSagaId);
+    saga.ObservedSagaId.Should().Be(expectedSagaId);
+    saga.ObservedCorrelationId.Should().Be(correlationId);
   }
 
-  private sealed class CorrelatedSaga :
+  private sealed class CorrelatedSaga(Guid expectedSagaId) :
     SagaBase<CorrelatedSagaState>,
     IHandle<StepEvent>,
-    IMessageCorrelation<StepEvent>
+    ISagaIdResolver<StepEvent>
   {
-    public bool CorrelationResolverCalled { get; private set; }
+    public bool SagaIdResolverCalled { get; private set; }
+    public bool HandlerCalled { get; private set; }
+    public Guid? ObservedSagaId { get; private set; }
+    public Guid? ObservedCorrelationId { get; private set; }
 
-    public string GetCorrelationId(StepEvent message)
+    public Guid ResolveSagaId(StepEvent message)
     {
-      CorrelationResolverCalled = true;
-      return "correlation-key";
+      SagaIdResolverCalled = true;
+      return expectedSagaId;
     }
 
     public Task<ISagaTransition> HandleAsync(
       StepEvent message,
       ISagaContext context,
       CancellationToken cancellationToken = default)
-      => Task.FromResult<ISagaTransition>(context.Continue());
+    {
+      HandlerCalled = true;
+      ObservedSagaId = context.SagaId;
+      ObservedCorrelationId = context.CorrelationId;
+      return Task.FromResult<ISagaTransition>(context.Continue());
+    }
   }
 
   private sealed class CorrelatedSagaState : ISagaState
@@ -63,13 +81,18 @@ public sealed class SagaCorrelationTests
       => serviceType == typeof(CorrelatedSaga) ? saga : null;
   }
 
-  private sealed class TestSagaRepository : ISagaRepository
+  private sealed class TestSagaRepository(CorrelatedSagaState state) : ISagaRepository
   {
+    public Guid? LoadedSagaId { get; private set; }
+
     public Task<object?> LoadStateAsync(
       Guid sagaId,
       Type stateType,
       CancellationToken cancellationToken)
-      => Task.FromResult<object?>(null);
+    {
+      LoadedSagaId = sagaId;
+      return Task.FromResult<object?>(state);
+    }
 
     public Task SaveStateAsync(
       Guid sagaId,

@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
@@ -11,38 +11,33 @@ namespace Franz.Common.Messaging.Sagas.Validation;
 
 /// <summary>
 /// Validates saga message mappings (start handlers, steps, compensation steps)
-/// to ensure handler signatures and correlation constraints are respected.
+/// to ensure handler signatures and identity-resolution constraints are respected.
 /// </summary>
 public static class SagaMappingValidator
 {
   public static void ValidateRegistration(SagaRegistration reg)
   {
-    // Validate saga type first
     SagaTypeValidator.ValidateSagaType(reg.SagaType);
 
     foreach (var start in reg.StartHandlers)
-      ValidateHandler(reg, start.Key, start.Value, isStart: true);
+      ValidateHandler(reg, start.Key, start.Value);
 
     foreach (var step in reg.StepHandlers)
-      ValidateHandler(reg, step.Key, step.Value, isStart: false);
+      ValidateHandler(reg, step.Key, step.Value);
 
     foreach (var comp in reg.CompensationHandlers)
-      ValidateHandler(reg, comp.Key, comp.Value, isStart: false);
+      ValidateHandler(reg, comp.Key, comp.Value);
 
-    // Validate that non-start messages have correlation rules
-    ValidateCorrelationRules(reg);
+    ValidateSagaIdentityRules(reg);
   }
 
   private static void ValidateHandler(
       SagaRegistration reg,
       Type messageType,
-      MethodInfo handler,
-      bool isStart)
+      MethodInfo handler)
   {
     var parameters = handler.GetParameters();
 
-    // expected signature:
-    // (TMessage message, ISagaContext ctx, CancellationToken ct)
     if (parameters.Length != 3)
       throw new SagaConfigurationError(
           HandlerError(reg, handler, "must have exactly 3 parameters."));
@@ -59,45 +54,38 @@ public static class SagaMappingValidator
       throw new SagaConfigurationError(
           HandlerError(reg, handler, "third parameter must be CancellationToken."));
 
-    // Return type can be:
-    // Task<ISagaTransition> or Task
     var returnType = handler.ReturnType;
 
     if (returnType == typeof(Task))
-      return; // valid: no transition returned
+      return;
 
     if (returnType.IsGenericType &&
         returnType.GetGenericTypeDefinition() == typeof(Task<>) &&
         returnType.GetGenericArguments()[0] == typeof(ISagaTransition))
-      return; // valid
+      return;
 
     throw new SagaConfigurationError(
         HandlerError(reg, handler,
             "must return Task or Task<ISagaTransition>."));
   }
 
-  private static void ValidateCorrelationRules(SagaRegistration reg)
+  private static void ValidateSagaIdentityRules(SagaRegistration reg)
   {
-    var sagaType = reg.SagaType;
-
-    // Start messages don't need correlation
     var startTypes = reg.StartHandlers.Keys.ToHashSet();
 
-    // Other messages must implement IMessageCorrelation<T>
-    foreach (var msgType in reg.AllMessageTypes)
+    foreach (var messageType in reg.AllMessageTypes)
     {
-      if (startTypes.Contains(msgType))
+      if (startTypes.Contains(messageType))
         continue;
 
-      // correlation interface:
-      // IMessageCorrelation<TMessage>
-      var correlationInterface = typeof(IMessageCorrelation<>).MakeGenericType(msgType);
+      var resolverInterface = typeof(ISagaIdResolver<>).MakeGenericType(messageType);
 
-      if (!sagaType.GetInterfaces().Contains(correlationInterface))
+      if (!reg.SagaType.GetInterfaces().Contains(resolverInterface))
       {
         throw new SagaConfigurationError(
-            $"Saga '{sagaType.Name}' does not implement IMessageCorrelation<{msgType.Name}> " +
-            $"required for non-start message '{msgType.Name}'.");
+            $"Saga '{reg.SagaType.Name}' does not implement " +
+            $"ISagaIdResolver<{messageType.Name}> required to resolve the saga instance " +
+            $"for non-start message '{messageType.Name}'.");
       }
     }
   }
