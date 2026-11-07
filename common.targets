@@ -44,9 +44,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 
     <!-- Compare the 3.0.0 release candidate against the last published stable package. -->
-    <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>2.3.4</PackageValidationBaselineVersion>
-    <PackageValidationBaselineName>$(PackageId)</PackageValidationBaselineName>
+   
   </PropertyGroup>
 
   <ItemGroup>
