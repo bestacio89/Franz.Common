@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Net;
+using Franz.Common.Messaging;
 using Franz.Common.Messaging.Storage;
 using Microsoft.Azure.Cosmos;
 using Microsoft.EntityFrameworkCore;
