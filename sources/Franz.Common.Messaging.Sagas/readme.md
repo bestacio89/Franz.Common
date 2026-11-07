@@ -1,6 +1,12 @@
 # Franz.Common.Messaging.Sagas
 
-Saga contracts, message routing, lifecycle orchestration, persistence adapters, and optional audit hooks for long-running workflows.
+> Saga orchestration, lifecycle management, and persistence adapters for long-running workflows.
+
+## Installation
+
+```bash
+dotnet add package Franz.Common.Messaging.Sagas
+```
 
 ## Overview
 
