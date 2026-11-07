@@ -11,6 +11,7 @@ using Microsoft.Azure.Cosmos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using Testcontainers.CosmosDb;
 
 namespace Franz.Common.AzureCosmosDB.Tests;
 
