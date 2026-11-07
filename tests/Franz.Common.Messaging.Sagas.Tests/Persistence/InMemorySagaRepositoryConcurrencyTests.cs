@@ -95,7 +95,7 @@ public sealed class InMemorySagaRepositoryConcurrencyTests
     return new SagaPersistenceRecord
     {
       SagaId = sagaId,
-      SagaType = typeof(TestSaga).AssemblyQualifiedName!,
+      SagaType = typeof(InMemorySagaRepositoryConcurrencyTests).AssemblyQualifiedName!,
       State = state,
       Status = SagaLifecycleStatus.Running,
       CreatedAt = now,
@@ -103,9 +103,7 @@ public sealed class InMemorySagaRepositoryConcurrencyTests
     };
   }
 
-  private sealed class TestSaga;
-  
-  private sealed class TestSagaState : ISagaState
+  public sealed class TestSagaState : ISagaState
   {
     public string? ConcurrencyToken { get; set; }
     public string Value { get; set; } = string.Empty;
