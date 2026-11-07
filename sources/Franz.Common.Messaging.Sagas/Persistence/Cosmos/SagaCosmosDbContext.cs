@@ -29,7 +29,6 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
     modelBuilder.Entity<CosmosSagaStateDocument>(entity =>
     {
       entity.ToContainer("SagaStates");
-      entity.HasKey(x => x.Id);
       entity.HasPartitionKey(x => x.TenantId);
       entity.UseETagConcurrency();
       entity.Property(x => x.TenantId).IsRequired();
