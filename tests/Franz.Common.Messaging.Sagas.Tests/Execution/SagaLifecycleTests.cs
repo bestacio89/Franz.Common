@@ -73,10 +73,11 @@ public sealed class SagaLifecycleTests
     var saga = new FailingSaga();
     var repository = CreateRepository();
     var orchestrator = CreateOrchestrator(saga, repository);
+    var correlationId = Guid.CreateVersion7();
 
     var act = () => orchestrator.HandleEventAsync(
         new StartEvent(),
-        Guid.CreateVersion7(),
+        correlationId,
         null);
 
     await act.Should().ThrowAsync<SagaFailedException>();
