@@ -17,14 +17,12 @@ public sealed class SagaStartupTests
     var middlewareInvoked = false;
     var services = new ServiceCollection();
 
-    services.AddFranzSagas(builder =>
+    var sagaBuilder = services.AddFranzSagas();
+    sagaBuilder.AddSaga<StartupSaga>();
+    sagaBuilder.UsePipeline(async next =>
     {
-      builder.AddSaga<StartupSaga>();
-      builder.UsePipeline(async next =>
-      {
-        middlewareInvoked = true;
-        await next();
-      });
+      middlewareInvoked = true;
+      await next();
     });
 
     services.AddScoped<IMessagingPublisher, TestMessagingPublisher>();
