@@ -128,8 +128,24 @@ public sealed class SagaLifecycleTests
     compensating!.Status.Should().Be(SagaLifecycleStatus.Compensating);
     publisher.Published.Should().ContainSingle().Which.Should().BeOfType<CompensationRequestedEvent>();
 
+    var stepAct = () => orchestrator.HandleEventAsync(
+        new NormalStepEvent(saga.SagaId),
+        correlationId,
+        null);
+    var stepException = await stepAct.Should().ThrowAsync<SagaLifecycleException>();
+    stepException.Which.Status.Should().Be(SagaLifecycleStatus.Compensating);
+    saga.StepHandlerInvoked.Should().BeFalse();
+
     await orchestrator.HandleEventAsync(
         new CompensationRequestedEvent(saga.SagaId),
+        correlationId,
+        null);
+
+    publisher.Published.Should().HaveCount(2);
+    publisher.Published[1].Should().BeOfType<InventoryReleasedEvent>();
+
+    await orchestrator.HandleEventAsync(
+        new InventoryReleasedEvent(saga.SagaId),
         correlationId,
         null);
 
@@ -233,10 +249,18 @@ public sealed class SagaLifecycleTests
   private sealed class CompensatingSaga :
       SagaBase<TestSagaState>,
       IStartWith<StartEvent>,
+      IHandle<NormalStepEvent>,
       ICompensateWith<CompensationRequestedEvent>,
-      ISagaIdResolver<CompensationRequestedEvent>
+      ICompensateWith<InventoryReleasedEvent>,
+      ISagaIdResolver<NormalStepEvent>,
+      ISagaIdResolver<CompensationRequestedEvent>,
+      ISagaIdResolver<InventoryReleasedEvent>
   {
+    public bool StepHandlerInvoked { get; private set; }
+
+    public Guid ResolveSagaId(NormalStepEvent message) => message.SagaId;
     public Guid ResolveSagaId(CompensationRequestedEvent message) => message.SagaId;
+    public Guid ResolveSagaId(InventoryReleasedEvent message) => message.SagaId;
 
     public Task<ISagaTransition> HandleAsync(
         StartEvent message,
@@ -245,7 +269,22 @@ public sealed class SagaLifecycleTests
         => Task.FromResult(context.Compensate(new CompensationRequestedEvent(context.SagaId)));
 
     public Task<ISagaTransition> HandleAsync(
+        NormalStepEvent message,
+        ISagaContext context,
+        CancellationToken cancellationToken)
+    {
+      StepHandlerInvoked = true;
+      return Task.FromResult(context.Continue());
+    }
+
+    public Task<ISagaTransition> HandleAsync(
         CompensationRequestedEvent message,
+        ISagaContext context,
+        CancellationToken cancellationToken)
+        => Task.FromResult(context.Compensate(new InventoryReleasedEvent(context.SagaId)));
+
+    public Task<ISagaTransition> HandleAsync(
+        InventoryReleasedEvent message,
         ISagaContext context,
         CancellationToken cancellationToken)
         => Task.FromResult(context.Complete());
@@ -284,6 +323,8 @@ public sealed class SagaLifecycleTests
 
   private sealed record StartEvent : IIntegrationEvent;
   private sealed record CompensationRequestedEvent(Guid SagaId) : IIntegrationEvent;
+  private sealed record InventoryReleasedEvent(Guid SagaId) : IIntegrationEvent;
+  private sealed record NormalStepEvent(Guid SagaId) : IIntegrationEvent;
 
   private sealed class TestServiceProvider(object saga) : IServiceProvider
   {
