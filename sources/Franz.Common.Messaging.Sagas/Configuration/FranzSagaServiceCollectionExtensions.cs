@@ -87,6 +87,11 @@ public static class FranzSagaServiceCollectionExtensions
 
       case "MONGO":
         RegisterRepository<MongoSagaRepository>(services);
+        services.TryAddScoped<MongoSagaUnitOfWork>();
+        services.AddScoped<Franz.Common.Mediator.Pipelines.Core.IUnitOfWork>(
+            provider => provider.GetRequiredService<MongoSagaUnitOfWork>());
+        services.AddScoped<IInboxStore, MongoSagaInboxStore>();
+        services.AddScoped<IMessageStore, MongoSagaMessageStore>();
         break;
 
       case "COSMOS":
