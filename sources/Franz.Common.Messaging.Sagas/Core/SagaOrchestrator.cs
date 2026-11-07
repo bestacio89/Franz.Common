@@ -420,8 +420,11 @@ public sealed class SagaOrchestrator
         throw;
       }
 
-      if (result is Task task)
-        await task.ConfigureAwait(false);
+      if (result is not Task task)
+        throw new SagaConfigurationError(
+            $"Saga '{saga.GetType().Name}' handler '{handler.Name}' returned a null task.");
+
+      await task.ConfigureAwait(false);
     }).ConfigureAwait(false);
 
     if (result is Task<ISagaTransition> transitionTask)
