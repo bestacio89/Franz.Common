@@ -55,6 +55,14 @@ public sealed class SagaLifecycleTests
     record!.Status.Should().Be(SagaLifecycleStatus.Completed);
     record.CompletedAt.Should().NotBeNull();
     record.FailedAt.Should().BeNull();
+
+    var act = () => orchestrator.HandleEventAsync(
+        new AfterTerminalEvent(saga.SagaId),
+        Guid.CreateVersion7(),
+        null);
+    var exception = await act.Should().ThrowAsync<SagaLifecycleException>();
+    exception.Which.Status.Should().Be(SagaLifecycleStatus.Completed);
+    saga.FollowUpInvoked.Should().BeFalse();
   }
 
   [Fact]
@@ -81,6 +89,14 @@ public sealed class SagaLifecycleTests
     record!.Status.Should().Be(SagaLifecycleStatus.Failed);
     record.FailedAt.Should().NotBeNull();
     record.LastError.Should().Be("payment declined");
+
+    var followUp = () => orchestrator.HandleEventAsync(
+        new AfterTerminalEvent(saga.SagaId),
+        Guid.CreateVersion7(),
+        null);
+    var lifecycleException = await followUp.Should().ThrowAsync<SagaLifecycleException>();
+    lifecycleException.Which.Status.Should().Be(SagaLifecycleStatus.Failed);
+    saga.FollowUpInvoked.Should().BeFalse();
   }
 
   [Fact]
@@ -163,6 +179,37 @@ public sealed class SagaLifecycleTests
   }
 
   [Fact]
+  public async Task Orchestrator_RehydratesPersistedStateAfterInstanceRecreation()
+  {
+    var repository = CreateRepository();
+    var originalSaga = new RecoverableSaga();
+    var sagaId = originalSaga.SagaId;
+    var correlationId = Guid.CreateVersion7();
+
+    await CreateOrchestrator(originalSaga, repository)
+        .HandleEventAsync(new StartEvent(), correlationId, null);
+
+    var restartedSaga = new RecoverableSaga();
+    var restartedOrchestrator = CreateOrchestrator(restartedSaga, repository);
+
+    await restartedOrchestrator.HandleEventAsync(
+        new RecoveryStepEvent(sagaId),
+        correlationId,
+        null);
+
+    var record = await repository.LoadAsync(
+        sagaId,
+        tenantId: null,
+        typeof(TestSagaState),
+        CancellationToken.None);
+
+    record.Should().NotBeNull();
+    record!.Status.Should().Be(SagaLifecycleStatus.Completed);
+    ((TestSagaState)record.State).StepCount.Should().Be(2);
+    restartedSaga.SagaId.Should().Be(sagaId);
+  }
+
+  [Fact]
   public async Task OutgoingPublishFailure_LeavesCommittedSagaStateAndExposesDualWriteWindow()
   {
     var saga = new PublishingSaga();
@@ -239,6 +286,33 @@ public sealed class SagaLifecycleTests
         services);
   }
 
+  private sealed class RecoverableSaga :
+      SagaBase<TestSagaState>,
+      IStartWith<StartEvent>,
+      IHandle<RecoveryStepEvent>,
+      ISagaIdResolver<RecoveryStepEvent>
+  {
+    public Guid ResolveSagaId(RecoveryStepEvent message) => message.SagaId;
+
+    public Task<ISagaTransition> HandleAsync(
+        StartEvent message,
+        ISagaContext context,
+        CancellationToken cancellationToken)
+    {
+      ((TestSagaState)context.State).StepCount++;
+      return Task.FromResult(context.Continue());
+    }
+
+    public Task<ISagaTransition> HandleAsync(
+        RecoveryStepEvent message,
+        ISagaContext context,
+        CancellationToken cancellationToken)
+    {
+      ((TestSagaState)context.State).StepCount++;
+      return Task.FromResult(context.Complete());
+    }
+  }
+
   private sealed class PublishingSaga : SagaBase<TestSagaState>, IStartWith<StartEvent>
   {
     public Task<ISagaTransition> HandleAsync(
@@ -257,22 +331,54 @@ public sealed class SagaLifecycleTests
         => null!;
   }
 
-  private sealed class CompletingSaga : SagaBase<TestSagaState>, IStartWith<StartEvent>
+  private sealed class CompletingSaga :
+      SagaBase<TestSagaState>,
+      IStartWith<StartEvent>,
+      IHandle<AfterTerminalEvent>,
+      ISagaIdResolver<AfterTerminalEvent>
   {
+    public bool FollowUpInvoked { get; private set; }
+    public Guid ResolveSagaId(AfterTerminalEvent message) => message.SagaId;
+
     public Task<ISagaTransition> HandleAsync(
         StartEvent message,
         ISagaContext context,
         CancellationToken cancellationToken)
         => Task.FromResult(context.Complete());
+
+    public Task<ISagaTransition> HandleAsync(
+        AfterTerminalEvent message,
+        ISagaContext context,
+        CancellationToken cancellationToken)
+    {
+      FollowUpInvoked = true;
+      return Task.FromResult(context.Continue());
+    }
   }
 
-  private sealed class FailingSaga : SagaBase<TestSagaState>, IStartWith<StartEvent>
+  private sealed class FailingSaga :
+      SagaBase<TestSagaState>,
+      IStartWith<StartEvent>,
+      IHandle<AfterTerminalEvent>,
+      ISagaIdResolver<AfterTerminalEvent>
   {
+    public bool FollowUpInvoked { get; private set; }
+    public Guid ResolveSagaId(AfterTerminalEvent message) => message.SagaId;
+
     public Task<ISagaTransition> HandleAsync(
         StartEvent message,
         ISagaContext context,
         CancellationToken cancellationToken)
         => Task.FromResult(context.Fail(new InvalidOperationException("payment declined")));
+
+    public Task<ISagaTransition> HandleAsync(
+        AfterTerminalEvent message,
+        ISagaContext context,
+        CancellationToken cancellationToken)
+    {
+      FollowUpInvoked = true;
+      return Task.FromResult(context.Continue());
+    }
   }
 
   private sealed class RetryingSaga : SagaBase<TestSagaState>, IStartWith<StartEvent>
@@ -359,10 +465,13 @@ public sealed class SagaLifecycleTests
   public sealed class TestSagaState : ISagaState
   {
     public string? ConcurrencyToken { get; set; }
+    public int StepCount { get; set; }
   }
 
   private sealed record StartEvent : IIntegrationEvent;
   private sealed record FollowUpEvent : IIntegrationEvent;
+  private sealed record AfterTerminalEvent(Guid SagaId) : IIntegrationEvent;
+  private sealed record RecoveryStepEvent(Guid SagaId) : IIntegrationEvent;
   private sealed record CompensationRequestedEvent(Guid SagaId) : IIntegrationEvent;
   private sealed record InventoryReleasedEvent(Guid SagaId) : IIntegrationEvent;
   private sealed record NormalStepEvent(Guid SagaId) : IIntegrationEvent;
