@@ -61,6 +61,9 @@ public sealed class SagaOrchestrator
     _logger = logger ?? NullLogger<SagaOrchestrator>.Instance;
   }
 
+  internal bool TryResolveMessageType(string typeName, out Type? messageType)
+      => _router.TryResolveMessageType(typeName, out messageType);
+
   public Task HandleEventAsync(
       IIntegrationEvent incomingEvent,
       Guid correlationId,

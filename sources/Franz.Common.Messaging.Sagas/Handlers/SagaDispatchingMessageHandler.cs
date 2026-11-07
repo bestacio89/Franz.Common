@@ -31,8 +31,7 @@ public sealed class SagaDispatchingMessageHandler(
     if (string.IsNullOrWhiteSpace(typeName))
       throw new PermanentMessagingException("Saga message does not declare a message type.");
 
-    var type = ResolveType(typeName);
-    if (type is null)
+    if (!_orchestrator.TryResolveMessageType(typeName, out var type) || type is null)
       throw new PermanentMessagingException(
           $"Saga message type '{typeName}' could not be resolved.");
 
@@ -92,16 +91,5 @@ public sealed class SagaDispatchingMessageHandler(
         message.Id,
         tenantId,
         ct).ConfigureAwait(false);
-  }
-
-  private static Type? ResolveType(string typeName)
-  {
-    var type = Type.GetType(typeName, throwOnError: false);
-    if (type is not null)
-      return type;
-
-    return AppDomain.CurrentDomain.GetAssemblies()
-        .Select(assembly => assembly.GetType(typeName, throwOnError: false))
-        .FirstOrDefault(candidate => candidate is not null);
   }
 }
