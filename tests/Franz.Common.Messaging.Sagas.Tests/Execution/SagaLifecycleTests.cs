@@ -13,6 +13,30 @@ namespace Franz.Common.Messaging.Sagas.Tests.Execution;
 public sealed class SagaLifecycleTests
 {
   [Fact]
+  public async Task HandlerReturningNullTask_FailsWithoutPersistingSaga()
+  {
+    var saga = new NullTaskSaga();
+    var repository = CreateRepository();
+    var orchestrator = CreateOrchestrator(saga, repository);
+
+    var act = () => orchestrator.HandleEventAsync(
+        new StartEvent(),
+        Guid.CreateVersion7(),
+        null);
+
+    await act.Should().ThrowAsync<Exception>()
+        .WithMessage("*returned a null task*");
+
+    var record = await repository.LoadAsync(
+        saga.SagaId,
+        tenantId: null,
+        typeof(TestSagaState),
+        CancellationToken.None);
+
+    record.Should().BeNull();
+  }
+
+  [Fact]
   public async Task CompleteTransition_PersistsTerminalStatusAndTimestamp()
   {
     var saga = new CompletingSaga();
@@ -138,6 +162,15 @@ public sealed class SagaLifecycleTests
         new SagaExecutionPipeline(),
         publisher ?? new TestMessagingPublisher(),
         services);
+  }
+
+  private sealed class NullTaskSaga : SagaBase<TestSagaState>, IStartWith<StartEvent>
+  {
+    public Task<ISagaTransition> HandleAsync(
+        StartEvent message,
+        ISagaContext context,
+        CancellationToken cancellationToken)
+        => null!;
   }
 
   private sealed class CompletingSaga : SagaBase<TestSagaState>, IStartWith<StartEvent>
