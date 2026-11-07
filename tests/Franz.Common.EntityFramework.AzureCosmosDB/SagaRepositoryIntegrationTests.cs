@@ -27,7 +27,17 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<CosmosFixture
   {
     var databaseName = $"SagaTests_{Guid.NewGuid():N}";
     await using (var schemaContext = CreateContext(databaseName))
+    {
       await schemaContext.Database.EnsureCreatedAsync();
+
+      var entityType = schemaContext.Model.FindEntityType(typeof(CosmosSagaStateDocument));
+      entityType.Should().NotBeNull();
+      entityType!.FindPrimaryKey()!.Properties
+          .Select(property => property.Name)
+          .Should()
+          .Contain(nameof(CosmosSagaStateDocument.Id))
+          .And.Contain(nameof(CosmosSagaStateDocument.TenantId));
+    }
 
     var sagaId = Guid.NewGuid();
     var tenantA = CreateRecord(sagaId, "tenant-a", "tenant-a");
