@@ -98,6 +98,7 @@
     <Project Path="tests/Franz.Common.Messaging.Kafka.Tests/Franz.Common.Messaging.Kafka.Tests.csproj" />
     <Project Path="tests/Franz.Common.Messaging.RabbitMQ.Tests/Franz.Common.Messaging.RabbitMQ.Tests.csproj" />
     <Project Path="tests/Franz.Common.Messaging.Tests/Franz.Common.Messaging.Tests.csproj" />
+    <Project Path="tests/Franz.Common.Messaging.Sagas.Tests/Franz.Common.Messaging.Sagas.Tests.csproj" />
     <Project Path="tests/Franz.Common.SSO.Tests/Franz.Common.SSO.Tests.csproj" />
   </Folder>
 </Solution>
