@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Franz.Common.Mediator;
 using Franz.Common.Messaging;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Configuration;
@@ -9,6 +10,7 @@ using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
+using Franz.Common.Messaging.Sagas.Logging;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Execution;
 
