@@ -134,14 +134,14 @@ public sealed class SagaOrchestrator
 
       await CallOnCreatedAsync(saga, context, cancellationToken).ConfigureAwait(false);
 
-      var handlerTimer = Stopwatch.StartNew();
+      var startHandlerTimer = Stopwatch.StartNew();
       var transition = await ExecuteHandlerAsync(
           saga,
           message,
           registration.StartHandlers[messageType],
           context,
           cancellationToken).ConfigureAwait(false);
-      handlerTimer.Stop();
+      startHandlerTimer.Stop();
 
       EnsureSagaIdentityUnchanged(saga, sagaId);
 
@@ -169,7 +169,7 @@ public sealed class SagaOrchestrator
           effectiveCorrelationId,
           causationId,
           tenantId,
-          handlerTimer.Elapsed,
+          startHandlerTimer.Elapsed,
           cancellationToken).ConfigureAwait(false);
 
       return;
