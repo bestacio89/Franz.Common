@@ -18,10 +18,11 @@ public sealed class SagaLifecycleTests
     var saga = new NullTaskSaga();
     var repository = CreateRepository();
     var orchestrator = CreateOrchestrator(saga, repository);
+    var correlationId = Guid.CreateVersion7();
 
     var act = () => orchestrator.HandleEventAsync(
         new StartEvent(),
-        Guid.CreateVersion7(),
+        correlationId,
         null);
 
     await act.Should().ThrowAsync<Exception>()
@@ -42,8 +43,9 @@ public sealed class SagaLifecycleTests
     var saga = new CompletingSaga();
     var repository = CreateRepository();
     var orchestrator = CreateOrchestrator(saga, repository);
+    var correlationId = Guid.CreateVersion7();
 
-    await orchestrator.HandleEventAsync(new StartEvent(), Guid.CreateVersion7(), null);
+    await orchestrator.HandleEventAsync(new StartEvent(), correlationId, null);
 
     var record = await repository.LoadAsync(
         saga.SagaId,
@@ -58,7 +60,7 @@ public sealed class SagaLifecycleTests
 
     var act = () => orchestrator.HandleEventAsync(
         new AfterTerminalEvent(saga.SagaId),
-        Guid.CreateVersion7(),
+        correlationId,
         null);
     var exception = await act.Should().ThrowAsync<SagaLifecycleException>();
     exception.Which.Status.Should().Be(SagaLifecycleStatus.Completed);
@@ -92,7 +94,7 @@ public sealed class SagaLifecycleTests
 
     var followUp = () => orchestrator.HandleEventAsync(
         new AfterTerminalEvent(saga.SagaId),
-        Guid.CreateVersion7(),
+        correlationId,
         null);
     var lifecycleException = await followUp.Should().ThrowAsync<SagaLifecycleException>();
     lifecycleException.Which.Status.Should().Be(SagaLifecycleStatus.Failed);
