@@ -73,12 +73,6 @@
   },
   {
     "rule": "ASSEMBLY_SCAN",
-    "path": "sources/Franz.Common.Messaging.Sagas/Handlers/SagaDispatchingMessageHandler.cs",
-    "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed.",
-    "ruleId": "SRC-004"
-  },
-  {
-    "rule": "ASSEMBLY_SCAN",
     "path": "sources/Franz.Common.Reflection/Extensions/HostBuilderExtensions.cs",
     "reason": "Existing runtime assembly discovery. The owning registration or integration path needs an explicit, compatibility-preserving registration contract before discovery can be removed.",
     "ruleId": "SRC-004"
