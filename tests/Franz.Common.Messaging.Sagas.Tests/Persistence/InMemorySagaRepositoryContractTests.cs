@@ -51,6 +51,26 @@ public sealed class InMemorySagaRepositoryContractTests
   }
 
   [Fact]
+  public async Task SaveAsync_PreservesCreatedAtAcrossUpdates()
+  {
+    var record = CreateRecord();
+    var created = await _repository.SaveAsync(record, expectedVersion: null);
+    var attemptedReplacement = record with
+    {
+      CreatedAt = record.CreatedAt.AddDays(30),
+      State = new ContractSagaState { Value = "updated" }
+    };
+
+    var updated = await _repository.SaveAsync(attemptedReplacement, created.Version);
+    var reloaded = await _repository.LoadAsync(
+        record.SagaId, record.TenantId, typeof(ContractSagaState));
+
+    updated.CreatedAt.Should().Be(record.CreatedAt);
+    reloaded!.CreatedAt.Should().Be(record.CreatedAt);
+    reloaded.UpdatedAt.Should().BeAfter(record.UpdatedAt);
+  }
+
+  [Fact]
   public async Task LoadAsync_IsolatesRecordsByTenant()
   {
     var sagaId = Guid.NewGuid();
