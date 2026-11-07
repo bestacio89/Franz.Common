@@ -126,6 +126,7 @@ public sealed class SagaLifecycleTests
 
     compensating.Should().NotBeNull();
     compensating!.Status.Should().Be(SagaLifecycleStatus.Compensating);
+    compensating.LastError.Should().Be("order failed");
     publisher.Published.Should().ContainSingle().Which.Should().BeOfType<CompensationRequestedEvent>();
 
     var stepAct = () => orchestrator.HandleEventAsync(
@@ -158,6 +159,34 @@ public sealed class SagaLifecycleTests
     completed.Should().NotBeNull();
     completed!.Status.Should().Be(SagaLifecycleStatus.Completed);
     completed.CompletedAt.Should().NotBeNull();
+    completed.LastError.Should().Be("order failed");
+  }
+
+  [Fact]
+  public async Task OutgoingPublishFailure_LeavesCommittedSagaStateAndExposesDualWriteWindow()
+  {
+    var saga = new PublishingSaga();
+    var repository = CreateRepository();
+    var publisher = new FailingMessagingPublisher();
+    var orchestrator = CreateOrchestrator(saga, repository, publisher);
+
+    var act = () => orchestrator.HandleEventAsync(
+        new StartEvent(),
+        Guid.CreateVersion7(),
+        null);
+
+    await act.Should().ThrowAsync<InvalidOperationException>()
+        .WithMessage("broker unavailable");
+
+    var record = await repository.LoadAsync(
+        saga.SagaId,
+        tenantId: null,
+        typeof(TestSagaState),
+        CancellationToken.None);
+
+    record.Should().NotBeNull();
+    record!.Status.Should().Be(SagaLifecycleStatus.Running);
+    record.Version.Should().Be(1);
   }
 
   [Fact]
@@ -208,6 +237,15 @@ public sealed class SagaLifecycleTests
         new SagaExecutionPipeline(),
         publisher ?? new TestMessagingPublisher(),
         services);
+  }
+
+  private sealed class PublishingSaga : SagaBase<TestSagaState>, IStartWith<StartEvent>
+  {
+    public Task<ISagaTransition> HandleAsync(
+        StartEvent message,
+        ISagaContext context,
+        CancellationToken cancellationToken)
+        => Task.FromResult(context.Continue(new FollowUpEvent()));
   }
 
   private sealed class NullTaskSaga : SagaBase<TestSagaState>, IStartWith<StartEvent>
@@ -266,7 +304,9 @@ public sealed class SagaLifecycleTests
         StartEvent message,
         ISagaContext context,
         CancellationToken cancellationToken)
-        => Task.FromResult(context.Compensate(new CompensationRequestedEvent(context.SagaId)));
+        => Task.FromResult(context.Compensate(
+            new CompensationRequestedEvent(context.SagaId),
+            new InvalidOperationException("order failed")));
 
     public Task<ISagaTransition> HandleAsync(
         NormalStepEvent message,
@@ -322,6 +362,7 @@ public sealed class SagaLifecycleTests
   }
 
   private sealed record StartEvent : IIntegrationEvent;
+  private sealed record FollowUpEvent : IIntegrationEvent;
   private sealed record CompensationRequestedEvent(Guid SagaId) : IIntegrationEvent;
   private sealed record InventoryReleasedEvent(Guid SagaId) : IIntegrationEvent;
   private sealed record NormalStepEvent(Guid SagaId) : IIntegrationEvent;
@@ -330,6 +371,15 @@ public sealed class SagaLifecycleTests
   {
     public object? GetService(Type serviceType)
         => serviceType == saga.GetType() ? saga : null;
+  }
+
+  private sealed class FailingMessagingPublisher : IMessagingPublisher
+  {
+    public ValueTask Publish<TIntegrationEvent>(
+        TIntegrationEvent integrationEvent,
+        CancellationToken ct = default)
+        where TIntegrationEvent : IIntegrationEvent
+        => ValueTask.FromException(new InvalidOperationException("broker unavailable"));
   }
 
   private sealed class TestMessagingPublisher : IMessagingPublisher
