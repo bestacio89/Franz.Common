@@ -102,11 +102,11 @@ public sealed class FranzSagaBuilder
 
     foreach (var type in _sagaTypes)
     {
+      var registration = SagaRegistration.FromType(type);
+      SagaTypeValidator.ValidateSagaType(type);
+
       if (validate)
-      {
-        var registration = SagaRegistration.FromType(type);
         SagaMappingValidator.ValidateRegistration(registration);
-      }
 
       router.RegisterSaga(type);
     }
