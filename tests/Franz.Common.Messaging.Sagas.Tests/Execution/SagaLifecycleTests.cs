@@ -225,7 +225,7 @@ public sealed class SagaLifecycleTests
   private static SagaOrchestrator CreateOrchestrator(
       object saga,
       InMemorySagaRepository repository,
-      TestMessagingPublisher? publisher = null)
+      IMessagingPublisher? publisher = null)
   {
     var services = new TestServiceProvider(saga);
     var router = new SagaRouter(services);
