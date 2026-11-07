@@ -62,34 +62,37 @@ public sealed class SagaDispatchingMessageHandler(
           exception);
     }
 
-    var correlationId = message.CorrelationId ?? Guid.Empty;
-    var causationId = message.Headers.TryGetValue(Message.CausationHeader, out var causationValues) &&
-                      causationValues.Length > 0 &&
-                      Guid.TryParse(causationValues[0], out var parsedCausationId)
-        ? parsedCausationId
-        : null;
+    var correlationId = message.CorrelationId.GetValueOrDefault();
+    if (correlationId == Guid.Empty)
+      correlationId = Guid.CreateVersion7();
+
+    Guid? causationId =
+        message.Headers.TryGetValue(Message.CausationHeader, out var causationValues) &&
+        causationValues.Length > 0 &&
+        Guid.TryParse(causationValues[0], out var parsedCausationId)
+            ? parsedCausationId
+            : null;
+
     var tenantId = message.Headers.TryGetValue(HeaderConstants.TenantId, out var tenantValues) &&
                    tenantValues.Length > 0 &&
                    !string.IsNullOrWhiteSpace(tenantValues[0])
         ? tenantValues[0]
         : null;
 
-    MediatorContext.EnsureCorrelationId();
+    var executionContext = MediatorContext.Current
+        .WithCorrelationId(correlationId)
+        .WithCausationId(causationId)
+        .WithTenant(tenantId);
 
-    try
-    {
-      await _orchestrator.HandleEventAsync(
-          integrationEvent,
-          correlationId,
-          causationId,
-          message.Id,
-          tenantId,
-          ct).ConfigureAwait(false);
-    }
-    finally
-    {
-      MediatorContext.Reset();
-    }
+    using var contextScope = MediatorContext.BeginScope(executionContext);
+
+    await _orchestrator.HandleEventAsync(
+        integrationEvent,
+        correlationId,
+        causationId,
+        message.Id,
+        tenantId,
+        ct).ConfigureAwait(false);
   }
 
   private static Type? ResolveType(string typeName)
