@@ -40,9 +40,11 @@ public static class SagaTypeValidator
 
     // SagaId property
     var idProp = sagaType.GetProperty("SagaId");
-    if (idProp == null || idProp.PropertyType != typeof(string))
+    if (idProp is null ||
+        idProp.PropertyType != typeof(Guid) ||
+        idProp.GetMethod is not { IsPublic: true })
       throw new SagaConfigurationError(
-          $"Saga '{sagaType.Name}' must define a readable SagaId string property.");
+          $"Saga '{sagaType.Name}' must expose a readable Guid SagaId property.");
 
     // State property
     var stateProp = sagaType.GetProperty("State");
