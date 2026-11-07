@@ -4,6 +4,7 @@ using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
@@ -27,6 +28,10 @@ public static class SagaMappingValidator
 
     foreach (var comp in reg.CompensationHandlers)
       ValidateHandler(reg, comp.Key, comp.Value);
+
+    ValidateDistinctMessageRoles(reg, reg.StartHandlers, reg.StepHandlers, "start", "step");
+    ValidateDistinctMessageRoles(reg, reg.StartHandlers, reg.CompensationHandlers, "start", "compensation");
+    ValidateDistinctMessageRoles(reg, reg.StepHandlers, reg.CompensationHandlers, "step", "compensation");
 
     ValidateSagaIdentityRules(reg);
   }
@@ -67,6 +72,22 @@ public static class SagaMappingValidator
     throw new SagaConfigurationError(
         HandlerError(reg, handler,
             "must return Task or Task<ISagaTransition>."));
+  }
+
+
+  private static void ValidateDistinctMessageRoles(
+      SagaRegistration registration,
+      IReadOnlyDictionary<Type, MethodInfo> firstHandlers,
+      IReadOnlyDictionary<Type, MethodInfo> secondHandlers,
+      string firstRole,
+      string secondRole)
+  {
+    foreach (var messageType in firstHandlers.Keys.Intersect(secondHandlers.Keys))
+    {
+      throw new SagaConfigurationError(
+          $"Saga '{registration.SagaType.Name}' message '{messageType.Name}' " +
+          $"cannot be mapped as both a {firstRole} and a {secondRole}.");
+    }
   }
 
   private static void ValidateSagaIdentityRules(SagaRegistration reg)
