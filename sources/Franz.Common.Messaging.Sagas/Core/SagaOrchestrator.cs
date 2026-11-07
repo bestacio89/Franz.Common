@@ -6,6 +6,11 @@ using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence;
+using Franz.Common.Messaging.Sagas.Configuration;
+using Franz.Common.Messaging.Sagas.Logging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 
@@ -21,6 +26,9 @@ public sealed class SagaOrchestrator
   private readonly SagaExecutionPipeline _pipeline;
   private readonly IMessagingPublisher _publisher;
   private readonly IServiceProvider _services;
+  private readonly IReadOnlyCollection<ISagaAuditSink> _auditSinks;
+  private readonly FranzSagaOptions _options;
+  private readonly ILogger<SagaOrchestrator> _logger;
 
   public SagaOrchestrator(
       SagaRouter router,
@@ -28,12 +36,29 @@ public sealed class SagaOrchestrator
       SagaExecutionPipeline pipeline,
       IMessagingPublisher publisher,
       IServiceProvider services)
+      : this(router, repository, pipeline, publisher, services,
+          Array.Empty<ISagaAuditSink>(), new FranzSagaOptions(), NullLogger<SagaOrchestrator>.Instance)
+  {
+  }
+
+  public SagaOrchestrator(
+      SagaRouter router,
+      ISagaRepository repository,
+      SagaExecutionPipeline pipeline,
+      IMessagingPublisher publisher,
+      IServiceProvider services,
+      IEnumerable<ISagaAuditSink> auditSinks,
+      FranzSagaOptions options,
+      ILogger<SagaOrchestrator>? logger = null)
   {
     _router = router ?? throw new ArgumentNullException(nameof(router));
     _repository = repository ?? throw new ArgumentNullException(nameof(repository));
     _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
     _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
     _services = services ?? throw new ArgumentNullException(nameof(services));
+    _auditSinks = (auditSinks ?? throw new ArgumentNullException(nameof(auditSinks))).ToArray();
+    _options = options ?? throw new ArgumentNullException(nameof(options));
+    _logger = logger ?? NullLogger<SagaOrchestrator>.Instance;
   }
 
   public Task HandleEventAsync(
@@ -108,12 +133,14 @@ public sealed class SagaOrchestrator
 
       await CallOnCreatedAsync(saga, context, cancellationToken).ConfigureAwait(false);
 
+      var handlerTimer = Stopwatch.StartNew();
       var transition = await ExecuteHandlerAsync(
           saga,
           message,
           registration.StartHandlers[messageType],
           context,
           cancellationToken).ConfigureAwait(false);
+      handlerTimer.Stop();
 
       EnsureSagaIdentityUnchanged(saga, sagaId);
 
@@ -135,6 +162,12 @@ public sealed class SagaOrchestrator
           expectedVersion: null,
           transition,
           messageId,
+          messageType,
+          "Start",
+          correlationId,
+          causationId,
+          tenantId,
+          handlerTimer.Elapsed,
           cancellationToken).ConfigureAwait(false);
 
       return;
@@ -181,12 +214,14 @@ public sealed class SagaOrchestrator
           $"Saga '{registration.SagaType.Name}' was routed message '{messageType.Name}' " +
           "but no step or compensation handler was registered.");
 
+    var handlerTimer = Stopwatch.StartNew();
     var result = await ExecuteHandlerAsync(
         saga,
         message,
         handler,
         executionContext,
         cancellationToken).ConfigureAwait(false);
+    handlerTimer.Stop();
 
     EnsureSagaIdentityUnchanged(saga, sagaIdExisting);
 
@@ -199,6 +234,12 @@ public sealed class SagaOrchestrator
         existingRecord.Version,
         result,
         messageId,
+        messageType,
+        registration.CanCompensate(messageType) ? "Compensate" : "Step",
+        correlationId,
+        causationId,
+        tenantId,
+        handlerTimer.Elapsed,
         cancellationToken).ConfigureAwait(false);
   }
 
@@ -207,6 +248,12 @@ public sealed class SagaOrchestrator
       long? expectedVersion,
       ISagaTransition transition,
       Guid? messageId,
+      Type incomingMessageType,
+      string stepType,
+      Guid correlationId,
+      Guid? causationId,
+      string? tenantId,
+      TimeSpan duration,
       CancellationToken cancellationToken)
   {
     ArgumentNullException.ThrowIfNull(transition);
@@ -257,6 +304,18 @@ public sealed class SagaOrchestrator
 
     await _repository.SaveAsync(updatedRecord, expectedVersion, cancellationToken).ConfigureAwait(false);
 
+    await WriteAuditAsync(
+        updatedRecord,
+        transition,
+        incomingMessageType,
+        stepType,
+        correlationId,
+        causationId,
+        messageId,
+        tenantId,
+        duration,
+        cancellationToken).ConfigureAwait(false);
+
     // This direct publish is at-least-once only. A transactional outbox integration is
     // required before state persistence and outgoing dispatch can be claimed atomic.
     if (transition.OutgoingMessage is IIntegrationEvent outgoingEvent)
@@ -271,6 +330,61 @@ public sealed class SagaOrchestrator
 
     if (transition.Type == SagaTransitionType.Fail)
       throw new SagaFailedException(record.SagaId, transition.Error);
+  }
+
+  private async Task WriteAuditAsync(
+      SagaPersistenceRecord updatedRecord,
+      ISagaTransition transition,
+      Type incomingMessageType,
+      string stepType,
+      Guid correlationId,
+      Guid? causationId,
+      Guid? messageId,
+      string? tenantId,
+      TimeSpan duration,
+      CancellationToken cancellationToken)
+  {
+    if (!_options.EnableAuditing || _auditSinks.Count == 0)
+      return;
+
+    var auditRecord = new SagaAuditRecord
+    {
+      SagaId = updatedRecord.SagaId,
+      SagaType = updatedRecord.SagaType,
+      StateType = updatedRecord.State.GetType().AssemblyQualifiedName ?? updatedRecord.State.GetType().FullName!,
+      StepType = stepType,
+      IncomingMessageType = incomingMessageType.AssemblyQualifiedName ?? incomingMessageType.FullName!,
+      OutgoingMessageType = transition.OutgoingMessage?.GetType().AssemblyQualifiedName,
+      CorrelationId = correlationId,
+      CausationId = causationId,
+      MessageId = messageId,
+      TenantId = tenantId,
+      Status = updatedRecord.Status,
+      Timestamp = updatedRecord.UpdatedAt,
+      Duration = duration,
+      ErrorType = transition.Error?.GetType().FullName
+    };
+
+    foreach (var sink in _auditSinks)
+    {
+      try
+      {
+        await sink.WriteAsync(auditRecord, cancellationToken).ConfigureAwait(false);
+      }
+      catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+      {
+        throw;
+      }
+      catch (Exception exception)
+      {
+        _logger.LogError(
+            exception,
+            "Saga audit sink {AuditSink} failed after saga {SagaId} committed transition {Status}.",
+            sink.GetType().FullName,
+            updatedRecord.SagaId,
+            updatedRecord.Status);
+      }
+    }
   }
 
   private async Task<ISagaTransition> ExecuteHandlerAsync(

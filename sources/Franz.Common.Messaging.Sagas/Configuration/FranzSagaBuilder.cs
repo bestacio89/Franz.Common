@@ -16,6 +16,8 @@ public sealed class FranzSagaBuilder
 {
   private readonly IServiceCollection _services;
   private readonly List<Type> _sagaTypes = new();
+  private readonly List<Func<Func<Task>, Task>> _pipelineMiddlewares = new();
+  private bool _built;
 
   public FranzSagaBuilder(IServiceCollection services)
   {
@@ -26,6 +28,7 @@ public sealed class FranzSagaBuilder
 
   public FranzSagaBuilder AddSaga(Type sagaType)
   {
+    EnsureNotBuilt();
     ArgumentNullException.ThrowIfNull(sagaType);
 
     if (!IsSagaType(sagaType))
@@ -42,6 +45,7 @@ public sealed class FranzSagaBuilder
 
   public FranzSagaBuilder AddSagaAssembly(Assembly assembly)
   {
+    EnsureNotBuilt();
     ArgumentNullException.ThrowIfNull(assembly);
 
     foreach (var saga in assembly.GetTypes().Where(IsSagaType))
@@ -56,12 +60,24 @@ public sealed class FranzSagaBuilder
   public FranzSagaBuilder AddAuditSink<TSink>()
       where TSink : class, ISagaAuditSink
   {
+    EnsureNotBuilt();
     _services.TryAddEnumerable(ServiceDescriptor.Singleton<ISagaAuditSink, TSink>());
+    return this;
+  }
+
+  public FranzSagaBuilder UsePipeline(Func<Func<Task>, Task> middleware)
+  {
+    EnsureNotBuilt();
+    ArgumentNullException.ThrowIfNull(middleware);
+    _pipelineMiddlewares.Add(middleware);
     return this;
   }
 
   internal void Build(IServiceProvider provider, bool validate)
   {
+    if (_built)
+      return;
+
     if (provider.GetService<ISagaRepository>() is null)
       throw new InvalidOperationException(
           "No ISagaRepository is registered. Configure a supported saga persistence adapter.");
@@ -70,8 +86,14 @@ public sealed class FranzSagaBuilder
       throw new InvalidOperationException(
           "No IMessagingPublisher is registered. Saga orchestration requires a messaging publisher.");
 
+    var pipeline = provider.GetRequiredService<SagaExecutionPipeline>();
+    foreach (var middleware in _pipelineMiddlewares)
+      pipeline.Use(middleware);
+    pipeline.Freeze();
+
     var router = provider.GetRequiredService<SagaRouter>();
     RegisterIntoRouter(router, validate);
+    _built = true;
   }
 
   public void RegisterIntoRouter(SagaRouter router, bool validate)
@@ -88,6 +110,12 @@ public sealed class FranzSagaBuilder
 
       router.RegisterSaga(type);
     }
+  }
+
+  private void EnsureNotBuilt()
+  {
+    if (_built)
+      throw new InvalidOperationException("Saga registration cannot be changed after startup finalization.");
   }
 
   private static bool IsSagaType(Type type)

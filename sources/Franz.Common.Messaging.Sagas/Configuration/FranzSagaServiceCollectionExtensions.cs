@@ -30,7 +30,7 @@ public static class FranzSagaServiceCollectionExtensions
     services.AddSingleton(options);
 
     services.TryAddSingleton<SagaRouter>();
-    services.TryAddTransient<SagaExecutionPipeline>();
+    services.TryAddSingleton<SagaExecutionPipeline>();
     services.TryAddTransient<SagaOrchestrator>();
     services.TryAddScoped<ISagaStateSerializer, JsonSagaStateSerializer>();
 
