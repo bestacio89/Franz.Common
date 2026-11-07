@@ -108,17 +108,30 @@ public sealed class SagaOrchestrator
 
     var messageType = incomingEvent.GetType();
 
+    SagaFailedException? failure = null;
     foreach (var registration in _router.ResolveRegistrationsForMessage(messageType))
     {
-      await ExecuteSagaForMessageAsync(
-          incomingEvent,
-          registration,
-          correlationId,
-          causationId,
-          messageId,
-          tenantId,
-          cancellationToken).ConfigureAwait(false);
+      try
+      {
+        await ExecuteSagaForMessageAsync(
+            incomingEvent,
+            registration,
+            correlationId,
+            causationId,
+            messageId,
+            tenantId,
+            cancellationToken).ConfigureAwait(false);
+      }
+      catch (SagaFailedException exception)
+      {
+        // A terminal failure is a persisted lifecycle transition. Continue routing
+        // the same incoming message to every matching saga before the unit commits.
+        failure ??= exception;
+      }
     }
+
+    if (failure is not null)
+      ExceptionDispatchInfo.Capture(failure).Throw();
   }
 
   private async Task ExecuteSagaForMessageAsync(

@@ -116,8 +116,8 @@ public sealed class MongoSagaRepository : ISagaRepository
 
       try
       {
-        if (_unitOfWork?.CurrentSession is { } session)
-          await _collection.InsertOneAsync(session, document, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (_unitOfWork?.CurrentSession is { } insertSession)
+          await _collection.InsertOneAsync(insertSession, document, cancellationToken: cancellationToken).ConfigureAwait(false);
         else
           await _collection.InsertOneAsync(document, cancellationToken: cancellationToken).ConfigureAwait(false);
       }
@@ -155,8 +155,8 @@ public sealed class MongoSagaRepository : ISagaRepository
           .Set(x => x.LastMessageId, record.LastMessageId)
           .Set(x => x.LastError, record.LastError);
 
-      var result = _unitOfWork?.CurrentSession is { } session
-          ? await _collection.UpdateOneAsync(session, filter, update, cancellationToken: cancellationToken).ConfigureAwait(false)
+      var result = _unitOfWork?.CurrentSession is { } updateSession
+          ? await _collection.UpdateOneAsync(updateSession, filter, update, cancellationToken: cancellationToken).ConfigureAwait(false)
           : await _collection.UpdateOneAsync(filter, update, cancellationToken: cancellationToken).ConfigureAwait(false);
 
       if (result.MatchedCount != 1)
