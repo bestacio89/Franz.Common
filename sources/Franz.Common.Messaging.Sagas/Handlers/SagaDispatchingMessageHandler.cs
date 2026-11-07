@@ -8,21 +8,38 @@ using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Core;
+using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Messaging.Storage;
 
 namespace Franz.Common.Messaging.Sagas.Handlers;
 
-public sealed class SagaDispatchingMessageHandler(
-    SagaOrchestrator orchestrator,
-    IMessageSerializer serializer,
-    IInboxStore? inboxStore = null,
-    IUnitOfWork? persistenceUnitOfWork = null) : IMessageHandler
+public sealed class SagaDispatchingMessageHandler : IMessageHandler
 {
-  private readonly SagaOrchestrator _orchestrator = orchestrator;
-  private readonly IMessageSerializer _serializer = serializer;
-  private readonly IInboxStore? _inboxStore = inboxStore;
-  private readonly IUnitOfWork? _persistenceUnitOfWork = persistenceUnitOfWork;
+  private readonly SagaOrchestrator _orchestrator;
+  private readonly IMessageSerializer _serializer;
+  private readonly IInboxStore? _inboxStore;
+  private readonly IUnitOfWork? _persistenceUnitOfWork;
+
+  public SagaDispatchingMessageHandler(
+      SagaOrchestrator orchestrator,
+      IMessageSerializer serializer,
+      IInboxStore? inboxStore = null)
+      : this(orchestrator, serializer, inboxStore, null)
+  {
+  }
+
+  public SagaDispatchingMessageHandler(
+      SagaOrchestrator orchestrator,
+      IMessageSerializer serializer,
+      IInboxStore? inboxStore,
+      IUnitOfWork? persistenceUnitOfWork)
+  {
+    _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
+    _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+    _inboxStore = inboxStore;
+    _persistenceUnitOfWork = persistenceUnitOfWork;
+  }
 
   public async Task ProcessAsync(Message message, CancellationToken ct = default)
   {
@@ -120,6 +137,15 @@ public sealed class SagaDispatchingMessageHandler(
 
       if (_persistenceUnitOfWork is not null)
         await _persistenceUnitOfWork.CommitAsync(ct).ConfigureAwait(false);
+    }
+    catch (SagaFailedException)
+    {
+      // A Fail transition is a successful persistence outcome: commit the terminal
+      // state and inbox receipt before surfacing the failure to the transport.
+      if (_persistenceUnitOfWork is not null)
+        await _persistenceUnitOfWork.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+
+      throw;
     }
     catch (Exception operationException)
     {

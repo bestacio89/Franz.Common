@@ -18,10 +18,15 @@ public sealed class MongoSagaRepository : ISagaRepository
   private readonly ISagaStateSerializer _serializer;
   private readonly MongoSagaUnitOfWork? _unitOfWork;
 
+  public MongoSagaRepository(IMongoDatabase database, ISagaStateSerializer serializer)
+      : this(database, serializer, null)
+  {
+  }
+
   public MongoSagaRepository(
       IMongoDatabase database,
       ISagaStateSerializer serializer,
-      MongoSagaUnitOfWork? unitOfWork = null)
+      MongoSagaUnitOfWork? unitOfWork)
   {
     ArgumentNullException.ThrowIfNull(database);
     _collection = database.GetCollection<SagaStateDocument>("sagaStates");
@@ -127,8 +132,8 @@ public sealed class MongoSagaRepository : ISagaRepository
       var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, CreateDocumentId(tenantId, record.SagaId)) &
                    Builders<SagaStateDocument>.Filter.Eq(x => x.Version, expectedVersion.Value);
 
-      var existing = _unitOfWork?.CurrentSession is { } session
-          ? await _collection.Find(session, filter).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false)
+      var existing = _unitOfWork?.CurrentSession is { } readSession
+          ? await _collection.Find(readSession, filter).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false)
           : await _collection.Find(filter).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
 
       if (existing is null)
@@ -171,8 +176,8 @@ public sealed class MongoSagaRepository : ISagaRepository
     var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, CreateDocumentId(tenantId, sagaId)) &
                  Builders<SagaStateDocument>.Filter.Eq(x => x.Version, expectedVersion);
 
-    var result = _unitOfWork?.CurrentSession is { } session
-        ? await _collection.DeleteOneAsync(session, filter, cancellationToken: cancellationToken).ConfigureAwait(false)
+    var result = _unitOfWork?.CurrentSession is { } deleteSession
+        ? await _collection.DeleteOneAsync(deleteSession, filter, cancellationToken: cancellationToken).ConfigureAwait(false)
         : await _collection.DeleteOneAsync(filter, cancellationToken).ConfigureAwait(false);
     if (result.DeletedCount != 1)
       throw new SagaConcurrencyException(sagaId, expectedVersion);

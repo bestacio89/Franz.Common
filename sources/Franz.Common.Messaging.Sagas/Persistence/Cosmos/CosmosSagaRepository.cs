@@ -16,10 +16,15 @@ public sealed class CosmosSagaRepository : ISagaRepository
   private readonly ISagaStateSerializer _serializer;
   private readonly CosmosSagaUnitOfWork? _unitOfWork;
 
+  public CosmosSagaRepository(CosmosSagaDbContext db, ISagaStateSerializer serializer)
+      : this(db, serializer, null)
+  {
+  }
+
   public CosmosSagaRepository(
       CosmosSagaDbContext db,
       ISagaStateSerializer serializer,
-      CosmosSagaUnitOfWork? unitOfWork = null)
+      CosmosSagaUnitOfWork? unitOfWork)
   {
     _db = db ?? throw new ArgumentNullException(nameof(db));
     _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));

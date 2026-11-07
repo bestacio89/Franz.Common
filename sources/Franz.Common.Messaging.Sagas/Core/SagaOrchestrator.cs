@@ -52,8 +52,21 @@ public sealed class SagaOrchestrator
       IServiceProvider services,
       IEnumerable<ISagaAuditSink> auditSinks,
       FranzSagaOptions options,
-      ILogger<SagaOrchestrator>? logger = null,
-      IMessageStore? messageStore = null)
+      ILogger<SagaOrchestrator>? logger = null)
+      : this(router, repository, pipeline, publisher, services, auditSinks, options, logger, null)
+  {
+  }
+
+  public SagaOrchestrator(
+      SagaRouter router,
+      ISagaRepository repository,
+      SagaExecutionPipeline pipeline,
+      IMessagingPublisher publisher,
+      IServiceProvider services,
+      IEnumerable<ISagaAuditSink> auditSinks,
+      FranzSagaOptions options,
+      ILogger<SagaOrchestrator>? logger,
+      IMessageStore? messageStore)
   {
     _router = router ?? throw new ArgumentNullException(nameof(router));
     _repository = repository ?? throw new ArgumentNullException(nameof(repository));
