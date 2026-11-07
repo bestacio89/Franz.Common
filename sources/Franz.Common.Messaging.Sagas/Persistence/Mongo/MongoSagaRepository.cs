@@ -30,6 +30,7 @@ public sealed class MongoSagaRepository : ISagaRepository
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(stateType);
+    tenantId = SagaTenantId.Normalize(tenantId);
     var document = await _collection.Find(
         x => x.SagaId == sagaId && x.TenantId == tenantId)
         .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
@@ -66,6 +67,7 @@ public sealed class MongoSagaRepository : ISagaRepository
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(record);
+    var tenantId = SagaTenantId.Normalize(record.TenantId);
     if (record.SagaId == Guid.Empty)
       throw new ArgumentException("SagaId cannot be empty.", nameof(record));
     if (record.State is not ISagaState)
@@ -80,10 +82,10 @@ public sealed class MongoSagaRepository : ISagaRepository
     {
       var document = new SagaStateDocument
       {
-        Id = CreateDocumentId(record.TenantId, record.SagaId),
+        Id = CreateDocumentId(tenantId, record.SagaId),
         SagaId = record.SagaId,
         CorrelationId = record.CorrelationId,
-        TenantId = record.TenantId,
+        TenantId = tenantId,
         SagaType = record.SagaType,
         StateType = stateType,
         Payload = payload,
@@ -110,7 +112,7 @@ public sealed class MongoSagaRepository : ISagaRepository
     }
     else
     {
-      var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, CreateDocumentId(record.TenantId, record.SagaId)) &
+      var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, CreateDocumentId(tenantId, record.SagaId)) &
                    Builders<SagaStateDocument>.Filter.Eq(x => x.Version, expectedVersion.Value);
 
       var update = Builders<SagaStateDocument>.Update
@@ -145,6 +147,7 @@ public sealed class MongoSagaRepository : ISagaRepository
       long expectedVersion,
       CancellationToken cancellationToken = default)
   {
+    tenantId = SagaTenantId.Normalize(tenantId);
     var filter = Builders<SagaStateDocument>.Filter.Eq(x => x.Id, CreateDocumentId(tenantId, sagaId)) &
                  Builders<SagaStateDocument>.Filter.Eq(x => x.Version, expectedVersion);
 

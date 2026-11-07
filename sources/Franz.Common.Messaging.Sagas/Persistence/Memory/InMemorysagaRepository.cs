@@ -68,6 +68,7 @@ public sealed class InMemorySagaRepository : ISagaRepository
   {
     ArgumentNullException.ThrowIfNull(stateType);
     cancellationToken.ThrowIfCancellationRequested();
+    tenantId = SagaTenantId.Normalize(tenantId);
 
     if (!_store.Store.TryGetValue((tenantId, sagaId), out var record))
       return Task.FromResult<SagaPersistenceRecord?>(null);
@@ -86,6 +87,7 @@ public sealed class InMemorySagaRepository : ISagaRepository
   {
     ArgumentNullException.ThrowIfNull(record);
     cancellationToken.ThrowIfCancellationRequested();
+    var tenantId = SagaTenantId.Normalize(record.TenantId);
 
     if (record.SagaId == Guid.Empty)
       throw new ArgumentException("SagaId cannot be empty.", nameof(record));
@@ -93,7 +95,7 @@ public sealed class InMemorySagaRepository : ISagaRepository
     if (record.State is not ISagaState)
       throw new ArgumentException("Saga state must implement ISagaState.", nameof(record));
 
-    var key = (record.TenantId, record.SagaId);
+    var key = (tenantId, record.SagaId);
     var persistedState = CloneState(record.State);
 
     if (expectedVersion is null)
@@ -139,6 +141,7 @@ public sealed class InMemorySagaRepository : ISagaRepository
       CancellationToken cancellationToken = default)
   {
     cancellationToken.ThrowIfCancellationRequested();
+    tenantId = SagaTenantId.Normalize(tenantId);
     var key = (tenantId, sagaId);
 
     if (!_store.Store.TryGetValue(key, out var current) ||

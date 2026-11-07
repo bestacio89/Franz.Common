@@ -28,6 +28,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(stateType);
+    tenantId = SagaTenantId.Normalize(tenantId);
     var partitionKey = tenantId ?? string.Empty;
 
     var document = await _db.SagaStates.SingleOrDefaultAsync(
@@ -66,12 +67,13 @@ public sealed class CosmosSagaRepository : ISagaRepository
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(record);
+    var normalizedTenantId = SagaTenantId.Normalize(record.TenantId);
     if (record.SagaId == Guid.Empty)
       throw new ArgumentException("SagaId cannot be empty.", nameof(record));
     if (record.State is not ISagaState)
       throw new ArgumentException("Saga state must implement ISagaState.", nameof(record));
 
-    var tenantId = record.TenantId ?? string.Empty;
+    var tenantId = normalizedTenantId ?? string.Empty;
     var now = DateTimeOffset.UtcNow;
     CosmosSagaStateDocument document;
 
@@ -157,6 +159,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
       long expectedVersion,
       CancellationToken cancellationToken = default)
   {
+    tenantId = SagaTenantId.Normalize(tenantId);
     var document = await _db.SagaStates.SingleOrDefaultAsync(
         x => x.Id == sagaId && x.TenantId == (tenantId ?? string.Empty),
         cancellationToken).ConfigureAwait(false)

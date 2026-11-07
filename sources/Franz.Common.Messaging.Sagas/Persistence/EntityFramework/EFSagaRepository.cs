@@ -28,6 +28,7 @@ public sealed class EFSagaRepository : ISagaRepository
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(stateType);
+    tenantId = SagaTenantId.Normalize(tenantId);
     var scopedTenantId = tenantId ?? string.Empty;
 
     var entity = await _db.SagaStates
@@ -69,13 +70,14 @@ public sealed class EFSagaRepository : ISagaRepository
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(record);
+    var tenantId = SagaTenantId.Normalize(record.TenantId);
     if (record.SagaId == Guid.Empty)
       throw new ArgumentException("SagaId cannot be empty.", nameof(record));
     if (record.State is not ISagaState)
       throw new ArgumentException("Saga state must implement ISagaState.", nameof(record));
 
     var now = DateTimeOffset.UtcNow;
-    var scopedTenantId = record.TenantId ?? string.Empty;
+    var scopedTenantId = tenantId ?? string.Empty;
     SagaStateEntity entity;
 
     if (expectedVersion is null)
@@ -147,7 +149,7 @@ public sealed class EFSagaRepository : ISagaRepository
 
     return record with
     {
-      TenantId = scopedTenantId.Length == 0 ? null : scopedTenantId,
+      TenantId = tenantId,
       Version = entity.Version,
       UpdatedAt = entity.UpdatedAt
     };
@@ -159,6 +161,7 @@ public sealed class EFSagaRepository : ISagaRepository
       long expectedVersion,
       CancellationToken cancellationToken = default)
   {
+    tenantId = SagaTenantId.Normalize(tenantId);
     var entity = await _db.SagaStates.SingleOrDefaultAsync(
         x => x.SagaId == sagaId && x.TenantId == (tenantId ?? string.Empty),
         cancellationToken).ConfigureAwait(false)
