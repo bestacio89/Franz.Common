@@ -91,7 +91,8 @@ public sealed class SagaLifecycleTests
     var publisher = new TestMessagingPublisher();
     var orchestrator = CreateOrchestrator(saga, repository, publisher);
 
-    await orchestrator.HandleEventAsync(new StartEvent(), Guid.CreateVersion7(), null);
+    var correlationId = Guid.CreateVersion7();
+    await orchestrator.HandleEventAsync(new StartEvent(), correlationId, null);
 
     var compensating = await repository.LoadAsync(
         saga.SagaId,
@@ -105,7 +106,7 @@ public sealed class SagaLifecycleTests
 
     await orchestrator.HandleEventAsync(
         new CompensationRequestedEvent(saga.SagaId),
-        Guid.CreateVersion7(),
+        correlationId,
         null);
 
     var completed = await repository.LoadAsync(

@@ -47,6 +47,7 @@ public sealed class EFSagaRepository : ISagaRepository
     return new SagaPersistenceRecord
     {
       SagaId = entity.SagaId,
+      CorrelationId = entity.CorrelationId,
       TenantId = entity.TenantId.Length == 0 ? null : entity.TenantId,
       SagaType = entity.SagaType,
       State = _serializer.Deserialize(entity.SerializedState, targetType),
@@ -82,6 +83,7 @@ public sealed class EFSagaRepository : ISagaRepository
       entity = new SagaStateEntity
       {
         SagaId = record.SagaId,
+        CorrelationId = record.CorrelationId,
         TenantId = scopedTenantId,
         SagaType = record.SagaType,
         StateType = record.State.GetType().AssemblyQualifiedName!,
@@ -109,6 +111,7 @@ public sealed class EFSagaRepository : ISagaRepository
       if (entity.Version != expectedVersion.Value)
         throw new SagaConcurrencyException(record.SagaId, expectedVersion);
 
+      entity.CorrelationId = record.CorrelationId;
       entity.SagaType = record.SagaType;
       entity.StateType = record.State.GetType().AssemblyQualifiedName!;
       entity.SerializedState = _serializer.Serialize(record.State);
@@ -129,6 +132,17 @@ public sealed class EFSagaRepository : ISagaRepository
     catch (DbUpdateConcurrencyException)
     {
       throw new SagaConcurrencyException(record.SagaId, expectedVersion);
+    }
+    catch (DbUpdateException) when (expectedVersion is null)
+    {
+      var exists = await _db.SagaStates.AsNoTracking().AnyAsync(
+          x => x.SagaId == record.SagaId && x.TenantId == scopedTenantId,
+          cancellationToken).ConfigureAwait(false);
+
+      if (exists)
+        throw new SagaConcurrencyException(record.SagaId, expectedVersion);
+
+      throw;
     }
 
     return record with

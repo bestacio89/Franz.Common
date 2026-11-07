@@ -44,6 +44,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
     return new SagaPersistenceRecord
     {
       SagaId = document.Id,
+      CorrelationId = document.CorrelationId,
       TenantId = document.TenantId,
       SagaType = document.SagaType,
       State = _serializer.Deserialize(document.Payload, targetType),
@@ -79,6 +80,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
       document = new CosmosSagaStateDocument(record.SagaId)
       {
         TenantId = tenantId,
+        CorrelationId = record.CorrelationId,
         SagaType = record.SagaType,
         StateType = record.State.GetType().AssemblyQualifiedName!,
         Payload = _serializer.Serialize(record.State),
@@ -106,6 +108,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
       if (document.Version != expectedVersion.Value)
         throw new SagaConcurrencyException(record.SagaId, expectedVersion);
 
+      document.CorrelationId = record.CorrelationId;
       document.SagaType = record.SagaType;
       document.StateType = record.State.GetType().AssemblyQualifiedName!;
       document.Payload = _serializer.Serialize(record.State);
@@ -127,6 +130,17 @@ public sealed class CosmosSagaRepository : ISagaRepository
     catch (DbUpdateConcurrencyException)
     {
       throw new SagaConcurrencyException(record.SagaId, expectedVersion);
+    }
+    catch (DbUpdateException) when (expectedVersion is null)
+    {
+      var exists = await _db.SagaStates.AsNoTracking().AnyAsync(
+          x => x.Id == record.SagaId && x.TenantId == tenantId,
+          cancellationToken).ConfigureAwait(false);
+
+      if (exists)
+        throw new SagaConcurrencyException(record.SagaId, expectedVersion);
+
+      throw;
     }
 
     return record with

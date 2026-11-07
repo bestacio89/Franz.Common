@@ -3,6 +3,7 @@ using Franz.Common.Mediator;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
+using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
@@ -64,7 +65,50 @@ public sealed class SagaCorrelationTests
     saga.ObservedCorrelationId.Should().Be(correlationId);
     persisted.Should().NotBeNull();
     persisted!.Version.Should().Be(2);
+    persisted.CorrelationId.Should().Be(correlationId);
     persisted.Status.Should().Be(SagaLifecycleStatus.Running);
+  }
+
+  [Fact]
+  public async Task HandleEventAsync_RejectsCorrelationMismatchBeforeExecutingHandler()
+  {
+    var expectedSagaId = Guid.CreateVersion7();
+    var expectedCorrelationId = Guid.CreateVersion7();
+    var actualCorrelationId = Guid.CreateVersion7();
+    var now = DateTimeOffset.UtcNow;
+    var saga = new CorrelatedSaga(expectedSagaId);
+    var repository = new InMemorySagaRepository(new InMemorySagaStateStore(), new JsonSagaStateSerializer());
+
+    await repository.SaveAsync(
+        new SagaPersistenceRecord
+        {
+          SagaId = expectedSagaId,
+          CorrelationId = expectedCorrelationId,
+          SagaType = typeof(CorrelatedSaga).AssemblyQualifiedName!,
+          State = new CorrelatedSagaState(),
+          Status = SagaLifecycleStatus.Running,
+          CreatedAt = now,
+          UpdatedAt = now
+        },
+        expectedVersion: null,
+        CancellationToken.None);
+
+    var services = new TestServiceProvider(saga);
+    var router = new SagaRouter(services);
+    router.RegisterSaga<CorrelatedSaga>();
+    var orchestrator = new SagaOrchestrator(
+        router, repository, new SagaExecutionPipeline(), new TestMessagingPublisher(), services);
+
+    var act = () => orchestrator.HandleEventAsync(
+        new StepEvent(), actualCorrelationId, Guid.CreateVersion7());
+
+    await act.Should().ThrowAsync<SagaCorrelationException>();
+
+    saga.HandlerCalled.Should().BeFalse();
+    var persisted = await repository.LoadAsync(
+        expectedSagaId, null, typeof(CorrelatedSagaState), CancellationToken.None);
+    persisted!.Version.Should().Be(1);
+    persisted.CorrelationId.Should().Be(expectedCorrelationId);
   }
 
   private sealed class CorrelatedSaga(Guid expectedSagaId) :

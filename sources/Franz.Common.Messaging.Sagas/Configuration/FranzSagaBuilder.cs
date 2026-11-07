@@ -78,11 +78,11 @@ public sealed class FranzSagaBuilder
     if (_built)
       return;
 
-    if (provider.GetService<ISagaRepository>() is null)
+    if (!_services.Any(descriptor => descriptor.ServiceType == typeof(ISagaRepository)))
       throw new InvalidOperationException(
           "No ISagaRepository is registered. Configure a supported saga persistence adapter.");
 
-    if (provider.GetService<IMessagingPublisher>() is null)
+    if (!_services.Any(descriptor => descriptor.ServiceType == typeof(IMessagingPublisher)))
       throw new InvalidOperationException(
           "No IMessagingPublisher is registered. Saga orchestration requires a messaging publisher.");
 

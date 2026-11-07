@@ -10,6 +10,7 @@ namespace Franz.Common.Messaging.Sagas.Persistence;
 public sealed record SagaPersistenceRecord
 {
   public required Guid SagaId { get; init; }
+  public Guid CorrelationId { get; init; }
   public required string SagaType { get; init; }
   public required object State { get; init; }
   public SagaLifecycleStatus Status { get; init; } = SagaLifecycleStatus.Running;

@@ -44,6 +44,7 @@ public sealed class MongoSagaRepository : ISagaRepository
     return new SagaPersistenceRecord
     {
       SagaId = document.SagaId,
+      CorrelationId = document.CorrelationId,
       TenantId = document.TenantId,
       SagaType = document.SagaType,
       State = _serializer.Deserialize(document.Payload, targetType),
@@ -81,6 +82,7 @@ public sealed class MongoSagaRepository : ISagaRepository
       {
         Id = CreateDocumentId(record.TenantId, record.SagaId),
         SagaId = record.SagaId,
+        CorrelationId = record.CorrelationId,
         TenantId = record.TenantId,
         SagaType = record.SagaType,
         StateType = stateType,
@@ -112,6 +114,7 @@ public sealed class MongoSagaRepository : ISagaRepository
                    Builders<SagaStateDocument>.Filter.Eq(x => x.Version, expectedVersion.Value);
 
       var update = Builders<SagaStateDocument>.Update
+          .Set(x => x.CorrelationId, record.CorrelationId)
           .Set(x => x.SagaType, record.SagaType)
           .Set(x => x.StateType, stateType)
           .Set(x => x.Payload, payload)
@@ -158,6 +161,7 @@ public sealed class MongoSagaRepository : ISagaRepository
     [BsonId]
     public string Id { get; set; } = default!;
     public Guid SagaId { get; set; }
+    public Guid CorrelationId { get; set; }
     public string? TenantId { get; set; }
     public string SagaType { get; set; } = default!;
     public string StateType { get; set; } = default!;

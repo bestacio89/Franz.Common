@@ -8,6 +8,7 @@ namespace Franz.Common.Messaging.Sagas.Persistence.EntityFramework;
 public sealed class SagaStateEntity
 {
   public required Guid SagaId { get; set; }
+  public Guid CorrelationId { get; set; }
   public string TenantId { get; set; } = string.Empty;
   public required string SagaType { get; set; }
   public required string StateType { get; set; }

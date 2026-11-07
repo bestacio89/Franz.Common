@@ -14,6 +14,7 @@ public sealed class CosmosSagaStateDocument : Entity<Guid>
   public CosmosSagaStateDocument(Guid sagaId) : base(sagaId) { }
 
   public string TenantId { get; set; } = string.Empty;
+  public Guid CorrelationId { get; set; }
   public string SagaType { get; set; } = default!;
   public string StateType { get; set; } = default!;
   public string Payload { get; set; } = default!;

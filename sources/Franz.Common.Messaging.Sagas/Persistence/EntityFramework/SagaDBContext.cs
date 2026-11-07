@@ -30,6 +30,7 @@ public sealed class SagaDbContext : DbContextBase
     {
       entity.HasKey(x => new { x.TenantId, x.SagaId });
       entity.Property(x => x.SagaId).IsRequired();
+      entity.Property(x => x.CorrelationId).IsRequired();
       entity.Property(x => x.TenantId).IsRequired().HasMaxLength(128);
       entity.Property(x => x.SagaType).IsRequired().HasMaxLength(500);
       entity.Property(x => x.StateType).IsRequired().HasMaxLength(1000);

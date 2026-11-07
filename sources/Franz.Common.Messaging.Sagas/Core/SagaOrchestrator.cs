@@ -116,6 +116,7 @@ public sealed class SagaOrchestrator
 
     if (registration.CanStartWith(messageType))
     {
+      var effectiveCorrelationId = correlationId == Guid.Empty ? Guid.CreateVersion7() : correlationId;
       var state = Activator.CreateInstance(registration.StateType) as ISagaState
           ?? throw new SagaConfigurationError(
               $"Could not create saga state '{registration.StateType.FullName}'.");
@@ -127,7 +128,7 @@ public sealed class SagaOrchestrator
           registration.SagaType,
           state,
           message,
-          correlationId,
+          effectiveCorrelationId,
           causationId,
           cancellationToken);
 
@@ -148,6 +149,7 @@ public sealed class SagaOrchestrator
       var record = new SagaPersistenceRecord
       {
         SagaId = sagaId,
+        CorrelationId = effectiveCorrelationId,
         TenantId = tenantId,
         SagaType = registration.SagaType.AssemblyQualifiedName ?? registration.SagaType.FullName!,
         State = GetSagaState(saga, registration),
@@ -164,7 +166,7 @@ public sealed class SagaOrchestrator
           messageId,
           messageType,
           "Start",
-          correlationId,
+          effectiveCorrelationId,
           causationId,
           tenantId,
           handlerTimer.Elapsed,
@@ -184,6 +186,13 @@ public sealed class SagaOrchestrator
         ?? throw new SagaNotFoundException(
             $"Saga '{registration.SagaType.Name}' with ID '{sagaIdExisting}' was not found.");
 
+    var expectedSagaType = registration.SagaType.AssemblyQualifiedName ?? registration.SagaType.FullName!;
+    if (!string.Equals(existingRecord.SagaType, expectedSagaType, StringComparison.Ordinal))
+      throw new SagaConfigurationError(
+          $"Saga ID '{sagaIdExisting}' is persisted for '{existingRecord.SagaType}', not '{expectedSagaType}'.");
+
+    var effectiveExistingCorrelationId = ResolveCorrelationId(existingRecord, correlationId);
+
     if (existingRecord.Status is SagaLifecycleStatus.Completed or SagaLifecycleStatus.Failed)
       throw new SagaLifecycleException(sagaIdExisting, existingRecord.Status);
 
@@ -201,7 +210,7 @@ public sealed class SagaOrchestrator
         registration.SagaType,
         (ISagaState)existingRecord.State,
         message,
-        correlationId,
+        effectiveExistingCorrelationId,
         causationId,
         cancellationToken);
 
@@ -228,6 +237,7 @@ public sealed class SagaOrchestrator
     await PersistTransitionAsync(
         existingRecord with
         {
+          CorrelationId = effectiveExistingCorrelationId,
           State = GetSagaState(saga, registration),
           LastMessageId = messageId
         },
@@ -236,7 +246,7 @@ public sealed class SagaOrchestrator
         messageId,
         messageType,
         registration.CanCompensate(messageType) ? "Compensate" : "Step",
-        correlationId,
+        effectiveExistingCorrelationId,
         causationId,
         tenantId,
         handlerTimer.Elapsed,
@@ -320,7 +330,9 @@ public sealed class SagaOrchestrator
     // required before state persistence and outgoing dispatch can be claimed atomic.
     if (transition.OutgoingMessage is IIntegrationEvent outgoingEvent)
     {
-      var outgoingContext = MediatorContext.Current;
+      var outgoingContext = MediatorContext.Current
+          .WithCorrelationId(correlationId)
+          .WithTenant(tenantId);
       if (messageId.HasValue)
         outgoingContext = outgoingContext.WithCausationId(messageId);
 
@@ -443,6 +455,24 @@ public sealed class SagaOrchestrator
           $"Saga '{saga.GetType().Name}' OnCreatedAsync must return Task.");
 
     await task.ConfigureAwait(false);
+  }
+
+  private static Guid ResolveCorrelationId(SagaPersistenceRecord record, Guid incomingCorrelationId)
+  {
+    if (record.CorrelationId != Guid.Empty &&
+        incomingCorrelationId != Guid.Empty &&
+        record.CorrelationId != incomingCorrelationId)
+      throw new SagaCorrelationException(
+          record.SagaId,
+          record.CorrelationId,
+          incomingCorrelationId);
+
+    if (record.CorrelationId != Guid.Empty)
+      return record.CorrelationId;
+
+    return incomingCorrelationId == Guid.Empty
+        ? Guid.CreateVersion7()
+        : incomingCorrelationId;
   }
 
   private static Guid GetSagaId(object saga)
