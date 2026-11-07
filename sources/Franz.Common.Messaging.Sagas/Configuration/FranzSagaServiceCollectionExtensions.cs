@@ -81,8 +81,8 @@ public static class FranzSagaServiceCollectionExtensions
       case "ENTITYFRAMEWORK":
         RegisterRepository<EFSagaRepository>(services);
         services.AddUnitOfWork<SagaDbContext>();
-        services.TryAddScoped<IInboxStore, EfSagaInboxStore>();
-        services.TryAddScoped<IMessageStore, EfSagaMessageStore>();
+        services.AddScoped<IInboxStore, EfSagaInboxStore>();
+        services.AddScoped<IMessageStore, EfSagaMessageStore>();
         break;
 
       case "MONGO":

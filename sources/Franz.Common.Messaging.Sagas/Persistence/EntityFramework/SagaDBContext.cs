@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Franz.Common.Messaging.Sagas.Persistence.EntityFramework;
 
 /// <summary>
-/// EF DbContext for saga persistence, auditing and provider-enforced optimistic concurrency.
+/// EF DbContext for saga state and the inbox/outbox records that must commit with it.
 /// </summary>
 public sealed class SagaDbContext : DbContextBase
 {
@@ -39,6 +39,26 @@ public sealed class SagaDbContext : DbContextBase
       entity.Property(x => x.Status).IsRequired();
       entity.Property(x => x.CreatedAt).IsRequired();
       entity.Property(x => x.UpdatedAt).IsRequired();
+    });
+
+    modelBuilder.Entity<SagaInboxRecord>(entity =>
+    {
+      entity.ToTable("SagaInbox");
+      entity.HasKey(x => x.MessageId);
+      entity.Property(x => x.MessageId).ValueGeneratedNever();
+      entity.Property(x => x.ProcessedOn).IsRequired();
+    });
+
+    modelBuilder.Entity<SagaOutboxRecord>(entity =>
+    {
+      entity.ToTable("SagaOutbox");
+      entity.HasKey(x => x.Id);
+      entity.Property(x => x.Id).ValueGeneratedNever();
+      entity.Property(x => x.Body).IsRequired();
+      entity.Property(x => x.HeadersJson).IsRequired();
+      entity.Property(x => x.PropertiesJson).IsRequired();
+      entity.Property(x => x.CreatedOn).IsRequired();
+      entity.HasIndex(x => new { x.SentOn, x.IsDeadLetter, x.NextAttemptAt, x.Id });
     });
   }
 }
