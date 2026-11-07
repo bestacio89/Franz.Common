@@ -15,8 +15,11 @@ public sealed class MongoSagaUnitOfWork : IUnitOfWork, IAsyncDisposable
   private IClientSessionHandle? _session;
   private bool _disposed;
 
-  public MongoSagaUnitOfWork(IMongoClient client)
-      => _client = client ?? throw new ArgumentNullException(nameof(client));
+  public MongoSagaUnitOfWork(IMongoDatabase database)
+  {
+    ArgumentNullException.ThrowIfNull(database);
+    _client = database.Client;
+  }
 
   internal IClientSessionHandle? CurrentSession => _session;
 

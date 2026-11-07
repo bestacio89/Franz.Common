@@ -1,12 +1,15 @@
 using FluentAssertions;
 using Franz.Common.Headers;
 using Franz.Common.Mediator;
+using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Handlers;
+using Franz.Common.Messaging.Sagas.Exceptions;
+using Franz.Common.Messaging.Storage;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Franz.Common.Messaging.Serialization;
@@ -61,6 +64,29 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
   }
 
   [Fact]
+  public async Task ProcessAsync_CommitsFailedLifecycleStateBeforeSurfacingFailure()
+  {
+    var fixture = new Fixture();
+    fixture.Saga.FailOnStart = true;
+    var operations = new List<string>();
+    var handler = new SagaDispatchingMessageHandler(
+        fixture.Orchestrator,
+        new JsonMessageSerializer(),
+        new RecordingInboxStore(operations),
+        new RecordingUnitOfWork(operations));
+
+    var act = () => handler.ProcessAsync(fixture.CreateMessage());
+
+    await act.Should().ThrowAsync<SagaFailedException>();
+    operations.Should().Equal("begin", "inbox", "commit");
+
+    var persisted = await fixture.Repository.LoadAsync(
+        fixture.Saga.SagaId, null, typeof(TestSagaState));
+    persisted.Should().NotBeNull();
+    persisted!.Status.ToString().Should().Be("Failed");
+  }
+
+  [Fact]
   public async Task ProcessAsync_UsesDefaultScopeOnlyWhenTenantHeaderIsAbsent()
   {
     var fixture = new Fixture();
@@ -76,6 +102,7 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
     public TestSaga Saga { get; } = new();
     public InMemorySagaRepository Repository { get; }
     public SagaDispatchingMessageHandler Handler { get; }
+    public SagaOrchestrator Orchestrator { get; }
 
     public Fixture()
     {
@@ -87,14 +114,14 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
       var router = new SagaRouter(services);
       router.RegisterSaga(typeof(TestSaga));
 
-      var orchestrator = new SagaOrchestrator(
+      Orchestrator = new SagaOrchestrator(
           router,
           Repository,
           new SagaExecutionPipeline(),
           new TestMessagingPublisher(),
           services);
 
-      Handler = new SagaDispatchingMessageHandler(orchestrator, new JsonMessageSerializer());
+      Handler = new SagaDispatchingMessageHandler(Orchestrator, new JsonMessageSerializer());
     }
 
     public Message CreateMessage()
@@ -106,11 +133,51 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
 
   private sealed class TestSaga : SagaBase<TestSagaState>, IStartWith<StartEvent>
   {
+    public bool FailOnStart { get; set; }
+
     public Task<ISagaTransition> HandleAsync(
         StartEvent message,
         ISagaContext context,
         CancellationToken cancellationToken)
-        => Task.FromResult(context.Continue());
+        => Task.FromResult(FailOnStart
+            ? context.Fail(new InvalidOperationException("Expected saga failure."))
+            : context.Continue());
+  }
+
+  private sealed class RecordingInboxStore(List<string> operations) : IInboxStore
+  {
+    public Task<bool> HasProcessedAsync(Guid messageId, CancellationToken ct = default)
+        => Task.FromResult(false);
+
+    public Task<bool> TryRegisterAsync(Guid messageId, CancellationToken ct = default)
+    {
+      operations.Add("inbox");
+      return Task.FromResult(true);
+    }
+
+    public Task MarkProcessedAsync(Guid messageId, CancellationToken ct = default)
+        => Task.CompletedTask;
+  }
+
+  private sealed class RecordingUnitOfWork(List<string> operations) : IUnitOfWork
+  {
+    public Task BeginAsync(CancellationToken cancellationToken = default)
+    {
+      operations.Add("begin");
+      return Task.CompletedTask;
+    }
+
+    public Task CommitAsync(CancellationToken cancellationToken = default)
+    {
+      operations.Add("commit");
+      return Task.CompletedTask;
+    }
+
+    public Task RollbackAsync(CancellationToken cancellationToken = default)
+    {
+      operations.Add("rollback");
+      return Task.CompletedTask;
+    }
   }
 
   private sealed class TestSagaState : ISagaState

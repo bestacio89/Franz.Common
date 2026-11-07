@@ -1,10 +1,14 @@
 using FluentAssertions;
+using Franz.Common.EntityFramework;
 using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.EntityFramework;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
+using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.Storage;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 
@@ -97,6 +101,75 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<PostgresFixtu
       await repository.DeleteAsync(sagaId, "tenant-a", expectedVersion: 2);
       (await repository.LoadAsync(sagaId, "tenant-a", typeof(PostgresSagaState))).Should().BeNull();
       (await repository.LoadAsync(sagaId, "tenant-b", typeof(PostgresSagaState))).Should().NotBeNull();
+    }
+  }
+
+  [Fact]
+  public async Task InboxSagaStateAndOutbox_CommitAndRollbackAsOneUnit()
+  {
+    await using (var schemaContext = CreateContext())
+      await schemaContext.Database.EnsureCreatedAsync();
+
+    var rollbackMessageId = Guid.CreateVersion7();
+    var rollbackSaga = CreateRecord();
+    await using (var rollbackContext = CreateContext())
+    {
+      IUnitOfWork unitOfWork = new EfUnitOfWork<SagaDbContext>(rollbackContext);
+      var inbox = new EfSagaInboxStore(rollbackContext);
+      var outbox = new EfSagaMessageStore(rollbackContext);
+      var repository = CreateRepository(rollbackContext);
+
+      await unitOfWork.BeginAsync();
+      (await inbox.TryRegisterAsync(rollbackMessageId)).Should().BeTrue();
+      await repository.SaveAsync(rollbackSaga, expectedVersion: null);
+      await outbox.SaveAsync(new Message("{}")
+      {
+        MessageType = typeof(PostgresSagaState).AssemblyQualifiedName
+      });
+      await unitOfWork.RollbackAsync();
+    }
+
+    await using (var verifyRollbackContext = CreateContext())
+    {
+      var inbox = new EfSagaInboxStore(verifyRollbackContext);
+      var outbox = new EfSagaMessageStore(verifyRollbackContext);
+      var repository = CreateRepository(verifyRollbackContext);
+
+      (await inbox.HasProcessedAsync(rollbackMessageId)).Should().BeFalse();
+      (await repository.LoadAsync(rollbackSaga.SagaId, rollbackSaga.TenantId, typeof(PostgresSagaState)))
+          .Should().BeNull();
+      (await outbox.GetPendingAsync()).Should().BeEmpty();
+    }
+
+    var commitMessageId = Guid.CreateVersion7();
+    var commitSaga = CreateRecord();
+    await using (var commitContext = CreateContext())
+    {
+      IUnitOfWork unitOfWork = new EfUnitOfWork<SagaDbContext>(commitContext);
+      var inbox = new EfSagaInboxStore(commitContext);
+      var outbox = new EfSagaMessageStore(commitContext);
+      var repository = CreateRepository(commitContext);
+
+      await unitOfWork.BeginAsync();
+      (await inbox.TryRegisterAsync(commitMessageId)).Should().BeTrue();
+      await repository.SaveAsync(commitSaga, expectedVersion: null);
+      await outbox.SaveAsync(new Message("{}")
+      {
+        MessageType = typeof(PostgresSagaState).AssemblyQualifiedName
+      });
+      await unitOfWork.CommitAsync();
+    }
+
+    await using (var verifyCommitContext = CreateContext())
+    {
+      var inbox = new EfSagaInboxStore(verifyCommitContext);
+      var outbox = new EfSagaMessageStore(verifyCommitContext);
+      var repository = CreateRepository(verifyCommitContext);
+
+      (await inbox.HasProcessedAsync(commitMessageId)).Should().BeTrue();
+      (await repository.LoadAsync(commitSaga.SagaId, commitSaga.TenantId, typeof(PostgresSagaState)))
+          .Should().NotBeNull();
+      (await outbox.GetPendingAsync()).Should().ContainSingle();
     }
   }
 
