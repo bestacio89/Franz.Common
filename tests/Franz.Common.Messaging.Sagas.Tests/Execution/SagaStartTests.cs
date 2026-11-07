@@ -3,7 +3,8 @@ using Franz.Common.Mediator;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
-using Franz.Common.Messaging.Sagas.Persistence;
+using Franz.Common.Messaging.Sagas.Persistence.Memory;
+using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Execution;
 
@@ -13,7 +14,9 @@ public sealed class SagaStartTests
   public async Task HandleEventAsync_GeneratesSagaIdBeforeCreationAndStartHandler()
   {
     var saga = new StartingSaga();
-    var repository = new TestSagaRepository();
+    var repository = new InMemorySagaRepository(
+        new InMemorySagaStateStore(),
+        new JsonSagaStateSerializer());
     var services = new TestServiceProvider(saga);
     var router = new SagaRouter(services);
     router.RegisterSaga<StartingSaga>();
@@ -29,10 +32,18 @@ public sealed class SagaStartTests
       Guid.CreateVersion7(),
       null);
 
+    var persisted = await repository.LoadAsync(
+        saga.SagaId,
+        tenantId: null,
+        typeof(StartingSagaState),
+        CancellationToken.None);
+
     saga.SagaId.Should().NotBe(Guid.Empty);
     saga.IdObservedDuringCreation.Should().Be(saga.SagaId);
     saga.IdObservedByHandler.Should().Be(saga.SagaId);
-    repository.SavedSagaId.Should().Be(saga.SagaId);
+    persisted.Should().NotBeNull();
+    persisted!.Version.Should().Be(1);
+    persisted.Status.Should().Be(SagaLifecycleStatus.Running);
   }
 
   private sealed class StartingSaga :
@@ -60,7 +71,7 @@ public sealed class SagaStartTests
     }
   }
 
-  private sealed class StartingSagaState : ISagaState
+  public sealed class StartingSagaState : ISagaState
   {
     public string? ConcurrencyToken { get; set; }
   }
@@ -71,31 +82,6 @@ public sealed class SagaStartTests
   {
     public object? GetService(Type serviceType)
       => serviceType == typeof(StartingSaga) ? saga : null;
-  }
-
-  private sealed class TestSagaRepository : ISagaRepository
-  {
-    public Guid? SavedSagaId { get; private set; }
-
-    public Task<object?> LoadStateAsync(
-      Guid sagaId,
-      Type stateType,
-      CancellationToken cancellationToken)
-      => Task.FromResult<object?>(null);
-
-    public Task SaveStateAsync(
-      Guid sagaId,
-      object state,
-      CancellationToken cancellationToken)
-    {
-      SavedSagaId = sagaId;
-      return Task.CompletedTask;
-    }
-
-    public Task DeleteStateAsync(
-      Guid sagaId,
-      CancellationToken cancellationToken)
-      => Task.CompletedTask;
   }
 
   private sealed class TestMessagingPublisher : IMessagingPublisher

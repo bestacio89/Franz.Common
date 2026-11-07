@@ -11,6 +11,7 @@ public class Message : INotification, IEvent
   private Guid? _correlationId;
 
   public const string CorrelationHeader = "x-correlation-id";
+  public const string CausationHeader = "x-causation-id";
 
   public Message()
   {
@@ -33,11 +34,8 @@ public class Message : INotification, IEvent
   }
 
   public Guid Id { get; set; }
-
   public DateTimeOffset OccurredOn { get; set; } = DateTimeOffset.UtcNow;
-
   public virtual string? Body { get; set; }
-
   public MessageKind Kind { get; set; } = MessageKind.Command;
 
   public virtual IDictionary<string, string[]> Headers { get; set; }
@@ -63,11 +61,6 @@ public class Message : INotification, IEvent
     }
   }
 
-  /// <summary>
-  /// Identifies the aggregate whose ordering boundary applies to this message.
-  /// Messages for the same aggregate must use the same Kafka topic and partition key
-  /// to preserve their relative order.
-  /// </summary>
   public virtual Guid? AggregateId { get; set; }
 
   public virtual string? MessageType
@@ -77,12 +70,9 @@ public class Message : INotification, IEvent
   }
 
   public T? GetProperty<T>(string key)
-      => Properties.TryGetValue(key, out var value) && value is T cast
-          ? cast
-          : default;
+      => Properties.TryGetValue(key, out var value) && value is T cast ? cast : default;
 
-  public void SetProperty<T>(string key, T value)
-      => Properties[key] = value!;
+  public void SetProperty<T>(string key, T value) => Properties[key] = value!;
 
   private void SyncProjection()
   {
@@ -96,10 +86,10 @@ public class Message : INotification, IEvent
   {
     if (headers.TryGetValue(CorrelationHeader, out var values) &&
         values.Length > 0 &&
-        Guid.TryParse(values[0], out var cid))
+        Guid.TryParse(values[0], out var correlationId))
     {
-      _correlationId = cid;
-      Properties[nameof(CorrelationId)] = cid;
+      _correlationId = correlationId;
+      Properties[nameof(CorrelationId)] = correlationId;
     }
   }
 }

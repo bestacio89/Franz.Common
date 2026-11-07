@@ -4,6 +4,8 @@ using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Persistence;
+using Franz.Common.Messaging.Sagas.Persistence.Memory;
+using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Execution;
 
@@ -14,9 +16,25 @@ public sealed class SagaCorrelationTests
   {
     var expectedSagaId = Guid.CreateVersion7();
     var correlationId = Guid.CreateVersion7();
-    var state = new CorrelatedSagaState();
+    var now = DateTimeOffset.UtcNow;
     var saga = new CorrelatedSaga(expectedSagaId);
-    var repository = new TestSagaRepository(state);
+    var repository = new InMemorySagaRepository(
+        new InMemorySagaStateStore(),
+        new JsonSagaStateSerializer());
+
+    await repository.SaveAsync(
+        new SagaPersistenceRecord
+        {
+          SagaId = expectedSagaId,
+          SagaType = typeof(CorrelatedSaga).AssemblyQualifiedName!,
+          State = new CorrelatedSagaState(),
+          Status = SagaLifecycleStatus.Running,
+          CreatedAt = now,
+          UpdatedAt = now
+        },
+        expectedVersion: null,
+        CancellationToken.None);
+
     var services = new TestServiceProvider(saga);
     var router = new SagaRouter(services);
     router.RegisterSaga<CorrelatedSaga>();
@@ -33,11 +51,20 @@ public sealed class SagaCorrelationTests
       correlationId,
       Guid.CreateVersion7());
 
+    var persisted = await repository.LoadAsync(
+        expectedSagaId,
+        tenantId: null,
+        typeof(CorrelatedSagaState),
+        CancellationToken.None);
+
+    saga.SagaId.Should().Be(expectedSagaId);
     saga.SagaIdResolverCalled.Should().BeTrue();
     saga.HandlerCalled.Should().BeTrue();
-    repository.LoadedSagaId.Should().Be(expectedSagaId);
     saga.ObservedSagaId.Should().Be(expectedSagaId);
     saga.ObservedCorrelationId.Should().Be(correlationId);
+    persisted.Should().NotBeNull();
+    persisted!.Version.Should().Be(2);
+    persisted.Status.Should().Be(SagaLifecycleStatus.Running);
   }
 
   private sealed class CorrelatedSaga(Guid expectedSagaId) :
@@ -68,7 +95,7 @@ public sealed class SagaCorrelationTests
     }
   }
 
-  private sealed class CorrelatedSagaState : ISagaState
+  public sealed class CorrelatedSagaState : ISagaState
   {
     public string? ConcurrencyToken { get; set; }
   }
@@ -79,31 +106,6 @@ public sealed class SagaCorrelationTests
   {
     public object? GetService(Type serviceType)
       => serviceType == typeof(CorrelatedSaga) ? saga : null;
-  }
-
-  private sealed class TestSagaRepository(CorrelatedSagaState state) : ISagaRepository
-  {
-    public Guid? LoadedSagaId { get; private set; }
-
-    public Task<object?> LoadStateAsync(
-      Guid sagaId,
-      Type stateType,
-      CancellationToken cancellationToken)
-    {
-      LoadedSagaId = sagaId;
-      return Task.FromResult<object?>(state);
-    }
-
-    public Task SaveStateAsync(
-      Guid sagaId,
-      object state,
-      CancellationToken cancellationToken)
-      => Task.CompletedTask;
-
-    public Task DeleteStateAsync(
-      Guid sagaId,
-      CancellationToken cancellationToken)
-      => Task.CompletedTask;
   }
 
   private sealed class TestMessagingPublisher : IMessagingPublisher

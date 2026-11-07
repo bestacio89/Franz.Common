@@ -1,15 +1,13 @@
-﻿#nullable enable
+#nullable enable
+
+using Franz.Common.Headers;
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Context;
-using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Messaging.Delegating;
+using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Serialization;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Franz.Common.Messaging.Sagas.Handlers;
 
@@ -22,59 +20,86 @@ public sealed class SagaDispatchingMessageHandler(
 
   public async Task ProcessAsync(Message message, CancellationToken ct = default)
   {
-    var typeName = message.MessageType;
+    ArgumentNullException.ThrowIfNull(message);
 
+    var typeName = message.MessageType;
     if (string.IsNullOrWhiteSpace(typeName) &&
-        message.Headers.TryGetValue("type", out var values) &&
-        values.Length > 0)
-    {
-      typeName = values[0];
-    }
+        message.Headers.TryGetValue("type", out var typeValues) &&
+        typeValues.Length > 0)
+      typeName = typeValues[0];
 
     if (string.IsNullOrWhiteSpace(typeName))
-      return;
+      throw new PermanentMessagingException("Saga message does not declare a message type.");
 
     var type = ResolveType(typeName);
-    if (type is null || !typeof(IIntegrationEvent).IsAssignableFrom(type))
-      return;
+    if (type is null)
+      throw new PermanentMessagingException(
+          $"Saga message type '{typeName}' could not be resolved.");
+
+    if (!typeof(IIntegrationEvent).IsAssignableFrom(type))
+      throw new PermanentMessagingException(
+          $"Saga message type '{typeName}' does not implement IIntegrationEvent.");
 
     if (string.IsNullOrWhiteSpace(message.Body))
-      return;
+      throw new PermanentMessagingException(
+          $"Saga message '{message.Id}' has an empty body.");
 
-    var evt = (IIntegrationEvent?)_serializer.Deserialize(message.Body, type);
-    if (evt is null)
-      return;
+    IIntegrationEvent integrationEvent;
+    try
+    {
+      integrationEvent = (IIntegrationEvent?)_serializer.Deserialize(message.Body, type)
+          ?? throw new PermanentMessagingException(
+              $"Saga message '{message.Id}' deserialized to null.");
+    }
+    catch (PermanentMessagingException)
+    {
+      throw;
+    }
+    catch (Exception exception)
+    {
+      throw new PermanentMessagingException(
+          $"Saga message '{message.Id}' could not be deserialized as '{typeName}'.",
+          exception);
+    }
 
-    // =========================
-    // BOUNDARY NORMALIZATION FIX
-    // =========================
     var correlationId = message.CorrelationId ?? Guid.Empty;
-    var causationId = message.Id;
+    var causationId = message.Headers.TryGetValue(Message.CausationHeader, out var causationValues) &&
+                      causationValues.Length > 0 &&
+                      Guid.TryParse(causationValues[0], out var parsedCausationId)
+        ? parsedCausationId
+        : null;
+    var tenantId = message.Headers.TryGetValue(HeaderConstants.TenantId, out var tenantValues) &&
+                   tenantValues.Length > 0 &&
+                   !string.IsNullOrWhiteSpace(tenantValues[0])
+        ? tenantValues[0]
+        : null;
 
-    var correlationGuid = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId(); // Ensure a correlation ID is present in the MediatorContext
+    MediatorContext.EnsureCorrelationId();
 
     try
     {
       await _orchestrator.HandleEventAsync(
-          evt,
+          integrationEvent,
           correlationId,
           causationId,
+          message.Id,
+          tenantId,
           ct).ConfigureAwait(false);
     }
     finally
     {
-      MediatorContext.Reset(); // Reset the MediatorContext to its previous state after handling the event
+      MediatorContext.Reset();
     }
   }
 
   private static Type? ResolveType(string typeName)
   {
     var type = Type.GetType(typeName, throwOnError: false);
-    if (type != null) return type;
+    if (type is not null)
+      return type;
 
     return AppDomain.CurrentDomain.GetAssemblies()
-        .Select(asm => asm.GetType(typeName, throwOnError: false))
-        .FirstOrDefault(t => t != null);
+        .Select(assembly => assembly.GetType(typeName, throwOnError: false))
+        .FirstOrDefault(candidate => candidate is not null);
   }
 }

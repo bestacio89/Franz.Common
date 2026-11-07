@@ -1,58 +1,76 @@
 #nullable enable
 
-using Franz.Common.Business.Domain;
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Context;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence;
-using System;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Runtime.ExceptionServices;
 
 namespace Franz.Common.Messaging.Sagas.Core;
 
+/// <summary>
+/// Executes saga handlers and persists their lifecycle transitions.
+/// </summary>
 public sealed class SagaOrchestrator
 {
   private readonly SagaRouter _router;
-  private readonly ISagaRepository _repository;
+  private readonly ISagaLifecycleRepository _repository;
   private readonly SagaExecutionPipeline _pipeline;
   private readonly IMessagingPublisher _publisher;
   private readonly IServiceProvider _services;
 
   public SagaOrchestrator(
       SagaRouter router,
-      ISagaRepository repository,
+      ISagaLifecycleRepository repository,
       SagaExecutionPipeline pipeline,
       IMessagingPublisher publisher,
       IServiceProvider services)
   {
-    _router = router;
-    _repository = repository;
-    _pipeline = pipeline;
-    _publisher = publisher;
-    _services = services;
+    _router = router ?? throw new ArgumentNullException(nameof(router));
+    _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
+    _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
+    _services = services ?? throw new ArgumentNullException(nameof(services));
   }
+
+  public Task HandleEventAsync(
+      IIntegrationEvent incomingEvent,
+      Guid correlationId,
+      Guid? causationId,
+      CancellationToken cancellationToken = default)
+      => HandleEventAsync(
+          incomingEvent,
+          correlationId,
+          causationId,
+          messageId: null,
+          tenantId: null,
+          cancellationToken);
 
   public async Task HandleEventAsync(
       IIntegrationEvent incomingEvent,
       Guid correlationId,
       Guid? causationId,
+      Guid? messageId,
+      string? tenantId,
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(incomingEvent);
+    cancellationToken.ThrowIfCancellationRequested();
 
-    var eventType = incomingEvent.GetType();
+    var messageType = incomingEvent.GetType();
 
-    foreach (var registration in _router.ResolveRegistrationsForMessage(eventType))
+    foreach (var registration in _router.ResolveRegistrationsForMessage(messageType))
     {
       await ExecuteSagaForMessageAsync(
           incomingEvent,
           registration,
           correlationId,
           causationId,
+          messageId,
+          tenantId,
           cancellationToken).ConfigureAwait(false);
     }
   }
@@ -62,10 +80,11 @@ public sealed class SagaOrchestrator
       SagaRegistration registration,
       Guid correlationId,
       Guid? causationId,
+      Guid? messageId,
+      string? tenantId,
       CancellationToken cancellationToken)
   {
     var messageType = message.GetType();
-
     var saga = _services.GetService(registration.SagaType)
         ?? throw new SagaConfigurationError(
             $"Saga '{registration.SagaType.FullName}' is not registered in the service provider.");
@@ -77,9 +96,7 @@ public sealed class SagaOrchestrator
               $"Could not create saga state '{registration.StateType.FullName}'.");
 
       SetSagaState(saga, registration, state);
-
       var sagaId = GetSagaId(saga);
-
       var context = new SagaContext(
           sagaId,
           registration.SagaType,
@@ -91,31 +108,65 @@ public sealed class SagaOrchestrator
 
       await CallOnCreatedAsync(saga, context, cancellationToken).ConfigureAwait(false);
 
-      await ExecuteHandlerAsync(
+      var transition = await ExecuteHandlerAsync(
           saga,
           message,
           registration.StartHandlers[messageType],
           context,
           cancellationToken).ConfigureAwait(false);
 
-      await _repository.SaveStateAsync(sagaId, state, cancellationToken).ConfigureAwait(false);
+      EnsureSagaIdentityUnchanged(saga, sagaId);
+
+      var now = DateTimeOffset.UtcNow;
+      var record = new SagaPersistenceRecord
+      {
+        SagaId = sagaId,
+        TenantId = tenantId,
+        SagaType = registration.SagaType.AssemblyQualifiedName ?? registration.SagaType.FullName!,
+        State = GetSagaState(saga, registration),
+        Status = SagaLifecycleStatus.Running,
+        CreatedAt = now,
+        UpdatedAt = now,
+        LastMessageId = messageId
+      };
+
+      await PersistTransitionAsync(
+          record,
+          expectedVersion: null,
+          transition,
+          messageId,
+          cancellationToken).ConfigureAwait(false);
+
       return;
     }
 
     var sagaIdExisting = ResolveSagaId(saga, message, registration);
-    var existingState = await _repository.LoadStateAsync(
+    SetSagaId(saga, sagaIdExisting);
+
+    var existingRecord = await _repository.LoadAsync(
         sagaIdExisting,
+        tenantId,
         registration.StateType,
-        cancellationToken).ConfigureAwait(false) as ISagaState
+        cancellationToken).ConfigureAwait(false)
         ?? throw new SagaNotFoundException(
             $"Saga '{registration.SagaType.Name}' with ID '{sagaIdExisting}' was not found.");
 
-    SetSagaState(saga, registration, existingState);
+    if (existingRecord.Status is SagaLifecycleStatus.Completed or SagaLifecycleStatus.Failed)
+      throw new SagaLifecycleException(sagaIdExisting, existingRecord.Status);
+
+    if (existingRecord.Status == SagaLifecycleStatus.RetryScheduled)
+      throw new SagaLifecycleException(sagaIdExisting, existingRecord.Status);
+
+    if (existingRecord.Status == SagaLifecycleStatus.Compensating &&
+        !registration.CanCompensate(messageType))
+      throw new SagaLifecycleException(sagaIdExisting, existingRecord.Status);
+
+    SetSagaState(saga, registration, (ISagaState)existingRecord.State);
 
     var executionContext = new SagaContext(
         sagaIdExisting,
         registration.SagaType,
-        existingState,
+        (ISagaState)existingRecord.State,
         message,
         correlationId,
         causationId,
@@ -130,20 +181,95 @@ public sealed class SagaOrchestrator
           $"Saga '{registration.SagaType.Name}' was routed message '{messageType.Name}' " +
           "but no step or compensation handler was registered.");
 
-    await ExecuteHandlerAsync(
+    var result = await ExecuteHandlerAsync(
         saga,
         message,
         handler,
         executionContext,
         cancellationToken).ConfigureAwait(false);
 
-    await _repository.SaveStateAsync(
-        sagaIdExisting,
-        existingState,
+    EnsureSagaIdentityUnchanged(saga, sagaIdExisting);
+
+    await PersistTransitionAsync(
+        existingRecord with
+        {
+          State = GetSagaState(saga, registration),
+          LastMessageId = messageId
+        },
+        existingRecord.Version,
+        result,
+        messageId,
         cancellationToken).ConfigureAwait(false);
   }
 
-  private async Task ExecuteHandlerAsync(
+  private async Task PersistTransitionAsync(
+      SagaPersistenceRecord record,
+      long? expectedVersion,
+      ISagaTransition transition,
+      Guid? messageId,
+      CancellationToken cancellationToken)
+  {
+    ArgumentNullException.ThrowIfNull(transition);
+
+    if (transition.OutgoingMessage is not null &&
+        transition.OutgoingMessage is not IIntegrationEvent)
+      throw new SagaConfigurationError(
+          $"Saga '{record.SagaType}' produced outgoing message '{transition.OutgoingMessage.GetType().FullName}'. " +
+          "Only IIntegrationEvent messages can be published by the saga orchestrator.");
+
+    if (transition.Type == SagaTransitionType.Retry)
+      throw new SagaConfigurationError(
+          "Saga retry is not enabled: a durable retry scheduler and atomic scheduling boundary are not configured.");
+
+    if (transition.Type == SagaTransitionType.Compensate && transition.OutgoingMessage is null)
+      throw new SagaConfigurationError(
+          "A compensation transition must provide a compensating IIntegrationEvent.");
+
+    if (transition.Type == SagaTransitionType.Fail && transition.Error is null)
+      throw new SagaConfigurationError("A failed saga transition must provide an exception.");
+
+    if (transition.Type == SagaTransitionType.Fail && transition.OutgoingMessage is not null)
+      throw new SagaConfigurationError("A failed saga transition cannot publish an outgoing message.");
+
+    var now = DateTimeOffset.UtcNow;
+    var nextStatus = transition.Type switch
+    {
+      SagaTransitionType.Continue => record.Status == SagaLifecycleStatus.Compensating
+          ? SagaLifecycleStatus.Compensating
+          : SagaLifecycleStatus.Running,
+      SagaTransitionType.Complete => SagaLifecycleStatus.Completed,
+      SagaTransitionType.Compensate => SagaLifecycleStatus.Compensating,
+      SagaTransitionType.Fail => SagaLifecycleStatus.Failed,
+      _ => throw new SagaConfigurationError(
+          $"Saga transition type '{transition.Type}' is not a supported lifecycle outcome.")
+    };
+
+    var updatedRecord = record with
+    {
+      Status = nextStatus,
+      UpdatedAt = now,
+      CompletedAt = nextStatus == SagaLifecycleStatus.Completed ? now : record.CompletedAt,
+      FailedAt = nextStatus == SagaLifecycleStatus.Failed ? now : record.FailedAt,
+      NextAttemptAt = null,
+      LastMessageId = messageId,
+      LastError = transition.Error?.Message
+    };
+
+    await _repository.SaveAsync(updatedRecord, expectedVersion, cancellationToken).ConfigureAwait(false);
+
+    // This direct publish is at-least-once only. A transactional outbox integration is
+    // required before state persistence and outgoing dispatch can be claimed atomic.
+    if (transition.OutgoingMessage is IIntegrationEvent outgoingEvent)
+    {
+      MediatorContext.EnsureCorrelationId();
+      await _publisher.Publish(outgoingEvent, cancellationToken).ConfigureAwait(false);
+    }
+
+    if (transition.Type == SagaTransitionType.Fail)
+      throw new SagaFailedException(record.SagaId, transition.Error);
+  }
+
+  private async Task<ISagaTransition> ExecuteHandlerAsync(
       object saga,
       IIntegrationEvent message,
       MethodInfo handler,
@@ -154,21 +280,26 @@ public sealed class SagaOrchestrator
 
     await _pipeline.ExecuteAsync(async () =>
     {
-      result = handler.Invoke(saga, new object[] { message, context, cancellationToken });
+      try
+      {
+        result = handler.Invoke(saga, new object[] { message, context, cancellationToken });
+      }
+      catch (TargetInvocationException exception) when (exception.InnerException is not null)
+      {
+        ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+        throw;
+      }
 
       if (result is Task task)
         await task.ConfigureAwait(false);
     }).ConfigureAwait(false);
 
-    var transition = result is Task<ISagaTransition> transitionTask
-        ? await transitionTask.ConfigureAwait(false)
-        : SagaTransition.Continue(null);
+    if (result is Task<ISagaTransition> transitionTask)
+      return await transitionTask.ConfigureAwait(false)
+          ?? throw new SagaConfigurationError(
+              $"Saga '{saga.GetType().Name}' handler '{handler.Name}' returned a null transition.");
 
-    if (transition.OutgoingMessage is IIntegrationEvent outgoingEvent)
-    {
-      MediatorContext.EnsureCorrelationId();
-      await _publisher.Publish(outgoingEvent, cancellationToken).ConfigureAwait(false);
-    }
+    return SagaTransition.Continue(null);
   }
 
   private static async Task CallOnCreatedAsync(
@@ -206,6 +337,37 @@ public sealed class SagaOrchestrator
             $"Saga '{saga.GetType().Name}' must have a non-empty Guid SagaId before its start handler executes.");
   }
 
+  private static void SetSagaId(object saga, Guid sagaId)
+  {
+    var method = saga.GetType().GetMethod("SetId", new[] { typeof(Guid) })
+        ?? throw new SagaConfigurationError(
+            $"Saga '{saga.GetType().Name}' must expose public SetId(Guid) for identity rehydration.");
+
+    method.Invoke(saga, new object[] { sagaId });
+
+    if (GetSagaId(saga) != sagaId)
+      throw new SagaConfigurationError(
+          $"Saga '{saga.GetType().Name}' did not retain the persisted saga identity.");
+  }
+
+  private static void EnsureSagaIdentityUnchanged(object saga, Guid expectedSagaId)
+  {
+    if (GetSagaId(saga) != expectedSagaId)
+      throw new SagaConfigurationError(
+          $"Saga '{saga.GetType().Name}' changed its identity during execution.");
+  }
+
+  private static ISagaState GetSagaState(object saga, SagaRegistration registration)
+  {
+    var stateProperty = registration.SagaType.GetProperty("State")
+        ?? throw new SagaConfigurationError(
+            $"Saga '{registration.SagaType.Name}' does not expose a State property.");
+
+    return stateProperty.GetValue(saga) as ISagaState
+        ?? throw new SagaConfigurationError(
+            $"Saga '{registration.SagaType.Name}' returned a null or invalid State.");
+  }
+
   private static Guid ResolveSagaId(
       object saga,
       IIntegrationEvent message,
@@ -231,10 +393,7 @@ public sealed class SagaOrchestrator
             $"Saga '{registration.SagaType.Name}' resolved an empty or invalid SagaId for message '{messageType.Name}'.");
   }
 
-  private static void SetSagaState(
-      object saga,
-      SagaRegistration registration,
-      ISagaState state)
+  private static void SetSagaState(object saga, SagaRegistration registration, ISagaState state)
   {
     var stateProperty = registration.SagaType.GetProperty("State")
         ?? throw new SagaConfigurationError(

@@ -1,50 +1,69 @@
-﻿#nullable enable
+#nullable enable
 
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Logging;
+using Franz.Common.Messaging.Sagas.Persistence;
+using Franz.Common.Messaging.Sagas.Persistence.Memory;
+using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace Franz.Common.Messaging.Sagas.Configuration;
 
 public static class FranzSagaServiceCollectionExtensions
 {
-  /// <summary>
-  /// Registers Franz Saga infrastructure and returns the builder
-  /// so callers can register saga types.
-  /// </summary>
   public static FranzSagaBuilder AddFranzSagas(
       this IServiceCollection services,
       Action<FranzSagaOptions>? configure = null)
   {
+    ArgumentNullException.ThrowIfNull(services);
+
     var options = new FranzSagaOptions();
     configure?.Invoke(options);
 
+    if (!new[] { "Memory", "EntityFramework", "Mongo", "Cosmos" }
+        .Contains(options.Persistence, StringComparer.OrdinalIgnoreCase))
+      throw new NotSupportedException(
+          $"Saga persistence provider '{options.Persistence}' is not supported by the lifecycle repository contract.");
+
     services.AddSingleton(options);
 
-    // Core infrastructure
-    services.AddSingleton<SagaRouter>();
-    services.AddTransient<SagaExecutionPipeline>();
-    services.AddTransient<SagaOrchestrator>();
+    services.TryAddSingleton<SagaRouter>();
+    services.TryAddTransient<SagaExecutionPipeline>();
+    services.TryAddTransient<SagaOrchestrator>();
+    services.TryAddScoped<ISagaStateSerializer, JsonSagaStateSerializer>();
 
-    // Default audit sink
+    if (options.Persistence.Equals("Memory", StringComparison.OrdinalIgnoreCase))
+    {
+      services.TryAddSingleton<InMemorySagaStateStore>();
+      services.TryAddScoped<InMemorySagaRepository>();
+      services.TryAddScoped<ISagaLifecycleRepository>(
+          provider => provider.GetRequiredService<InMemorySagaRepository>());
+      services.TryAddScoped<ISagaRepository>(
+          provider => provider.GetRequiredService<InMemorySagaRepository>());
+    }
+
     services.TryAddSingleton<ISagaAuditSink, DefaultSagaAuditSink>();
 
-    // Create + register the builder
     var builder = new FranzSagaBuilder(services);
     services.AddSingleton(builder);
+    services.TryAddEnumerable(
+        ServiceDescriptor.Singleton<IHostedService, SagaRegistrationHostedService>());
 
     return builder;
   }
 
   /// <summary>
-  /// Finalizes saga registrations.
+  /// Explicit registration finalization for hosts that do not use IHostedService startup.
+  /// The operation is idempotent because the router rejects duplicate saga registrations.
   /// </summary>
   public static void BuildFranzSagas(this IServiceProvider provider)
   {
+    ArgumentNullException.ThrowIfNull(provider);
+
     var builder = provider.GetRequiredService<FranzSagaBuilder>();
     var options = provider.GetRequiredService<FranzSagaOptions>();
-
     builder.Build(provider, options.ValidateMappings);
   }
 }
