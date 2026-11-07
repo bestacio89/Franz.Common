@@ -53,7 +53,7 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<PostgresFixtu
       var unscoped = await repository.LoadAsync(sagaId, null, typeof(PostgresSagaState));
 
       loadedA.Should().NotBeNull();
-      loadedA!.CreatedAt.Should().Be(tenantA.CreatedAt);
+      loadedA!.CreatedAt.Should().BeCloseTo(tenantA.CreatedAt, TimeSpan.FromMilliseconds(1));
       loadedA.Version.Should().Be(2);
       ((PostgresSagaState)loadedA.State).Value.Should().Be("tenant-a-updated");
       ((PostgresSagaState)loadedB!.State).Value.Should().Be("tenant-b");

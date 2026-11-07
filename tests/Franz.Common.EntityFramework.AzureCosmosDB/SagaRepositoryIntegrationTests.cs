@@ -15,6 +15,7 @@ using Testcontainers.CosmosDb;
 
 namespace Franz.Common.AzureCosmosDB.Tests;
 
+[Collection("CosmosIntegration")]
 public sealed class SagaRepositoryIntegrationTests : IClassFixture<CosmosFixture>
 {
   private readonly CosmosFixture _fixture;
@@ -139,7 +140,7 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<CosmosFixture
     return new CosmosSagaDbContext(
         options,
         Substitute.For<IDispatcher>(),
-        Options.Create(cosmosOptions));
+        Microsoft.Extensions.Options.Options.Create(cosmosOptions));
   }
 
   private static CosmosSagaRepository CreateRepository(CosmosSagaDbContext context)
