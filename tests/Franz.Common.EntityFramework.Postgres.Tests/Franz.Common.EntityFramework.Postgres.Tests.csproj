@@ -27,6 +27,7 @@
     <ProjectReference Include="..\..\sources\Franz.Common.Business\Franz.Common.Business.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework.PostGres\Franz.Common.EntityFramework.PostGres.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Sagas\Franz.Common.Messaging.Sagas.csproj" />
   </ItemGroup>
 
   <ItemGroup>
