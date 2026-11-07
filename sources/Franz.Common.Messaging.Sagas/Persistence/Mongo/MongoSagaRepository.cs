@@ -3,6 +3,7 @@
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 
@@ -172,7 +173,9 @@ public sealed class MongoSagaRepository : ISagaRepository
   {
     [BsonId]
     public string Id { get; set; } = default!;
+    [BsonGuidRepresentation(GuidRepresentation.Standard)]
     public Guid SagaId { get; set; }
+    [BsonGuidRepresentation(GuidRepresentation.Standard)]
     public Guid CorrelationId { get; set; }
     public string? TenantId { get; set; }
     public string SagaType { get; set; } = default!;
@@ -185,6 +188,7 @@ public sealed class MongoSagaRepository : ISagaRepository
     public DateTimeOffset? CompletedAt { get; set; }
     public DateTimeOffset? FailedAt { get; set; }
     public DateTimeOffset? NextAttemptAt { get; set; }
+    [BsonGuidRepresentation(GuidRepresentation.Standard)]
     public Guid? LastMessageId { get; set; }
     public string? LastError { get; set; }
   }
