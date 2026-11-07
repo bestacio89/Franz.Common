@@ -3,6 +3,8 @@ using Franz.Common.Mediator;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
+using Franz.Common.Messaging.Sagas.Configuration;
+using Franz.Common.Messaging.Storage;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
@@ -240,6 +242,27 @@ public sealed class SagaLifecycleTests
   }
 
   [Fact]
+  public async Task OutgoingIntegrationEvent_IsPersistedThroughMessagingOutboxWhenConfigured()
+  {
+    var saga = new PublishingSaga();
+    var repository = CreateRepository();
+    var publisher = new TestMessagingPublisher();
+    var outbox = new RecordingMessageStore();
+    var orchestrator = CreateOrchestrator(saga, repository, publisher, outbox);
+
+    await orchestrator.HandleEventAsync(
+        new StartEvent(),
+        Guid.CreateVersion7(),
+        null);
+
+    outbox.Saved.Should().ContainSingle();
+    outbox.Saved[0].MessageType.Should().Contain(nameof(FollowUpEvent));
+    outbox.Saved[0].Body.Should().NotBeNullOrWhiteSpace();
+    outbox.Saved[0].Kind.Should().Be(MessageKind.IntegrationEvent);
+    publisher.Published.Should().BeEmpty();
+  }
+
+  [Fact]
   public async Task CompensationHandler_CannotRunBeforeSagaEntersCompensatingState()
   {
     var saga = new PrematureCompensationSaga();
@@ -275,7 +298,8 @@ public sealed class SagaLifecycleTests
   private static SagaOrchestrator CreateOrchestrator(
       object saga,
       InMemorySagaRepository repository,
-      IMessagingPublisher? publisher = null)
+      IMessagingPublisher? publisher = null,
+      IMessageStore? messageStore = null)
   {
     var services = new TestServiceProvider(saga);
     var router = new SagaRouter(services);
@@ -286,7 +310,36 @@ public sealed class SagaLifecycleTests
         repository,
         new SagaExecutionPipeline(),
         publisher ?? new TestMessagingPublisher(),
-        services);
+        services,
+        Array.Empty<ISagaAuditSink>(),
+        new FranzSagaOptions(),
+        messageStore: messageStore);
+  }
+
+  private sealed class RecordingMessageStore : IMessageStore
+  {
+    public List<Franz.Common.Messaging.Messages.Message> Saved { get; } = [];
+
+    public Task SaveAsync(
+        Franz.Common.Messaging.Messages.Message message,
+        CancellationToken cancellationToken = default)
+    {
+      Saved.Add(message);
+      return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<StoredMessage>> GetPendingAsync(
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<StoredMessage>>(Array.Empty<StoredMessage>());
+
+    public Task MarkAsSentAsync(Guid messageId, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task UpdateRetryAsync(StoredMessage message, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task MoveToDeadLetterAsync(StoredMessage message, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
   }
 
   private sealed class RecoverableSaga :
