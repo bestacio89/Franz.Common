@@ -114,7 +114,7 @@ internal sealed class GrpcTestHost : IAsyncDisposable
 
     public TestServer Server { get; }
 
-    public static async Task<GrpcTestHost> StartAsync()
+    public static Task<GrpcTestHost> StartAsync()
     {
         var server = new TestServer(new WebHostBuilder()
             .ConfigureServices(services => services.AddGrpc())
@@ -124,8 +124,7 @@ internal sealed class GrpcTestHost : IAsyncDisposable
                 app.UseEndpoints(endpoints => endpoints.MapGrpcService<GrpcProbeService>());
             }));
 
-        await server.StartAsync();
-        return new GrpcTestHost(server);
+        return Task.FromResult(new GrpcTestHost(server));
     }
 
     public ValueTask DisposeAsync()
