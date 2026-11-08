@@ -48,7 +48,10 @@ public sealed class GrpcPipelineCharacterizationTests
     private sealed class ProbeRequest { }
     private sealed class ProbeResponse { }
 
-    private sealed class ProbeFailureException(string message) : Exception(message);
+    private sealed class ProbeFailureException : Exception
+    {
+        public ProbeFailureException(string message) : base(message) { }
+    }
 
     private sealed class ThrowingBehavior : IGrpcServerBehavior<ProbeRequest, ProbeResponse>
     {
