@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option csharp_namespace = "Franz.Common.Grpc.Tests.Contracts";
+package franz.grpc.tests.v1;
+
+service GrpcProbe {
+  rpc Unary (ProbeRequest) returns (ProbeReply);
+  rpc ServerStream (ProbeRequest) returns (stream ProbeReply);
+  rpc ClientStream (stream ProbeRequest) returns (ProbeReply);
+  rpc Duplex (stream ProbeRequest) returns (stream ProbeReply);
+}
+
+message ProbeRequest {
+  string value = 1;
+}
+
+message ProbeReply {
+  string value = 1;
+  string observed_user_id = 2;
+  string observed_correlation_id = 3;
+}
