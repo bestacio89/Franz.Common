@@ -144,6 +144,8 @@ internal sealed class GrpcTestHost : IAsyncDisposable
             })
             .Configure(app =>
             {
+                app.UseRouting();
+
                 if (authenticated)
                 {
                     app.Use(async (context, next) =>
@@ -155,11 +157,14 @@ internal sealed class GrpcTestHost : IAsyncDisposable
                                 new[] { new Claim(ClaimTypes.NameIdentifier, "trusted-user") },
                                 authenticationType: "IntegrationTest")
                         });
+
+                        if (context.User.Identities.All(identity => !identity.IsAuthenticated))
+                            throw new InvalidOperationException("The integration test principal was not authenticated.");
+
                         await next();
                     });
                 }
 
-                app.UseRouting();
                 app.UseEndpoints(endpoints => endpoints.MapGrpcService<GrpcProbeService>());
             }));
 
