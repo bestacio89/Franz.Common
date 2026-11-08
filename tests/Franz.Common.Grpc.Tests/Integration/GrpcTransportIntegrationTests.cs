@@ -148,9 +148,13 @@ internal sealed class GrpcTestHost : IAsyncDisposable
                 {
                     app.Use(async (context, next) =>
                     {
-                        context.User = new ClaimsPrincipal(new ClaimsIdentity(
-                            new[] { new Claim(ClaimTypes.NameIdentifier, "trusted-user") },
-                            authenticationType: "IntegrationTest"));
+                        context.User = new ClaimsPrincipal(new[]
+                        {
+                            new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, "untrusted-user") }),
+                            new ClaimsIdentity(
+                                new[] { new Claim(ClaimTypes.NameIdentifier, "trusted-user") },
+                                authenticationType: "IntegrationTest")
+                        });
                         await next();
                     });
                 }

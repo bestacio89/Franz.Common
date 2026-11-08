@@ -49,9 +49,9 @@ public sealed class FranzGrpcServerInterceptor : Interceptor
     private GrpcCallContext CreateCallContext(ServerCallContext serverCallContext)
     {
         var principal = serverCallContext.GetHttpContext().User;
-        var userId = principal.Identity?.IsAuthenticated == true
-            ? principal.FindFirst(_options.UserIdClaimType)?.Value
-            : null;
+        var authenticatedIdentity = principal.Identities.FirstOrDefault(identity => identity.IsAuthenticated);
+        var userIdClaim = authenticatedIdentity?.FindFirst(_options.UserIdClaimType)?.Value;
+        var userId = string.IsNullOrWhiteSpace(userIdClaim) ? null : userIdClaim;
 
         return GrpcCallContext.FromServerCallContext(serverCallContext, userId: userId);
     }
