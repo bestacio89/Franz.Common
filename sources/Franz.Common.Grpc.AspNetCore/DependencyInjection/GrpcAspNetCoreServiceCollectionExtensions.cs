@@ -18,6 +18,8 @@ public static class GrpcAspNetCoreServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.AddHttpContextAccessor();
+
         var options = services.AddOptions<FranzGrpcAspNetCoreOptions>();
         if (configure is not null)
             options.Configure(configure);
