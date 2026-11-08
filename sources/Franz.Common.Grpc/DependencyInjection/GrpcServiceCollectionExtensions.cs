@@ -2,6 +2,7 @@
 using Franz.Common.Grpc.Abstractions;
 using Franz.Common.Grpc.Client.Interceptors;
 using Franz.Common.Grpc.Configuration;
+using Franz.Common.Grpc.Client;
 using Franz.Common.Grpc.Hosting;
 using Franz.Common.Grpc.Hosting.NoOp;
 using Franz.Common.MultiTenancy;
