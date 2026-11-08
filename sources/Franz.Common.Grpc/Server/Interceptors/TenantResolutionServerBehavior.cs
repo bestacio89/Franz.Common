@@ -54,7 +54,7 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(next);
 
-        var trustedContext = context.WithTenant(null).WithUser(null);
+        var trustedContext = context.WithTenant(null).WithoutUserHeader();
 
         if (_tenantContextAccessor?.Current is { } establishedContext)
         {

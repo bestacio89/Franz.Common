@@ -189,8 +189,26 @@ public sealed record GrpcCallContext
         ImmutableDictionary<string, string>.Empty.WithComparers(HeaderComparer),
         isServerSide: true);
 
-    serverContext.UserState[ServerContextStateKey] = context;
+    EstablishServerCallContext(serverContext, context);
     return context;
+  }
+
+  /// <summary>
+  /// Associates the effective server pipeline context with its transport call so
+  /// service implementations observe the same immutable context as behaviors.
+  /// </summary>
+  internal static void EstablishServerCallContext(
+      ServerCallContext serverContext,
+      GrpcCallContext callContext)
+  {
+    if (serverContext is null)
+      throw new ArgumentNullException(nameof(serverContext));
+    if (callContext is null)
+      throw new ArgumentNullException(nameof(callContext));
+    if (!callContext.IsServerSide)
+      throw new ArgumentException("The established context must be server-side.", nameof(callContext));
+
+    serverContext.UserState[ServerContextStateKey] = callContext;
   }
 
   #endregion
@@ -272,6 +290,13 @@ public sealed record GrpcCallContext
         UserId = userId,
         RequestHeaders = UpdateHeader(UserIdHeaderName, userId)
       };
+
+  /// <summary>
+  /// Removes caller-supplied user identity metadata without changing the trusted
+  /// user identity established by the server hosting adapter.
+  /// </summary>
+  internal GrpcCallContext WithoutUserHeader() =>
+      this with { RequestHeaders = RequestHeaders.Remove(UserIdHeaderName) };
 
   public GrpcCallContext WithDeadline(DateTime? deadlineUtc) =>
       this with { DeadlineUtc = deadlineUtc };

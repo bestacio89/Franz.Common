@@ -45,7 +45,11 @@ public sealed class FranzGrpcServerInterceptor : Interceptor
         var callContext = CreateCallContext(context);
         var pipeline = FranzServerInteropPipeline.Build(
             provider.ResolveBehaviors<TRequest, TResponse>(),
-            (message, _, _) => continuation(message, context));
+            (message, finalContext, _) =>
+            {
+                GrpcCallContext.EstablishServerCallContext(context, finalContext);
+                return continuation(message, context);
+            });
 
         return await pipeline(request, callContext, context.CancellationToken).ConfigureAwait(false);
     }
