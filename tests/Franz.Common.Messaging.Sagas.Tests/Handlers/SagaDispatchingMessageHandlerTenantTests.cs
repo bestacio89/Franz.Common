@@ -87,6 +87,25 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
   }
 
   [Fact]
+  public async Task ProcessAsync_RollsBackWhenSagaExecutionThrowsBeforeCommit()
+  {
+    var fixture = new Fixture();
+    fixture.Saga.ThrowOnStart = true;
+    var operations = new List<string>();
+    var handler = new SagaDispatchingMessageHandler(
+        fixture.Orchestrator,
+        new JsonMessageSerializer(),
+        new RecordingInboxStore(operations),
+        new RecordingUnitOfWork(operations));
+
+    var act = () => handler.ProcessAsync(fixture.CreateMessage());
+
+    await act.Should().ThrowAsync<InvalidOperationException>()
+        .WithMessage("Expected unexpected saga execution failure.");
+    operations.Should().Equal("begin", "inbox", "rollback");
+  }
+
+  [Fact]
   public async Task ProcessAsync_RollsBackAndSkipsExecutionWhenInboxReceiptAlreadyExists()
   {
     var fixture = new Fixture();
@@ -152,14 +171,20 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
   private sealed class TestSaga : SagaBase<TestSagaState>, IStartWith<StartEvent>
   {
     public bool FailOnStart { get; set; }
+    public bool ThrowOnStart { get; set; }
 
     public Task<ISagaTransition> HandleAsync(
         StartEvent message,
         ISagaContext context,
         CancellationToken cancellationToken)
-        => Task.FromResult(FailOnStart
-            ? context.Fail(new InvalidOperationException("Expected saga failure."))
-            : context.Continue());
+    {
+      if (ThrowOnStart)
+        throw new InvalidOperationException("Expected unexpected saga execution failure.");
+
+      return Task.FromResult(FailOnStart
+          ? context.Fail(new InvalidOperationException("Expected saga failure."))
+          : context.Continue());
+    }
   }
 
   private sealed class RecordingInboxStore(List<string> operations) : IInboxStore
