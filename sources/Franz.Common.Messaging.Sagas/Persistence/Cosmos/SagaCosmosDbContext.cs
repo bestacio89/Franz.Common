@@ -44,7 +44,6 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
     modelBuilder.Entity<CosmosSagaInboxDocument>(entity =>
     {
       entity.ToContainer("SagaStates");
-      entity.HasKey(x => x.Id);
       entity.HasPartitionKey(x => x.TenantId);
       entity.Property(x => x.Id).ToJsonProperty("id");
       entity.Property(x => x.TenantId).ToJsonProperty("tenantId").IsRequired();
@@ -54,7 +53,6 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
     modelBuilder.Entity<CosmosSagaOutboxDocument>(entity =>
     {
       entity.ToContainer("SagaStates");
-      entity.HasKey(x => x.Id);
       entity.HasPartitionKey(x => x.TenantId);
       entity.Property(x => x.Id).ToJsonProperty("id");
       entity.Property(x => x.TenantId).ToJsonProperty("tenantId").IsRequired();
