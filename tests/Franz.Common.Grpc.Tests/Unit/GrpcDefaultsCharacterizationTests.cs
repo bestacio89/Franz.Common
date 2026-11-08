@@ -1,6 +1,7 @@
 using Franz.Common.Grpc.Abstractions;
 using Franz.Common.Grpc.DependencyInjection;
-using Franz.Common.Grpc.Hosting.NoOp;
+using Franz.Common.Grpc.Hosting.Security;
+using Grpc.Core;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Franz.Common.Grpc.Tests.Unit;
@@ -8,7 +9,7 @@ namespace Franz.Common.Grpc.Tests.Unit;
 public sealed class GrpcDefaultsCharacterizationTests
 {
     [Fact]
-    public async Task AddFranzGrpcDefaults_RegistersAllowAllAuthorizationServiceWhenExplicitlyCalled()
+    public async Task AddFranzGrpcDefaults_RegistersFailClosedAuthorizationService()
     {
         var services = new ServiceCollection();
         services.AddFranzGrpcDefaults();
@@ -16,9 +17,9 @@ public sealed class GrpcDefaultsCharacterizationTests
         await using var provider = services.BuildServiceProvider();
         var authorization = provider.GetRequiredService<IFranzAuthorizationService>();
 
-        Assert.IsType<NoOpAuthorizationService>(authorization);
+        Assert.IsType<DenyAllAuthorizationService>(authorization);
 
-        // Characterization only: this no-op implementation accepts every call.
-        await authorization.AuthorizeAsync(GrpcCallContext.CreateClient("tests.Service", "Call"));
+        await Assert.ThrowsAsync<RpcException>(() =>
+            authorization.AuthorizeAsync(GrpcCallContext.CreateClient("tests.Service", "Call")));
     }
 }

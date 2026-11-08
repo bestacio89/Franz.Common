@@ -5,6 +5,7 @@ using Franz.Common.Grpc.Configuration;
 using Franz.Common.Grpc.Client;
 using Franz.Common.Grpc.Hosting;
 using Franz.Common.Grpc.Hosting.NoOp;
+using Franz.Common.Grpc.Hosting.Security;
 using Franz.Common.MultiTenancy;
 using Franz.Common.Grpc.Server;
 using Franz.Common.Grpc.Server.Interceptors;
@@ -85,7 +86,9 @@ public static class GrpcServiceCollectionExtensions
       this IServiceCollection services)
   {
     services.TryAddScoped<IFranzValidationEngine, NoOpValidationEngine>();
-    services.TryAddScoped<IFranzAuthorizationService, NoOpAuthorizationService>();
+    // Authorization is fail-closed by default. Hosts must register an explicit
+    // authorization policy to permit calls; allow-all is never selected implicitly.
+    services.TryAddScoped<IFranzAuthorizationService, DenyAllAuthorizationService>();
     services.TryAddScoped<IFranzTenantResolver, NoOpTenantResolver>();
     services.TryAddScoped<IFranzGrpcLogger, NoOpGrpcLogger>();
     services.TryAddScoped<IFranzGrpcMetrics, NoOpGrpcMetrics>();

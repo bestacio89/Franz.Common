@@ -88,7 +88,7 @@ public sealed class GrpcTransportIntegrationTests
     }
 
     [Fact]
-    public async Task UnaryCall_CharacterizesCallerSuppliedUserMetadataAsCurrentContextInput()
+    public async Task UnaryCall_DoesNotTreatCallerSuppliedUserMetadataAsAuthenticatedIdentity()
     {
         await using var host = await GrpcTestHost.StartAsync();
         using var channel = GrpcChannel.ForAddress("http://localhost", new GrpcChannelOptions
@@ -102,9 +102,9 @@ public sealed class GrpcTransportIntegrationTests
             new ProbeRequest { Value = "identity" },
             headers);
 
-        // Characterization test: FromServerCallContext currently treats x-user-id metadata as identity.
-        // Phase 3 must replace this with an authenticated-principal source and change this expectation.
-        Assert.Equal("caller-controlled-user", response.ObservedUserId);
+        // Caller-controlled x-user-id metadata is retained as metadata only. The hosting
+        // adapter must supply UserId from the authenticated principal in a later phase.
+        Assert.Equal(string.Empty, response.ObservedUserId);
     }
 }
 

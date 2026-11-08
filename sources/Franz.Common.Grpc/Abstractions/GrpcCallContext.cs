@@ -154,7 +154,8 @@ public sealed record GrpcCallContext
     var correlationId = GetOrCreate(requestHeaders, CorrelationIdHeaderName);
     var requestId = GetOrCreate(requestHeaders, RequestIdHeaderName);
 
-    userId ??= requestHeaders.TryGetValue(UserIdHeaderName, out var u) ? u : null;
+    // User identity must be supplied by the hosting adapter from an authenticated
+    // principal. Caller-controlled metadata is never an identity authority.
 
     var method = serverContext.Method ?? string.Empty;
     var serviceName = ExtractServiceName(method);
