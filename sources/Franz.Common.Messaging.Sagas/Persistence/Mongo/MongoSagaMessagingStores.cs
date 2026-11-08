@@ -27,10 +27,8 @@ public sealed class MongoSagaInboxStore : IInboxStore
     ArgumentNullException.ThrowIfNull(database);
     _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     _collection = database.GetCollection<MongoSagaInboxRecord>("sagaInbox");
-    _collection.Indexes.CreateOne(
-        new CreateIndexModel<MongoSagaInboxRecord>(
-            Builders<MongoSagaInboxRecord>.IndexKeys.Ascending(record => record.MessageId),
-            new CreateIndexOptions { Unique = true }));
+    // MessageId is the BSON _id field. MongoDB creates its unique _id index
+    // automatically; creating a second unique index over the same field is invalid.
   }
 
   public Task<bool> HasProcessedAsync(Guid messageId, CancellationToken ct = default)
