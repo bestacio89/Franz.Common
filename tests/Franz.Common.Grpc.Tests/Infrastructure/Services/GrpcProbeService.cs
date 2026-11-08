@@ -1,5 +1,6 @@
 using Franz.Common.Grpc.Abstractions;
 using Franz.Common.Grpc.Tests.Contracts;
+using Franz.Common.Grpc.Tests.Infrastructure.Diagnostics;
 using Grpc.Core;
 
 namespace Franz.Common.Grpc.Tests.Infrastructure.Services;
@@ -8,11 +9,12 @@ namespace Franz.Common.Grpc.Tests.Infrastructure.Services;
 /// Minimal transport endpoint used to verify all four gRPC RPC shapes.
 /// It contains no host setup, authentication, authorization, or test assertions.
 /// </summary>
-internal sealed class GrpcProbeService : GrpcProbe.GrpcProbeBase
+internal sealed class GrpcProbeService(GrpcPipelineProbe probe) : GrpcProbe.GrpcProbeBase
 {
     public override Task<ProbeReply> Unary(ProbeRequest request, ServerCallContext context)
     {
         var franzContext = GrpcCallContext.FromServerCallContext(context);
+        probe.RecordServiceContext(franzContext);
 
         return Task.FromResult(new ProbeReply
         {

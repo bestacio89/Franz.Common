@@ -6,6 +6,7 @@ namespace Franz.Common.Grpc.Tests.Behaviors;
 
 /// <summary>
 /// Test behavior that records the trusted call identity and exposes it in the unary response.
+/// It also adds a harmless marker to verify that the terminal service receives the final pipeline context.
 /// </summary>
 internal sealed class ProbeContextBehavior(GrpcPipelineProbe probe)
     : IGrpcServerBehavior<ProbeRequest, ProbeReply>
@@ -20,8 +21,12 @@ internal sealed class ProbeContextBehavior(GrpcPipelineProbe probe)
     {
         probe.Record(context.UserId);
 
-        var response = await next(request, context, cancellationToken).ConfigureAwait(false);
-        response.ObservedUserId = context.UserId ?? string.Empty;
+        var pipelineContext = context.WithAdditionalHeader(
+            GrpcPipelineProbe.ContextMarkerHeaderName,
+            "pipeline-context");
+
+        var response = await next(request, pipelineContext, cancellationToken).ConfigureAwait(false);
+        response.ObservedUserId = pipelineContext.UserId ?? string.Empty;
 
         return response;
     }

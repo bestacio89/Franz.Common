@@ -33,6 +33,9 @@ public sealed class GrpcTransportIntegrationTests
         Assert.Equal("trusted-user", response.ObservedUserId);
         Assert.Equal(1, host.PipelineProbe.InvocationCount);
         Assert.Equal("trusted-user", host.PipelineProbe.LastUserId);
+        Assert.Equal("trusted-user", host.PipelineProbe.LastAuthorizedUserId);
+        Assert.Equal("trusted-user", host.PipelineProbe.LastServiceUserId);
+        Assert.Equal("pipeline-context", host.PipelineProbe.LastServiceContextMarker);
     }
 
     [Fact]
@@ -99,5 +102,8 @@ public sealed class GrpcTransportIntegrationTests
             headers);
 
         Assert.Equal(string.Empty, response.ObservedUserId);
+        Assert.Null(host.PipelineProbe.LastUserId);
+        Assert.Null(host.PipelineProbe.LastAuthorizedUserId);
+        Assert.Null(host.PipelineProbe.LastServiceUserId);
     }
 }
