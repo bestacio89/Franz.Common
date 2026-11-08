@@ -48,6 +48,8 @@ public sealed class GrpcPipelineCharacterizationTests
     private sealed class ProbeRequest { }
     private sealed class ProbeResponse { }
 
+    private sealed class ProbeFailureException(string message) : Exception(message);
+
     private sealed class ThrowingBehavior : IGrpcServerBehavior<ProbeRequest, ProbeResponse>
     {
         public Task<ProbeResponse> InvokeAsync(
@@ -55,6 +57,6 @@ public sealed class GrpcPipelineCharacterizationTests
             GrpcCallContext context,
             GrpcServerPipelineDelegate<ProbeRequest, ProbeResponse> next,
             CancellationToken cancellationToken = default)
-            => throw new InvalidOperationException("outer behavior failure");
+            => throw new ProbeFailureException("outer behavior failure");
     }
 }
