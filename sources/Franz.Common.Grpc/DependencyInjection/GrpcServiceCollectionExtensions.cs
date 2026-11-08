@@ -1,6 +1,5 @@
 ﻿using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Grpc.Abstractions;
-using Franz.Common.Grpc.Client;
 using Franz.Common.Grpc.Client.Interceptors;
 using Franz.Common.Grpc.Configuration;
 using Franz.Common.Grpc.Hosting;
@@ -69,10 +68,9 @@ public static class GrpcServiceCollectionExtensions
     services.Configure<FranzGrpcClientOptions>(
         configuration.GetSection("Franz:Grpc:Client"));
 
-    // Behavior provider and factory
+    // Behavior provider; transport clients and channel lifetime belong to Grpc.Net.ClientFactory.
     services.AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(TenantResolutionClientBehavior<,>));
     services.AddNoDuplicateScoped<IGrpcClientBehaviorProvider, GrpcClientBehaviorProvider>();
-    services.AddNoDuplicateSingleton<IFranzGrpcClientFactory, FranzGrpcClientFactory>();
 
     return services;
   }

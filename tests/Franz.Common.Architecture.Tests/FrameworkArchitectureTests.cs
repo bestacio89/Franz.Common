@@ -121,6 +121,43 @@ public sealed class FrameworkArchitectureTests
   }
 
   [Fact]
+  public void Grpc_core_must_not_reference_hosting_or_client_transport_implementations()
+  {
+    var projectPath = Path.Combine(
+      RepositoryRoot.Value,
+      "sources",
+      "Franz.Common.Grpc",
+      "Franz.Common.Grpc.csproj");
+    var project = XDocument.Load(projectPath);
+    var packageReferences = project
+      .Descendants()
+      .Where(element => element.Name.LocalName == "PackageReference")
+      .Select(element => (string?)element.Attribute("Include"))
+      .Where(include => !string.IsNullOrWhiteSpace(include))
+      .Select(include => include!)
+      .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    Assert.Contains("Grpc.Core.Api", packageReferences);
+    Assert.DoesNotContain("Grpc", packageReferences);
+    Assert.DoesNotContain("Grpc.Net.Client", packageReferences);
+    Assert.DoesNotContain("Grpc.AspNetCore", packageReferences);
+    Assert.DoesNotContain(packageReferences, name =>
+      name.StartsWith("Microsoft.AspNetCore.", StringComparison.OrdinalIgnoreCase));
+
+    var assembly = RuntimeAssemblies.Value.Single(candidate =>
+      string.Equals(candidate.GetName().Name, "Franz.Common.Grpc", StringComparison.Ordinal));
+    var referencedAssemblies = assembly.GetReferencedAssemblies()
+      .Select(reference => reference.Name ?? string.Empty)
+      .ToArray();
+
+    Assert.Contains("Grpc.Core.Api", referencedAssemblies);
+    Assert.DoesNotContain(referencedAssemblies, name =>
+      name.StartsWith("Grpc.Net.Client", StringComparison.Ordinal)
+      || name.StartsWith("Grpc.AspNetCore", StringComparison.Ordinal)
+      || name.StartsWith("Microsoft.AspNetCore.", StringComparison.Ordinal));
+  }
+
+  [Fact]
   public void Runtime_projects_must_not_reference_test_projects_or_test_helpers()
   {
     var sourceRoot = Path.Combine(RepositoryRoot.Value, "sources");

@@ -1,6 +1,6 @@
 # Franz.Common.Grpc
 
-> gRPC client/server behavior pipelines, call context, tenant propagation, and client factory abstractions.
+> gRPC protocol context and Franz client/server behavior pipelines with explicit host and transport ownership.
 
 ## Overview
 
@@ -48,17 +48,17 @@ The application provides implementations of `IFranzValidationEngine`, `IFranzAut
 
 ### Client side
 
-`AddFranzGrpcClient(configuration)` binds `Franz:Grpc:Client`, registers the tenant-resolution client behavior/provider, and registers `IFranzGrpcClientFactory`. The application must still configure each generated client through the gRPC client factory:
+`AddFranzGrpcClient(configuration)` binds `Franz:Grpc:Client` and registers the Franz client behavior/provider. Channel creation, handler configuration, and typed-client lifetime are owned by the official `Grpc.Net.ClientFactory` integration. Register generated clients directly with `AddGrpcClient<TClient>`:
 
 ```csharp
 builder.Services.AddGrpcClient<Orders.OrdersClient>(options =>
 {
     options.Address = new Uri(
-        builder.Configuration["Franz:Grpc:Client:Services:Orders:BaseAddress"]!);
+        builder.Configuration["Grpc:Services:Orders:Address"]!);
 });
 ```
 
-The package does not call `AddGrpcClient<TClient>()` itself.
+The package does not construct channels or clients. The former `IFranzGrpcClientFactory` and `FranzGrpcClientFactory` APIs are removed; migrate to the official typed-client registration above. The `FranzGrpcClient<TClient>` wrapper can still receive an injected generated client when the application wants to use the Franz client pipeline.
 
 ## GrpcCallContext
 

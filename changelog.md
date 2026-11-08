@@ -3,6 +3,11 @@
 
 ## v3.0.0 — Major platform release (planned)
 
+### gRPC modernization
+- Replace the legacy broad `Grpc` dependency with the supported `Grpc.Core.Api` contract package in `Franz.Common.Grpc`.
+- Remove `Grpc.Net.Client` and custom channel ownership from the core package; use official `Grpc.Net.ClientFactory` typed-client registration and lifecycle management.
+- Remove `IFranzGrpcClientFactory`, `FranzGrpcClientFactory`, and configuration that existed solely to construct channels; migration is through `AddGrpcClient<TClient>`.
+
 ### Caching and performance validation
 - Introduce provider-neutral cache contracts with MemoryCache, DistributedCache, Redis and HybridCache implementations.
 - Enforce deterministic SHA-256 cache keys, explicit JSON metadata, tenant-scoped isolation and process-local same-key single-flight coordination.
