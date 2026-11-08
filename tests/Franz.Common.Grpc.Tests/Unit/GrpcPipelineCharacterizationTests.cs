@@ -44,8 +44,8 @@ public sealed class GrpcPipelineCharacterizationTests
         Assert.Equal(Grpc.Core.StatusCode.Internal, outcome.StatusCode);
     }
 
-    private sealed class ProbeRequest;
-    private sealed class ProbeResponse;
+    private sealed class ProbeRequest { }
+    private sealed class ProbeResponse { }
 
     private sealed class ThrowingBehavior : IGrpcServerBehavior<ProbeRequest, ProbeResponse>
     {

@@ -2,6 +2,8 @@ using Franz.Common.Grpc.Abstractions;
 using Franz.Common.Grpc.Tests.Contracts;
 using Grpc.Core;
 using Grpc.Net.Client;
+using Grpc.AspNetCore.Server;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,7 +42,7 @@ public sealed class GrpcTransportIntegrationTests
         while (await call.ResponseStream.MoveNext(CancellationToken.None))
             values.Add(call.ResponseStream.Current.Value);
 
-        Assert.Equal(["server-1", "server-2"], values);
+        Assert.Equal(new[] { "server-1", "server-2" }, values);
     }
 
     [Fact]
@@ -82,7 +84,7 @@ public sealed class GrpcTransportIntegrationTests
         while (await call.ResponseStream.MoveNext(CancellationToken.None))
             values.Add(call.ResponseStream.Current.Value);
 
-        Assert.Equal(["one-duplex", "two-duplex"], values);
+        Assert.Equal(new[] { "one-duplex", "two-duplex" }, values);
     }
 
     [Fact]
@@ -126,7 +128,11 @@ internal sealed class GrpcTestHost : IAsyncDisposable
         return new GrpcTestHost(server);
     }
 
-    public async ValueTask DisposeAsync() => await Server.DisposeAsync();
+    public ValueTask DisposeAsync()
+    {
+        Server.Dispose();
+        return ValueTask.CompletedTask;
+    }
 }
 
 internal sealed class GrpcProbeService : GrpcProbe.GrpcProbeBase
