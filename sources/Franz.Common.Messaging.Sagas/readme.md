@@ -1,16 +1,23 @@
 # Franz.Common.Messaging.Sagas
 
-> Saga registration, state contracts, routing, orchestration, persistence adapters, and audit hooks for long-running workflows.
-
-## Overview
-
-The package contains saga contracts, a registration builder, a message router, an orchestrator, execution pipeline, audit sink, and repository adapters. It is transport-agnostic; a transport handler must invoke saga orchestration when an integration event is received.
+> Saga orchestration, lifecycle management, and provider-native atomic persistence.
 
 ## Installation
 
 ```bash
 dotnet add package Franz.Common.Messaging.Sagas
 ```
+
+## Overview
+
+The package provides:
+- Saga contracts and handler-role registration.
+- Explicit saga-instance identity resolution for non-start messages.
+- Lifecycle-gated orchestration with optimistic concurrency.
+- In-memory, EF Core, MongoDB, and Cosmos DB persistence adapters.
+- Metadata-only audit sink integration.
+
+The transport handler deserializes an integration event and invokes the orchestrator with its correlation, causation, message, and tenant metadata.
 
 ## Registration
 
@@ -19,36 +26,111 @@ using Franz.Common.Messaging.Sagas.Configuration;
 
 var sagaBuilder = builder.Services.AddFranzSagas(options =>
 {
+    options.Persistence = "EntityFramework";
     options.ValidateMappings = true;
+    options.EnableAuditing = true;
 });
 
 sagaBuilder.AddSaga<OrderSaga>();
 ```
 
-After the service provider is built, finalize registrations:
+The host supplies provider configuration:
+- `Memory`: package-owned in-memory saga state. This adapter is intended for tests and development and does not provide durable inbox/outbox guarantees.
+- `EntityFramework`: register and configure `SagaDbContext`; apply an EF migration containing the `SagaInbox` and `SagaOutbox` tables.
+- `Mongo`: register the host's `IMongoDatabase`; the deployment must support multi-document transactions (replica set or sharded cluster).
+- `Cosmos`: configure the host's Cosmos options and `CosmosSagaDbContext`. The existing `SagaStates` container must use `TenantId` as its partition key.
+
+The package does not own connection strings, database lifecycle, broker configuration, or provider credentials. Repository registration uses `TryAdd` so applications can provide their own `ISagaRepository`. The selected saga persistence adapter registers the existing `IInboxStore`, `IMessageStore`, and `IUnitOfWork` contracts with provider implementations that share the same transaction context.
+
+Register saga types with `AddSaga<TSaga>()` or the assembly-registration helpers. Finalize registrations after the service provider is built when the host does not use the package's hosted startup validation:
 
 ```csharp
 app.Services.BuildFranzSagas();
 ```
 
-The builder also exposes `AddSaga(Type)`, `AddSagaAssembly(assembly)`, `AddSagasFromAssemblyContaining<T>()`, and `AddAuditSink<TSink>()`. Saga types are registered as transient services.
+The package also registers a hosted startup validator. Mapping validation requires every non-start message contract to have a matching `ISagaIdResolver<TMessage>` implementation on the saga.
 
-## Current contracts
+## Identity and message roles
 
-- `ISaga<TState>` requires a `State` property, a non-empty `Guid SagaId`, and `OnCreatedAsync`.
-- `ISagaState` currently contains a nullable string `ConcurrencyToken`; it does not define an ID or timestamp.
-- `IStartWith<TMessage>`, `IHandle<TMessage>`, and `ICompensateWith<TMessage>` declare the message roles handled by a saga.
-- `IMessageCorrelation<TMessage>` currently declares an instance method returning `string`.
+- `SagaId` is the durable identity of one saga instance and the repository key.
+- `CorrelationId` groups related messages; it is not a saga repository key.
+- `CausationId` identifies the message that caused the current execution.
+- `MessageId` is transport-level message identity. The dispatch handler atomically claims it through the existing `IInboxStore` before executing saga handlers.
+- `TenantId` scopes repository operations. `null` represents the default non-tenant scope; supplied values must not be empty or whitespace.
 
-## Important implementation limitation
+A start handler creates the saga instance. For a non-start message, the saga must implement `ISagaIdResolver<TMessage>` and return the non-empty `SagaId` of the target instance. Do not derive this identity from correlation metadata.
 
-The current correlation contract and orchestrator are inconsistent: the interface returns `string`, but the orchestrator invokes the interface method with a null target and then requires the result to be a `Guid`. In addition, the orchestrator requires `SagaId` to be non-empty before it starts the saga; it does not generate the ID automatically.
+Handler roles are mutually exclusive for a given message type:
+- `IStartWith<TMessage>`: creates a saga instance.
+- `IHandle<TMessage>`: advances a running saga.
+- `ICompensateWith<TMessage>`: executes a compensation step after compensation has been requested.
 
-Consequently, the current correlation-based start/continuation path is not reliably executable. Do not treat saga orchestration or its persistence adapters as production-ready until the correlation contract, invocation target, ID lifecycle, and end-to-end tests are corrected. This guide intentionally does not provide a misleading working-saga sample.
+## Lifecycle contract
 
-## Persistence and transport boundaries
+The persisted lifecycle states are:
 
-Repository classes exist for in-memory, EF Core, Cosmos DB, MongoDB, Redis, Kafka, and RabbitMQ. `AddFranzSagas` registers the router, execution pipeline, orchestrator, audit sink, options, and builder; it does not register an `ISagaRepository` implementation. The `FranzSagaOptions.Persistence` value is not currently used to select or register an adapter. Register the intended repository explicitly and do not infer adapter activation from that option. The options model documents Memory, EntityFramework, Redis, and Kafka as its allowed values; the other repository classes are not selected by this options path. Adapter presence does not imply equivalent transactional guarantees. Validate concurrency, atomicity, and failure recovery for the selected repository and transport.
+| State | Accepted handler role | Meaning |
+|---|---|---|
+| `Running` | Step handlers | Normal forward execution |
+| `Compensating` | Compensation handlers only | Forward execution is suspended while compensation proceeds |
+| `RetryScheduled` | None | Reserved for a future durable scheduler; currently unsupported |
+| `Completed` | None | Successful terminal state |
+| `Failed` | None | Failed terminal state |
+
+A handler returns an `ISagaTransition`:
+- `Continue(message?)`: persist the current state as `Running`, or keep it `Compensating` during compensation.
+- `Complete(message?)`: persist `Completed` and its completion timestamp.
+- `Compensate(message, error?)`: require an outgoing integration event, persist `Compensating`, and enqueue the compensation request.
+- `Fail(error)`: persist `Failed`, commit the transaction, then surface `SagaFailedException`.
+- `Retry(delay?, error?)`: rejected before persistence because no durable retry scheduler is configured.
+
+Compensation order is application-defined and sequential. A compensation handler may emit the next compensation command/event; the next compensation handler runs only after that message is delivered. While the saga is `Compensating`, ordinary step messages are rejected. The orchestrator does not persist or validate the expected next compensation message, infer a compensation stack, or execute compensations in reverse order automatically. Saga implementations must validate domain-specific compensation ordering against their persisted state.
+
+Every successful transition is persisted with the repository's optimistic concurrency contract. Concurrent updates using the same expected version must not both succeed.
+
+## Atomic persistence boundary
+
+For a single incoming message, the dispatch handler performs one persistence unit of work:
+
+1. Begin the provider's `IUnitOfWork`.
+2. Atomically claim the incoming message through `IInboxStore.TryRegisterAsync`.
+3. Execute every matching saga registration.
+4. Persist every saga state transition.
+5. Enqueue every outgoing integration event through `IMessageStore`.
+6. Commit once after all matching saga handlers finish.
+
+If processing fails before commit, the inbox receipt, all saga transitions, and all outgoing outbox records roll back together. A duplicate receipt skips execution. The inbox receipt is registered before handler execution, but it is not committed until the entire unit succeeds.
+
+Provider implementations:
+
+| Provider | Shared transaction context |
+|---|---|
+| EF Core / relational | One scoped `SagaDbContext` and one database transaction. The saga repository, EF inbox, EF outbox, and `EfUnitOfWork<SagaDbContext>` share that context. |
+| MongoDB | One `IClientSessionHandle` transaction shared by saga state, inbox, and outbox collections in the same database. The server deployment must support transactions. |
+| Cosmos DB | One EF Cosmos `SaveChanges` transactional batch. Saga state, inbox, and outbox documents share the existing `SagaStates` container and the same `TenantId` logical partition. Cross-container or cross-partition atomicity is not claimed. |
+| Memory | In-memory state only. It is not a durable transactional inbox/outbox provider. |
+
+The transaction abstraction is the persistence `IUnitOfWork`; `IMessagingTransaction` remains a transport/broker transaction and is not used for database coordination.
+
+## Delivery semantics
+
+The database commit atomically records inbox receipt, saga state, and outgoing messages. The outbox publisher sends those records after commit. Publication is **at-least-once**: a crash after broker publication but before marking an outbox record as sent can cause redelivery. Consumers and external side effects must therefore be idempotent. Exactly-once delivery across a database and broker is not claimed.
+
+Hosts without the provider outbox registration retain the direct-publish compatibility path; that path does not provide the atomic inbox/state/outbox guarantee.
+
+## Auditing
+
+Set `EnableAuditing = true` and register one or more `ISagaAuditSink` implementations. Audit records contain lifecycle and message-type metadata, not application state or exception messages. Sink failures are logged and remain best-effort; audit writes are not part of the persistence transaction.
+
+## Current limitations
+
+- Durable retry scheduling is not implemented.
+- The in-memory adapter is non-durable and does not provide atomic inbox/outbox processing.
+- Cosmos atomicity is limited to one container and one logical partition per incoming message.
+- MongoDB transactions require a transaction-capable deployment.
+- Compensation sequencing is application-defined; there is no automatic compensation stack.
+- Audit writes are best-effort and are not part of the saga persistence transaction.
+- Native AOT compatibility must be validated independently for this package and each adapter before it is claimed.
 
 ## License
 

@@ -1,40 +1,31 @@
-﻿#nullable enable
+#nullable enable
 
 namespace Franz.Common.Messaging.Sagas.Configuration;
 
 /// <summary>
 /// Options for configuring the Saga subsystem.
-/// Loaded automatically from appsettings.json: section "Franz:Sagas"
+/// Loaded from the "Franz:Sagas" configuration section.
 /// </summary>
 public sealed class FranzSagaOptions
 {
   /// <summary>
-  /// Allowed: "Memory", "EntityFramework", "Redis", "Kafka"
+  /// Supported lifecycle repositories: Memory, EntityFramework, Mongo, and Cosmos.
+  /// Kafka and Redis state repositories are not implemented.
   /// </summary>
   public string Persistence { get; set; } = "Memory";
 
   /// <summary>
-  /// Strict mapping validation used by SagaBuilder.Build().
+  /// Enables strict validation of saga message mappings during startup.
   /// </summary>
   public bool ValidateMappings { get; set; } = true;
 
   /// <summary>
-  /// Whether audit logs should be written.
+  /// Enables saga audit sink writes.
   /// </summary>
-  public bool EnableAuditing { get; set; } = false;
+  public bool EnableAuditing { get; set; }
 
   /// <summary>
-  /// Optional: Kafka compacted topic for saga state.
-  /// </summary>
-  public string? KafkaStateTopic { get; set; }
-
-  /// <summary>
-  /// Redis connection string for Redis persistence.
-  /// </summary>
-  public string? RedisConnectionString { get; set; }
-
-  /// <summary>
-  /// Optional EF schema for saga persistence.
+  /// Optional EF schema for relational saga persistence.
   /// </summary>
   public string? EntityFrameworkSchema { get; set; }
 }

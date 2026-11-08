@@ -1,16 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
- <PropertyGroup>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+  <PropertyGroup>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
-  
-  <Import Project="..\..\common.targets" />  <PropertyGroup>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-  </PropertyGroup>  <ItemGroup>
-  <PackageReference Include="SharpCompress" Version="0.50.7" />
-    <PackageReference Include="Snappier" Version="1.3.1" />
-</ItemGroup>
 
+  <Import Project="..\..\common.targets" />
+
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" Version="3.12.0" />
+    <PackageReference Include="SharpCompress" Version="0.50.7" />
+    <PackageReference Include="Snappier" Version="1.3.1" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Franz.Common.AzureCosmosDB\Franz.Common.AzureCosmosDB.csproj" />
@@ -19,9 +19,7 @@
     <ProjectReference Include="..\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
     <ProjectReference Include="..\Franz.Common.Errors\Franz.Common.Errors.csproj" />
     <ProjectReference Include="..\Franz.Common.Mediator\Franz.Common.Mediator.csproj" />
-    <ProjectReference Include="..\Franz.Common.Messaging.RabbitMQ\Franz.Common.Messaging.RabbitMQ.csproj" />
     <ProjectReference Include="..\Franz.Common.Messaging\Franz.Common.Messaging.csproj" />
   </ItemGroup>
-
 
 </Project>

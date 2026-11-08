@@ -1,22 +1,19 @@
-﻿#nullable enable
+#nullable enable
 
 using Franz.Common.Messaging.Sagas.Abstractions;
-using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Exceptions;
-using System;
-using System.Linq;
-using System.Reflection;
 
 namespace Franz.Common.Messaging.Sagas.Validation;
 
 /// <summary>
-/// Validates a saga type (class) independently of its message mappings.
-/// Ensures that the saga follows the required Franz saga conventions.
+/// Validates saga types independently of their message mappings.
 /// </summary>
 public static class SagaTypeValidator
 {
   public static void ValidateSagaType(Type sagaType)
   {
+    ArgumentNullException.ThrowIfNull(sagaType);
+
     if (!sagaType.IsClass || sagaType.IsAbstract)
       throw new SagaConfigurationError(
           $"Saga type '{sagaType.Name}' must be a non-abstract class.");
@@ -30,30 +27,35 @@ public static class SagaTypeValidator
       throw new SagaConfigurationError(
           $"Saga '{sagaType.Name}' must implement ISaga<TState>.");
 
-    Type stateType = sagaInterface.GetGenericArguments()[0];
-
-    // Validate state implements ISagaState
+    var stateType = sagaInterface.GetGenericArguments()[0];
     if (!typeof(ISagaState).IsAssignableFrom(stateType))
       throw new SagaConfigurationError(
           $"Saga '{sagaType.Name}' has invalid state type '{stateType.Name}'. " +
-          $"It must implement ISagaState.");
+          "It must implement ISagaState.");
 
-    // SagaId property
-    var idProp = sagaType.GetProperty("SagaId");
-    if (idProp == null || idProp.PropertyType != typeof(string))
+    var idProperty = sagaType.GetProperty("SagaId");
+    if (idProperty is null ||
+        idProperty.PropertyType != typeof(Guid) ||
+        idProperty.GetMethod is not { IsPublic: true })
       throw new SagaConfigurationError(
-          $"Saga '{sagaType.Name}' must define a readable SagaId string property.");
+          $"Saga '{sagaType.Name}' must expose a readable Guid SagaId property.");
 
-    // State property
-    var stateProp = sagaType.GetProperty("State");
-    if (stateProp == null || !stateType.IsAssignableFrom(stateProp.PropertyType))
+    var setIdMethod = sagaType.GetMethod("SetId", new[] { typeof(Guid) });
+    if (setIdMethod is null || !setIdMethod.IsPublic || setIdMethod.ReturnType != typeof(void))
+      throw new SagaConfigurationError(
+          $"Saga '{sagaType.Name}' must expose public SetId(Guid) for persisted identity rehydration.");
+
+    var stateProperty = sagaType.GetProperty("State");
+    if (stateProperty is null || !stateType.IsAssignableFrom(stateProperty.PropertyType))
       throw new SagaConfigurationError(
           $"Saga '{sagaType.Name}' must define a State property of type '{stateType.Name}'.");
 
-    // OnCreatedAsync method
-    var createdMethod = sagaType.GetMethod("OnCreatedAsync");
-    if (createdMethod == null)
+    var createdMethod = sagaType.GetMethod(
+        "OnCreatedAsync",
+        new[] { typeof(ISagaContext), typeof(CancellationToken) });
+
+    if (createdMethod is null)
       throw new SagaConfigurationError(
-          $"Saga '{sagaType.Name}' must define an OnCreatedAsync(ISagaContext, CancellationToken) method.");
+          $"Saga '{sagaType.Name}' must define OnCreatedAsync(ISagaContext, CancellationToken).");
   }
 }

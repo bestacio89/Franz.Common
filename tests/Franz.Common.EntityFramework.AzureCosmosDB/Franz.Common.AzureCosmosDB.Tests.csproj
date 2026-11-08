@@ -27,6 +27,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.AzureCosmosDB\Franz.Common.AzureCosmosDB.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.EntityFramework\Franz.Common.EntityFramework.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Sagas\Franz.Common.Messaging.Sagas.csproj" />
   </ItemGroup>
 
   <ItemGroup>

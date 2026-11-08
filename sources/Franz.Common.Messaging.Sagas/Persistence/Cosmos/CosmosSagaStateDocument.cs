@@ -1,35 +1,28 @@
-﻿#nullable enable
+#nullable enable
 
 using Franz.Common.Business.Domain;
 
 namespace Franz.Common.Messaging.Sagas.Persistence.Cosmos;
 
 /// <summary>
-/// Cosmos document for saga state, using Guid identity aligned with messaging + factories.
+/// Cosmos document containing saga state and its durable lifecycle metadata.
 /// </summary>
 public sealed class CosmosSagaStateDocument : Entity<Guid>
 {
-  public CosmosSagaStateDocument() { } // EF/Cosmos deserialization
-
-  
-
-  /// <summary>
-  /// Fully-qualified .NET type name of the saga state (for polymorphic deserialization).
-  /// </summary>
+  public CosmosSagaStateDocument() { }
+  public CosmosSagaStateDocument(Guid sagaId) : base(sagaId) { }
+  public string TenantId { get; set; } = string.Empty;
+  public Guid CorrelationId { get; set; }
   public string SagaType { get; set; } = default!;
-
-  /// <summary>
-  /// Raw JSON serialized saga state.
-  /// </summary>
+  public string StateType { get; set; } = default!;
   public string Payload { get; set; } = default!;
-
-  /// <summary>
-  /// Optional concurrency token.
-  /// </summary>
-  public string? ConcurrencyToken { get; set; }
-
-  /// <summary>
-  /// Server timestamp for change tracking (Cosmos-friendly).
-  /// </summary>
-  public DateTime UpdatedAt { get; set; }
+  public int Status { get; set; }
+  public long Version { get; set; }
+  public DateTimeOffset CreatedAt { get; set; }
+  public DateTimeOffset UpdatedAt { get; set; }
+  public DateTimeOffset? CompletedAt { get; set; }
+  public DateTimeOffset? FailedAt { get; set; }
+  public DateTimeOffset? NextAttemptAt { get; set; }
+  public Guid? LastMessageId { get; set; }
+  public string? LastError { get; set; }
 }

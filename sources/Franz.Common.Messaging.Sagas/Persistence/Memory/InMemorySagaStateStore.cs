@@ -1,11 +1,12 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
+using Franz.Common.Messaging.Sagas.Persistence;
 
 namespace Franz.Common.Messaging.Sagas.Persistence.Memory;
 
 /// <summary>
-/// Simple thread-safe storage for development and testing.
+/// Thread-safe in-memory storage for saga records. Intended for tests and development only.
 /// </summary>
 public sealed class InMemorySagaStateStore
 {
-  public ConcurrentDictionary<Guid , string> Store { get; } = new();
+  public ConcurrentDictionary<(string? TenantId, Guid SagaId), SagaPersistenceRecord> Store { get; } = new();
 }

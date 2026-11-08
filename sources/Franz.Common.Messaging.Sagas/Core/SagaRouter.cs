@@ -56,6 +56,43 @@ public sealed class SagaRouter
   public IEnumerable<SagaRegistration> GetRegistrations() => _registrations.Values;
 
   /// <summary>
+  /// Resolves a message type only when it is part of a registered saga contract.
+  /// Assembly-qualified names are preferred; unqualified names must be unambiguous.
+  /// </summary>
+  public bool TryResolveMessageType(string typeName, out Type? messageType)
+  {
+    ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
+
+    var registeredTypes = _registrations.Values
+        .SelectMany(registration => registration.AllMessageTypes)
+        .Distinct()
+        .ToArray();
+
+    var assemblyQualifiedMatch = registeredTypes.SingleOrDefault(type =>
+        string.Equals(type.AssemblyQualifiedName, typeName, StringComparison.Ordinal));
+
+    if (assemblyQualifiedMatch is not null)
+    {
+      messageType = assemblyQualifiedMatch;
+      return true;
+    }
+
+    var fullNameMatches = registeredTypes
+        .Where(type => string.Equals(type.FullName, typeName, StringComparison.Ordinal))
+        .Take(2)
+        .ToArray();
+
+    if (fullNameMatches.Length == 1)
+    {
+      messageType = fullNameMatches[0];
+      return true;
+    }
+
+    messageType = null;
+    return false;
+  }
+
+  /// <summary>
   /// Returns saga registrations capable of handling the message.
   /// There may be multiple sagas that react to the same message.
   /// </summary>

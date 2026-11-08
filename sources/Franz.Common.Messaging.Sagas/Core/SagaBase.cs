@@ -1,11 +1,11 @@
-﻿#nullable enable
+#nullable enable
 
 using Franz.Common.Messaging.Sagas.Abstractions;
 
 namespace Franz.Common.Messaging.Sagas.Core;
 
 /// <summary>
-/// Base saga with deterministic identity.
+/// Base saga that assigns a sortable, globally unique identity when the instance is created.
 /// </summary>
 public abstract class SagaBase<TState> : ISaga<TState>
     where TState : class, ISagaState, new()
@@ -16,13 +16,17 @@ public abstract class SagaBase<TState> : ISaga<TState>
 
   protected SagaBase()
   {
+    SagaId = Guid.CreateVersion7();
   }
 
   /// <summary>
-  /// Factory-controlled initialization
+  /// Replaces the generated identity when an application explicitly supplies one.
   /// </summary>
   public void SetId(Guid id)
   {
+    if (id == Guid.Empty)
+      throw new ArgumentException("A saga identity cannot be empty.", nameof(id));
+
     SagaId = id;
   }
 
