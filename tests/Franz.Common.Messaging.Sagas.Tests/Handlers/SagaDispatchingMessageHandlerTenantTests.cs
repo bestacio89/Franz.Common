@@ -87,6 +87,24 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
   }
 
   [Fact]
+  public async Task ProcessAsync_RollsBackAndSkipsExecutionWhenInboxReceiptAlreadyExists()
+  {
+    var fixture = new Fixture();
+    var operations = new List<string>();
+    var handler = new SagaDispatchingMessageHandler(
+        fixture.Orchestrator,
+        new JsonMessageSerializer(),
+        new DuplicateInboxStore(operations),
+        new RecordingUnitOfWork(operations));
+
+    await handler.ProcessAsync(fixture.CreateMessage());
+
+    operations.Should().Equal("begin", "inbox", "rollback");
+    (await fixture.Repository.LoadAsync(
+        fixture.Saga.SagaId, null, typeof(TestSagaState))).Should().BeNull();
+  }
+
+  [Fact]
   public async Task ProcessAsync_UsesDefaultScopeOnlyWhenTenantHeaderIsAbsent()
   {
     var fixture = new Fixture();
@@ -153,6 +171,21 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
     {
       operations.Add("inbox");
       return Task.FromResult(true);
+    }
+
+    public Task MarkProcessedAsync(Guid messageId, CancellationToken ct = default)
+        => Task.CompletedTask;
+  }
+
+  private sealed class DuplicateInboxStore(List<string> operations) : IInboxStore
+  {
+    public Task<bool> HasProcessedAsync(Guid messageId, CancellationToken ct = default)
+        => Task.FromResult(true);
+
+    public Task<bool> TryRegisterAsync(Guid messageId, CancellationToken ct = default)
+    {
+      operations.Add("inbox");
+      return Task.FromResult(false);
     }
 
     public Task MarkProcessedAsync(Guid messageId, CancellationToken ct = default)
