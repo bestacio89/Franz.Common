@@ -170,7 +170,7 @@ public sealed class FrameworkArchitectureTests
       .Where(element => element.Name.LocalName == "ProjectReference")
       .Select(element => (string?)element.Attribute("Include"))
       .Where(include => !string.IsNullOrWhiteSpace(include))
-      .Select(include => Path.GetFileNameWithoutExtension(include!.Replace('\\\\', '/')))
+      .Select(include => Path.GetFileNameWithoutExtension(include!.Replace('\\', '/')))
       .ToArray();
 
     Assert.Contains("Franz.Common.Grpc", adapterReferences);

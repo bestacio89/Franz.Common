@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Franz.Common.Grpc.Abstractions;
 using Franz.Common.Grpc.AspNetCore.DependencyInjection;
 using Franz.Common.Grpc.DependencyInjection;
@@ -28,6 +29,21 @@ public sealed class GrpcTransportIntegrationTests
 
         Assert.Equal("unary", response.Value);
         Assert.Equal(string.Empty, response.ObservedUserId);
+    }
+
+    [Fact]
+    public async Task UnaryCall_UsesAuthenticatedPrincipalClaimForTrustedIdentity()
+    {
+        await using var host = await GrpcTestHost.StartAsync(authenticated: true);
+        using var channel = GrpcChannel.ForAddress("http://localhost", new GrpcChannelOptions
+        {
+            HttpHandler = host.Server.CreateHandler()
+        });
+        var client = new GrpcProbe.GrpcProbeClient(channel);
+
+        var response = await client.UnaryAsync(new ProbeRequest { Value = "trusted-identity" });
+
+        Assert.Equal("trusted-user", response.ObservedUserId);
     }
 
     [Fact]
@@ -115,7 +131,7 @@ internal sealed class GrpcTestHost : IAsyncDisposable
 
     public TestServer Server { get; }
 
-    public static Task<GrpcTestHost> StartAsync()
+    public static Task<GrpcTestHost> StartAsync(bool authenticated = false)
     {
         var server = new TestServer(new WebHostBuilder()
             .ConfigureServices(services =>
@@ -128,6 +144,17 @@ internal sealed class GrpcTestHost : IAsyncDisposable
             })
             .Configure(app =>
             {
+                if (authenticated)
+                {
+                    app.Use(async (context, next) =>
+                    {
+                        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                            new[] { new Claim(ClaimTypes.NameIdentifier, "trusted-user") },
+                            authenticationType: "IntegrationTest"));
+                        await next();
+                    });
+                }
+
                 app.UseRouting();
                 app.UseEndpoints(endpoints => endpoints.MapGrpcService<GrpcProbeService>());
             }));
