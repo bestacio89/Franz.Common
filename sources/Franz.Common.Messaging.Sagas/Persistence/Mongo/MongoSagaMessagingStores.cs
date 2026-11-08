@@ -3,6 +3,7 @@
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Storage;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 
@@ -11,9 +12,71 @@ namespace Franz.Common.Messaging.Sagas.Persistence.Mongo;
 internal sealed class MongoSagaInboxRecord
 {
   [BsonId]
-  [BsonGuidRepresentation(MongoDB.Bson.GuidRepresentation.Standard)]
+  [BsonGuidRepresentation(GuidRepresentation.Standard)]
   public Guid MessageId { get; set; }
   public DateTime ProcessedOn { get; set; }
+}
+
+/// <summary>
+/// Mongo-specific outbox document. Explicit GUID representation keeps this adapter
+/// independent from process-wide MongoDB serializer conventions.
+/// </summary>
+internal sealed class MongoSagaStoredMessage
+{
+  [BsonId]
+  [BsonGuidRepresentation(GuidRepresentation.Standard)]
+  public Guid Id { get; set; }
+  public string Body { get; set; } = string.Empty;
+  public IDictionary<string, string[]> Headers { get; set; }
+      = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+  public IDictionary<string, object> Properties { get; set; }
+      = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+  [BsonGuidRepresentation(GuidRepresentation.Standard)]
+  public Guid? CorrelationId { get; set; }
+  public string? MessageType { get; set; }
+  public DateTime CreatedOn { get; set; }
+  public DateTime? SentOn { get; set; }
+  public int RetryCount { get; set; }
+  public string? LastError { get; set; }
+  public DateTime? LastTriedOn { get; set; }
+  public DateTime? NextAttemptAt { get; set; }
+  public bool IsDeadLetter { get; set; }
+
+  public static MongoSagaStoredMessage From(StoredMessage message)
+      => new()
+      {
+        Id = message.Id,
+        Body = message.Body,
+        Headers = message.Headers,
+        Properties = message.Properties,
+        CorrelationId = message.CorrelationId,
+        MessageType = message.MessageType,
+        CreatedOn = message.CreatedOn,
+        SentOn = message.SentOn,
+        RetryCount = message.RetryCount,
+        LastError = message.LastError,
+        LastTriedOn = message.LastTriedOn,
+        NextAttemptAt = message.NextAttemptAt,
+        IsDeadLetter = message.IsDeadLetter
+      };
+
+  public StoredMessage ToStoredMessage()
+      => new()
+      {
+        Id = Id,
+        Body = Body,
+        Headers = Headers,
+        Properties = Properties,
+        CorrelationId = CorrelationId,
+        MessageType = MessageType,
+        CreatedOn = CreatedOn,
+        SentOn = SentOn,
+        RetryCount = RetryCount,
+        LastError = LastError,
+        LastTriedOn = LastTriedOn,
+        NextAttemptAt = NextAttemptAt,
+        IsDeadLetter = IsDeadLetter
+      };
 }
 
 /// <summary>Mongo inbox adapter enlisted in MongoSagaUnitOfWork's session.</summary>
@@ -64,9 +127,8 @@ public sealed class MongoSagaInboxStore : IInboxStore
     catch (MongoWriteException exception) when (
         exception.WriteError?.Category == ServerErrorCategory.DuplicateKey)
     {
-      // The unique _id index is the concurrency arbiter. A duplicate insert inside
-      // a transaction aborts that transaction; the dispatcher observes false and
-      // rolls the unit of work back without executing saga handlers.
+      // A duplicate insert inside a transaction aborts that transaction. The
+      // dispatcher must roll back and skip saga execution when registration loses.
       return false;
     }
   }
@@ -84,27 +146,27 @@ public sealed class MongoSagaInboxStore : IInboxStore
 /// <summary>Mongo outbox adapter enlisted in MongoSagaUnitOfWork's session.</summary>
 public sealed class MongoSagaMessageStore : IMessageStore
 {
-  private readonly IMongoCollection<StoredMessage> _outbox;
-  private readonly IMongoCollection<StoredMessage> _deadLetters;
+  private readonly IMongoCollection<MongoSagaStoredMessage> _outbox;
+  private readonly IMongoCollection<MongoSagaStoredMessage> _deadLetters;
   private readonly MongoSagaUnitOfWork _unitOfWork;
 
   public MongoSagaMessageStore(IMongoDatabase database, MongoSagaUnitOfWork unitOfWork)
   {
     ArgumentNullException.ThrowIfNull(database);
     _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
-    _outbox = database.GetCollection<StoredMessage>("sagaOutbox");
-    _deadLetters = database.GetCollection<StoredMessage>("sagaDeadLetters");
+    _outbox = database.GetCollection<MongoSagaStoredMessage>("sagaOutbox");
+    _deadLetters = database.GetCollection<MongoSagaStoredMessage>("sagaDeadLetters");
     _outbox.Indexes.CreateMany(new[]
     {
-      new CreateIndexModel<StoredMessage>(Builders<StoredMessage>.IndexKeys.Ascending(item => item.SentOn)),
-      new CreateIndexModel<StoredMessage>(Builders<StoredMessage>.IndexKeys.Ascending(item => item.NextAttemptAt))
+      new CreateIndexModel<MongoSagaStoredMessage>(Builders<MongoSagaStoredMessage>.IndexKeys.Ascending(item => item.SentOn)),
+      new CreateIndexModel<MongoSagaStoredMessage>(Builders<MongoSagaStoredMessage>.IndexKeys.Ascending(item => item.NextAttemptAt))
     });
   }
 
   public async Task SaveAsync(Message message, CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(message);
-    var stored = message.ToStored();
+    var stored = MongoSagaStoredMessage.From(message.ToStored());
     if (_unitOfWork.CurrentSession is { } session)
       await _outbox.InsertOneAsync(session, stored, cancellationToken: cancellationToken).ConfigureAwait(false);
     else
@@ -114,24 +176,26 @@ public sealed class MongoSagaMessageStore : IMessageStore
   public async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(CancellationToken cancellationToken = default)
   {
     var filter = PendingFilter();
-    return _unitOfWork.CurrentSession is { } session
+    var documents = _unitOfWork.CurrentSession is { } session
         ? await _outbox.Find(session, filter).SortBy(item => item.Id).ToListAsync(cancellationToken).ConfigureAwait(false)
         : await _outbox.Find(filter).SortBy(item => item.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
+    return documents.Select(item => item.ToStoredMessage()).ToArray();
   }
 
   public async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(int batchSize, CancellationToken cancellationToken = default)
   {
     ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
     var filter = PendingFilter();
-    return _unitOfWork.CurrentSession is { } session
+    var documents = _unitOfWork.CurrentSession is { } session
         ? await _outbox.Find(session, filter).SortBy(item => item.Id).Limit(batchSize).ToListAsync(cancellationToken).ConfigureAwait(false)
         : await _outbox.Find(filter).SortBy(item => item.Id).Limit(batchSize).ToListAsync(cancellationToken).ConfigureAwait(false);
+    return documents.Select(item => item.ToStoredMessage()).ToArray();
   }
 
   public async Task MarkAsSentAsync(Guid messageId, CancellationToken cancellationToken = default)
   {
-    var update = Builders<StoredMessage>.Update.Set(item => item.SentOn, DateTime.UtcNow);
-    var filter = Builders<StoredMessage>.Filter.Eq(item => item.Id, messageId);
+    var update = Builders<MongoSagaStoredMessage>.Update.Set(item => item.SentOn, DateTime.UtcNow);
+    var filter = Builders<MongoSagaStoredMessage>.Filter.Eq(item => item.Id, messageId);
     if (_unitOfWork.CurrentSession is { } session)
       await _outbox.UpdateOneAsync(session, filter, update, cancellationToken: cancellationToken).ConfigureAwait(false);
     else
@@ -141,12 +205,12 @@ public sealed class MongoSagaMessageStore : IMessageStore
   public async Task UpdateRetryAsync(StoredMessage message, CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(message);
-    var update = Builders<StoredMessage>.Update
+    var update = Builders<MongoSagaStoredMessage>.Update
         .Set(item => item.RetryCount, message.RetryCount)
         .Set(item => item.LastError, message.LastError)
         .Set(item => item.LastTriedOn, message.LastTriedOn)
         .Set(item => item.NextAttemptAt, message.NextAttemptAt);
-    var filter = Builders<StoredMessage>.Filter.Eq(item => item.Id, message.Id);
+    var filter = Builders<MongoSagaStoredMessage>.Filter.Eq(item => item.Id, message.Id);
     if (_unitOfWork.CurrentSession is { } session)
       await _outbox.UpdateOneAsync(session, filter, update, cancellationToken: cancellationToken).ConfigureAwait(false);
     else
@@ -157,25 +221,26 @@ public sealed class MongoSagaMessageStore : IMessageStore
   {
     ArgumentNullException.ThrowIfNull(message);
     message.IsDeadLetter = true;
-    var filter = Builders<StoredMessage>.Filter.Eq(item => item.Id, message.Id);
+    var document = MongoSagaStoredMessage.From(message);
+    var filter = Builders<MongoSagaStoredMessage>.Filter.Eq(item => item.Id, message.Id);
 
     if (_unitOfWork.CurrentSession is { } session)
     {
-      await _deadLetters.ReplaceOneAsync(session, filter, message,
+      await _deadLetters.ReplaceOneAsync(session, filter, document,
           new ReplaceOptions { IsUpsert = true }, cancellationToken).ConfigureAwait(false);
       await _outbox.DeleteOneAsync(session, filter, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
     else
     {
-      await _deadLetters.ReplaceOneAsync(filter, message,
+      await _deadLetters.ReplaceOneAsync(filter, document,
           new ReplaceOptions { IsUpsert = true }, cancellationToken).ConfigureAwait(false);
       await _outbox.DeleteOneAsync(filter, cancellationToken).ConfigureAwait(false);
     }
   }
 
-  private static FilterDefinition<StoredMessage> PendingFilter()
-      => Builders<StoredMessage>.Filter.Eq(item => item.SentOn, null) &
-         Builders<StoredMessage>.Filter.Eq(item => item.IsDeadLetter, false) &
-         (Builders<StoredMessage>.Filter.Eq(item => item.NextAttemptAt, null) |
-          Builders<StoredMessage>.Filter.Lte(item => item.NextAttemptAt, DateTime.UtcNow));
+  private static FilterDefinition<MongoSagaStoredMessage> PendingFilter()
+      => Builders<MongoSagaStoredMessage>.Filter.Eq(item => item.SentOn, null) &
+         Builders<MongoSagaStoredMessage>.Filter.Eq(item => item.IsDeadLetter, false) &
+         (Builders<MongoSagaStoredMessage>.Filter.Eq(item => item.NextAttemptAt, null) |
+          Builders<MongoSagaStoredMessage>.Filter.Lte(item => item.NextAttemptAt, DateTime.UtcNow));
 }
