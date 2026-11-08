@@ -1,17 +1,17 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Franz.Common.Grpc.Abstractions;
 
-namespace Franz.Common.Grpc.Client.Interceptors; // or .Server.Interceptors
+namespace Franz.Common.Grpc.Client.Interceptors;
 
 /// <summary>
-/// Creates a structured log scope, logs incoming requests, outgoing responses,
-/// failures, and timing metrics. Does not handle exceptions.
+/// Logs outgoing gRPC requests, responses, failures, and elapsed time.
+/// Does not handle exceptions.
 /// </summary>
 public sealed class LoggingClientBehavior<TRequest, TResponse>
-    : IGrpcServerBehavior<TRequest, TResponse>
+    : IGrpcClientBehavior<TRequest, TResponse>
     where TRequest : class
     where TResponse : class
 {
@@ -25,35 +25,26 @@ public sealed class LoggingClientBehavior<TRequest, TResponse>
   public async Task<TResponse> InvokeAsync(
       TRequest request,
       GrpcCallContext context,
-      GrpcServerPipelineDelegate<TRequest, TResponse> next,
+      GrpcClientPipelineDelegate<TRequest, TResponse> next,
       CancellationToken cancellationToken = default)
   {
     using var scope = _logger.BeginScope(context);
-    var sw = Stopwatch.StartNew();
-
-    // Log incoming request
+    var stopwatch = Stopwatch.StartNew();
     _logger.LogRequest(context, request);
 
     try
     {
-      // Continue pipeline
       var response = await next(request, context, cancellationToken)
           .ConfigureAwait(false);
 
-      sw.Stop();
-
-      // Log success response
-      _logger.LogResponse(context, response, sw.ElapsedMilliseconds);
-
+      stopwatch.Stop();
+      _logger.LogResponse(context, response, stopwatch.ElapsedMilliseconds);
       return response;
     }
-    catch (Exception ex)
+    catch (Exception exception)
     {
-      sw.Stop();
-
-      // Log failure — but do NOT handle it.
-      _logger.LogError(context, ex, sw.ElapsedMilliseconds);
-
+      stopwatch.Stop();
+      _logger.LogError(context, exception, stopwatch.ElapsedMilliseconds);
       throw;
     }
   }

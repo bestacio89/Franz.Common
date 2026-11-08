@@ -1,17 +1,17 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Franz.Common.Grpc.Abstractions;
 
-namespace Franz.Common.Grpc.Client.Interceptors; // or .Server.Interceptors
+namespace Franz.Common.Grpc.Client.Interceptors;
 
 /// <summary>
-/// Records request counts, success/failure counts, and execution duration metrics.
-/// Uses IFranzGrpcMetrics abstraction to support any backend (OTel, Prometheus, etc.).
+/// Records outgoing gRPC request counts, success/failure counts, and execution duration.
+/// Uses the Franz metrics abstraction so hosts can select their metrics backend.
 /// </summary>
 public sealed class MetricClientBehavior<TRequest, TResponse>
-    : IGrpcServerBehavior<TRequest, TResponse>
+    : IGrpcClientBehavior<TRequest, TResponse>
     where TRequest : class
     where TResponse : class
 {
@@ -25,34 +25,25 @@ public sealed class MetricClientBehavior<TRequest, TResponse>
   public async Task<TResponse> InvokeAsync(
       TRequest request,
       GrpcCallContext context,
-      GrpcServerPipelineDelegate<TRequest, TResponse> next,
+      GrpcClientPipelineDelegate<TRequest, TResponse> next,
       CancellationToken cancellationToken = default)
   {
-    // Record request arrival
     _metrics.RecordRequest(context);
-
-    var sw = Stopwatch.StartNew();
+    var stopwatch = Stopwatch.StartNew();
 
     try
     {
-      // Execute downstream behaviors
       var response = await next(request, context, cancellationToken)
           .ConfigureAwait(false);
 
-      sw.Stop();
-
-      // Record success metrics
-      _metrics.RecordSuccess(context, sw.ElapsedMilliseconds);
-
+      stopwatch.Stop();
+      _metrics.RecordSuccess(context, stopwatch.ElapsedMilliseconds);
       return response;
     }
-    catch (Exception ex)
+    catch (Exception exception)
     {
-      sw.Stop();
-
-      // Record failure metrics
-      _metrics.RecordFailure(context, ex, sw.ElapsedMilliseconds);
-
+      stopwatch.Stop();
+      _metrics.RecordFailure(context, exception, stopwatch.ElapsedMilliseconds);
       throw;
     }
   }
