@@ -61,6 +61,7 @@ public sealed record GrpcCallContext
   public bool IsClientSide => !IsServerSide;
 
   private static readonly StringComparer HeaderComparer = StringComparer.OrdinalIgnoreCase;
+  private static readonly object ServerContextStateKey = new();
 
   private GrpcCallContext(
       string correlationId,
@@ -147,6 +148,16 @@ public sealed record GrpcCallContext
     if (serverContext is null)
       throw new ArgumentNullException(nameof(serverContext));
 
+    // The ASP.NET Core transport adapter establishes the canonical context before
+    // invoking the service. Reuse it so service code and pipeline behaviors observe
+    // the same trusted identity and per-call metadata rather than rebuilding a
+    // context from transport headers and silently losing host-derived identity.
+    if (serverContext.UserState.TryGetValue(ServerContextStateKey, out var existingContext)
+        && existingContext is GrpcCallContext establishedContext)
+    {
+      return establishedContext;
+    }
+
     var requestHeaders = ToImmutableHeaderDictionary(serverContext.RequestHeaders
         .Select(h => new KeyValuePair<string, string>(h.Key, h.Value)));
 
@@ -164,7 +175,7 @@ public sealed record GrpcCallContext
     ? (DateTime?)null
     : serverContext.Deadline.ToUniversalTime();
 
-    return new GrpcCallContext(
+    var context = new GrpcCallContext(
         correlationId,
         requestId,
         tenantId,
@@ -177,6 +188,9 @@ public sealed record GrpcCallContext
         requestHeaders,
         ImmutableDictionary<string, string>.Empty.WithComparers(HeaderComparer),
         isServerSide: true);
+
+    serverContext.UserState[ServerContextStateKey] = context;
+    return context;
   }
 
   #endregion

@@ -44,6 +44,8 @@ public sealed class GrpcTransportIntegrationTests
         var response = await client.UnaryAsync(new ProbeRequest { Value = "trusted-identity" });
 
         Assert.Equal("trusted-user", response.ObservedUserId);
+        Assert.Equal(1, host.PipelineProbe.InvocationCount);
+        Assert.Equal("trusted-user", host.PipelineProbe.LastUserId);
     }
 
     [Fact]
@@ -127,15 +129,22 @@ public sealed class GrpcTransportIntegrationTests
 
 internal sealed class GrpcTestHost : IAsyncDisposable
 {
-    private GrpcTestHost(TestServer server) => Server = server;
+    private GrpcTestHost(TestServer server, GrpcPipelineProbe pipelineProbe)
+    {
+        Server = server;
+        PipelineProbe = pipelineProbe;
+    }
 
     public TestServer Server { get; }
+    public GrpcPipelineProbe PipelineProbe { get; }
 
     public static Task<GrpcTestHost> StartAsync(bool authenticated = false)
     {
+        var pipelineProbe = new GrpcPipelineProbe();
         var server = new TestServer(new WebHostBuilder()
             .ConfigureServices(services =>
             {
+                services.AddSingleton(pipelineProbe);
                 services.AddFranzGrpcServer(new ConfigurationBuilder().Build());
                 services.AddFranzGrpcDefaults();
                 services.AddSingleton<IFranzAuthorizationService, AllowAllGrpcAuthorizationService>();
@@ -168,7 +177,7 @@ internal sealed class GrpcTestHost : IAsyncDisposable
                 app.UseEndpoints(endpoints => endpoints.MapGrpcService<GrpcProbeService>());
             }));
 
-        return Task.FromResult(new GrpcTestHost(server));
+        return Task.FromResult(new GrpcTestHost(server, pipelineProbe));
     }
 
     public ValueTask DisposeAsync()
@@ -184,7 +193,22 @@ internal sealed class AllowAllGrpcAuthorizationService : IFranzAuthorizationServ
         => Task.CompletedTask;
 }
 
-internal sealed class ProbeContextBehavior : IGrpcServerBehavior<ProbeRequest, ProbeReply>
+internal sealed class GrpcPipelineProbe
+{
+    private int _invocationCount;
+    private string? _lastUserId;
+
+    public int InvocationCount => Volatile.Read(ref _invocationCount);
+    public string? LastUserId => Volatile.Read(ref _lastUserId);
+
+    public void Record(string? userId)
+    {
+        Volatile.Write(ref _lastUserId, userId);
+        Interlocked.Increment(ref _invocationCount);
+    }
+}
+
+internal sealed class ProbeContextBehavior(GrpcPipelineProbe probe) : IGrpcServerBehavior<ProbeRequest, ProbeReply>
 {
     public int Order => 2_500;
 
@@ -194,6 +218,7 @@ internal sealed class ProbeContextBehavior : IGrpcServerBehavior<ProbeRequest, P
         GrpcServerPipelineDelegate<ProbeRequest, ProbeReply> next,
         CancellationToken cancellationToken = default)
     {
+        probe.Record(context.UserId);
         var response = await next(request, context, cancellationToken).ConfigureAwait(false);
         response.ObservedUserId = context.UserId ?? string.Empty;
         return response;
