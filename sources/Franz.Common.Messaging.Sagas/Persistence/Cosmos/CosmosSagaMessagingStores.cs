@@ -69,8 +69,7 @@ public sealed class CosmosSagaInboxStore : IInboxStore
   {
     Validate(messageId);
     var tenantId = CurrentTenantId();
-    return _db.Set<CosmosSagaInboxDocument>().AsNoTracking()
-        .AnyAsync(record => record.Id == messageId.ToString("N") && record.TenantId == tenantId, ct);
+    return FindAsync(messageId, tenantId, ct) is not null;
   }
 
   public async Task<bool> TryRegisterAsync(Guid messageId, CancellationToken ct = default)
@@ -78,9 +77,7 @@ public sealed class CosmosSagaInboxStore : IInboxStore
     Validate(messageId);
     var tenantId = CurrentTenantId();
 
-    if (await _db.Set<CosmosSagaInboxDocument>().AnyAsync(
-        record => record.Id == messageId.ToString("N") && record.TenantId == tenantId, ct)
-        .ConfigureAwait(false))
+    if (await FindAsync(messageId, tenantId, ct).ConfigureAwait(false) is not null)
       return false;
 
     await _db.Set<CosmosSagaInboxDocument>().AddAsync(new CosmosSagaInboxDocument
@@ -98,6 +95,13 @@ public sealed class CosmosSagaInboxStore : IInboxStore
 
   public async Task MarkProcessedAsync(Guid messageId, CancellationToken ct = default)
       => _ = await TryRegisterAsync(messageId, ct).ConfigureAwait(false);
+
+  private Task<CosmosSagaInboxDocument?> FindAsync(
+      Guid messageId,
+      string tenantId,
+      CancellationToken ct)
+      => _db.Set<CosmosSagaInboxDocument>()
+          .FindAsync([messageId.ToString("N"), tenantId], ct).AsTask();
 
   private static string CurrentTenantId()
       => MediatorContext.TenantId ?? string.Empty;
