@@ -6,32 +6,26 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Franz.Common.Grpc.Server;
 
 /// <summary>
-/// Shared scoped resolution and ordering implementation for the three distinct streaming RPC shapes.
-/// The behavior contract remains specific to each shape; only discovery and ordering are shared.
+/// Internal shared discovery and ordering engine for the three distinct streaming RPC shapes.
 /// </summary>
-internal abstract class GrpcStreamingBehaviorProvider
+internal sealed class GrpcStreamingBehaviorResolver(IServiceProvider serviceProvider)
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IServiceProvider _serviceProvider =
+        serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+
     private readonly ConcurrentDictionary<(Type Request, Type Response, Type Behavior), object> _cache = new();
 
-    protected GrpcStreamingBehaviorProvider(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-    }
-
-    protected TBehavior[] Resolve<TRequest, TResponse, TBehavior>()
+    public TBehavior[] Resolve<TRequest, TResponse, TBehavior>()
         where TRequest : class
         where TResponse : class
         where TBehavior : class, IOrderedGrpcStreamingBehavior
     {
         var key = (typeof(TRequest), typeof(TResponse), typeof(TBehavior));
-        return (TBehavior[])_cache.GetOrAdd(key, _ => Create<TBehavior>());
-
-        TBehavior[] Create<T>() where T : class, IOrderedGrpcStreamingBehavior
+        return (TBehavior[])_cache.GetOrAdd(key, _ =>
         {
-            var behaviors = _serviceProvider.GetServices<T>().ToArray();
+            var behaviors = _serviceProvider.GetServices<TBehavior>().ToArray();
             if (behaviors.Length == 0)
-                return Array.Empty<T>();
+                return Array.Empty<TBehavior>();
 
             var ordered = behaviors.OrderBy(behavior => behavior.Order).ToArray();
             var duplicateOrder = ordered
@@ -42,41 +36,53 @@ internal abstract class GrpcStreamingBehaviorProvider
             {
                 throw new InvalidOperationException(
                     $"Multiple gRPC streaming behaviors use the same execution order '{duplicateOrder.Key}' " +
-                    $"for behavior contract '{typeof(T).FullName}', request '{typeof(TRequest).FullName}', " +
+                    $"for behavior contract '{typeof(TBehavior).FullName}', request '{typeof(TRequest).FullName}', " +
                     $"and response '{typeof(TResponse).FullName}'.");
             }
 
             return ordered;
-        }
+        });
     }
 }
 
 /// <summary>Scoped provider for server-streaming behavior pipelines.</summary>
-public sealed class GrpcServerStreamingBehaviorProvider(IServiceProvider serviceProvider)
-    : GrpcStreamingBehaviorProvider(serviceProvider), IGrpcServerStreamingBehaviorProvider
+public sealed class GrpcServerStreamingBehaviorProvider : IGrpcServerStreamingBehaviorProvider
 {
+    private readonly GrpcStreamingBehaviorResolver _resolver;
+
+    public GrpcServerStreamingBehaviorProvider(IServiceProvider serviceProvider)
+        => _resolver = new GrpcStreamingBehaviorResolver(serviceProvider);
+
     public IGrpcServerStreamingBehavior<TRequest, TResponse>[] ResolveBehaviors<TRequest, TResponse>()
-        => Resolve<TRequest, TResponse, IGrpcServerStreamingBehavior<TRequest, TResponse>>()
         where TRequest : class
-        where TResponse : class;
+        where TResponse : class
+        => _resolver.Resolve<TRequest, TResponse, IGrpcServerStreamingBehavior<TRequest, TResponse>>();
 }
 
 /// <summary>Scoped provider for client-streaming behavior pipelines.</summary>
-public sealed class GrpcClientStreamingBehaviorProvider(IServiceProvider serviceProvider)
-    : GrpcStreamingBehaviorProvider(serviceProvider), IGrpcClientStreamingBehaviorProvider
+public sealed class GrpcClientStreamingBehaviorProvider : IGrpcClientStreamingBehaviorProvider
 {
+    private readonly GrpcStreamingBehaviorResolver _resolver;
+
+    public GrpcClientStreamingBehaviorProvider(IServiceProvider serviceProvider)
+        => _resolver = new GrpcStreamingBehaviorResolver(serviceProvider);
+
     public IGrpcClientStreamingBehavior<TRequest, TResponse>[] ResolveBehaviors<TRequest, TResponse>()
-        => Resolve<TRequest, TResponse, IGrpcClientStreamingBehavior<TRequest, TResponse>>()
         where TRequest : class
-        where TResponse : class;
+        where TResponse : class
+        => _resolver.Resolve<TRequest, TResponse, IGrpcClientStreamingBehavior<TRequest, TResponse>>();
 }
 
 /// <summary>Scoped provider for duplex-streaming behavior pipelines.</summary>
-public sealed class GrpcDuplexStreamingBehaviorProvider(IServiceProvider serviceProvider)
-    : GrpcStreamingBehaviorProvider(serviceProvider), IGrpcDuplexStreamingBehaviorProvider
+public sealed class GrpcDuplexStreamingBehaviorProvider : IGrpcDuplexStreamingBehaviorProvider
 {
+    private readonly GrpcStreamingBehaviorResolver _resolver;
+
+    public GrpcDuplexStreamingBehaviorProvider(IServiceProvider serviceProvider)
+        => _resolver = new GrpcStreamingBehaviorResolver(serviceProvider);
+
     public IGrpcDuplexStreamingBehavior<TRequest, TResponse>[] ResolveBehaviors<TRequest, TResponse>()
-        => Resolve<TRequest, TResponse, IGrpcDuplexStreamingBehavior<TRequest, TResponse>>()
         where TRequest : class
-        where TResponse : class;
+        where TResponse : class
+        => _resolver.Resolve<TRequest, TResponse, IGrpcDuplexStreamingBehavior<TRequest, TResponse>>();
 }

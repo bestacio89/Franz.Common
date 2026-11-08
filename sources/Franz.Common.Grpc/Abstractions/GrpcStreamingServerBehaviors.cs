@@ -9,7 +9,7 @@ namespace Franz.Common.Grpc.Abstractions;
 /// response lifetime; implementations must defer scoped work until enumeration
 /// and release resources when enumeration completes, fails, or is disposed.
 /// </summary>
-public interface IGrpcServerStreamingBehavior<TRequest, TResponse>
+public interface IGrpcServerStreamingBehavior<TRequest, TResponse> : IOrderedGrpcStreamingBehavior
     where TRequest : class
     where TResponse : class
 {
@@ -24,7 +24,7 @@ public interface IGrpcServerStreamingBehavior<TRequest, TResponse>
 /// Intercepts a client-streaming RPC. The task must cover the complete consumption
 /// of the request stream and must observe cancellation while reading it.
 /// </summary>
-public interface IGrpcClientStreamingBehavior<TRequest, TResponse>
+public interface IGrpcClientStreamingBehavior<TRequest, TResponse> : IOrderedGrpcStreamingBehavior
     where TRequest : class
     where TResponse : class
 {
@@ -39,7 +39,7 @@ public interface IGrpcClientStreamingBehavior<TRequest, TResponse>
 /// Intercepts a bidirectional streaming RPC. The returned stream represents the
 /// complete response lifetime and must remain cancellation-aware and disposable.
 /// </summary>
-public interface IGrpcDuplexStreamingBehavior<TRequest, TResponse>
+public interface IGrpcDuplexStreamingBehavior<TRequest, TResponse> : IOrderedGrpcStreamingBehavior
     where TRequest : class
     where TResponse : class
 {
