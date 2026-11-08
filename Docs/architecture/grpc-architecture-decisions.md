@@ -46,7 +46,7 @@ The host owns endpoint configuration, credentials/handlers, channel lifetime, an
 
 ### 2.1 Unary compatibility
 
-Keep the existing `FranzServiceBase.ExecuteUnary` API as a compatibility facade while the new transport-boundary integration is introduced. It must delegate to the same canonical pipeline rather than maintain a second implementation.
+Do not preserve `FranzServiceBase.ExecuteUnary` merely for source compatibility. The canonical server pipeline must be applied by the hosting adapter at the transport boundary, so service implementations cannot bypass it accidentally. Remove the base-class/manual-pipeline contract if it prevents that invariant; provide a migration path to ordinary generated gRPC service implementations registered through the adapter.
 
 Do not make application service methods responsible for manually invoking behaviours. The hosting adapter must ensure the pipeline cannot be accidentally bypassed by normal service registration.
 
@@ -107,10 +107,10 @@ Inert options must not remain advertised as working controls. Configuration defa
 
 ## 7. Compatibility and release policy
 
-- Preserve unary APIs where their semantics remain sound.
-- Introduce streaming APIs explicitly; do not overload unary abstractions or silently change their meaning.
-- Remove the custom channel-owning factory in favour of official typed-client lifecycle management. Preserve any genuinely useful Franz pipeline API separately, with an explicit migration path.
-- Since package release status and downstream usage determine the compatibility cost, verify published package history before deciding whether obsolete APIs require a deprecation period. Do not assume source compatibility alone is sufficient.
+- Preserve only contracts whose semantics remain correct and whose dependencies respect the accepted architecture. Source or binary compatibility is not a reason to retain an unsafe contract.
+- Introduce explicit streaming APIs; do not overload unary abstractions or silently change their meaning.
+- Remove the custom channel-owning factory in favour of official typed-client lifecycle management. Preserve genuinely useful pipeline functionality independently, with an explicit migration path.
+- The user has explicitly authorized full gRPC modernization, including removal of legacy/deprecated APIs and unsafe contracts. The published 2.3.3 package history must be documented, but does not impose a requirement to retain defective APIs. Treat the 3.0.0 release line as the intended breaking-change vehicle and provide migration guidance.
 - Package names, dependency direction, public APIs, and migration guidance must be covered by architecture tests and package-consumer tests.
 
 ## 8. Phase gates

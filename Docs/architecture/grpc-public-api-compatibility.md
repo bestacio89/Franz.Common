@@ -1,6 +1,6 @@
 # gRPC Public API and Compatibility Inventory
 
-**Status:** Audited at PR #194 checkpoint `ae28d5c749208c244b1ed272addb1df68a07ca8c`  
+**Status:** Audited at PR #194 checkpoint `5ae3bd6fd154bffbced3b2913c50f2a27d4846ed`; modernization authorization recorded at the next implementation checkpoint  
 **Date:** 2026-11-08  
 **Purpose:** Establish the compatibility constraints for the production-hardening migration. This inventory is evidence for implementation sequencing, not a promise that every current API will be retained unchanged.
 
@@ -12,7 +12,7 @@ Sources:
 - https://www.nuget.org/packages/Franz.Common.Grpc/
 - https://www.nuget.org/profiles/BerEstacio89
 
-The repository's current `common.targets` identifies the working source line as 3.0.0. The gRPC hardening PR must not infer that the next package release is free of compatibility obligations merely because the repository is preparing a major-version line. The actual release/versioning decision belongs to the release process and must be made explicitly.
+The repository's current `common.targets` identifies the working source line as 3.0.0. The user has explicitly authorized a full modernization of the gRPC stack and removal of legacy, deprecated, or unsafe public contracts. The published 2.3.3 package is an important migration baseline, but it is not a reason to retain defective API shapes. The intended breaking-change vehicle is the 3.0.0 line; migration guidance and a compiled API diff remain mandatory.
 
 ## 2. Public API surface identified
 
@@ -67,14 +67,14 @@ The current server provider puts exception mapping at the highest numeric order 
 | `GrpcCallContext` and metadata constants | Preserve sound context semantics; remove trust in caller identity metadata; add trusted-principal construction at adapter boundary | Core context is useful, but current identity source is unsafe |
 | `GrpcOutcome` and status contracts | Preserve public factories where semantics remain valid; sanitize unexpected remote details | Useful stable contract |
 | Unary behaviour interfaces/provider | Preserve where possible; make ordering explicit and ensure exception mapping is outermost | Avoid unnecessary source break while fixing execution semantics |
-| `FranzServiceBase.ExecuteUnary` | Preserve as a compatibility facade delegating to the canonical pipeline | Existing service implementations may inherit it |
+| `FranzServiceBase.ExecuteUnary` | Remove; apply the canonical pipeline at the hosting transport boundary | A manual base-class entry point permits pipeline bypass and couples application services to Franz execution mechanics |
 | Streaming contracts | Add explicit new contracts for each RPC shape | New capability; must not overload unary semantics |
 | `IFranzGrpcClientFactory` / `FranzGrpcClientFactory` | Retire channel ownership; provide a documented migration to `AddGrpcClient<T>` and a Franz pipeline entry point independent of channel creation | Current design duplicates official lifecycle management and leaks ownership ambiguity |
 | Core DI extensions | Keep host-independent registrations in core; move ASP.NET Core hosting/principal integration to adapter | Enforce dependency direction |
 | No-op authorization registration | Remove from ordinary production defaults; expose explicit opt-in only if retained | Secure-by-default requirement |
 | Inert configuration properties | Implement, remove, or obsolete with a documented window based on actual downstream use | Prevent false configuration promises |
 
-Because 2.3.3 is published, removal of the custom factory and any moved public symbols must not be treated as an incidental refactor. Before release, compare the compiled 2.3.3 public API and decide whether the 3.0.0 release line is the explicit breaking-change vehicle. If a compatibility facade would reintroduce forbidden channel/hosting dependencies, do not retain it merely to preserve a symbol; document the source and binary migration clearly.
+Because 2.3.3 is published, removal of the custom factory and other public symbols must be deliberate and accompanied by migration guidance. The user has authorized these breaking changes for the 3.0.0 line. Do not retain a compatibility facade if it reintroduces forbidden channel/hosting dependencies, unsafe identity semantics, insecure defaults, or ambiguous resource ownership. Document the source and binary migration clearly.
 
 ## 5. Required compatibility evidence before release
 
