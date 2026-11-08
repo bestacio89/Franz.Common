@@ -60,12 +60,4 @@ public sealed record FranzGrpcClientOptions
   /// Default: true.
   /// </summary>
   public bool AutoResolveMethodName { get; init; } = true;
-
-  /// <summary>
-  /// Named gRPC services and their connection information.
-  /// Used by FranzGrpcClientFactory to construct channels.
-  /// </summary>
-  public Dictionary<string, FranzGrpcClientServiceConfig> Services { get; init; }
-      = new(StringComparer.OrdinalIgnoreCase);
-
 }
