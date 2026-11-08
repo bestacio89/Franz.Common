@@ -1,3 +1,4 @@
+using Franz.Common.Messaging.Messages;
 using FluentAssertions;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Exceptions;
