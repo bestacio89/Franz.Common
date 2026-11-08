@@ -9,7 +9,7 @@ namespace Franz.Common.Grpc.Abstractions;
 /// </summary>
 /// <typeparam name="TRequest">The incoming gRPC message type.</typeparam>
 /// <typeparam name="TResponse">The outgoing gRPC response type.</typeparam>
-public interface IGrpcServerBehavior<TRequest, TResponse>
+public interface IGrpcServerBehavior<TRequest, TResponse> : IOrderedGrpcServerBehavior
     where TRequest : class
     where TResponse : class
 {
