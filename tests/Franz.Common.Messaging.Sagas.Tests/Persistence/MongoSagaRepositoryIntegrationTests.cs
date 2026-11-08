@@ -11,19 +11,88 @@ namespace Franz.Common.Messaging.Sagas.Tests.Persistence;
 
 public sealed class MongoSagaRepositoryIntegrationTests : IAsyncLifetime
 {
-  private readonly MongoDbContainer _container = new MongoDbBuilder("mongo:7.0").Build();
+  private readonly MongoDbContainer _container = new MongoDbBuilder("mongo:7.0").WithReplicaSet().Build();
+  private MongoClient _client = default!;
   private IMongoDatabase _database = default!;
   private MongoSagaRepository _repository = default!;
 
   public async Task InitializeAsync()
   {
     await _container.StartAsync();
-    var client = new MongoClient(_container.GetConnectionString());
-    _database = client.GetDatabase($"franz_saga_tests_{Guid.NewGuid():N}");
+    _client = new MongoClient(_container.GetConnectionString());
+    _database = _client.GetDatabase($"franz_saga_tests_{Guid.NewGuid():N}");
     _repository = new MongoSagaRepository(_database, new JsonSagaStateSerializer());
   }
 
   public Task DisposeAsync() => _container.DisposeAsync().AsTask();
+
+  [Fact]
+  public async Task InboxSagaStateAndOutbox_CommitAndRollbackAsOneTransaction()
+  {
+    var rollbackMessageId = Guid.CreateVersion7();
+    var rollbackSaga = CreateRecord();
+
+    await using (var rollbackUnitOfWork = new MongoSagaUnitOfWork(_database))
+    {
+      var inbox = new MongoSagaInboxStore(_database, rollbackUnitOfWork);
+      var outbox = new MongoSagaMessageStore(_database, rollbackUnitOfWork);
+      var repository = new MongoSagaRepository(
+          _database, new JsonSagaStateSerializer(), rollbackUnitOfWork);
+
+      await rollbackUnitOfWork.BeginAsync();
+      (await inbox.TryRegisterAsync(rollbackMessageId)).Should().BeTrue();
+      await repository.SaveAsync(rollbackSaga, expectedVersion: null);
+      await outbox.SaveAsync(new Message("{}")
+      {
+        MessageType = typeof(MongoSagaState).AssemblyQualifiedName
+      });
+      await rollbackUnitOfWork.RollbackAsync();
+    }
+
+    await using (var verificationUnitOfWork = new MongoSagaUnitOfWork(_database))
+    {
+      var inbox = new MongoSagaInboxStore(_database, verificationUnitOfWork);
+      var outbox = new MongoSagaMessageStore(_database, verificationUnitOfWork);
+      var repository = new MongoSagaRepository(_database, new JsonSagaStateSerializer());
+
+      (await inbox.HasProcessedAsync(rollbackMessageId)).Should().BeFalse();
+      (await repository.LoadAsync(
+          rollbackSaga.SagaId, rollbackSaga.TenantId, typeof(MongoSagaState))).Should().BeNull();
+      (await outbox.GetPendingAsync()).Should().BeEmpty();
+    }
+
+    var commitMessageId = Guid.CreateVersion7();
+    var commitSaga = CreateRecord();
+
+    await using (var commitUnitOfWork = new MongoSagaUnitOfWork(_database))
+    {
+      var inbox = new MongoSagaInboxStore(_database, commitUnitOfWork);
+      var outbox = new MongoSagaMessageStore(_database, commitUnitOfWork);
+      var repository = new MongoSagaRepository(
+          _database, new JsonSagaStateSerializer(), commitUnitOfWork);
+
+      await commitUnitOfWork.BeginAsync();
+      (await inbox.TryRegisterAsync(commitMessageId)).Should().BeTrue();
+      await repository.SaveAsync(commitSaga, expectedVersion: null);
+      await outbox.SaveAsync(new Message("{}")
+      {
+        MessageType = typeof(MongoSagaState).AssemblyQualifiedName
+      });
+      await commitUnitOfWork.CommitAsync();
+    }
+
+    await using (var verificationUnitOfWork = new MongoSagaUnitOfWork(_database))
+    {
+      var inbox = new MongoSagaInboxStore(_database, verificationUnitOfWork);
+      var outbox = new MongoSagaMessageStore(_database, verificationUnitOfWork);
+      var repository = new MongoSagaRepository(_database, new JsonSagaStateSerializer());
+
+      (await inbox.HasProcessedAsync(commitMessageId)).Should().BeTrue();
+      (await repository.LoadAsync(
+          commitSaga.SagaId, commitSaga.TenantId, typeof(MongoSagaState))).Should().NotBeNull();
+      (await outbox.GetPendingAsync()).Should().ContainSingle();
+    }
+  }
 
   [Fact]
   public async Task Repository_PreservesTenantScopedIdentityAndImmutableCreationMetadata()
