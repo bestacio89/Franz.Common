@@ -55,6 +55,8 @@ public sealed class GrpcPipelineCharacterizationTests
 
     private sealed class ThrowingBehavior : IGrpcServerBehavior<ProbeRequest, ProbeResponse>
     {
+        public int Order => 100_000;
+
         public Task<ProbeResponse> InvokeAsync(
             ProbeRequest request,
             GrpcCallContext context,

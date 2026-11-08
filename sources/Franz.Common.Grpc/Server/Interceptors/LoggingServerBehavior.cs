@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,39 +11,37 @@ public sealed class LoggingServerBehavior<TRequest, TResponse>
     where TRequest : class
     where TResponse : class
 {
-  private readonly IFranzGrpcLogger _logger;
+    private readonly IFranzGrpcLogger _logger;
 
-  public LoggingServerBehavior(IFranzGrpcLogger logger)
-  {
-    _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-  }
-
-  public async Task<TResponse> InvokeAsync(
-      TRequest request,
-      GrpcCallContext context,
-      GrpcServerPipelineDelegate<TRequest, TResponse> next,
-      CancellationToken cancellationToken = default)
-  {
-    using var scope = _logger.BeginScope(context);
-    var sw = Stopwatch.StartNew();
-
-    _logger.LogRequest(context, request);
-
-    try
+    public LoggingServerBehavior(IFranzGrpcLogger logger)
     {
-      var response = await next(request, context, cancellationToken)
-          .ConfigureAwait(false);
-
-      sw.Stop();
-      _logger.LogResponse(context, response, sw.ElapsedMilliseconds);
-
-      return response;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
-    catch (Exception ex)
+
+    public int Order => GrpcServerBehaviorOrder.Logging;
+
+    public async Task<TResponse> InvokeAsync(
+        TRequest request,
+        GrpcCallContext context,
+        GrpcServerPipelineDelegate<TRequest, TResponse> next,
+        CancellationToken cancellationToken = default)
     {
-      sw.Stop();
-      _logger.LogError(context, ex, sw.ElapsedMilliseconds);
-      throw;
+        using var scope = _logger.BeginScope(context);
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogRequest(context, request);
+
+        try
+        {
+            var response = await next(request, context, cancellationToken).ConfigureAwait(false);
+            stopwatch.Stop();
+            _logger.LogResponse(context, response, stopwatch.ElapsedMilliseconds);
+            return response;
+        }
+        catch (Exception exception)
+        {
+            stopwatch.Stop();
+            _logger.LogError(context, exception, stopwatch.ElapsedMilliseconds);
+            throw;
+        }
     }
-  }
 }

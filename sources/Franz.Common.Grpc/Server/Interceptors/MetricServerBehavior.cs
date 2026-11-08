@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,38 +11,36 @@ public sealed class MetricServerBehavior<TRequest, TResponse>
     where TRequest : class
     where TResponse : class
 {
-  private readonly IFranzGrpcMetrics _metrics;
+    private readonly IFranzGrpcMetrics _metrics;
 
-  public MetricServerBehavior(IFranzGrpcMetrics metrics)
-  {
-    _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-  }
-
-  public async Task<TResponse> InvokeAsync(
-      TRequest request,
-      GrpcCallContext context,
-      GrpcServerPipelineDelegate<TRequest, TResponse> next,
-      CancellationToken cancellationToken = default)
-  {
-    _metrics.RecordRequest(context);
-
-    var sw = Stopwatch.StartNew();
-
-    try
+    public MetricServerBehavior(IFranzGrpcMetrics metrics)
     {
-      var response = await next(request, context, cancellationToken)
-          .ConfigureAwait(false);
-
-      sw.Stop();
-      _metrics.RecordSuccess(context, sw.ElapsedMilliseconds);
-
-      return response;
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
-    catch (Exception ex)
+
+    public int Order => GrpcServerBehaviorOrder.Metrics;
+
+    public async Task<TResponse> InvokeAsync(
+        TRequest request,
+        GrpcCallContext context,
+        GrpcServerPipelineDelegate<TRequest, TResponse> next,
+        CancellationToken cancellationToken = default)
     {
-      sw.Stop();
-      _metrics.RecordFailure(context, ex, sw.ElapsedMilliseconds);
-      throw;
+        _metrics.RecordRequest(context);
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            var response = await next(request, context, cancellationToken).ConfigureAwait(false);
+            stopwatch.Stop();
+            _metrics.RecordSuccess(context, stopwatch.ElapsedMilliseconds);
+            return response;
+        }
+        catch (Exception exception)
+        {
+            stopwatch.Stop();
+            _metrics.RecordFailure(context, exception, stopwatch.ElapsedMilliseconds);
+            throw;
+        }
     }
-  }
 }

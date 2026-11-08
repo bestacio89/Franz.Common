@@ -78,6 +78,8 @@ A behaviour must either invoke its continuation exactly once or deliberately sho
 
 ## 4. Pipeline and exception semantics
 
+- Every unary server behavior declares an explicit numeric execution order. Lower values execute earlier; exception mapping uses the reserved `int.MinValue` position. Built-in behaviors use documented reserved positions, and duplicate positions for the same RPC contract fail pipeline construction rather than falling back to DI registration order.
+- Custom unary behavior authors must choose an explicit order. The streaming contracts will use the same ordering model when their DI providers are introduced.
 - Pipeline order is explicit, deterministic, and documented.
 - Exception mapping is the outermost boundary so it observes failures from validation, tenant resolution, authorization, logging, metrics, and the handler.
 - Custom behaviour ordering must be an explicit contract. Registration order alone is not an adequate undocumented extension point.

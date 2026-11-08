@@ -23,11 +23,6 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
     private readonly ITenantValidator? _tenantValidator;
     private readonly FranzGrpcOptions _options;
 
-    /// <summary>
-    /// Retains the original resolver-only constructor for binary compatibility.
-    /// Tenant resolution remains fail-closed: a resolved tenant requires authorization
-    /// and a validated execution-context accessor, supplied by the full constructor.
-    /// </summary>
     public TenantResolutionServerBehavior(IFranzTenantResolver tenantResolver)
         : this(tenantResolver, Options.Create(new FranzGrpcOptions()))
     {
@@ -47,6 +42,8 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
         _tenantValidator = tenantValidator;
     }
 
+    public int Order => GrpcServerBehaviorOrder.TenantResolution;
+
     public async Task<TResponse> InvokeAsync(
         TRequest request,
         GrpcCallContext context,
@@ -57,11 +54,8 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(next);
 
-        // x-tenant-id is untrusted propagation metadata, never an authority on the server.
         var trustedContext = context.WithTenant(null).WithUser(null);
 
-        // HTTP middleware may already have established and authorized the tenant for this
-        // same ASP.NET request. Reuse that context and leave its cleanup to the HTTP scope.
         if (_tenantContextAccessor?.Current is { } establishedContext)
         {
             if (establishedContext.TenantId == Guid.Empty)

@@ -24,7 +24,7 @@ The current source tree exposes the following public contracts and entry points.
 - Public metadata header constants on `GrpcCallContext`.
 
 ### Server pipeline
-- `IGrpcServerBehavior<TRequest,TResponse>` and `IGrpcServerBehaviorProvider`.
+- `IGrpcServerBehavior<TRequest,TResponse>` and `IGrpcServerBehaviorProvider`; unary behavior implementations now declare an explicit `Order` through `IOrderedGrpcServerBehavior`.
 - `GrpcServerBehaviorProvider`.
 - `FranzServiceBase`, including the protected `ExecuteUnary` compatibility entry point.
 - Validation, tenant-resolution, authorization, logging, metrics, and exception-mapping behaviour implementations.
@@ -66,7 +66,7 @@ The current server provider puts exception mapping at the highest numeric order 
 |---|---|---|
 | `GrpcCallContext` and metadata constants | Preserve sound context semantics; remove trust in caller identity metadata; add trusted-principal construction at adapter boundary | Core context is useful, but current identity source is unsafe |
 | `GrpcOutcome` and status contracts | Preserve public factories where semantics remain valid; sanitize unexpected remote details | Useful stable contract |
-| Unary behaviour interfaces/provider | Preserve where possible; make ordering explicit and ensure exception mapping is outermost | Avoid unnecessary source break while fixing execution semantics |
+| Unary behavior interfaces/provider | Require explicit numeric ordering; reject duplicate positions and reserve the outermost position for exception mapping | Registration-order fallback is ambiguous and can invalidate exception boundaries |
 | `FranzServiceBase.ExecuteUnary` | Remove; apply the canonical pipeline at the hosting transport boundary | A manual base-class entry point permits pipeline bypass and couples application services to Franz execution mechanics |
 | Streaming contracts | Add explicit new contracts for each RPC shape | New capability; must not overload unary semantics |
 | `IFranzGrpcClientFactory` / `FranzGrpcClientFactory` | Retire channel ownership; provide a documented migration to `AddGrpcClient<T>` and a Franz pipeline entry point independent of channel creation | Current design duplicates official lifecycle management and leaks ownership ambiguity |
