@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Text.Encodings.Web;
+using Microsoft.AspNetCore.Authentication;
 using Franz.Common.Grpc.Abstractions;
 using Franz.Common.Grpc.AspNetCore.DependencyInjection;
 using Franz.Common.Grpc.DependencyInjection;
@@ -10,6 +12,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Grpc.Tests.Integration;
 
@@ -129,62 +133,93 @@ public sealed class GrpcTransportIntegrationTests
 
 internal sealed class GrpcTestHost : IAsyncDisposable
 {
-    private GrpcTestHost(TestServer server, GrpcPipelineProbe pipelineProbe)
+    private readonly IHost _host;
+
+    private GrpcTestHost(IHost host, GrpcPipelineProbe pipelineProbe)
     {
-        Server = server;
+        _host = host;
+        Server = host.GetTestServer();
         PipelineProbe = pipelineProbe;
     }
 
     public TestServer Server { get; }
     public GrpcPipelineProbe PipelineProbe { get; }
 
-    public static Task<GrpcTestHost> StartAsync(bool authenticated = false)
+    public static async Task<GrpcTestHost> StartAsync(bool authenticated = false)
     {
         var pipelineProbe = new GrpcPipelineProbe();
-        var server = new TestServer(new WebHostBuilder()
-            .ConfigureServices(services =>
+        var host = await new HostBuilder()
+            .ConfigureWebHost(webHost =>
             {
-                services.AddSingleton(pipelineProbe);
-                services.AddFranzGrpcServer(new ConfigurationBuilder().Build());
-                services.AddFranzGrpcDefaults();
-                services.AddSingleton<IFranzAuthorizationService, AllowAllGrpcAuthorizationService>();
-                services.AddScoped<IGrpcServerBehavior<ProbeRequest, ProbeReply>, ProbeContextBehavior>();
-                services.AddFranzGrpcAspNetCore();
-            })
-            .Configure(app =>
-            {
-                app.UseRouting();
-
-                if (authenticated)
+                webHost.UseTestServer();
+                webHost.ConfigureServices(services =>
                 {
-                    app.Use(async (context, next) =>
-                    {
-                        context.User = new ClaimsPrincipal(new[]
-                        {
-                            new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, "untrusted-user") }),
-                            new ClaimsIdentity(authenticationType: "UpstreamAuthentication"),
-                            new ClaimsIdentity(
-                                new[] { new Claim(ClaimTypes.NameIdentifier, "trusted-user") },
-                                authenticationType: "IntegrationTest")
-                        });
+                    services.AddSingleton(pipelineProbe);
+                    services.AddFranzGrpcServer(new ConfigurationBuilder().Build());
+                    services.AddFranzGrpcDefaults();
+                    services.AddSingleton<IFranzAuthorizationService, AllowAllGrpcAuthorizationService>();
+                    services.AddScoped<IGrpcServerBehavior<ProbeRequest, ProbeReply>, ProbeContextBehavior>();
+                    services.AddFranzGrpcAspNetCore();
 
-                        if (context.User.Identities.All(identity => !identity.IsAuthenticated))
-                            throw new InvalidOperationException("The integration test principal was not authenticated.");
+                    services
+                        .AddAuthentication(TestAuthenticationHandler.SchemeName)
+                        .AddScheme<TestAuthenticationOptions, TestAuthenticationHandler>(
+                            TestAuthenticationHandler.SchemeName,
+                            options => options.Authenticate = authenticated);
+                    services.AddAuthorization();
+                });
+                webHost.Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseAuthentication();
+                    app.UseAuthorization();
+                    app.UseEndpoints(endpoints => endpoints.MapGrpcService<GrpcProbeService>());
+                });
+            })
+            .StartAsync();
 
-                        await next();
-                    });
-                }
-
-                app.UseEndpoints(endpoints => endpoints.MapGrpcService<GrpcProbeService>());
-            }));
-
-        return Task.FromResult(new GrpcTestHost(server, pipelineProbe));
+        return new GrpcTestHost(host, pipelineProbe);
     }
 
     public ValueTask DisposeAsync()
     {
-        Server.Dispose();
+        _host.Dispose();
         return ValueTask.CompletedTask;
+    }
+}
+
+internal sealed class TestAuthenticationOptions : AuthenticationSchemeOptions
+{
+    public bool Authenticate { get; set; }
+}
+
+internal sealed class TestAuthenticationHandler(
+    IOptionsMonitor<TestAuthenticationOptions> options,
+    ILoggerFactory logger,
+    UrlEncoder encoder)
+    : AuthenticationHandler<TestAuthenticationOptions>(options, logger, encoder)
+{
+    public const string SchemeName = "FranzGrpcIntegrationTest";
+
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    {
+        if (!Options.Authenticate)
+            return Task.FromResult(AuthenticateResult.NoResult());
+
+        var principal = new ClaimsPrincipal(new[]
+        {
+            new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, "untrusted-user")
+            }),
+            new ClaimsIdentity(authenticationType: "AuthenticatedWithoutSubject"),
+            new ClaimsIdentity(
+                new[] { new Claim(ClaimTypes.NameIdentifier, "trusted-user") },
+                authenticationType: SchemeName)
+        });
+
+        var ticket = new AuthenticationTicket(principal, SchemeName);
+        return Task.FromResult(AuthenticateResult.Success(ticket));
     }
 }
 
