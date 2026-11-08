@@ -1,11 +1,13 @@
 using Franz.Common.Grpc.Abstractions;
+using Franz.Common.Grpc.AspNetCore.DependencyInjection;
+using Franz.Common.Grpc.DependencyInjection;
 using Franz.Common.Grpc.Tests.Contracts;
 using Grpc.Core;
 using Grpc.Net.Client;
-using Grpc.AspNetCore.Server;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Franz.Common.Grpc.Tests.Integration;
@@ -13,7 +15,7 @@ namespace Franz.Common.Grpc.Tests.Integration;
 public sealed class GrpcTransportIntegrationTests
 {
     [Fact]
-    public async Task UnaryCall_TraversesHttp2Transport()
+    public async Task UnaryCall_TraversesHttp2TransportAndFranzPipeline()
     {
         await using var host = await GrpcTestHost.StartAsync();
         using var channel = GrpcChannel.ForAddress("http://localhost", new GrpcChannelOptions
@@ -25,6 +27,7 @@ public sealed class GrpcTransportIntegrationTests
         var response = await client.UnaryAsync(new ProbeRequest { Value = "unary" });
 
         Assert.Equal("unary", response.Value);
+        Assert.Equal(string.Empty, response.ObservedUserId);
     }
 
     [Fact]
@@ -102,8 +105,6 @@ public sealed class GrpcTransportIntegrationTests
             new ProbeRequest { Value = "identity" },
             headers);
 
-        // Caller-controlled x-user-id metadata is retained as metadata only. The hosting
-        // adapter must supply UserId from the authenticated principal in a later phase.
         Assert.Equal(string.Empty, response.ObservedUserId);
     }
 }
@@ -117,7 +118,14 @@ internal sealed class GrpcTestHost : IAsyncDisposable
     public static Task<GrpcTestHost> StartAsync()
     {
         var server = new TestServer(new WebHostBuilder()
-            .ConfigureServices(services => services.AddGrpc())
+            .ConfigureServices(services =>
+            {
+                services.AddFranzGrpcServer(new ConfigurationBuilder().Build());
+                services.AddFranzGrpcDefaults();
+                services.AddSingleton<IFranzAuthorizationService, AllowAllGrpcAuthorizationService>();
+                services.AddScoped<IGrpcServerBehavior<ProbeRequest, ProbeReply>, ProbeContextBehavior>();
+                services.AddFranzGrpcAspNetCore();
+            })
             .Configure(app =>
             {
                 app.UseRouting();
@@ -131,6 +139,28 @@ internal sealed class GrpcTestHost : IAsyncDisposable
     {
         Server.Dispose();
         return ValueTask.CompletedTask;
+    }
+}
+
+internal sealed class AllowAllGrpcAuthorizationService : IFranzAuthorizationService
+{
+    public Task AuthorizeAsync(GrpcCallContext context, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+}
+
+internal sealed class ProbeContextBehavior : IGrpcServerBehavior<ProbeRequest, ProbeReply>
+{
+    public int Order => 2_500;
+
+    public async Task<ProbeReply> InvokeAsync(
+        ProbeRequest request,
+        GrpcCallContext context,
+        GrpcServerPipelineDelegate<ProbeRequest, ProbeReply> next,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await next(request, context, cancellationToken).ConfigureAwait(false);
+        response.ObservedUserId = context.UserId ?? string.Empty;
+        return response;
     }
 }
 

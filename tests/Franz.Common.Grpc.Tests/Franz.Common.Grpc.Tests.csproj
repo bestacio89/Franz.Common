@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.Grpc\Franz.Common.Grpc.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Grpc.AspNetCore\Franz.Common.Grpc.AspNetCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>

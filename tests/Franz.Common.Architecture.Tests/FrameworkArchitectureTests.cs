@@ -158,6 +158,35 @@ public sealed class FrameworkArchitectureTests
   }
 
   [Fact]
+  public void Grpc_aspnetcore_adapter_must_reference_core_and_keep_hosting_out_of_core()
+  {
+    var sourceRoot = Path.Combine(RepositoryRoot.Value, "sources");
+    var adapterPath = Path.Combine(sourceRoot, "Franz.Common.Grpc.AspNetCore", "Franz.Common.Grpc.AspNetCore.csproj");
+    var corePath = Path.Combine(sourceRoot, "Franz.Common.Grpc", "Franz.Common.Grpc.csproj");
+    var adapter = XDocument.Load(adapterPath);
+    var core = XDocument.Load(corePath);
+
+    var adapterReferences = adapter.Descendants()
+      .Where(element => element.Name.LocalName == "ProjectReference")
+      .Select(element => (string?)element.Attribute("Include"))
+      .Where(include => !string.IsNullOrWhiteSpace(include))
+      .Select(include => Path.GetFileNameWithoutExtension(include!.Replace('\\\\', '/')))
+      .ToArray();
+
+    Assert.Contains("Franz.Common.Grpc", adapterReferences);
+
+    var coreReferences = core.Descendants()
+      .Where(element => element.Name.LocalName is "ProjectReference" or "PackageReference")
+      .Select(element => (string?)element.Attribute("Include"))
+      .Where(include => !string.IsNullOrWhiteSpace(include))
+      .ToArray();
+
+    Assert.DoesNotContain(coreReferences, reference =>
+      reference!.Contains("AspNetCore", StringComparison.OrdinalIgnoreCase)
+      || reference!.Contains("Grpc.AspNetCore", StringComparison.OrdinalIgnoreCase));
+  }
+
+  [Fact]
   public void Runtime_projects_must_not_reference_test_projects_or_test_helpers()
   {
     var sourceRoot = Path.Combine(RepositoryRoot.Value, "sources");
