@@ -115,6 +115,84 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<CosmosFixture
     (await deleteRepository.LoadAsync(sagaId, "tenant-b", typeof(CosmosSagaState))).Should().NotBeNull();
   }
 
+
+  [Fact]
+  public async Task InboxSagaStateAndOutbox_CommitAndRollbackAsOneTransactionalBatch()
+  {
+    var databaseName = $"SagaAtomicity_{Guid.NewGuid():N}";
+    await using (var schemaContext = CreateContext(databaseName))
+      await schemaContext.Database.EnsureCreatedAsync();
+
+    using var contextScope = Franz.Common.Mediator.Context.MediatorContext.BeginScope(
+        Franz.Common.Mediator.Context.MediatorExecutionContext.Empty);
+
+    var rollbackMessageId = Guid.CreateVersion7();
+    var rollbackSaga = CreateRecord();
+    await using (var rollbackContext = CreateContext(databaseName))
+    {
+      var unitOfWork = new CosmosSagaUnitOfWork(rollbackContext);
+      var inbox = new CosmosSagaInboxStore(rollbackContext, unitOfWork);
+      var outbox = new CosmosSagaMessageStore(rollbackContext, unitOfWork);
+      var repository = new CosmosSagaRepository(
+          rollbackContext, new JsonSagaStateSerializer(), unitOfWork);
+
+      await unitOfWork.BeginAsync();
+      (await inbox.TryRegisterAsync(rollbackMessageId)).Should().BeTrue();
+      await repository.SaveAsync(rollbackSaga, expectedVersion: null);
+      await outbox.SaveAsync(new Franz.Common.Messaging.Messages.Message("{}")
+      {
+        MessageType = typeof(CosmosSagaState).AssemblyQualifiedName
+      });
+      await unitOfWork.RollbackAsync();
+    }
+
+    await using (var verifyRollbackContext = CreateContext(databaseName))
+    {
+      var unitOfWork = new CosmosSagaUnitOfWork(verifyRollbackContext);
+      var inbox = new CosmosSagaInboxStore(verifyRollbackContext, unitOfWork);
+      var outbox = new CosmosSagaMessageStore(verifyRollbackContext, unitOfWork);
+      var repository = CreateRepository(verifyRollbackContext);
+
+      (await inbox.HasProcessedAsync(rollbackMessageId)).Should().BeFalse();
+      (await repository.LoadAsync(rollbackSaga.SagaId, rollbackSaga.TenantId, typeof(CosmosSagaState)))
+          .Should().BeNull();
+      (await outbox.GetPendingAsync()).Should().BeEmpty();
+    }
+
+    var commitMessageId = Guid.CreateVersion7();
+    var commitSaga = CreateRecord();
+    await using (var commitContext = CreateContext(databaseName))
+    {
+      var unitOfWork = new CosmosSagaUnitOfWork(commitContext);
+      var inbox = new CosmosSagaInboxStore(commitContext, unitOfWork);
+      var outbox = new CosmosSagaMessageStore(commitContext, unitOfWork);
+      var repository = new CosmosSagaRepository(
+          commitContext, new JsonSagaStateSerializer(), unitOfWork);
+
+      await unitOfWork.BeginAsync();
+      (await inbox.TryRegisterAsync(commitMessageId)).Should().BeTrue();
+      await repository.SaveAsync(commitSaga, expectedVersion: null);
+      await outbox.SaveAsync(new Franz.Common.Messaging.Messages.Message("{}")
+      {
+        MessageType = typeof(CosmosSagaState).AssemblyQualifiedName
+      });
+      await unitOfWork.CommitAsync();
+    }
+
+    await using (var verifyCommitContext = CreateContext(databaseName))
+    {
+      var unitOfWork = new CosmosSagaUnitOfWork(verifyCommitContext);
+      var inbox = new CosmosSagaInboxStore(verifyCommitContext, unitOfWork);
+      var outbox = new CosmosSagaMessageStore(verifyCommitContext, unitOfWork);
+      var repository = CreateRepository(verifyCommitContext);
+
+      (await inbox.HasProcessedAsync(commitMessageId)).Should().BeTrue();
+      (await repository.LoadAsync(commitSaga.SagaId, commitSaga.TenantId, typeof(CosmosSagaState)))
+          .Should().NotBeNull();
+      (await outbox.GetPendingAsync()).Should().ContainSingle();
+    }
+  }
+
   private CosmosSagaDbContext CreateContext(string databaseName)
   {
     var endpoint = $"https://localhost:{_fixture.Container.GetMappedPublicPort(8081)}/";
