@@ -41,7 +41,7 @@ public sealed class GrpcPipelineCharacterizationTests
         var outcome = GrpcOutcome.FromException(new OperationCanceledException());
 
         // Characterization only. Cancellation must receive deliberate transport semantics.
-        Assert.Equal(Grpc.Core.StatusCode.Internal, outcome.StatusCode);
+        Assert.Equal(global::Grpc.Core.StatusCode.Internal, outcome.StatusCode);
     }
 
     private sealed class ProbeRequest { }
