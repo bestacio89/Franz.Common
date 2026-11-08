@@ -65,11 +65,11 @@ public sealed class CosmosSagaInboxStore : IInboxStore
     _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
   }
 
-  public Task<bool> HasProcessedAsync(Guid messageId, CancellationToken ct = default)
+  public async Task<bool> HasProcessedAsync(Guid messageId, CancellationToken ct = default)
   {
     Validate(messageId);
     var tenantId = CurrentTenantId();
-    return FindAsync(messageId, tenantId, ct) is not null;
+    return await FindAsync(messageId, tenantId, ct).ConfigureAwait(false) is not null;
   }
 
   public async Task<bool> TryRegisterAsync(Guid messageId, CancellationToken ct = default)
