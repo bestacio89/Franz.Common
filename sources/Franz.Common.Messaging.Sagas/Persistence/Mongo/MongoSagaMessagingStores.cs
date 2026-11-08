@@ -54,12 +54,23 @@ public sealed class MongoSagaInboxStore : IInboxStore
       ProcessedOn = DateTime.UtcNow
     };
 
-    if (_unitOfWork.CurrentSession is { } session)
-      await _collection.InsertOneAsync(session, record, cancellationToken: ct).ConfigureAwait(false);
-    else
-      await _collection.InsertOneAsync(record, cancellationToken: ct).ConfigureAwait(false);
+    try
+    {
+      if (_unitOfWork.CurrentSession is { } session)
+        await _collection.InsertOneAsync(session, record, cancellationToken: ct).ConfigureAwait(false);
+      else
+        await _collection.InsertOneAsync(record, cancellationToken: ct).ConfigureAwait(false);
 
-    return true;
+      return true;
+    }
+    catch (MongoWriteException exception) when (
+        exception.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+    {
+      // The unique _id index is the concurrency arbiter. A duplicate insert inside
+      // a transaction aborts that transaction; the dispatcher observes false and
+      // rolls the unit of work back without executing saga handlers.
+      return false;
+    }
   }
 
   public async Task MarkProcessedAsync(Guid messageId, CancellationToken ct = default)

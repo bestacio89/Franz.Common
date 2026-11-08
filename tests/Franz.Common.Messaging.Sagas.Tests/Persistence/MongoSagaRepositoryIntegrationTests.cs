@@ -88,6 +88,7 @@ public sealed class MongoSagaRepositoryIntegrationTests : IAsyncLifetime
       var repository = new MongoSagaRepository(_database, new JsonSagaStateSerializer());
 
       (await inbox.HasProcessedAsync(commitMessageId)).Should().BeTrue();
+      (await inbox.TryRegisterAsync(commitMessageId)).Should().BeFalse();
       (await repository.LoadAsync(
           commitSaga.SagaId, commitSaga.TenantId, typeof(MongoSagaState))).Should().NotBeNull();
       (await outbox.GetPendingAsync()).Should().ContainSingle();
