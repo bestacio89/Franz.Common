@@ -101,7 +101,7 @@ public sealed class CosmosSagaInboxStore : IInboxStore
       string tenantId,
       CancellationToken ct)
       => _db.Set<CosmosSagaInboxDocument>()
-          .FindAsync([messageId.ToString("N")], ct).AsTask();
+          .FindAsync([messageId.ToString("N"), tenantId], ct).AsTask();
 
   private static string CurrentTenantId()
       => MediatorContext.TenantId ?? string.Empty;
