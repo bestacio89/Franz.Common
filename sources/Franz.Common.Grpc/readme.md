@@ -30,12 +30,14 @@ The registrations are independent; add only the client or server side used by th
 
 `AddFranzGrpcServer(configuration)` binds `Franz:Grpc` and registers the ordered server behaviors:
 
-1. Validation
-2. Tenant resolution
-3. Authorization
-4. Logging
-5. Metrics
-6. Exception mapping
+1. Exception mapping (outermost boundary)
+2. Validation
+3. Tenant resolution
+4. Authorization
+5. Logging
+6. Metrics
+
+The exception mapper encloses the complete behavior pipeline so failures from validation, tenancy, authorization, logging, metrics, and the service handler reach the same transport error boundary.
 
 The host must register its gRPC server services and map its generated service implementations:
 
@@ -76,7 +78,7 @@ When a validated HTTP tenant context already exists for the same request, the gR
 
 ## Hosting boundary
 
-The package does not call `AddGrpc()`, map endpoints, or configure ASP.NET Core routing. It also does not provide a separate `Franz.Common.Grpc.AspNetCore` package in this repository state. Use the official gRPC host integration and the Franz behaviors together.
+The package does not call `AddGrpc()`, map endpoints, or configure ASP.NET Core routing. The ASP.NET Core adapter and transport-enforced pipeline are being introduced as a separate package in this modernization workstream.
 
 ## License
 

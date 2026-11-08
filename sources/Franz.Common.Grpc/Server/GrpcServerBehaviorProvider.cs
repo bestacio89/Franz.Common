@@ -46,37 +46,35 @@ public sealed class GrpcServerBehaviorProvider : IGrpcServerBehaviorProvider
       where TRequest : class
       where TResponse : class
   {
-    // Resolve all behaviors from DI (unordered)
     var all = _provider.GetServices<IGrpcServerBehavior<TRequest, TResponse>>()?.ToList()
               ?? new List<IGrpcServerBehavior<TRequest, TResponse>>();
 
     if (all.Count == 0)
       return Array.Empty<IGrpcServerBehavior<TRequest, TResponse>>();
 
-    // Canonical Franz ordering
-    var ordered = all
-        .OrderBy(b => BehaviorOrder(b))
+    // Exception mapping is the outermost boundary: it must observe failures from
+    // every behavior, including validation, tenant resolution and authorization.
+    return all
+        .OrderBy(BehaviorOrder)
         .ToArray();
-
-    return ordered;
   }
 
   /// <summary>
   /// Defines canonical Franz ordering across server behaviors.
   /// Lower value = execute earlier (outer behavior).
   /// </summary>
-  private static int BehaviorOrder<TRequest, TResponse>(IGrpcServerBehavior<TRequest, TResponse> b)
+  private static int BehaviorOrder<TRequest, TResponse>(IGrpcServerBehavior<TRequest, TResponse> behavior)
       where TRequest : class
       where TResponse : class
   {
-    return b switch
+    return behavior switch
     {
-      ValidationServerBehavior<TRequest, TResponse> => 0,
-      TenantResolutionServerBehavior<TRequest, TResponse> => 1,
-      AuthorizationServerBehavior<TRequest, TResponse> => 2,
-      LoggingServerBehavior<TRequest, TResponse> => 3,
-      MetricServerBehavior<TRequest, TResponse> => 4,
-      ExceptionMappingServerBehavior<TRequest, TResponse> => 5,
+      ExceptionMappingServerBehavior<TRequest, TResponse> => 0,
+      ValidationServerBehavior<TRequest, TResponse> => 1,
+      TenantResolutionServerBehavior<TRequest, TResponse> => 2,
+      AuthorizationServerBehavior<TRequest, TResponse> => 3,
+      LoggingServerBehavior<TRequest, TResponse> => 4,
+      MetricServerBehavior<TRequest, TResponse> => 5,
       _ => int.MaxValue
     };
   }

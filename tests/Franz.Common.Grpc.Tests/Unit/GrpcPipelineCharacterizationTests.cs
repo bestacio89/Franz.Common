@@ -1,28 +1,29 @@
 using Franz.Common.Grpc.Abstractions;
 using Franz.Common.Grpc.Server.Interceptors;
 using Franz.Common.Grpc.Server.Pipelines;
+using Grpc.Core;
 
 namespace Franz.Common.Grpc.Tests.Unit;
 
 public sealed class GrpcPipelineCharacterizationTests
 {
     [Fact]
-    public async Task ExceptionMappingBehavior_DoesNotMapExceptionsThrownByEarlierBehaviors()
+    public async Task ExceptionMappingBehavior_MapsExceptionsThrownByEveryPipelineBehavior()
     {
         var behaviors = new IGrpcServerBehavior<ProbeRequest, ProbeResponse>[]
         {
-            new ThrowingBehavior(),
-            new ExceptionMappingServerBehavior<ProbeRequest, ProbeResponse>()
+            new ExceptionMappingServerBehavior<ProbeRequest, ProbeResponse>(),
+            new ThrowingBehavior()
         };
 
         var pipeline = FranzServerInteropPipeline.Build(
             behaviors,
             (_, _, _) => Task.FromResult(new ProbeResponse()));
 
-        // Characterizes the current pipeline order: exception mapping is innermost,
-        // so an exception from an earlier/outer behavior bypasses the mapper.
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var exception = await Assert.ThrowsAsync<RpcException>(() =>
             pipeline(new ProbeRequest(), GrpcCallContext.CreateClient("tests.Service", "Call"), CancellationToken.None));
+
+        Assert.Equal(StatusCode.Internal, exception.StatusCode);
     }
 
     [Fact]
@@ -31,7 +32,7 @@ public sealed class GrpcPipelineCharacterizationTests
         const string sensitiveMessage = "database endpoint and credentials must not be exposed";
         var outcome = GrpcOutcome.FromException(new InvalidOperationException(sensitiveMessage));
 
-        // Characterization only. The production contract must sanitize unexpected failures.
+        // This remains a characterization until the dedicated error-semantics checkpoint.
         Assert.Equal(sensitiveMessage, outcome.ToRpcException().Status.Detail);
     }
 
@@ -40,8 +41,8 @@ public sealed class GrpcPipelineCharacterizationTests
     {
         var outcome = GrpcOutcome.FromException(new OperationCanceledException());
 
-        // Characterization only. Cancellation must receive deliberate transport semantics.
-        Assert.Equal(global::Grpc.Core.StatusCode.Internal, outcome.StatusCode);
+        // This remains a characterization until the dedicated cancellation checkpoint.
+        Assert.Equal(StatusCode.Internal, outcome.StatusCode);
     }
 
     private sealed class ProbeRequest { }
