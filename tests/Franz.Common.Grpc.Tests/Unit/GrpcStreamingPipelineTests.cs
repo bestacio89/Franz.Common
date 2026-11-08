@@ -119,6 +119,8 @@ public sealed class GrpcStreamingPipelineTests
     private sealed class ServerStreamingBehavior(string name, List<string> order)
         : IGrpcServerStreamingBehavior<ProbeMessage, ProbeMessage>
     {
+        public int Order => name == "outer" ? 0 : 10;
+
         public async IAsyncEnumerable<ProbeMessage> InvokeAsync(
             ProbeMessage request,
             GrpcCallContext context,
@@ -135,6 +137,8 @@ public sealed class GrpcStreamingPipelineTests
     private sealed class ClientStreamingBehavior(string name, List<string> order)
         : IGrpcClientStreamingBehavior<ProbeMessage, ProbeMessage>
     {
+        public int Order => name == "outer" ? 0 : 10;
+
         public async Task<ProbeMessage> InvokeAsync(
             IAsyncEnumerable<ProbeMessage> requestStream,
             GrpcCallContext context,
@@ -151,6 +155,8 @@ public sealed class GrpcStreamingPipelineTests
     private sealed class DuplexStreamingBehavior(string name, List<string> order)
         : IGrpcDuplexStreamingBehavior<ProbeMessage, ProbeMessage>
     {
+        public int Order => name == "outer" ? 0 : 10;
+
         public async IAsyncEnumerable<ProbeMessage> InvokeAsync(
             IAsyncEnumerable<ProbeMessage> requestStream,
             GrpcCallContext context,
