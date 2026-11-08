@@ -1,15 +1,6 @@
 namespace Franz.Common.Grpc.Abstractions;
 
 /// <summary>
-/// Defines the explicit execution position of a unary server behavior.
-/// Lower values execute earlier and therefore wrap higher values.
-/// </summary>
-public interface IOrderedGrpcServerBehavior
-{
-    int Order { get; }
-}
-
-/// <summary>
 /// Reserved execution positions for the built-in unary server behaviors.
 /// Custom behaviors may use values between these positions to declare their
 /// placement relative to the standard pipeline.

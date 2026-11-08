@@ -1,15 +1,6 @@
 namespace Franz.Common.Grpc.Abstractions;
 
 /// <summary>
-/// Shared ordering contract for server-streaming, client-streaming, and duplex-streaming behaviors.
-/// Lower values execute earlier and therefore wrap higher values.
-/// </summary>
-public interface IOrderedGrpcStreamingBehavior
-{
-    int Order { get; }
-}
-
-/// <summary>
 /// Reserved positions for built-in streaming behaviors. Custom behaviors may use
 /// values between these positions to declare deterministic placement.
 /// </summary>
