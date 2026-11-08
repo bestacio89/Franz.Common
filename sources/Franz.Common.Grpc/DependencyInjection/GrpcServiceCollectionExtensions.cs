@@ -49,8 +49,11 @@ public static class GrpcServiceCollectionExtensions
         .AddNoDuplicateScoped(typeof(IGrpcServerBehavior<,>), typeof(MetricServerBehavior<,>))
         .AddNoDuplicateScoped(typeof(IGrpcServerBehavior<,>), typeof(ExceptionMappingServerBehavior<,>));
 
-    // Behavior provider (resolves ordered behaviors)
+    // Unary and streaming behavior providers are scoped to the RPC service lifetime.
     services.AddNoDuplicateScoped<IGrpcServerBehaviorProvider, GrpcServerBehaviorProvider>();
+    services.AddNoDuplicateScoped<IGrpcServerStreamingBehaviorProvider, GrpcServerStreamingBehaviorProvider>();
+    services.AddNoDuplicateScoped<IGrpcClientStreamingBehaviorProvider, GrpcClientStreamingBehaviorProvider>();
+    services.AddNoDuplicateScoped<IGrpcDuplexStreamingBehaviorProvider, GrpcDuplexStreamingBehaviorProvider>();
 
     return services;
   }
