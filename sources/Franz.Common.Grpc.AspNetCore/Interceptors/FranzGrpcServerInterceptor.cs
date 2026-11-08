@@ -4,6 +4,7 @@ using Franz.Common.Grpc.Server.Pipelines;
 using Grpc.AspNetCore.Server;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -17,13 +18,16 @@ namespace Franz.Common.Grpc.AspNetCore.Interceptors;
 public sealed class FranzGrpcServerInterceptor : Interceptor
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly FranzGrpcAspNetCoreOptions _options;
 
     public FranzGrpcServerInterceptor(
         IServiceScopeFactory scopeFactory,
+        IHttpContextAccessor httpContextAccessor,
         IOptions<FranzGrpcAspNetCoreOptions> options)
     {
         _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
+        _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     }
 
@@ -48,10 +52,14 @@ public sealed class FranzGrpcServerInterceptor : Interceptor
 
     private GrpcCallContext CreateCallContext(ServerCallContext serverCallContext)
     {
-        var principal = serverCallContext.GetHttpContext().User;
-        var authenticatedIdentity = principal.Identities.FirstOrDefault(identity => identity.IsAuthenticated);
-        var userIdClaim = authenticatedIdentity?.FindFirst(_options.UserIdClaimType)?.Value;
-        var userId = string.IsNullOrWhiteSpace(userIdClaim) ? null : userIdClaim;
+        // Resolve the principal from the active ASP.NET Core request scope. The
+        // IHttpContextAccessor is the hosting boundary's authoritative request
+        // context; caller metadata is never used as an identity source.
+        var principal = _httpContextAccessor.HttpContext?.User;
+        var userId = principal?.Identities
+            .Where(identity => identity.IsAuthenticated)
+            .Select(identity => identity.FindFirst(_options.UserIdClaimType)?.Value)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
         return GrpcCallContext.FromServerCallContext(serverCallContext, userId: userId);
     }

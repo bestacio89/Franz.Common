@@ -162,6 +162,7 @@ internal sealed class GrpcTestHost : IAsyncDisposable
                         context.User = new ClaimsPrincipal(new[]
                         {
                             new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, "untrusted-user") }),
+                            new ClaimsIdentity(authenticationType: "UpstreamAuthentication"),
                             new ClaimsIdentity(
                                 new[] { new Claim(ClaimTypes.NameIdentifier, "trusted-user") },
                                 authenticationType: "IntegrationTest")
