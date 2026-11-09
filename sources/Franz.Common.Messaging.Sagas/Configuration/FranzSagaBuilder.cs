@@ -42,12 +42,16 @@ public sealed class FranzSagaBuilder
       throw new InvalidOperationException($"Saga '{sagaType.FullName}' has already been registered.");
 
     var registration = SagaRegistration.FromType(sagaType);
-    foreach (var messageType in registration.AllMessageTypes)
-    {
-      if (!typeof(IIntegrationEvent).IsAssignableFrom(messageType))
-        throw new InvalidOperationException(
-            $"Saga message type '{messageType.FullName}' must implement IIntegrationEvent.");
+    var messageTypes = registration.AllMessageTypes.ToArray();
+    var invalidMessageType = messageTypes.FirstOrDefault(
+        messageType => !typeof(IIntegrationEvent).IsAssignableFrom(messageType));
 
+    if (invalidMessageType is not null)
+      throw new InvalidOperationException(
+          $"Saga message type '{invalidMessageType.FullName}' must implement IIntegrationEvent.");
+
+    foreach (var messageType in messageTypes)
+    {
       var notificationType = typeof(INotificationHandler<>).MakeGenericType(messageType);
       var handlerType = typeof(SagaIntegrationEventNotificationHandler<>).MakeGenericType(messageType);
       _services.TryAddEnumerable(ServiceDescriptor.Scoped(notificationType, handlerType));
