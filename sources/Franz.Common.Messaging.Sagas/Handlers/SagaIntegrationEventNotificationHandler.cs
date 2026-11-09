@@ -54,9 +54,20 @@ internal sealed class SagaIntegrationEventNotificationHandler<TNotification> : I
     Guid? messageId = message is { Id: var id } && id != Guid.Empty ? id : null;
     var tenantId = SagaTenantContextResolver.ResolveTenantId(message, _tenantExecutionContextAccessor);
 
-    if (_inboxStore is not null && message is not null && !messageId.HasValue)
-      throw new PermanentMessagingException(
-          "Saga inbox processing requires a non-empty message identity.");
+    if (_inboxStore is not null)
+    {
+      if (message is null)
+        throw new PermanentMessagingException(
+            "Saga inbox processing requires the original inbound message context.");
+
+      if (!messageId.HasValue)
+        throw new PermanentMessagingException(
+            "Saga inbox processing requires a non-empty message identity.");
+
+      if (message.GetProperty<bool>(MessagingConstants.TransportGeneratedMessageId))
+        throw new PermanentMessagingException(
+            "Saga inbox processing requires a stable broker-supplied message identity.");
+    }
 
     var executionContext = MediatorContext.Current
         .WithCorrelationId(correlationId)
