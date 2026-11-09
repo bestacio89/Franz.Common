@@ -1,7 +1,7 @@
 #nullable enable
 
 using System.Text;
-using Confluent.Kafka;
+using KafkaHeaders = Confluent.Kafka.Headers;
 using FluentAssertions;
 using Franz.Common.Messaging.Kafka.Headers;
 using Franz.Common.Messaging.Messages;
@@ -19,8 +19,8 @@ public sealed class KafkaMessageHeaderMapperTests
     var causationId = Guid.CreateVersion7();
     var tenantId = Guid.CreateVersion7();
     var domainId = Guid.CreateVersion7();
-    var message = new Message("{}") { Id = messageId };
-    var headers = new Headers
+    var message = new Message("{}") { Id = messageId, CorrelationId = null };
+    var headers = new KafkaHeaders
     {
       { "X-Message-ID", Encode(messageId.ToString("D")) },
       { Message.CorrelationHeader, Encode(correlationId.ToString("D")) },
