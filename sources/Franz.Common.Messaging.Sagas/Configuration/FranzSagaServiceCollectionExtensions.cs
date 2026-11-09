@@ -1,7 +1,6 @@
 #nullable enable
 
 using Franz.Common.EntityFramework.Extensions;
-using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Storage;
 using Franz.Common.Messaging.Sagas.Core;
@@ -40,10 +39,6 @@ public static class FranzSagaServiceCollectionExtensions
     services.TryAddSingleton<SagaExecutionPipeline>();
     services.TryAddTransient<SagaOrchestrator>();
     services.TryAddScoped<ISagaStateSerializer, JsonSagaStateSerializer>();
-    services.TryAddEnumerable(
-        ServiceDescriptor.Scoped(
-            typeof(INotificationHandler<>),
-            typeof(SagaIntegrationEventNotificationHandler<>)));
 
     RegisterPersistenceAdapter(services, options.Persistence);
 

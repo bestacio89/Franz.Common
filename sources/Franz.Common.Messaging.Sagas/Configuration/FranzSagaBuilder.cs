@@ -4,6 +4,8 @@ using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Logging;
+using Franz.Common.Messaging.Sagas.Handlers;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Validation;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +39,18 @@ public sealed class FranzSagaBuilder
 
     if (_sagaTypes.Contains(sagaType))
       throw new InvalidOperationException($"Saga '{sagaType.FullName}' has already been registered.");
+
+    var registration = SagaRegistration.FromType(sagaType);
+    foreach (var messageType in registration.AllMessageTypes)
+    {
+      if (!typeof(INotification).IsAssignableFrom(messageType))
+        throw new InvalidOperationException(
+            $"Saga message type '{messageType.FullName}' must implement INotification.");
+
+      var notificationType = typeof(INotificationHandler<>).MakeGenericType(messageType);
+      var handlerType = typeof(SagaIntegrationEventNotificationHandler<>).MakeGenericType(messageType);
+      _services.TryAddEnumerable(ServiceDescriptor.Scoped(notificationType, handlerType));
+    }
 
     _sagaTypes.Add(sagaType);
     _services.TryAdd(ServiceDescriptor.Transient(sagaType, sagaType));
