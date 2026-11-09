@@ -4,6 +4,7 @@ using Franz.Common.Mediator;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Exceptions;
+using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
@@ -121,6 +122,18 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
     operations.Should().Equal("begin", "inbox", "rollback");
     (await fixture.Repository.LoadAsync(
         fixture.Saga.SagaId, null, typeof(TestSagaState))).Should().BeNull();
+  }
+
+  [Fact]
+  public async Task ProcessAsync_ResolvesIntegrationEventEnvelopeProducedByCanonicalMessageBuilder()
+  {
+    var fixture = new Fixture();
+    var message = new IntegrationEventMessageBuilderStrategy().Build(new StartEvent());
+
+    await fixture.Handler.ProcessAsync(message);
+
+    (await fixture.Repository.LoadAsync(
+        fixture.Saga.SagaId, null, typeof(TestSagaState))).Should().NotBeNull();
   }
 
   [Fact]
