@@ -14,7 +14,7 @@ public sealed class GrpcStreamingExceptionMappingTests
     {
         var behavior = new ExceptionMappingStreamingBehavior<ProbeRequest, ProbeReply>();
         var context = CreateContext("server-stream-correlation");
-        var pipeline = behavior.InvokeAsync(
+        var pipeline = ((IGrpcServerStreamingBehavior<ProbeRequest, ProbeReply>)behavior).InvokeAsync(
             new ProbeRequest(),
             context,
             (_, _, _) => FaultingResponses(),
