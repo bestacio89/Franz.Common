@@ -12,12 +12,15 @@ dotnet add package Franz.Common.Messaging.Sagas
 
 The package provides:
 - Saga contracts and handler-role registration.
+- Automatic inbound integration-event notification handlers for registered saga message contracts.
 - Explicit saga-instance identity resolution for non-start messages.
 - Lifecycle-gated orchestration with optimistic concurrency.
 - In-memory, EF Core, MongoDB, and Cosmos DB persistence adapters.
 - Metadata-only audit sink integration.
 
-The transport handler deserializes an integration event and invokes the orchestrator with its correlation, causation, message, and tenant metadata.
+The standard Messaging pipeline deserializes an inbound integration event and publishes it through Franz Mediator. `AddSaga<TSaga>()` registers the Saga notification handler for the exact integration-event contracts declared by that saga. No separate transport-specific Saga strategy executer is required.
+
+The notification handler reads the original `Message` from `IMessageContextAccessor`, obtains tenant identity only from the validated `ITenantExecutionContextAccessor`, and passes message identity, correlation, causation, and tenant context to the orchestrator.
 
 ## Registration
 
@@ -48,15 +51,15 @@ Register saga types with `AddSaga<TSaga>()` or the assembly-registration helpers
 app.Services.BuildFranzSagas();
 ```
 
-The package also registers a hosted startup validator. Mapping validation requires every non-start message contract to have a matching `ISagaIdResolver<TMessage>` implementation on the saga.
+The package also registers a hosted startup validator. Mapping validation requires every non-start message contract to have a matching `ISagaIdResolver<TMessage>` implementation on the saga. Every saga message contract must implement `IIntegrationEvent`; closed notification-handler registrations are created for those contracts when `AddSaga<TSaga>()` is called.
 
 ## Identity and message roles
 
 - `SagaId` is the durable identity of one saga instance and the repository key.
 - `CorrelationId` groups related messages; it is not a saga repository key.
 - `CausationId` identifies the message that caused the current execution.
-- `MessageId` is transport-level message identity. The dispatch handler atomically claims it through the existing `IInboxStore` before executing saga handlers.
-- `TenantId` scopes repository operations. `null` represents the default non-tenant scope; supplied values must not be empty or whitespace.
+- `MessageId` is transport-level message identity. The inbound Saga notification handler atomically claims it through the existing `IInboxStore` before executing saga handlers when an original message context is available.
+- `TenantId` scopes repository operations. It is taken from the validated tenant execution context, not copied from an untrusted message header. `null` represents the default non-tenant scope.
 
 A start handler creates the saga instance. For a non-start message, the saga must implement `ISagaIdResolver<TMessage>` and return the non-empty `SagaId` of the target instance. Do not derive this identity from correlation metadata.
 
@@ -88,18 +91,29 @@ Compensation order is application-defined and sequential. A compensation handler
 
 Every successful transition is persisted with the repository's optimistic concurrency contract. Concurrent updates using the same expected version must not both succeed.
 
+## Inbound dispatch and failure propagation
+
+The inbound path is:
+
+1. The transport listener reconstructs the Franz `Message` envelope.
+2. `MessagingStrategyExecuter` resolves the canonical `ClassName` header, deserializes the integration event, and publishes it through `IDispatcher`.
+3. The registered Saga notification handler receives the concrete event and the original message context.
+4. The handler establishes one persistence unit of work and invokes the orchestrator.
+
+Inbound integration-event notifications use `StopOnFirstFailure`. A handler failure therefore propagates back to the transport listener instead of being swallowed by the Mediator's default `ContinueOnError` policy. The configured transport retry/dead-letter policy can then decide the delivery disposition. This fail-fast rule applies to all handlers of an inbound integration event, not only Saga handlers.
+
 ## Atomic persistence boundary
 
-For a single incoming message, the dispatch handler performs one persistence unit of work:
+For a single incoming message, the Saga notification handler performs one persistence unit of work:
 
 1. Begin the provider's `IUnitOfWork`.
-2. Atomically claim the incoming message through `IInboxStore.TryRegisterAsync`.
+2. Atomically claim the incoming message through `IInboxStore.TryRegisterAsync` when a transport message context and message identity are available.
 3. Execute every matching saga registration.
 4. Persist every saga state transition.
 5. Enqueue every outgoing integration event through `IMessageStore`.
 6. Commit once after all matching saga handlers finish.
 
-If processing fails before commit, the inbox receipt, all saga transitions, and all outgoing outbox records roll back together. A duplicate receipt skips execution. The inbox receipt is registered before handler execution, but it is not committed until the entire unit succeeds.
+If processing fails before commit, the inbox receipt, all saga transitions, and all outgoing outbox records roll back together. A duplicate receipt skips execution. The inbox receipt is registered before handler execution, but it is not committed until the entire unit succeeds. Local in-process notification publication without a transport message context has no transport message ID and therefore cannot use message-level inbox deduplication.
 
 Provider implementations:
 
@@ -113,6 +127,8 @@ Provider implementations:
 The transaction abstraction is the persistence `IUnitOfWork`; `IMessagingTransaction` remains a transport/broker transaction and is not used for database coordination.
 
 ## Delivery semantics
+
+The RabbitMQ adapter maps Franz `Message.Id` to AMQP `BasicProperties.MessageId` and `Message.CorrelationId` to AMQP `CorrelationId`; it restores those values on consumption and preserves the `x-causation-id` envelope header. The built-in RabbitMQ sender and publisher both apply this mapping. External RabbitMQ producers must supply a non-empty GUID message ID to obtain stable inbox deduplication. For backward compatibility, deliveries with a missing or invalid ID receive a new local ID; those legacy deliveries cannot be deduplicated reliably across redelivery.
 
 The database commit atomically records inbox receipt, saga state, and outgoing messages. The outbox publisher sends those records after commit. Publication is **at-least-once**: a crash after broker publication but before marking an outbox record as sent can cause redelivery. Consumers and external side effects must therefore be idempotent. Exactly-once delivery across a database and broker is not claimed.
 
