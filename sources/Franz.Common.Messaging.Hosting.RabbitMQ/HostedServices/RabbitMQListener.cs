@@ -214,9 +214,8 @@ public sealed class RabbitMQListener(
         Id = messageId
       };
 
-      // Older producers may omit AMQP correlation metadata. In that compatibility
-      // case, use this delivery's identity as correlation; a synthesized identity is
-      // explicitly marked above and is not stable across redeliveries.
+      // Older producers may not have supplied AMQP correlation metadata. In that
+      // compatibility case, retain the message's own stable identity as correlation.
       if (!headers.TryGetValue(Message.CorrelationHeader, out var correlationValues) ||
           correlationValues.Length != 1 ||
           !Guid.TryParse(correlationValues[0], out _))
