@@ -1,5 +1,7 @@
 using Franz.Common.Grpc.Configuration;
 using Franz.Common.Grpc.DependencyInjection;
+using Franz.Common.Grpc.AspNetCore.Configuration;
+using Franz.Common.Grpc.AspNetCore.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -40,6 +42,18 @@ public sealed class GrpcConfigurationOptionsTests
 
         Assert.Throws<OptionsValidationException>(
             () => provider.GetRequiredService<IOptions<FranzGrpcClientOptions>>().Value);
+    }
+
+    [Fact]
+    public void AddFranzGrpcAspNetCore_RejectsEmptyAuthenticatedUserClaimType()
+    {
+        var services = new ServiceCollection();
+        services.AddFranzGrpcAspNetCore(options => options.UserIdClaimType = " ");
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<FranzGrpcAspNetCoreOptions>>().Value);
     }
 
     [Fact]
