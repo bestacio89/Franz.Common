@@ -26,7 +26,7 @@ internal sealed class GrpcPipelineProbe : IFranzTenantResolver, IFranzTenantAuth
     private string? _lastServiceContextMarker;
     private string? _lastRequestedTenantId;
     private string? _lastRequestedTenantHeader;
-    private Guid? _lastAuthorizedTenantId;
+    private string? _lastAuthorizedTenantId;
 
     public int InvocationCount => Volatile.Read(ref _invocationCount);
     public int AuthorizationInvocationCount => Volatile.Read(ref _authorizationInvocationCount);
@@ -42,7 +42,8 @@ internal sealed class GrpcPipelineProbe : IFranzTenantResolver, IFranzTenantAuth
     public string? LastServiceContextMarker => Volatile.Read(ref _lastServiceContextMarker);
     public string? LastRequestedTenantId => Volatile.Read(ref _lastRequestedTenantId);
     public string? LastRequestedTenantHeader => Volatile.Read(ref _lastRequestedTenantHeader);
-    public Guid? LastAuthorizedTenantId => _lastAuthorizedTenantId;
+    public Guid? LastAuthorizedTenantId =>
+        Guid.TryParse(Volatile.Read(ref _lastAuthorizedTenantId), out var tenantId) ? tenantId : null;
 
     public Task<string?> ResolveTenantAsync(GrpcCallContext context, CancellationToken cancellationToken = default)
     {
@@ -59,7 +60,7 @@ internal sealed class GrpcPipelineProbe : IFranzTenantResolver, IFranzTenantAuth
         CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _tenantAuthorizationInvocationCount);
-        _lastAuthorizedTenantId = tenantId;
+        Volatile.Write(ref _lastAuthorizedTenantId, tenantId.ToString("D"));
         return Task.FromResult(true);
     }
 
