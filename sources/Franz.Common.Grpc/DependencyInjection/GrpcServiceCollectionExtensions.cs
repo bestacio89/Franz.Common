@@ -68,6 +68,15 @@ public static class GrpcServiceCollectionExtensions
         .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(AuthorizationStreamingBehavior<,>))
         .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(AuthorizationStreamingBehavior<,>));
 
+    // Streaming lifecycle logging and metrics remain active through full enumeration.
+    services
+        .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(LoggingStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(LoggingStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(LoggingStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(MetricStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(MetricStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(MetricStreamingBehavior<,>));
+
     // Unary and streaming behavior providers are scoped to the RPC service lifetime.
     services.AddNoDuplicateScoped<IGrpcServerBehaviorProvider, GrpcServerBehaviorProvider>();
     services.AddNoDuplicateScoped<IGrpcServerStreamingBehaviorProvider, GrpcServerStreamingBehaviorProvider>();
