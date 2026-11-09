@@ -1,14 +1,14 @@
 # gRPC Public API and Compatibility Inventory
 
-**Status:** Source-level inventory updated for PR #194 head `099db6a96f1b0903f256aa0f129649c55d14c5e6`; compiled API comparison remains a release gate  
+**Status:** Source-level inventory updated for PR #194 head `1e2fdca5b9b7d6258a9c46f82bd5d1b1449ae3a0`; compiled API comparison remains a release gate  
 **Date:** 2026-11-09  
-**Purpose:** Record the 2.3.3 published baseline, the intended 3.0.0 public contract, and the migration obligations for the gRPC modernization.
+**Purpose:** Record the published baseline, intended 3.0.0 public contract, and migration obligations for the gRPC modernization.
 
 ## 1. Published baseline and release policy
 
-The latest published `Franz.Common.Grpc` baseline identified for this work is version **2.3.3**. The repository's working source line is 3.0.0. The 2.3.3 package is a published consumer contract, but the user has explicitly authorized a full gRPC modernization for the 3.0.0 breaking-change line.
+The latest published `Franz.Common.Grpc` baseline identified for this work is version **2.3.3**. The repository's working source line is 3.0.0. The published package is a consumer contract, but the user has authorized a full modernization for the 3.0.0 breaking-change line.
 
-The 2.3.3 package's compiled public API must still be extracted and compared with both 3.0.0 package outputs. This document is a source-level disposition, not a substitute for that binary comparison.
+The 2.3.3 package's compiled public API must still be extracted and compared with both 3.0.0 package outputs. This source-level inventory is not a substitute for that binary comparison.
 
 ## 2. Current package boundary
 
@@ -20,6 +20,7 @@ The core package references `Grpc.Core.Api` and owns:
 - Unary client and server behavior contracts and pipeline providers.
 - Explicit server-streaming, client-streaming, and duplex behavior contracts and providers.
 - Tenant, validation, authorization, logging, and bounded metrics abstractions.
+- Standard .NET ActivitySource and Meter instrumentation.
 - Host-independent dependency-injection registrations.
 
 The core package does not reference `Grpc.Net.Client`, ASP.NET Core hosting, or the ASP.NET Core adapter. It does not create channels or own handlers.
@@ -30,7 +31,7 @@ The adapter owns:
 - ASP.NET Core server interceptor and hosting registration.
 - Trusted principal-to-call-context mapping.
 - Server-call scope and transport lifecycle.
-- Bridging between gRPC stream readers/writers and Franz async stream contracts.
+- Bridging between gRPC stream readers/writers and Franz async stream contracts, including per-message response write options.
 
 The adapter references core in one direction only.
 
@@ -38,7 +39,7 @@ The adapter references core in one direction only.
 
 Generated typed clients, channels, handlers, credentials, endpoint configuration, and transport disposal belong to `Grpc.Net.ClientFactory` and the application host. The former Franz channel-owning factory has been removed.
 
-The Franz client wrapper currently governs unary calls only. Generated client streaming, server streaming, and duplex methods remain directly available through the typed client; they do not run through a Franz client-side streaming behavior pipeline. This is an explicit scope boundary documented in `grpc-client-lifecycle.md`.
+The Franz client wrapper governs unary calls only. Generated client streaming, server streaming, and duplex methods remain directly available through the typed client; they do not run through a Franz client-side streaming behavior pipeline. This is an explicit scope boundary documented in `grpc-client-lifecycle.md`.
 
 ## 3. Current source-level public surface
 
@@ -50,9 +51,12 @@ The Franz client wrapper currently governs unary calls only. Generated client st
 ### Server pipeline
 - Unary behavior interfaces and provider with explicit numeric order and duplicate-order rejection.
 - Explicit server-streaming, client-streaming, and duplex behavior interfaces/providers with deterministic order and duplicate-order rejection.
-- Validation, tenant resolution, authorization, logging, metrics, and exception-mapping behaviors.
-- Tenant resolver/authorizer, validation, logger, and metrics service abstractions.
-- ASP.NET Core interceptor applying pipelines at the transport boundary.
+- Validation, tenant resolution, authorization, logging, metrics, and exception-mapping behaviors for supported server RPC shapes.
+- Streaming logging and metrics cover the complete stream lifetime and do not inspect payloads.
+- Tenant resolver/authorizer, validation, logger, and bounded metrics abstractions.
+- `GrpcMetricContext` excludes tenant, user, correlation, peer, and request identifiers.
+- `FranzGrpcDiagnostics` exposes the standard ActivitySource and Meter.
+- ASP.NET Core interceptor applies pipelines at the transport boundary.
 
 ### Client pipeline
 - `IGrpcClientBehavior<TRequest,TResponse>` and its provider.
@@ -74,10 +78,12 @@ Inert legacy timeout, metadata normalization/propagation, payload logging, retry
 | Caller-controlled user identity from `x-user-id` | Removed as an identity source | Derive identity from the authenticated host principal |
 | `FranzServiceBase.ExecuteUnary` manual pipeline | Removed | Use generated service implementations registered through the ASP.NET Core adapter |
 | `IFranzGrpcClientFactory` / `FranzGrpcClientFactory` | Removed; no channel-owning compatibility facade | Use `AddGrpcClient<TClient>` and inject the generated client |
-| Legacy broad `Grpc` package dependency | Replaced by `Grpc.Core.Api` in core | Reference supported API package through the new package graph |
-| Inert global/client option properties | Removed | Remove the obsolete configuration keys; configure transport retries, credentials, and metadata through supported gRPC host APIs |
+| Legacy broad `Grpc` package dependency | Replaced by `Grpc.Core.Api` in core | Reference the supported API package through the new package graph |
+| Inert global/client option properties | Removed | Remove obsolete configuration keys; configure transport retries, credentials, and metadata through supported gRPC host APIs |
 | `FranzGrpcHostingOptions.ApplyNamingConventions` | Removed placeholder | Use explicit generated service names and normal ASP.NET Core endpoint conventions |
 | Unary-only client behavior wrapper | Retained as unary-only | Use generated typed-client streaming methods directly |
+| `IFranzGrpcMetrics` methods accepting `GrpcCallContext` | Replaced with `GrpcMetricContext` | Implement metrics using service, method, RPC shape, and direction; do not tag identity/correlation/request values |
+| `IFranzGrpcLogger` | Extended with stream lifecycle methods | Implement start, complete, error, and aborted stream events without logging payloads |
 | No-op authorization fallback | Replaced by fail-closed deny-all default | Register an explicit application authorization service |
 
 ## 5. Required binary compatibility evidence

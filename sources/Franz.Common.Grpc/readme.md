@@ -38,7 +38,7 @@ The default authorization service denies calls. Replace it with an explicit appl
 5. Logging
 6. Metrics
 
-It also registers exception mapping, tenant resolution, authorization, logging, and metrics for server-streaming, client-streaming, and duplex RPCs. Streaming behaviors execute for the complete stream lifetime, including enumeration, cancellation, and disposal.
+It also registers exception mapping, tenant resolution, authorization, logging, and metrics for server-streaming, client-streaming, and duplex RPCs. Streaming behaviors execute for the complete stream lifetime, including enumeration, cancellation, and disposal. Streaming logging records lifecycle events only; it does not enumerate or log payloads.
 
 The host registers ASP.NET Core gRPC hosting and maps its generated service implementations. Add `Franz.Common.Grpc.AspNetCore` to apply these pipelines at the transport boundary.
 
@@ -78,6 +78,17 @@ Only options with implemented runtime semantics remain in the 3.0.0 configuratio
 | `Franz:Grpc:Client` | `DefaultClientTimeout` | `00:00:15` | Default unary client deadline when no explicit deadline is supplied |
 
 The client timeout must be greater than zero and no longer than 365 days. Invalid values fail options validation at startup. Legacy timeout, retry, metadata, payload-logging, and naming-convention switches were removed because they did not control production behavior. Configure retries and credentials through the standard gRPC host/typed-client mechanisms.
+
+## Observability
+
+The package exposes standard .NET diagnostics through `FranzGrpcDiagnostics`:
+
+- Activity source: `FranzGrpcDiagnostics.ActivitySourceName` (`Franz.Common.Grpc`)
+- Meter: `FranzGrpcDiagnostics.MeterName` (`Franz.Common.Grpc`)
+- Counter: `franz.grpc.calls`
+- Histogram: `franz.grpc.call.duration` (seconds)
+
+Subscribe to the activity source and meter through the host's OpenTelemetry configuration. Tags are limited to RPC service, method, shape, direction, and outcome. Tenant IDs, user IDs, correlation IDs, peer addresses, and request IDs are excluded from metric dimensions. Custom `IFranzGrpcMetrics` implementations receive `GrpcMetricContext`, which exposes only those bounded dimensions.
 
 ## Call context and security
 
