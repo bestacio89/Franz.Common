@@ -184,5 +184,11 @@
     "path": "sources/Franz.Common.Identity/Testing/FakeIdentityContextAccessor.cs",
     "reason": "Existing testing helper shipped under a runtime package. Relocation is a public package surface change and must be reviewed before moving or removing it.",
     "ruleId": "GOV-002"
+  },
+  {
+    "rule": "GENERIC_REFLECTION",
+    "ruleId": "SRC-003",
+    "path": "sources/Franz.Common.Messaging.Sagas/Configuration/FranzSagaBuilder.cs",
+    "reason": "The builder closes INotificationHandler<TEvent> and SagaIntegrationEventNotificationHandler<TEvent> only for the integration-event contracts declared by explicitly registered Saga types, then registers those closed services in DI. This preserves contract-scoped dispatch and avoids registering an open generic handler for unrelated notifications. The current AddSaga(Type)/AddSagaAssembly API discovers event contracts at runtime, so closed generic DI descriptors require MakeGenericType. This is a deliberate, narrowly scoped runtime-composition exception, not unrestricted type loading. Native AOT support for arbitrary runtime Saga discovery is not claimed; a future AOT-safe registration contract must use compile-time generated or explicit typed registrations."
   }
 ]
