@@ -25,7 +25,7 @@ public sealed class SagaIntegrationEventNotificationHandlerTests
   {
     var services = new ServiceCollection();
     services.AddLogging();
-    services.AddSingleton<IMessagingPublisher, TestMessagingPublisher>();
+    services.AddSingleton<IMessagingPublisher>(new TestMessagingPublisher());
 
     var messageId = Guid.CreateVersion7();
     var correlationId = Guid.CreateVersion7();
