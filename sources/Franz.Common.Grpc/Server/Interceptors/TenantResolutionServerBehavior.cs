@@ -10,7 +10,7 @@ namespace Franz.Common.Grpc.Server.Interceptors;
 /// <summary>
 /// Resolves a tenant from trusted server-side identity, authorizes membership,
 /// establishes the validated execution context, and clears it after the call.
-/// Caller-supplied tenant metadata is removed before resolution.
+/// Caller-supplied tenant metadata is only a resolver selection hint and is removed before authorization.
 /// </summary>
 public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
     : IGrpcServerBehavior<TRequest, TResponse>
@@ -54,7 +54,8 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(next);
 
-        var trustedContext = context.WithTenant(null).WithoutUserHeader();
+        var resolutionContext = context.WithoutUserHeader();
+        var trustedContext = resolutionContext.WithTenant(null);
 
         if (_tenantContextAccessor?.Current is { } establishedContext)
         {
@@ -68,7 +69,7 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
         }
 
         var resolvedTenantId = await _tenantResolver
-            .ResolveTenantAsync(trustedContext, cancellationToken)
+            .ResolveTenantAsync(resolutionContext, cancellationToken)
             .ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(resolvedTenantId))
