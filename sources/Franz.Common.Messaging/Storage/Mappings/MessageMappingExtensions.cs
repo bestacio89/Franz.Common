@@ -79,7 +79,7 @@ public static class MessageMappingExtensions
                                  DateTimeOffset.TryParse(
                                      occurredOnValue,
                                      CultureInfo.InvariantCulture,
-                                     DateTimeStyles.RoundtripKind,
+                                     DateTimeStyles.None,
                                      out var parsedOccurredOn)
         ? parsedOccurredOn
         : null;
