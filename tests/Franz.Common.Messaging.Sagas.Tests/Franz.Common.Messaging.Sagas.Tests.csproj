@@ -28,12 +28,6 @@
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.MediatR\Franz.Common.Messaging.Hosting.Mediator.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference
-      Include="..\..\sources\Franz.Common.Mediator.SourceGenerator\Franz.Common.Mediator.SourceGenerator.csproj"
-      OutputItemType="Analyzer"
-      ReferenceOutputAssembly="false" />
-  </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
