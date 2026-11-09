@@ -99,6 +99,47 @@ public sealed class GrpcTransportIntegrationTests
     }
 
     [Fact]
+    public async Task ServerStreamingCall_CancellationDisposesScopedDependenciesAndStopsProducer()
+    {
+        await using var host = await GrpcTestHost.StartAsync();
+        host.StreamingLifecycleProbe.HoldServerStreaming();
+        using var channel = host.CreateChannel();
+        var client = new GrpcProbe.GrpcProbeClient(channel);
+        var call = client.ServerStream(new ProbeRequest { Value = "cancel-server" });
+
+        Assert.True(await call.ResponseStream.MoveNext(CancellationToken.None));
+        Assert.Equal("cancel-server-1", call.ResponseStream.Current.Value);
+        await host.StreamingLifecycleProbe.WaitForServerStreamingPauseAsync();
+
+        Assert.Equal(0, host.StreamingLifecycleProbe.ScopeDisposalCount);
+
+        call.Dispose();
+
+        await host.StreamingLifecycleProbe.WaitForScopeDisposalAsync();
+        Assert.Equal(1, host.StreamingLifecycleProbe.ScopeDisposalCount);
+    }
+
+    [Fact]
+    public async Task ClientStreamingCall_CancellationDisposesScopedDependenciesDuringRequestConsumption()
+    {
+        await using var host = await GrpcTestHost.StartAsync();
+        host.StreamingLifecycleProbe.HoldClientStreaming();
+        using var channel = host.CreateChannel();
+        var client = new GrpcProbe.GrpcProbeClient(channel);
+        var call = client.ClientStream();
+
+        await call.RequestStream.WriteAsync(new ProbeRequest { Value = "cancel-client" });
+        await host.StreamingLifecycleProbe.WaitForClientStreamingPauseAsync();
+
+        Assert.Equal(0, host.StreamingLifecycleProbe.ScopeDisposalCount);
+
+        call.Dispose();
+
+        await host.StreamingLifecycleProbe.WaitForScopeDisposalAsync();
+        Assert.Equal(1, host.StreamingLifecycleProbe.ScopeDisposalCount);
+    }
+
+    [Fact]
     public async Task ClientStreamingCall_TraversesFranzPipelineAndPreservesFinalContext()
     {
         await using var host = await GrpcTestHost.StartAsync();
