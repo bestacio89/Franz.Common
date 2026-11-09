@@ -70,7 +70,7 @@ public abstract class FranzGrpcClientBase<TClient>
         GrpcCallContext ctx,
         CancellationToken token)
     {
-      var options = ctx.ToCallOptions();
+      var options = ctx.WithCancellation(token).ToCallOptions();
       return await transportFunc(GrpcClient, req, options).ConfigureAwait(false);
     }
 
