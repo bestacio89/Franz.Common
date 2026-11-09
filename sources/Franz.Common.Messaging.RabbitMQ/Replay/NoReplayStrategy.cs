@@ -46,7 +46,11 @@ public class NoReplayStrategy : IReplayStrategy
     headers[ExceptionMessageHeader] = Truncate(ex.Message);
     headers[ExceptionStackTraceHeader] = Truncate(ex.StackTrace ?? string.Empty);
 
-    var properties = RabbitMQReplayPropertiesMapper.Create(e, headers);
+    var properties = new BasicProperties
+    {
+      DeliveryMode = DeliveryModes.Persistent,
+      Headers = headers
+    };
 
     var channel = await _confirmChannelPool.GetPublisherConfirmChannelAsync().ConfigureAwait(false);
 

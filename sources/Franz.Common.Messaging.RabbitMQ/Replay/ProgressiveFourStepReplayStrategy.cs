@@ -58,7 +58,7 @@ public class ProgressiveFourStepReplayStrategy : IReplayStrategy
         ? Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture) + 1
         : 1;
     headers[ReplayHeader] = replayCount;
-    var properties = RabbitMQReplayPropertiesMapper.Create(e, headers);
+    var properties = new BasicProperties { DeliveryMode = DeliveryModes.Persistent, Headers = headers };
 
     string exchange;
     string routingKey;
