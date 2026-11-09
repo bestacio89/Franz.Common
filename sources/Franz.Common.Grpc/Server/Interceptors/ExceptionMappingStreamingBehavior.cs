@@ -101,7 +101,18 @@ public sealed class ExceptionMappingStreamingBehavior<TRequest, TResponse> :
         [EnumeratorCancellation] CancellationToken enumerationToken = default)
     {
         var effectiveToken = enumerationToken.CanBeCanceled ? enumerationToken : cancellationToken;
-        var enumerator = responses.GetAsyncEnumerator(effectiveToken);
+        IAsyncEnumerator<TResponse> enumerator;
+
+        try
+        {
+            enumerator = responses.GetAsyncEnumerator(effectiveToken);
+        }
+        catch (Exception exception)
+        {
+            throw Map(exception, context, effectiveToken);
+        }
+
+        Exception? streamException = null;
 
         try
         {
@@ -118,6 +129,7 @@ public sealed class ExceptionMappingStreamingBehavior<TRequest, TResponse> :
                 }
                 catch (Exception exception)
                 {
+                    streamException = exception;
                     throw Map(exception, context, effectiveToken);
                 }
 
@@ -132,6 +144,10 @@ public sealed class ExceptionMappingStreamingBehavior<TRequest, TResponse> :
             try
             {
                 await enumerator.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception) when (streamException is not null)
+            {
+                // Preserve the primary stream failure; disposal must not replace it.
             }
             catch (Exception exception)
             {
