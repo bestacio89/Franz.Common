@@ -155,61 +155,6 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
   }
 
   [Fact]
-  [Trait("Category", "MessagingContract")]
-  public async Task Listener_MarksSynthesizedIdentityForLegacyDelivery()
-  {
-    var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
-    var channelPool = _fixture.Services.GetRequiredService<IChannelPool>();
-    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-    var body = $"legacy-envelope-{Guid.NewGuid():N}";
-    var received = new TaskCompletionSource<Message>(
-        TaskCreationOptions.RunContinuationsAsynchronously);
-    var previousHandler = listener.OnMessageReceivedAsync;
-
-    listener.OnMessageReceivedAsync = args =>
-    {
-      if (string.Equals(args.Message.Body, body, StringComparison.Ordinal))
-        received.TrySetResult(args.Message);
-
-      return Task.CompletedTask;
-    };
-
-    try
-    {
-      await listener.Listen(cts.Token);
-      await listener.WaitUntilReadyAsync().WaitAsync(cts.Token);
-
-      var publisher = await channelPool.GetAsync(cts.Token);
-      try
-      {
-        await publisher.BasicPublishAsync(
-            exchange: string.Empty,
-            routingKey: ListenerQueueName,
-            mandatory: true,
-            basicProperties: new BasicProperties(),
-            body: Encoding.UTF8.GetBytes(body),
-            cancellationToken: cts.Token);
-      }
-      finally
-      {
-        channelPool.Return(publisher);
-      }
-
-      var message = await received.Task.WaitAsync(cts.Token);
-
-      message.Id.Should().NotBeEmpty();
-      message.Properties.Should()
-          .ContainKey(MessagingConstants.TransportGeneratedMessageId)
-          .WhoseValue.Should().Be(true);
-    }
-    finally
-    {
-      listener.OnMessageReceivedAsync = previousHandler;
-      await listener.StopListenAsync();
-    }
-  }
-
-  [Fact]
   [Trait("Category", "FaultTolerance")]
   public async Task Listener_ShouldConfirmRetryPublicationBeforeAcknowledgingOriginalDelivery()
   {

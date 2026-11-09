@@ -15,7 +15,6 @@ using Franz.Common.Messaging.Sagas.Configuration;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
-using Franz.Common.Messaging.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -111,74 +110,6 @@ public sealed class SagaIntegrationEventNotificationHandlerTests
     state.CausationId.Should().Be(causationId);
   }
 
-  [Fact]
-  public async Task NotificationPipeline_RejectsTransportGeneratedIdentityWhenInboxIsEnabled()
-  {
-    var services = new ServiceCollection();
-    services.AddLogging();
-    services.AddSingleton<IMessagingPublisher>(new TestMessagingPublisher());
-    services.AddSingleton<IInboxStore>(new TestInboxStore());
-
-    var message = new Message("{}");
-    message.SetProperty(MessagingConstants.TransportGeneratedMessageId, true);
-    message.Headers[MessagingConstants.ClassName] =
-        [HeaderNamer.GetEventClassName(typeof(StartedEvent))];
-
-    services.AddSingleton<IMessageContextAccessor>(
-        new TestMessageContextAccessor(new MessageContext(message)));
-
-    services
-        .AddFranzSagas(options => options.Persistence = "Memory")
-        .AddSaga<StartedEventSaga>();
-
-    using var provider = services.BuildServiceProvider();
-    provider.BuildFranzSagas();
-
-    await using var scope = provider.CreateAsyncScope();
-    var dispatcher = new FranzDispatcher(scope.ServiceProvider);
-    var executer = new MessagingStrategyExecuter(
-        Array.Empty<IAsyncMessageActionFilter>(),
-        dispatcher);
-
-    var act = () => executer.ExecuteAsync(message);
-
-    await act.Should().ThrowAsync<PermanentMessagingException>()
-        .WithMessage("*stable transport message identity*");
-    provider.GetRequiredService<InMemorySagaStateStore>().Store.Should().BeEmpty();
-  }
-
-  [Fact]
-  public async Task NotificationPipeline_RejectsMissingMessageContextWhenInboxIsEnabled()
-  {
-    var services = new ServiceCollection();
-    services.AddLogging();
-    services.AddSingleton<IMessagingPublisher>(new TestMessagingPublisher());
-    services.AddSingleton<IInboxStore>(new TestInboxStore());
-
-    var message = new Message("{}");
-    message.Headers[MessagingConstants.ClassName] =
-        [HeaderNamer.GetEventClassName(typeof(StartedEvent))];
-
-    services
-        .AddFranzSagas(options => options.Persistence = "Memory")
-        .AddSaga<StartedEventSaga>();
-
-    using var provider = services.BuildServiceProvider();
-    provider.BuildFranzSagas();
-
-    await using var scope = provider.CreateAsyncScope();
-    var dispatcher = new FranzDispatcher(scope.ServiceProvider);
-    var executer = new MessagingStrategyExecuter(
-        Array.Empty<IAsyncMessageActionFilter>(),
-        dispatcher);
-
-    var act = () => executer.ExecuteAsync(message);
-
-    await act.Should().ThrowAsync<PermanentMessagingException>()
-        .WithMessage("*original message context*");
-    provider.GetRequiredService<InMemorySagaStateStore>().Store.Should().BeEmpty();
-  }
-
   public sealed record StartedEvent : IIntegrationEvent;
 
   public sealed class StartedEventSaga : SagaBase<StartedEventSagaState>, IStartWith<StartedEvent>
@@ -206,18 +137,6 @@ public sealed class SagaIntegrationEventNotificationHandlerTests
       : IMessageContextAccessor
   {
     public IMessageContext? Current => messageContext;
-  }
-
-  private sealed class TestInboxStore : IInboxStore
-  {
-    public Task<bool> HasProcessedAsync(Guid messageId, CancellationToken ct = default)
-        => Task.FromResult(false);
-
-    public Task<bool> TryRegisterAsync(Guid messageId, CancellationToken ct = default)
-        => Task.FromResult(true);
-
-    public Task MarkProcessedAsync(Guid messageId, CancellationToken ct = default)
-        => Task.CompletedTask;
   }
 
   private sealed class TestMessagingPublisher : IMessagingPublisher

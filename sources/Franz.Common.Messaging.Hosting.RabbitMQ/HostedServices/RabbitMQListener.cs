@@ -1,5 +1,4 @@
 #nullable enable
-using Franz.Common.Messaging;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.Hosting;
@@ -205,17 +204,15 @@ public sealed class RabbitMQListener(
     try
     {
       var headers = RabbitHeaderMapper.ExtractHeaders(delivery);
-      var hasStableMessageId = Guid.TryParse(delivery.BasicProperties.MessageId, out var parsedMessageId) &&
-                               parsedMessageId != Guid.Empty;
-      var messageId = hasStableMessageId ? parsedMessageId : Guid.CreateVersion7();
+      var messageId = Guid.TryParse(delivery.BasicProperties.MessageId, out var parsedMessageId) &&
+                      parsedMessageId != Guid.Empty
+          ? parsedMessageId
+          : Guid.CreateVersion7();
 
       var message = new Message(Encoding.UTF8.GetString(delivery.Body.Span), headers)
       {
         Id = messageId
       };
-
-      if (!hasStableMessageId)
-        message.SetProperty(MessagingConstants.TransportGeneratedMessageId, true);
 
       // Older producers may not have supplied AMQP correlation metadata. In that
       // compatibility case, retain the message's own stable identity as correlation.
