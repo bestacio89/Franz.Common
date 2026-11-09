@@ -1,3 +1,4 @@
+using Franz.Common.Grpc.Tests.Contracts;
 using Franz.Common.Grpc.Tests.Infrastructure.Diagnostics;
 using Franz.Common.Grpc.Tests.Infrastructure.Services;
 using Grpc.Net.ClientFactory;
@@ -44,7 +45,7 @@ public sealed class GrpcClientFactoryLifecycleIntegrationTests
         await using (var provider = services.BuildServiceProvider())
         {
             var clientFactory = provider.GetRequiredService<GrpcClientFactory>();
-            var firstClient = clientFactory.CreateClient<GrpcProbe.GrpcProbeClient>();
+            var firstClient = clientFactory.CreateClient<GrpcProbe.GrpcProbeClient>(nameof(GrpcProbe.GrpcProbeClient));
             var secondClient = clientFactory.CreateClient<GrpcProbe.GrpcProbeClient>();
 
             var firstResponse = await firstClient.UnaryAsync(new ProbeRequest { Value = "first" });
