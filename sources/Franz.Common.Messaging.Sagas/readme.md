@@ -20,7 +20,7 @@ The package provides:
 
 The standard Messaging pipeline deserializes an inbound integration event and publishes it through Franz Mediator. `AddSaga<TSaga>()` registers the Saga notification handler for the exact integration-event contracts declared by that saga. No separate transport-specific Saga strategy executer is required.
 
-The notification handler reads the original `Message` from `IMessageContextAccessor`, obtains tenant identity only from the validated `ITenantExecutionContextAccessor`, and passes message identity, correlation, causation, and tenant context to the orchestrator.
+The notification handler reads the original `Message` from `IMessageContextAccessor`, obtains tenant identity only from the validated `ITenantExecutionContextAccessor`, and passes message identity, correlation, causation, and tenant context to the orchestrator. The legacy public `SagaDispatchingMessageHandler` uses the same tenant resolver; neither path accepts a tenant header as an authority on its own.
 
 ## Registration
 
@@ -59,7 +59,7 @@ The package also registers a hosted startup validator. Mapping validation requir
 - `CorrelationId` groups related messages; it is not a saga repository key.
 - `CausationId` identifies the message that caused the current execution.
 - `MessageId` is transport-level message identity. The inbound Saga notification handler atomically claims it through the existing `IInboxStore` before executing saga handlers when an original message context is available.
-- `TenantId` scopes repository operations. It is taken from the validated tenant execution context, not copied from an untrusted message header. `null` represents the default non-tenant scope.
+- `TenantId` scopes repository operations. It is taken from the validated tenant execution context, not copied from an untrusted message header. If a message contains `TenantId`, it must contain exactly one non-empty GUID and match the current validated context; a missing context or mismatch is rejected. If no tenant header or validated context exists, `null` represents the default non-tenant scope.
 
 A start handler creates the saga instance. For a non-start message, the saga must implement `ISagaIdResolver<TMessage>` and return the non-empty `SagaId` of the target instance. Do not derive this identity from correlation metadata.
 
