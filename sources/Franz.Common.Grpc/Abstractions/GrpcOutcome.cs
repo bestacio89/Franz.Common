@@ -179,6 +179,7 @@ public sealed record GrpcOutcome
         foreach (var entry in ex.Trailers)
         {
             if (entry.IsBinary ||
+                string.Equals(entry.Key, CorrelationIdTrailer, StringComparison.OrdinalIgnoreCase) ||
                 !SafeTrailerKeys.Contains(entry.Key) ||
                 !IsSafeTrailerValue(entry.Value))
             {
@@ -310,6 +311,7 @@ public sealed record GrpcOutcome
             StatusCode.Aborted => "The operation was aborted.",
             StatusCode.OutOfRange => "The requested value is outside the supported range.",
             StatusCode.Unauthenticated => "Authentication is required.",
+            StatusCode.Unimplemented => "The requested operation is not implemented.",
             StatusCode.Unavailable => "The requested service is temporarily unavailable.",
             _ => "An unexpected server error occurred."
         };
