@@ -56,6 +56,12 @@ public static class GrpcServiceCollectionExtensions
         .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(ExceptionMappingStreamingBehavior<,>))
         .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(ExceptionMappingStreamingBehavior<,>));
 
+    // Validate the unary request or each consumed streaming request before tenancy and authorization.
+    services
+        .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(ValidationStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(ValidationStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(ValidationStreamingBehavior<,>));
+
     // Apply tenant resolution before authorization for every server-side streaming RPC shape.
     services
         .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(TenantResolutionServerBehavior<,>))
