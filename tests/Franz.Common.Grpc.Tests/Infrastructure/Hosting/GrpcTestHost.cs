@@ -15,16 +15,20 @@ internal sealed class GrpcTestHost : IAsyncDisposable
 
     internal GrpcTestHost(
         IHost host,
-        GrpcPipelineProbe pipelineProbe)
+        GrpcPipelineProbe pipelineProbe,
+        GrpcStreamingLifecycleProbe streamingLifecycleProbe)
     {
         _host = host;
         Server = host.GetTestServer();
         PipelineProbe = pipelineProbe;
+        StreamingLifecycleProbe = streamingLifecycleProbe;
     }
 
     public TestServer Server { get; }
 
     public GrpcPipelineProbe PipelineProbe { get; }
+
+    public GrpcStreamingLifecycleProbe StreamingLifecycleProbe { get; }
 
     public static Task<GrpcTestHost> StartAsync(bool authenticated = false)
         => GrpcTestHostFactory.StartAsync(authenticated);

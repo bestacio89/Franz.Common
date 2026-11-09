@@ -26,6 +26,7 @@ internal static class GrpcTestHostFactory
     public static async Task<GrpcTestHost> StartAsync(bool authenticated)
     {
         var pipelineProbe = new GrpcPipelineProbe();
+        var streamingLifecycleProbe = new GrpcStreamingLifecycleProbe();
 
         var host = await new HostBuilder()
             .ConfigureWebHost(webHost =>
@@ -34,6 +35,8 @@ internal static class GrpcTestHostFactory
                 webHost.ConfigureServices(services =>
                 {
                     services.AddSingleton(pipelineProbe);
+                    services.AddSingleton(streamingLifecycleProbe);
+                    services.AddScoped<ScopedGrpcStreamingDependency>();
                     services.AddFranzGrpcServer(new ConfigurationBuilder().Build());
                     services.AddFranzGrpcDefaults();
                     services.AddSingleton<IFranzTenantResolver>(pipelineProbe);
@@ -60,6 +63,6 @@ internal static class GrpcTestHostFactory
             .StartAsync()
             .ConfigureAwait(false);
 
-        return new GrpcTestHost(host, pipelineProbe);
+        return new GrpcTestHost(host, pipelineProbe, streamingLifecycleProbe);
     }
 }

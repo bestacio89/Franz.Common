@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Franz.Common.Grpc.Abstractions;
 using Franz.Common.Grpc.Tests.Contracts;
 using Franz.Common.Grpc.Tests.Infrastructure.Diagnostics;
+using Franz.Common.Grpc.Tests.Infrastructure.Services;
 
 namespace Franz.Common.Grpc.Tests.Behaviors;
 
@@ -11,11 +12,15 @@ namespace Franz.Common.Grpc.Tests.Behaviors;
 /// Pass-through streaming behavior that proves each streaming RPC traverses the
 /// registered Franz pipeline and that the terminal service receives its final context.
 /// </summary>
-internal sealed class ProbeStreamingBehavior(GrpcPipelineProbe probe) :
+internal sealed class ProbeStreamingBehavior(
+    GrpcPipelineProbe probe,
+    ScopedGrpcStreamingDependency scopedDependency) :
     IGrpcServerStreamingBehavior<ProbeRequest, ProbeReply>,
     IGrpcClientStreamingBehavior<ProbeRequest, ProbeReply>,
     IGrpcDuplexStreamingBehavior<ProbeRequest, ProbeReply>
 {
+    private readonly ScopedGrpcStreamingDependency _scopedDependency = scopedDependency;
+
     public int Order => 2_500;
 
     public IAsyncEnumerable<ProbeReply> InvokeAsync(

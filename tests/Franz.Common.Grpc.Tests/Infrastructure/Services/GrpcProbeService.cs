@@ -9,7 +9,9 @@ namespace Franz.Common.Grpc.Tests.Infrastructure.Services;
 /// Minimal transport endpoint used to verify all four gRPC RPC shapes.
 /// It contains no host setup, authentication, authorization, or test assertions.
 /// </summary>
-internal sealed class GrpcProbeService(GrpcPipelineProbe probe) : GrpcProbe.GrpcProbeBase
+internal sealed class GrpcProbeService(
+    GrpcPipelineProbe probe,
+    GrpcStreamingLifecycleProbe streamingLifecycleProbe) : GrpcProbe.GrpcProbeBase
 {
     public override Task<ProbeReply> Unary(ProbeRequest request, ServerCallContext context)
     {
@@ -27,6 +29,7 @@ internal sealed class GrpcProbeService(GrpcPipelineProbe probe) : GrpcProbe.Grpc
     {
         probe.RecordServiceContext(GrpcCallContext.FromServerCallContext(context));
         await responseStream.WriteAsync(new ProbeReply { Value = $"{request.Value}-1" });
+        await streamingLifecycleProbe.PauseServerStreamingIfRequestedAsync(context.CancellationToken);
         await responseStream.WriteAsync(new ProbeReply { Value = $"{request.Value}-2" });
     }
 
@@ -34,8 +37,14 @@ internal sealed class GrpcProbeService(GrpcPipelineProbe probe) : GrpcProbe.Grpc
     {
         probe.RecordServiceContext(GrpcCallContext.FromServerCallContext(context));
         var values = new List<string>();
+
         while (await requestStream.MoveNext(context.CancellationToken))
+        {
             values.Add(requestStream.Current.Value);
+            if (values.Count == 1)
+                await streamingLifecycleProbe.PauseClientStreamingIfRequestedAsync(context.CancellationToken);
+        }
+
         return new ProbeReply { Value = string.Join(',', values) };
     }
 
