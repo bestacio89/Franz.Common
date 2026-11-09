@@ -12,6 +12,7 @@ internal sealed class GrpcPipelineProbe : IFranzTenantResolver
     public const string ContextMarkerHeaderName = "x-franz-test-pipeline-context";
 
     private int _invocationCount;
+    private int _authorizationInvocationCount;
     private int _serverStreamingBehaviorInvocationCount;
     private int _clientStreamingBehaviorInvocationCount;
     private int _duplexStreamingBehaviorInvocationCount;
@@ -23,6 +24,7 @@ internal sealed class GrpcPipelineProbe : IFranzTenantResolver
     private string? _lastRequestedTenantHeader;
 
     public int InvocationCount => Volatile.Read(ref _invocationCount);
+    public int AuthorizationInvocationCount => Volatile.Read(ref _authorizationInvocationCount);
     public int ServerStreamingBehaviorInvocationCount => Volatile.Read(ref _serverStreamingBehaviorInvocationCount);
     public int ClientStreamingBehaviorInvocationCount => Volatile.Read(ref _clientStreamingBehaviorInvocationCount);
     public int DuplexStreamingBehaviorInvocationCount => Volatile.Read(ref _duplexStreamingBehaviorInvocationCount);
@@ -50,7 +52,11 @@ internal sealed class GrpcPipelineProbe : IFranzTenantResolver
     public void RecordServerStreamingBehaviorInvocation() => Interlocked.Increment(ref _serverStreamingBehaviorInvocationCount);
     public void RecordClientStreamingBehaviorInvocation() => Interlocked.Increment(ref _clientStreamingBehaviorInvocationCount);
     public void RecordDuplexStreamingBehaviorInvocation() => Interlocked.Increment(ref _duplexStreamingBehaviorInvocationCount);
-    public void RecordAuthorization(string? userId) => Volatile.Write(ref _lastAuthorizedUserId, userId);
+    public void RecordAuthorization(string? userId)
+    {
+        Volatile.Write(ref _lastAuthorizedUserId, userId);
+        Interlocked.Increment(ref _authorizationInvocationCount);
+    }
 
     public void RecordServiceContext(GrpcCallContext context)
     {

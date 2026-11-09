@@ -47,6 +47,7 @@ public sealed class GrpcTransportIntegrationTests
         Assert.Equal(new[] { "server-1", "server-2" }, values);
         Assert.Equal(1, host.PipelineProbe.ServerStreamingBehaviorInvocationCount);
         Assert.Equal("pipeline-context", host.PipelineProbe.LastServiceContextMarker);
+        Assert.Equal(1, host.PipelineProbe.AuthorizationInvocationCount);
     }
 
     [Fact]
@@ -171,6 +172,7 @@ public sealed class GrpcTransportIntegrationTests
         Assert.Equal(new[] { "one-duplex", "two-duplex" }, values);
         Assert.Equal(1, host.PipelineProbe.DuplexStreamingBehaviorInvocationCount);
         Assert.Equal("pipeline-context", host.PipelineProbe.LastServiceContextMarker);
+        Assert.Equal(1, host.PipelineProbe.AuthorizationInvocationCount);
     }
 
     [Fact]
