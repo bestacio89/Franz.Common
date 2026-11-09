@@ -38,7 +38,7 @@ The default authorization service denies calls. Replace it with an explicit appl
 5. Logging
 6. Metrics
 
-It also registers exception mapping, tenant resolution, authorization, logging, and metrics for server-streaming, client-streaming, and duplex RPCs. Streaming behaviors execute for the complete stream lifetime, including enumeration, cancellation, and disposal. Streaming logging records lifecycle events only; it does not enumerate or log payloads.
+It also registers exception mapping, validation, tenant resolution, authorization, logging, and metrics for server-streaming, client-streaming, and duplex RPCs. Server-streaming validates its single request; client-streaming and duplex validate each request message as the downstream handler consumes it. Streaming behaviors execute for the complete stream lifetime, including enumeration, cancellation, and disposal. Streaming logging records lifecycle events only; it does not enumerate or log payloads.
 
 The host registers ASP.NET Core gRPC hosting and maps its generated service implementations. Add `Franz.Common.Grpc.AspNetCore` to apply these pipelines at the transport boundary.
 

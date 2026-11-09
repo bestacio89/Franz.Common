@@ -112,6 +112,9 @@ public sealed class GrpcStreamingObservabilityTests
         var services = new ServiceCollection();
         services.AddFranzGrpcServer(new ConfigurationBuilder().Build());
 
+        AssertBehaviorRegistration<IGrpcServerStreamingBehavior<ProbeMessage, ProbeMessage>, ValidationStreamingBehavior<ProbeMessage, ProbeMessage>>(services);
+        AssertBehaviorRegistration<IGrpcClientStreamingBehavior<ProbeMessage, ProbeMessage>, ValidationStreamingBehavior<ProbeMessage, ProbeMessage>>(services);
+        AssertBehaviorRegistration<IGrpcDuplexStreamingBehavior<ProbeMessage, ProbeMessage>, ValidationStreamingBehavior<ProbeMessage, ProbeMessage>>(services);
         AssertBehaviorRegistration<IGrpcServerStreamingBehavior<ProbeMessage, ProbeMessage>, LoggingStreamingBehavior<ProbeMessage, ProbeMessage>>(services);
         AssertBehaviorRegistration<IGrpcClientStreamingBehavior<ProbeMessage, ProbeMessage>, LoggingStreamingBehavior<ProbeMessage, ProbeMessage>>(services);
         AssertBehaviorRegistration<IGrpcDuplexStreamingBehavior<ProbeMessage, ProbeMessage>, LoggingStreamingBehavior<ProbeMessage, ProbeMessage>>(services);

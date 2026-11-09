@@ -107,12 +107,20 @@ Every existing option must receive one of three dispositions before the configur
 
 Inert options must not remain advertised as working controls. Configuration defaults must be safe, and invalid combinations must fail during startup rather than during an arbitrary RPC.
 
+### 6.1 Observability contract
+
+- Expose a standard .NET `ActivitySource` and `Meter` for both unary and server-side streaming calls.
+- Metric dimensions are restricted to service, method, RPC shape, direction, and outcome. Tenant, user, correlation, peer, and request identifiers are not available through the metrics context.
+- Streaming logging records lifecycle events only; it must not enumerate or log stream payloads.
+- Metrics and logging lifetimes cover complete stream consumption, response enumeration, cancellation, failure, and disposal.
+
 ## 7. Compatibility and release policy
 
 - Preserve only contracts whose semantics remain correct and whose dependencies respect the accepted architecture. Source or binary compatibility is not a reason to retain an unsafe contract.
 - Introduce explicit streaming APIs; do not overload unary abstractions or silently change their meaning.
 - Remove the custom channel-owning factory in favour of official typed-client lifecycle management. Preserve genuinely useful pipeline functionality independently, with an explicit migration path.
 - The user has explicitly authorized full gRPC modernization, including removal of legacy/deprecated APIs and unsafe contracts. The published 2.3.3 package history must be documented, but does not impose a requirement to retain defective APIs. Treat the 3.0.0 release line as the intended breaking-change vehicle and provide migration guidance.
+- The 3.0.0 metrics contract uses `GrpcMetricContext` rather than exposing the full call context to metric implementations. The logger contract adds stream lifecycle events and deliberately excludes stream payloads.
 - Package names, dependency direction, public APIs, and migration guidance must be covered by architecture tests and package-consumer tests.
 
 ## 8. Phase gates
