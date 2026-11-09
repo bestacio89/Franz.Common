@@ -158,6 +158,10 @@ public sealed record GrpcOutcome
                 StatusCode.FailedPrecondition, "The operation cannot be completed in the current state.",
                 "FAILED_PRECONDITION", "Domain", ex, correlationId),
 
+            NotImplementedException => MappedFailure(
+                StatusCode.Unimplemented, "The requested operation is not implemented.",
+                "UNIMPLEMENTED", "Platform", ex, correlationId),
+
             _ => InternalFailure(ex, correlationId)
         };
     }
