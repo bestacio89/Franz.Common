@@ -24,25 +24,27 @@ public sealed class GrpcPipelineCharacterizationTests
             pipeline(new ProbeRequest(), GrpcCallContext.CreateClient("tests.Service", "Call"), CancellationToken.None));
 
         Assert.Equal(StatusCode.Internal, exception.StatusCode);
+        Assert.Equal("An unexpected server error occurred.", exception.Status.Detail);
     }
 
     [Fact]
-    public void FromException_CurrentlyExposesUnexpectedExceptionMessageInRpcStatusDetail()
+    public void FromException_DoesNotExposeUnexpectedExceptionMessageInRpcStatusDetail()
     {
         const string sensitiveMessage = "database endpoint and credentials must not be exposed";
         var outcome = GrpcOutcome.FromException(new InvalidOperationException(sensitiveMessage));
 
-        // This remains a characterization until the dedicated error-semantics checkpoint.
-        Assert.Equal(sensitiveMessage, outcome.ToRpcException().Status.Detail);
+        Assert.Equal(StatusCode.FailedPrecondition, outcome.StatusCode);
+        Assert.Equal("The operation cannot be completed in the current state.", outcome.ToRpcException().Status.Detail);
+        Assert.DoesNotContain(sensitiveMessage, outcome.ToRpcException().Status.Detail);
     }
 
     [Fact]
-    public void FromException_CurrentlyMapsCancellationToInternalError()
+    public void FromException_ClassifiesUnrelatedCancellationAsInternalError()
     {
         var outcome = GrpcOutcome.FromException(new OperationCanceledException());
 
-        // This remains a characterization until the dedicated cancellation checkpoint.
         Assert.Equal(StatusCode.Internal, outcome.StatusCode);
+        Assert.Equal("An unexpected server error occurred.", outcome.ToRpcException().Status.Detail);
     }
 
     private sealed class ProbeRequest { }
