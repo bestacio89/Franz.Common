@@ -184,7 +184,11 @@ public sealed class GrpcTransportIntegrationTests
         using var channel = host.CreateChannel();
         var client = new GrpcProbe.GrpcProbeClient(channel);
         var tenantId = Guid.NewGuid().ToString("D");
-        var headers = new Metadata { { GrpcCallContext.TenantIdHeaderName, tenantId } };
+        var headers = new Metadata
+        {
+            { GrpcCallContext.TenantIdHeaderName, tenantId },
+            { GrpcCallContext.UserIdHeaderName, "caller-controlled-user" }
+        };
         using var call = client.ServerStream(new ProbeRequest { Value = "tenant-server" }, headers: headers);
 
         Assert.True(await call.ResponseStream.MoveNext(CancellationToken.None));
@@ -192,6 +196,8 @@ public sealed class GrpcTransportIntegrationTests
         Assert.Equal(1, host.PipelineProbe.TenantResolutionInvocationCount);
         Assert.Equal(1, host.PipelineProbe.TenantAuthorizationInvocationCount);
         Assert.Equal(Guid.Parse(tenantId), host.PipelineProbe.LastAuthorizedTenantId);
+        Assert.Equal("trusted-user", host.PipelineProbe.LastAuthorizedUserId);
+        Assert.Equal("trusted-user", host.PipelineProbe.LastServiceUserId);
         while (await call.ResponseStream.MoveNext(CancellationToken.None)) { }
     }
 
@@ -202,7 +208,11 @@ public sealed class GrpcTransportIntegrationTests
         using var channel = host.CreateChannel();
         var client = new GrpcProbe.GrpcProbeClient(channel);
         var tenantId = Guid.NewGuid().ToString("D");
-        var headers = new Metadata { { GrpcCallContext.TenantIdHeaderName, tenantId } };
+        var headers = new Metadata
+        {
+            { GrpcCallContext.TenantIdHeaderName, tenantId },
+            { GrpcCallContext.UserIdHeaderName, "caller-controlled-user" }
+        };
         using var call = client.ClientStream(headers: headers);
         await call.RequestStream.WriteAsync(new ProbeRequest { Value = "tenant-client" });
         await call.RequestStream.CompleteAsync();
@@ -213,6 +223,8 @@ public sealed class GrpcTransportIntegrationTests
         Assert.Equal(1, host.PipelineProbe.TenantResolutionInvocationCount);
         Assert.Equal(1, host.PipelineProbe.TenantAuthorizationInvocationCount);
         Assert.Equal(Guid.Parse(tenantId), host.PipelineProbe.LastAuthorizedTenantId);
+        Assert.Equal("trusted-user", host.PipelineProbe.LastAuthorizedUserId);
+        Assert.Equal("trusted-user", host.PipelineProbe.LastServiceUserId);
     }
 
     [Fact]
@@ -222,7 +234,11 @@ public sealed class GrpcTransportIntegrationTests
         using var channel = host.CreateChannel();
         var client = new GrpcProbe.GrpcProbeClient(channel);
         var tenantId = Guid.NewGuid().ToString("D");
-        var headers = new Metadata { { GrpcCallContext.TenantIdHeaderName, tenantId } };
+        var headers = new Metadata
+        {
+            { GrpcCallContext.TenantIdHeaderName, tenantId },
+            { GrpcCallContext.UserIdHeaderName, "caller-controlled-user" }
+        };
         using var call = client.Duplex(headers: headers);
         await call.RequestStream.WriteAsync(new ProbeRequest { Value = "tenant-duplex" });
         await call.RequestStream.CompleteAsync();
@@ -232,6 +248,8 @@ public sealed class GrpcTransportIntegrationTests
         Assert.Equal(1, host.PipelineProbe.TenantResolutionInvocationCount);
         Assert.Equal(1, host.PipelineProbe.TenantAuthorizationInvocationCount);
         Assert.Equal(Guid.Parse(tenantId), host.PipelineProbe.LastAuthorizedTenantId);
+        Assert.Equal("trusted-user", host.PipelineProbe.LastAuthorizedUserId);
+        Assert.Equal("trusted-user", host.PipelineProbe.LastServiceUserId);
         while (await call.ResponseStream.MoveNext(CancellationToken.None)) { }
     }
 
