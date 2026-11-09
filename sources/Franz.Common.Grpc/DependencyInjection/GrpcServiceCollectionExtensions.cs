@@ -97,8 +97,21 @@ public static class GrpcServiceCollectionExtensions
             "The default gRPC client timeout must be greater than zero and no longer than 365 days.")
         .ValidateOnStart();
 
-    // Behavior provider; transport clients and channel lifetime belong to Grpc.Net.ClientFactory.
-    services.AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(TenantResolutionClientBehavior<,>));
+    // Client behaviors are executable defaults. Authorization remains opt-in because
+    // the secure default authorization service intentionally denies every call.
+    services.TryAddScoped<IFranzValidationEngine, NoOpValidationEngine>();
+    services.TryAddScoped<IFranzGrpcLogger, NoOpGrpcLogger>();
+    services.TryAddScoped<IFranzGrpcMetrics, NoOpGrpcMetrics>();
+
+    services
+        .AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(ExceptionMappingClientBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(ValidationClientBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(TenantResolutionClientBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(LoggingClientBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(MetricClientBehavior<,>));
+
+    // The host registers AuthorizationClientBehavior explicitly when a client-side
+    // authorization policy is required; it is never silently made permissive.
     services.AddNoDuplicateScoped<IGrpcClientBehaviorProvider, GrpcClientBehaviorProvider>();
 
     return services;
