@@ -40,6 +40,31 @@ public sealed class SagaStartupTests
     provider.GetRequiredService<SagaRouter>().Should().NotBeNull();
   }
 
+
+  [Fact]
+  public void AddSaga_RegistersOnlyClosedNotificationHandlersForDeclaredIntegrationEvents()
+  {
+    var services = new ServiceCollection();
+
+    services.AddFranzSagas().AddSaga<StartupSaga>();
+
+    var notificationHandlerType = typeof(INotificationHandler<StartEvent>);
+    var descriptor = services
+        .Where(service => service.ServiceType == notificationHandlerType)
+        .Should()
+        .ContainSingle()
+        .Subject;
+
+    descriptor.Lifetime.Should().Be(ServiceLifetime.Scoped);
+    descriptor.ImplementationType.Should().NotBeNull();
+    descriptor.ImplementationType!.IsGenericType.Should().BeTrue();
+    descriptor.ImplementationType.GetGenericArguments().Should().ContainSingle()
+        .Which.Should().Be(typeof(StartEvent));
+
+    services.Should().NotContain(service =>
+        service.ServiceType == typeof(INotificationHandler<>));
+  }
+
   private sealed class StartupSaga : SagaBase<StartupSagaState>, IStartWith<StartEvent>
   {
     public Task<ISagaTransition> HandleAsync(
