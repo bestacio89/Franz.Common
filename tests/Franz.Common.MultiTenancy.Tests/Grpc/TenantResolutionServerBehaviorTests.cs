@@ -66,8 +66,7 @@ public sealed class TenantResolutionServerBehaviorTests
         await resolver.Received(1).ResolveTenantAsync(
             Arg.Is<GrpcCallContext>(context =>
                 context.TenantId == untrustedTenantId &&
-                context.RequestHeaders.TryGetValue(GrpcCallContext.TenantIdHeaderName, out var selector) &&
-                selector == untrustedTenantId &&
+                HasHeader(context, GrpcCallContext.TenantIdHeaderName, untrustedTenantId) &&
                 context.UserId == "trusted-user" &&
                 !context.RequestHeaders.ContainsKey(GrpcCallContext.UserIdHeaderName)),
             Arg.Any<CancellationToken>());
@@ -387,6 +386,9 @@ public sealed class TenantResolutionServerBehaviorTests
                 return Task.FromResult(new TestResponse());
             });
     }
+
+    private static bool HasHeader(GrpcCallContext context, string name, string expectedValue)
+        => context.RequestHeaders.TryGetValue(name, out var value) && value == expectedValue;
 
     private static TenantExecutionContext CreateTenantContext(Guid tenantId)
         => new(
