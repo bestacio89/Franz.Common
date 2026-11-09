@@ -204,7 +204,8 @@ public sealed class RabbitMQListener(
     try
     {
       var headers = RabbitHeaderMapper.ExtractHeaders(delivery);
-      var messageId = Guid.TryParse(delivery.BasicProperties.MessageId, out var parsedMessageId)
+      var messageId = Guid.TryParse(delivery.BasicProperties.MessageId, out var parsedMessageId) &&
+                      parsedMessageId != Guid.Empty
           ? parsedMessageId
           : Guid.CreateVersion7();
 
