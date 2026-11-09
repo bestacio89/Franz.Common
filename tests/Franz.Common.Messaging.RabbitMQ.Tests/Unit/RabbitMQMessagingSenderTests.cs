@@ -5,6 +5,7 @@ using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Connections;
+using Franz.Common.Messaging.RabbitMQ.Extensions;
 using Microsoft.Extensions.Options;
 using Moq;
 using RabbitMQ.Client;
@@ -14,6 +15,17 @@ namespace Franz.Common.Messaging.RabbitMQ.Tests.Unit;
 
 public sealed class RabbitMQMessagingSenderTests
 {
+  [Fact]
+  public void ToBasicProperties_RejectsEmptyMessageIdentity()
+  {
+    var message = new Message("{}") { Id = Guid.Empty };
+
+    var act = () => message.ToBasicProperties();
+
+    act.Should().Throw<ArgumentException>()
+        .WithMessage("*non-empty identity*");
+  }
+
   [Fact]
   public async Task SendAsync_MapsMessageIdentityAndCorrelationToRabbitProperties()
   {
