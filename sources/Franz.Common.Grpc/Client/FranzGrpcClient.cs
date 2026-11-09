@@ -1,8 +1,10 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Grpc.Core;
 using Franz.Common.Grpc.Abstractions;
+using Franz.Common.Grpc.Configuration;
+using Grpc.Core;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Grpc.Client;
 
@@ -24,8 +26,9 @@ public abstract class FranzGrpcClient<TInnerClient> : FranzGrpcClientBase<TInner
   protected FranzGrpcClient(
       TInnerClient innerClient,
       IGrpcClientBehaviorProvider behaviorProvider,
-      string serviceName)
-      : base(innerClient, behaviorProvider)
+      string serviceName,
+      IOptions<FranzGrpcClientOptions>? options = null)
+      : base(innerClient, behaviorProvider, options)
   {
     ServiceName = serviceName ?? throw new ArgumentNullException(nameof(serviceName));
   }
@@ -40,7 +43,8 @@ public abstract class FranzGrpcClient<TInnerClient> : FranzGrpcClientBase<TInner
       Action<Metadata>? metadataModifier = null,
       string? tenantId = null,
       string? userId = null,
-      CancellationToken cancellationToken = default)
+      CancellationToken cancellationToken = default,
+      DateTime? deadlineUtc = null)
       where TRequest : class
       where TResponse : class
   {
@@ -55,6 +59,7 @@ public abstract class FranzGrpcClient<TInnerClient> : FranzGrpcClientBase<TInner
         metadataModifier,
         tenantId,
         userId,
-        cancellationToken);
+        cancellationToken,
+        deadlineUtc);
   }
 }

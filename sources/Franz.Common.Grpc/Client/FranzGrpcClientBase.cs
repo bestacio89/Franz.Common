@@ -1,7 +1,9 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Franz.Common.Grpc.Configuration;
 using Grpc.Core;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Grpc.Abstractions;
 
@@ -11,19 +13,22 @@ public abstract class FranzGrpcClientBase<TClient>
   protected TClient GrpcClient { get; }
 
   private readonly IGrpcClientBehaviorProvider _behaviorProvider;
+  private readonly FranzGrpcClientOptions _options;
 
   protected FranzGrpcClientBase(
       TClient grpcClient,
-      IGrpcClientBehaviorProvider behaviorProvider)
+      IGrpcClientBehaviorProvider behaviorProvider,
+      IOptions<FranzGrpcClientOptions>? options = null)
   {
     GrpcClient = grpcClient ?? throw new ArgumentNullException(nameof(grpcClient));
     _behaviorProvider = behaviorProvider ?? throw new ArgumentNullException(nameof(behaviorProvider));
+    _options = options?.Value ?? new FranzGrpcClientOptions();
   }
 
-  // =====================================================================
-  // UNARY CALL EXECUTION
-  // =====================================================================
-
+  /// <summary>
+  /// Executes a unary RPC through the configured Franz client behavior pipeline.
+  /// An explicit deadline takes precedence over the configured default timeout.
+  /// </summary>
   protected async Task<TResponse> ExecuteUnaryAsync<TRequest, TResponse>(
       TRequest request,
       string serviceName,
@@ -32,23 +37,25 @@ public abstract class FranzGrpcClientBase<TClient>
       Action<Metadata>? metadataModifier = null,
       string? tenantId = null,
       string? userId = null,
-      CancellationToken cancellationToken = default)
+      CancellationToken cancellationToken = default,
+      DateTime? deadlineUtc = null)
       where TRequest : class
       where TResponse : class
   {
-    if (request is null)
-      throw new ArgumentNullException(nameof(request));
+    ArgumentNullException.ThrowIfNull(request);
+    ArgumentNullException.ThrowIfNull(transportFunc);
 
-    // Build logical context
+    var effectiveDeadline = deadlineUtc
+        ?? DateTime.UtcNow.Add(_options.DefaultClientTimeout);
+
     var context = GrpcCallContext.CreateClient(
         serviceName,
         methodName,
         tenantId: tenantId,
         userId: userId,
-        cancellationToken: cancellationToken
-    );
+        deadlineUtc: effectiveDeadline,
+        cancellationToken: cancellationToken);
 
-    // Allow external metadata injection
     if (metadataModifier is not null)
     {
       var temp = context.ToRequestMetadata();
@@ -58,7 +65,6 @@ public abstract class FranzGrpcClientBase<TClient>
         context = context.WithAdditionalHeader(entry.Key, entry.Value);
     }
 
-    // Prepare transport layer delegate
     async Task<TResponse> FinalTransport(
         TRequest req,
         GrpcCallContext ctx,
@@ -68,17 +74,12 @@ public abstract class FranzGrpcClientBase<TClient>
       return await transportFunc(GrpcClient, req, options).ConfigureAwait(false);
     }
 
-    // Build pipeline using resolved behaviors
     var pipeline = BuildClientPipeline(
         FinalTransport,
         _behaviorProvider.ResolveBehaviors<TRequest, TResponse>());
 
     return await pipeline(request, context, cancellationToken).ConfigureAwait(false);
   }
-
-  // =====================================================================
-  // PIPELINE BUILDING
-  // =====================================================================
 
   private static GrpcClientPipelineDelegate<TRequest, TResponse> BuildClientPipeline<TRequest, TResponse>(
       GrpcClientPipelineDelegate<TRequest, TResponse> terminal,
@@ -88,10 +89,10 @@ public abstract class FranzGrpcClientBase<TClient>
   {
     var pipeline = terminal;
 
-    // Reverse order to wrap correctly
-    for (int i = behaviors.Length - 1; i >= 0; i--)
+    for (var i = behaviors.Length - 1; i >= 0; i--)
     {
-      var behavior = behaviors[i];
+      var behavior = behaviors[i]
+          ?? throw new InvalidOperationException($"Client behavior at index {i} is null.");
       var next = pipeline;
 
       pipeline = async (req, ctx, token) =>
