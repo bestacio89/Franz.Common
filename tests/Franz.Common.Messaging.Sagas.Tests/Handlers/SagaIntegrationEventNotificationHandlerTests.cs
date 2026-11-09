@@ -1,6 +1,7 @@
 #nullable enable
 
 using FluentAssertions;
+using Franz.Common.Headers;
 using Franz.Common.Mediator;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Contexting;
@@ -36,6 +37,7 @@ public sealed class SagaIntegrationEventNotificationHandlerTests
       CorrelationId = correlationId
     };
     message.Headers[Message.CausationHeader] = [causationId.ToString("D")];
+    message.Headers[HeaderConstants.TenantId] = [Guid.CreateVersion7().ToString("D")];
     message.Headers[MessagingConstants.ClassName] =
         [HeaderNamer.GetEventClassName(typeof(StartedEvent))];
 
@@ -65,7 +67,12 @@ public sealed class SagaIntegrationEventNotificationHandlerTests
     var persisted = records.Single().Value;
     persisted.LastMessageId.Should().Be(messageId);
     persisted.CorrelationId.Should().Be(correlationId);
+    persisted.TenantId.Should().BeNull("an unvalidated tenant header must not establish tenant identity");
     persisted.Status.Should().Be(SagaLifecycleStatus.Completed);
+
+    var state = persisted.State.Should().BeOfType<StartedEventSagaState>().Subject;
+    state.CorrelationId.Should().Be(correlationId);
+    state.CausationId.Should().Be(causationId);
   }
 
   public sealed record StartedEvent : IIntegrationEvent;
@@ -76,12 +83,19 @@ public sealed class SagaIntegrationEventNotificationHandlerTests
         StartedEvent message,
         ISagaContext context,
         CancellationToken cancellationToken)
-        => Task.FromResult(context.Complete());
+    {
+      var state = (StartedEventSagaState)context.State;
+      state.CorrelationId = context.CorrelationId;
+      state.CausationId = context.CausationId;
+      return Task.FromResult(context.Complete());
+    }
   }
 
   public sealed class StartedEventSagaState : ISagaState
   {
     public string? ConcurrencyToken { get; set; }
+    public Guid CorrelationId { get; set; }
+    public Guid? CausationId { get; set; }
   }
 
   private sealed class TestMessageContextAccessor(IMessageContext messageContext)
