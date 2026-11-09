@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Franz.Common.Errors;
 using Franz.Common.Grpc.Abstractions;
 using Grpc.Core;
 
@@ -19,6 +20,29 @@ public sealed class GrpcOutcomeMappingTests
 
         Assert.Equal(expectedStatus, outcome.StatusCode);
         Assert.DoesNotContain("sensitive internal detail", outcome.ToRpcException().Status.Detail);
+    }
+
+    [Fact]
+    public void FromException_MapsFranzDomainAndSecurityFailures()
+    {
+        var cases = new (Exception Exception, StatusCode ExpectedStatus)[]
+        {
+            (new UnauthorizedException("sensitive identity detail"), StatusCode.Unauthenticated),
+            (new ForbiddenException("sensitive policy detail"), StatusCode.PermissionDenied),
+            (new NotFoundException("sensitive resource detail"), StatusCode.NotFound),
+            (new PreconditionFailedException("sensitive state detail"), StatusCode.FailedPrecondition),
+            (new BusinessException("business.rule.failed", "sensitive business detail"), StatusCode.FailedPrecondition),
+            (new FunctionalException("sensitive functional detail"), StatusCode.InvalidArgument),
+            (new TechnicalException("sensitive technical detail"), StatusCode.Internal)
+        };
+
+        foreach (var (exception, expectedStatus) in cases)
+        {
+            var rpcException = GrpcOutcome.FromException(exception).ToRpcException();
+
+            Assert.Equal(expectedStatus, rpcException.StatusCode);
+            Assert.DoesNotContain("sensitive", rpcException.Status.Detail);
+        }
     }
 
     [Fact]
