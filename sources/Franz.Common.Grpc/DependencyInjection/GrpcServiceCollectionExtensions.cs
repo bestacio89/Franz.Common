@@ -49,6 +49,12 @@ public static class GrpcServiceCollectionExtensions
         .AddNoDuplicateScoped(typeof(IGrpcServerBehavior<,>), typeof(MetricServerBehavior<,>))
         .AddNoDuplicateScoped(typeof(IGrpcServerBehavior<,>), typeof(ExceptionMappingServerBehavior<,>));
 
+    // Exception mapping encloses the complete lifetime of every streaming RPC shape.
+    services
+        .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(ExceptionMappingStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(ExceptionMappingStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(ExceptionMappingStreamingBehavior<,>));
+
     // Apply tenant resolution before authorization for every server-side streaming RPC shape.
     services
         .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(TenantResolutionServerBehavior<,>))
