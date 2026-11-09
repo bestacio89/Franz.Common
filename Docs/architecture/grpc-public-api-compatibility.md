@@ -1,6 +1,6 @@
 # gRPC Public API and Compatibility Inventory
 
-**Status:** Source-level inventory updated for PR #194 head `1e2fdca5b9b7d6258a9c46f82bd5d1b1449ae3a0`; compiled API comparison remains a release gate  
+**Status:** Source-level inventory updated for PR #194; compiled API comparison is enforced by package validation  
 **Date:** 2026-11-09  
 **Purpose:** Record the published baseline, intended 3.0.0 public contract, and migration obligations for the gRPC modernization.
 
@@ -8,7 +8,7 @@
 
 The latest published `Franz.Common.Grpc` baseline identified for this work is version **2.3.3**. The repository's working source line is 3.0.0. The published package is a consumer contract, but the user has authorized a full modernization for the 3.0.0 breaking-change line.
 
-The 2.3.3 package's compiled public API must still be extracted and compared with both 3.0.0 package outputs. This source-level inventory is not a substitute for that binary comparison.
+The core project now enables .NET package validation against the published 2.3.3 baseline and generates a tracked `CompatibilitySuppressions.xml` for the explicitly authorized 3.0.0 breaking changes. The ASP.NET Core adapter is a new package and has no published baseline. The CI package-consumer step separately validates the packed core/adapter pair.
 
 ## 2. Current package boundary
 
@@ -89,11 +89,10 @@ Inert legacy timeout, metadata normalization/propagation, payload logging, retry
 ## 5. Required binary compatibility evidence
 
 Before release:
-1. Download and extract the published 2.3.3 package assemblies and XML documentation.
-2. Capture the public API for the 3.0.0 core and ASP.NET Core package outputs.
-3. Produce a symbol-level diff covering removed, moved, added, and changed signatures.
-4. Verify both package dependency graphs, including absence of `Grpc.Net.Client` and ASP.NET Core hosting dependencies from core.
-5. Build and run a consumer fixture against the new package pair using generated unary and streaming server services.
-6. Include the completed diff and migration examples in release evidence.
+1. Run `dotnet pack` with package validation enabled against the published 2.3.3 core package.
+2. Review every generated `CompatibilitySuppressions.xml` entry and confirm it corresponds to an approved 3.0.0 breaking change; do not suppress unexplained differences.
+3. Verify both package dependency graphs, including absence of `Grpc.Net.Client` and ASP.NET Core hosting dependencies from core.
+4. Build the gRPC package-consumer fixture from the packed core/adapter pair, using a consumer-owned proto and official typed-client registration.
+5. Include the reviewed suppression file, package dependency evidence, and migration examples in release evidence.
 
 Do not mark the compatibility phase complete until these artifacts exist and are reviewed.

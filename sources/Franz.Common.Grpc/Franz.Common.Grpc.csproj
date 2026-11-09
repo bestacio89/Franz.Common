@@ -2,8 +2,15 @@
 
   <PropertyGroup>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>2.3.3</PackageValidationBaselineVersion>
+    <ApiCompatGenerateSuppressionFile>true</ApiCompatGenerateSuppressionFile>
   </PropertyGroup>
   <Import Project="..\..\common.targets" />
+
+  <ItemGroup>
+    <ApiCompatSuppressionFile Include="CompatibilitySuppressions.xml" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Grpc.Core.Api" Version="2.84.0" />

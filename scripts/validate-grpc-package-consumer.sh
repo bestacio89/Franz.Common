@@ -20,6 +20,7 @@ cat > "$consumer/Consumer.csproj" <<'EOF'
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Franz.Common.Grpc" Version="3.0.0" />
     <PackageReference Include="Franz.Common.Grpc.AspNetCore" Version="3.0.0" />
     <PackageReference Include="Google.Protobuf" Version="3.35.1" />
