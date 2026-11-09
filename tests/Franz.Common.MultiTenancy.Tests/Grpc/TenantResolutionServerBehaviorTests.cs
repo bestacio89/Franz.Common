@@ -13,7 +13,7 @@ namespace Franz.Common.MultiTenancy.Tests.Grpc;
 public sealed class TenantResolutionServerBehaviorTests
 {
     [Fact]
-    public async Task InvokeAsync_RemovesCallerTenantAndEstablishesValidatedExecutionContext()
+    public async Task InvokeAsync_UsesCallerTenantOnlyAsAnUntrustedResolutionSelector()
     {
         var tenantId = Guid.NewGuid();
         var resolver = Substitute.For<IFranzTenantResolver>();
@@ -65,10 +65,20 @@ public sealed class TenantResolutionServerBehaviorTests
 
         await resolver.Received(1).ResolveTenantAsync(
             Arg.Is<GrpcCallContext>(context =>
+                context.TenantId == untrustedTenantId &&
+                context.RequestHeaders.TryGetValue(GrpcCallContext.TenantIdHeaderName, out var selector) &&
+                selector == untrustedTenantId &&
+                context.UserId == "trusted-user" &&
+                !context.RequestHeaders.ContainsKey(GrpcCallContext.UserIdHeaderName)),
+            Arg.Any<CancellationToken>());
+
+        await authorizer.Received(1).IsAuthorizedAsync(
+            Arg.Is<GrpcCallContext>(context =>
                 context.TenantId == null &&
                 context.UserId == "trusted-user" &&
                 !context.RequestHeaders.ContainsKey(GrpcCallContext.TenantIdHeaderName) &&
                 !context.RequestHeaders.ContainsKey(GrpcCallContext.UserIdHeaderName)),
+            tenantId,
             Arg.Any<CancellationToken>());
     }
 
