@@ -1,7 +1,7 @@
 #nullable enable
 
 using System.Text;
-using Confluent.Kafka;
+using KafkaHeaders = Confluent.Kafka.Headers;
 using Franz.Common.Messaging.Messages;
 
 namespace Franz.Common.Messaging.Kafka.Headers;
@@ -20,7 +20,7 @@ public static class KafkaMessageHeaderMapper
   /// Repeated values are retained for multi-valued headers; conflicting projections
   /// are rejected instead of silently choosing one representation.
   /// </summary>
-  public static void Restore(Message message, Headers? transportHeaders)
+  public static void Restore(Message message, KafkaHeaders? transportHeaders)
   {
     ArgumentNullException.ThrowIfNull(message);
 
