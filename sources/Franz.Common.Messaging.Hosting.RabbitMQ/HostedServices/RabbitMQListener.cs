@@ -203,11 +203,24 @@ public sealed class RabbitMQListener(
   {
     try
     {
-      var message = new Message
+      var headers = RabbitHeaderMapper.ExtractHeaders(delivery);
+      var messageId = Guid.TryParse(delivery.BasicProperties.MessageId, out var parsedMessageId)
+          ? parsedMessageId
+          : Guid.CreateVersion7();
+
+      var message = new Message(Encoding.UTF8.GetString(delivery.Body.Span), headers)
       {
-        Headers = RabbitHeaderMapper.ExtractHeaders(delivery),
-        Body = Encoding.UTF8.GetString(delivery.Body.Span)
+        Id = messageId
       };
+
+      // Older producers may not have supplied AMQP correlation metadata. In that
+      // compatibility case, retain the message's own stable identity as correlation.
+      if (!headers.TryGetValue(Message.CorrelationHeader, out var correlationValues) ||
+          correlationValues.Length != 1 ||
+          !Guid.TryParse(correlationValues[0], out _))
+      {
+        message.CorrelationId = messageId;
+      }
 
       var handler = OnMessageReceivedAsync
           ?? throw new InvalidOperationException(
