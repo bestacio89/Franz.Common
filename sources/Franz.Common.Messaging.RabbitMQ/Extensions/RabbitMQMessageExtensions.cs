@@ -14,6 +14,11 @@ public static class RabbitMQMessageExtensions
   {
     ArgumentNullException.ThrowIfNull(message);
 
+    if (message.Id == Guid.Empty)
+      throw new ArgumentException(
+          "A RabbitMQ message must have a non-empty identity.",
+          nameof(message));
+
     var properties = message.Headers.ToBasicProperties();
     properties.MessageId = message.Id.ToString("D");
 
