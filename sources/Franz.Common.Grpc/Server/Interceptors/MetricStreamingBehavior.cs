@@ -143,6 +143,9 @@ public sealed class MetricStreamingBehavior<TRequest, TResponse> :
                 failure ??= exception;
             }
 
+            if (disposalFailure is not null)
+                succeeded = false;
+
             if (!succeeded && failure is null)
                 failure = new OperationCanceledException("The response stream ended before normal completion.");
 

@@ -139,7 +139,7 @@ public sealed class LoggingStreamingBehavior<TRequest, TResponse> :
             }
 
             stopwatch.Stop();
-            if (completed)
+            if (completed && failure is null)
                 _logger.LogStreamCompleted(context, rpcShape, stopwatch.ElapsedMilliseconds);
             else if (failure is not null)
                 _logger.LogStreamError(context, rpcShape, failure, stopwatch.ElapsedMilliseconds);
