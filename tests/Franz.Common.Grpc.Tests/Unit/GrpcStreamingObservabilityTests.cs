@@ -74,13 +74,13 @@ public sealed class GrpcStreamingObservabilityTests
         await foreach (var _ in stream) { }
 
         metrics.Received(1).RecordRequest(Arg.Is<GrpcMetricContext>(metric =>
-            metric is not null &&
+            metric != null &&
             metric.ServiceName == "tests.Service" &&
             metric.MethodName == "Stream" &&
             metric.RpcShape == "server_streaming" &&
             metric.Direction == "server"));
         metrics.Received(1).RecordSuccess(
-            Arg.Is<GrpcMetricContext>(metric => metric is not null && metric.RpcShape == "server_streaming"),
+            Arg.Is<GrpcMetricContext>(metric => metric != null && metric.RpcShape == "server_streaming"),
             Arg.Any<long>());
         metrics.DidNotReceive().RecordFailure(
             Arg.Any<GrpcMetricContext>(),
@@ -103,7 +103,7 @@ public sealed class GrpcStreamingObservabilityTests
         await enumerator.DisposeAsync();
 
         metrics.Received(1).RecordFailure(
-            Arg.Is<GrpcMetricContext>(metric => metric is not null && metric.RpcShape == "server_streaming"),
+            Arg.Is<GrpcMetricContext>(metric => metric != null && metric.RpcShape == "server_streaming"),
             Arg.Is<Exception>(exception => exception is OperationCanceledException),
             Arg.Any<long>());
     }
