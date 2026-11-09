@@ -6,6 +6,7 @@ using Franz.Common.Grpc.Abstractions;
 
 namespace Franz.Common.Grpc.Server.Interceptors;
 
+/// <summary>Records bounded-cardinality server call metrics and standard .NET diagnostics.</summary>
 public sealed class MetricServerBehavior<TRequest, TResponse>
     : IGrpcServerBehavior<TRequest, TResponse>
     where TRequest : class
@@ -26,21 +27,35 @@ public sealed class MetricServerBehavior<TRequest, TResponse>
         GrpcServerPipelineDelegate<TRequest, TResponse> next,
         CancellationToken cancellationToken = default)
     {
-        _metrics.RecordRequest(context);
+        var metricContext = GrpcMetricContext.Create(context, "unary", "server");
+        _metrics.RecordRequest(metricContext);
         var stopwatch = Stopwatch.StartNew();
+        using var activity = FranzGrpcDiagnostics.StartActivity(metricContext);
+
+        var succeeded = false;
+        Exception? failure = null;
 
         try
         {
             var response = await next(request, context, cancellationToken).ConfigureAwait(false);
-            stopwatch.Stop();
-            _metrics.RecordSuccess(context, stopwatch.ElapsedMilliseconds);
+            succeeded = true;
             return response;
         }
         catch (Exception exception)
         {
-            stopwatch.Stop();
-            _metrics.RecordFailure(context, exception, stopwatch.ElapsedMilliseconds);
+            failure = exception;
             throw;
+        }
+        finally
+        {
+            stopwatch.Stop();
+            if (succeeded)
+                _metrics.RecordSuccess(metricContext, stopwatch.ElapsedMilliseconds);
+            else
+                _metrics.RecordFailure(metricContext, failure!, stopwatch.ElapsedMilliseconds);
+
+            FranzGrpcDiagnostics.RecordCompleted(metricContext, succeeded, stopwatch.Elapsed.TotalSeconds);
+            FranzGrpcDiagnostics.SetActivityOutcome(activity, succeeded, failure);
         }
     }
 }
