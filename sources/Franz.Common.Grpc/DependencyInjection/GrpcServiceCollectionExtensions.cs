@@ -49,6 +49,12 @@ public static class GrpcServiceCollectionExtensions
         .AddNoDuplicateScoped(typeof(IGrpcServerBehavior<,>), typeof(MetricServerBehavior<,>))
         .AddNoDuplicateScoped(typeof(IGrpcServerBehavior<,>), typeof(ExceptionMappingServerBehavior<,>));
 
+    // Apply the same configured authorization policy to all server-side streaming RPC shapes.
+    services
+        .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(AuthorizationStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(AuthorizationStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(AuthorizationStreamingBehavior<,>));
+
     // Unary and streaming behavior providers are scoped to the RPC service lifetime.
     services.AddNoDuplicateScoped<IGrpcServerBehaviorProvider, GrpcServerBehaviorProvider>();
     services.AddNoDuplicateScoped<IGrpcServerStreamingBehaviorProvider, GrpcServerStreamingBehaviorProvider>();

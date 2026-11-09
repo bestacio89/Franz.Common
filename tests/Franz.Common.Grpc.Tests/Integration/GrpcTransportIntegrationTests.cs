@@ -154,6 +154,7 @@ public sealed class GrpcTransportIntegrationTests
         Assert.Equal("first,second", response.Value);
         Assert.Equal(1, host.PipelineProbe.ClientStreamingBehaviorInvocationCount);
         Assert.Equal("pipeline-context", host.PipelineProbe.LastServiceContextMarker);
+        Assert.Equal(1, host.PipelineProbe.AuthorizationInvocationCount);
     }
 
     [Fact]
