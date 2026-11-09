@@ -102,13 +102,23 @@ public sealed class MetricStreamingBehavior<TRequest, TResponse> :
         var stopwatch = Stopwatch.StartNew();
         using var activity = FranzGrpcDiagnostics.StartActivity(metricContext);
 
-        var enumerator = next().GetAsyncEnumerator(cancellationToken);
+        IAsyncEnumerator<TResponse>? enumerator = null;
         Exception? failure = null;
         Exception? disposalFailure = null;
         var succeeded = false;
 
         try
         {
+            try
+            {
+                enumerator = next().GetAsyncEnumerator(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+                throw;
+            }
+
             while (true)
             {
                 bool hasNext;
@@ -135,7 +145,8 @@ public sealed class MetricStreamingBehavior<TRequest, TResponse> :
         {
             try
             {
-                await enumerator.DisposeAsync().ConfigureAwait(false);
+                if (enumerator is not null)
+                    await enumerator.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception exception)
             {

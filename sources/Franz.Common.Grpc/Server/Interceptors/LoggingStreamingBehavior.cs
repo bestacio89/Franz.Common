@@ -97,13 +97,23 @@ public sealed class LoggingStreamingBehavior<TRequest, TResponse> :
         var stopwatch = Stopwatch.StartNew();
         _logger.LogStreamStarted(context, rpcShape);
 
-        var enumerator = next().GetAsyncEnumerator(cancellationToken);
+        IAsyncEnumerator<TResponse>? enumerator = null;
         Exception? failure = null;
         Exception? disposalFailure = null;
         var completed = false;
 
         try
         {
+            try
+            {
+                enumerator = next().GetAsyncEnumerator(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+                throw;
+            }
+
             while (true)
             {
                 bool hasNext;
@@ -130,7 +140,8 @@ public sealed class LoggingStreamingBehavior<TRequest, TResponse> :
         {
             try
             {
-                await enumerator.DisposeAsync().ConfigureAwait(false);
+                if (enumerator is not null)
+                    await enumerator.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception exception)
             {
