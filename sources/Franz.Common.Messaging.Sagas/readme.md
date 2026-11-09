@@ -58,7 +58,7 @@ The package also registers a hosted startup validator. Mapping validation requir
 - `SagaId` is the durable identity of one saga instance and the repository key.
 - `CorrelationId` groups related messages; it is not a saga repository key.
 - `CausationId` identifies the message that caused the current execution.
-- `MessageId` is transport-level message identity. The inbound Saga notification handler atomically claims it through the existing `IInboxStore` before executing saga handlers when an original message context is available.
+- `MessageId` is transport-level message identity. When an inbox store is configured, the inbound Saga notification handler requires the original message context and a stable transport identity before atomically claiming the receipt through `IInboxStore`. RabbitMQ marks locally synthesized IDs in `Message.Properties`; they are not accepted as deduplication identities.
 - `TenantId` scopes repository operations. It is taken from the validated tenant execution context, not copied from an untrusted message header. If a message contains `TenantId`, it must contain exactly one non-empty GUID and match the current validated context; a missing context or mismatch is rejected. If no tenant header or validated context exists, `null` represents the default non-tenant scope.
 
 A start handler creates the saga instance. For a non-start message, the saga must implement `ISagaIdResolver<TMessage>` and return the non-empty `SagaId` of the target instance. Do not derive this identity from correlation metadata.
@@ -113,7 +113,7 @@ For a single incoming message, the Saga notification handler performs one persis
 5. Enqueue every outgoing integration event through `IMessageStore`.
 6. Commit once after all matching saga handlers finish.
 
-If processing fails before commit, the inbox receipt, all saga transitions, and all outgoing outbox records roll back together. A duplicate receipt skips execution. The inbox receipt is registered before handler execution, but it is not committed until the entire unit succeeds. Local in-process notification publication without a transport message context has no transport message ID and therefore cannot use message-level inbox deduplication.
+If processing fails before commit, the inbox receipt, all saga transitions, and all outgoing outbox records roll back together. A duplicate receipt skips execution. The inbox receipt is registered before handler execution, but it is not committed until the entire unit succeeds. When an inbox store is configured, local in-process notification publication without the original transport message context is rejected because it cannot satisfy message-level deduplication. Without an inbox store, it can execute but has no message-level deduplication guarantee.
 
 Provider implementations:
 

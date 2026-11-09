@@ -118,9 +118,11 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
     var tenantId = SagaTenantContextResolver.ResolveTenantId(message, _tenantExecutionContextAccessor);
     Guid? messageId = message.Id == Guid.Empty ? null : message.Id;
 
-    if (_inboxStore is not null && !messageId.HasValue)
+    if (_inboxStore is not null &&
+        (!messageId.HasValue ||
+         message.GetProperty<bool>(MessagingConstants.TransportGeneratedMessageId)))
       throw new PermanentMessagingException(
-          "Saga inbox processing requires a non-empty message identity.");
+          "Saga inbox processing requires a stable transport message identity.");
 
     if (_inboxStore is not null && _persistenceUnitOfWork is null)
       throw new InvalidOperationException(

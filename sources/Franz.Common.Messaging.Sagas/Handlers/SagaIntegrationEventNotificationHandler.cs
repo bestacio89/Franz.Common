@@ -1,6 +1,7 @@
 #nullable enable
 
 using Franz.Common.Mediator.Context;
+using Franz.Common.Messaging;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging.Contexting;
@@ -54,9 +55,12 @@ internal sealed class SagaIntegrationEventNotificationHandler<TNotification> : I
     Guid? messageId = message is { Id: var id } && id != Guid.Empty ? id : null;
     var tenantId = SagaTenantContextResolver.ResolveTenantId(message, _tenantExecutionContextAccessor);
 
-    if (_inboxStore is not null && message is not null && !messageId.HasValue)
+    if (_inboxStore is not null &&
+        (message is null ||
+         !messageId.HasValue ||
+         message.GetProperty<bool>(MessagingConstants.TransportGeneratedMessageId)))
       throw new PermanentMessagingException(
-          "Saga inbox processing requires a non-empty message identity.");
+          "Saga inbox processing requires the original message context and a stable transport message identity.");
 
     var executionContext = MediatorContext.Current
         .WithCorrelationId(correlationId)
