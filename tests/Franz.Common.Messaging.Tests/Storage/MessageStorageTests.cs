@@ -82,6 +82,61 @@ public class MessageStorageTests
   }
 
   [Fact]
+  public void ToStoredAndBack_ShouldPreserveCompleteMessageEnvelope()
+  {
+    var messageId = Guid.CreateVersion7();
+    var correlationId = Guid.CreateVersion7();
+    var aggregateId = Guid.CreateVersion7();
+    var causationId = Guid.CreateVersion7();
+    var occurredOn = new DateTimeOffset(2026, 11, 9, 18, 30, 0, TimeSpan.Zero);
+    var message = new Message("integration-event-payload")
+    {
+      Id = messageId,
+      Kind = MessageKind.IntegrationEvent,
+      CorrelationId = correlationId,
+      AggregateId = aggregateId,
+      OccurredOn = occurredOn,
+      MessageType = "OrderPlaced, Contracts"
+    };
+    message.Headers[Message.CausationHeader] = [causationId.ToString("D")];
+    message.Headers["TenantId"] = [Guid.CreateVersion7().ToString("D")];
+    message.Properties["CustomProperty"] = "custom-value";
+
+    var restored = message.ToStored().ToMessage();
+
+    restored.Id.Should().Be(messageId);
+    restored.Kind.Should().Be(MessageKind.IntegrationEvent);
+    restored.CorrelationId.Should().Be(correlationId);
+    restored.AggregateId.Should().Be(aggregateId);
+    restored.OccurredOn.Should().Be(occurredOn);
+    restored.MessageType.Should().Be("OrderPlaced, Contracts");
+    restored.Headers[Message.CausationHeader].Should().ContainSingle(causationId.ToString("D"));
+    restored.Headers.Should().ContainKey("TenantId");
+    restored.Properties["CustomProperty"].Should().Be("custom-value");
+    restored.Properties.Should().NotContainKey("$franz.storage.message-kind");
+    restored.Properties.Should().NotContainKey("$franz.storage.aggregate-id");
+    restored.Properties.Should().NotContainKey("$franz.storage.occurred-on");
+  }
+
+  [Fact]
+  public void ToMessage_WhenReadingLegacyStoredMessage_UsesCommandKindAndNoAggregateId()
+  {
+    var stored = new StoredMessage
+    {
+      Id = Guid.CreateVersion7(),
+      Body = "legacy-payload",
+      Headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase),
+      Properties = new Dictionary<string, object>()
+    };
+
+    var restored = stored.ToMessage();
+
+    restored.Kind.Should().Be(MessageKind.Command);
+    restored.AggregateId.Should().BeNull();
+    restored.CorrelationId.Should().BeNull();
+  }
+
+  [Fact]
   public void StoredMessage_Constructor_ShouldDefaultToGuidV7()
   {
     // Act
