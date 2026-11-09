@@ -72,7 +72,8 @@ public sealed class FranzGrpcServerInterceptor : Interceptor
         var pipeline = GrpcServerStreamingInteropPipeline.BuildServerStreaming(
             provider.ResolveBehaviors<TRequest, TResponse>(),
             (message, finalContext, cancellationToken) =>
-                ExecuteServerStreamingAsync(message, finalContext, context, continuation, cancellationToken));
+                ExecuteServerStreamingAsync(
+                    message, finalContext, context, responseStream, continuation, cancellationToken));
 
         await foreach (var response in pipeline(request, callContext, context.CancellationToken)
             .WithCancellation(context.CancellationToken)
@@ -121,7 +122,8 @@ public sealed class FranzGrpcServerInterceptor : Interceptor
         var pipeline = GrpcServerStreamingInteropPipeline.BuildDuplexStreaming(
             provider.ResolveBehaviors<TRequest, TResponse>(),
             (messages, finalContext, cancellationToken) =>
-                ExecuteDuplexStreamingAsync(messages, finalContext, context, continuation, cancellationToken));
+                ExecuteDuplexStreamingAsync(
+                    messages, finalContext, context, responseStream, continuation, cancellationToken));
 
         await foreach (var response in pipeline(requestEnumerable, callContext, context.CancellationToken)
             .WithCancellation(context.CancellationToken)
@@ -153,6 +155,7 @@ public sealed class FranzGrpcServerInterceptor : Interceptor
         TRequest request,
         GrpcCallContext callContext,
         ServerCallContext serverCallContext,
+        IServerStreamWriter<TResponse> responseStream,
         ServerStreamingServerMethod<TRequest, TResponse> continuation,
         [EnumeratorCancellation] CancellationToken cancellationToken)
         where TRequest : class
@@ -198,6 +201,7 @@ public sealed class FranzGrpcServerInterceptor : Interceptor
         IAsyncEnumerable<TRequest> requestStream,
         GrpcCallContext callContext,
         ServerCallContext serverCallContext,
+        IServerStreamWriter<TResponse> responseStream,
         DuplexStreamingServerMethod<TRequest, TResponse> continuation,
         [EnumeratorCancellation] CancellationToken cancellationToken)
         where TRequest : class
