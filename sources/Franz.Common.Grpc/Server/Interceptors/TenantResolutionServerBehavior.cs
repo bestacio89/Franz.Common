@@ -1,19 +1,27 @@
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Franz.Common.Grpc.Abstractions;
 using Franz.Common.Grpc.Configuration;
 using Franz.Common.MultiTenancy;
 using Franz.Common.MultiTenancy.Models;
-using Microsoft.Extensions.Options;
 using Grpc.Core;
+using Microsoft.Extensions.Options;
 
 namespace Franz.Common.Grpc.Server.Interceptors;
 
 /// <summary>
 /// Resolves a tenant from trusted server-side identity, authorizes membership,
-/// establishes the validated execution context, and clears it after the call.
-/// Caller-supplied tenant metadata is removed before resolution.
+/// establishes the validated execution context, and clears it after the complete RPC lifetime.
+/// Caller-supplied tenant metadata is only a resolver selection hint.
 /// </summary>
-public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
-    : IGrpcServerBehavior<TRequest, TResponse>
+public sealed class TenantResolutionServerBehavior<TRequest, TResponse> :
+    IGrpcServerBehavior<TRequest, TResponse>,
+    IGrpcServerStreamingBehavior<TRequest, TResponse>,
+    IGrpcClientStreamingBehavior<TRequest, TResponse>,
+    IGrpcDuplexStreamingBehavior<TRequest, TResponse>
     where TRequest : class
     where TResponse : class
 {
@@ -23,11 +31,6 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
     private readonly ITenantValidator? _tenantValidator;
     private readonly FranzGrpcOptions _options;
 
-    /// <summary>
-    /// Retains the original resolver-only constructor for binary compatibility.
-    /// Tenant resolution remains fail-closed: a resolved tenant requires authorization
-    /// and a validated execution-context accessor, supplied by the full constructor.
-    /// </summary>
     public TenantResolutionServerBehavior(IFranzTenantResolver tenantResolver)
         : this(tenantResolver, Options.Create(new FranzGrpcOptions()))
     {
@@ -47,6 +50,8 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
         _tenantValidator = tenantValidator;
     }
 
+    public int Order => GrpcServerBehaviorOrder.TenantResolution;
+
     public async Task<TResponse> InvokeAsync(
         TRequest request,
         GrpcCallContext context,
@@ -57,24 +62,113 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(next);
 
-        // x-tenant-id is untrusted propagation metadata, never an authority on the server.
-        var trustedContext = context.WithTenant(null).WithUser(null);
+        var resolution = await ResolveTenantContextAsync(context, cancellationToken).ConfigureAwait(false);
 
-        // HTTP middleware may already have established and authorized the tenant for this
-        // same ASP.NET request. Reuse that context and leave its cleanup to the HTTP scope.
+        try
+        {
+            return await next(request, resolution.Context, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ClearTenantContext(resolution);
+        }
+    }
+
+    async IAsyncEnumerable<TResponse> IGrpcServerStreamingBehavior<TRequest, TResponse>.InvokeAsync(
+        TRequest request,
+        GrpcCallContext context,
+        GrpcServerStreamingPipelineDelegate<TRequest, TResponse> next,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(next);
+
+        var resolution = await ResolveTenantContextAsync(context, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await foreach (var response in next(request, resolution.Context, cancellationToken)
+                .WithCancellation(cancellationToken)
+                .ConfigureAwait(false))
+            {
+                yield return response;
+            }
+        }
+        finally
+        {
+            ClearTenantContext(resolution);
+        }
+    }
+
+    async Task<TResponse> IGrpcClientStreamingBehavior<TRequest, TResponse>.InvokeAsync(
+        IAsyncEnumerable<TRequest> requestStream,
+        GrpcCallContext context,
+        GrpcClientStreamingPipelineDelegate<TRequest, TResponse> next,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(requestStream);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(next);
+
+        var resolution = await ResolveTenantContextAsync(context, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            return await next(requestStream, resolution.Context, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ClearTenantContext(resolution);
+        }
+    }
+
+    async IAsyncEnumerable<TResponse> IGrpcDuplexStreamingBehavior<TRequest, TResponse>.InvokeAsync(
+        IAsyncEnumerable<TRequest> requestStream,
+        GrpcCallContext context,
+        GrpcDuplexStreamingPipelineDelegate<TRequest, TResponse> next,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(requestStream);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(next);
+
+        var resolution = await ResolveTenantContextAsync(context, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await foreach (var response in next(requestStream, resolution.Context, cancellationToken)
+                .WithCancellation(cancellationToken)
+                .ConfigureAwait(false))
+            {
+                yield return response;
+            }
+        }
+        finally
+        {
+            ClearTenantContext(resolution);
+        }
+    }
+
+    private async Task<TenantResolutionResult> ResolveTenantContextAsync(
+        GrpcCallContext context,
+        CancellationToken cancellationToken)
+    {
+        var resolutionContext = context.WithoutUserHeader();
+        var trustedContext = resolutionContext.WithTenant(null);
+
         if (_tenantContextAccessor?.Current is { } establishedContext)
         {
             if (establishedContext.TenantId == Guid.Empty)
                 throw new TenantIsolationException("The established gRPC tenant context is invalid.");
 
-            return await next(
-                request,
+            return new TenantResolutionResult(
                 trustedContext.WithTenant(establishedContext.TenantId.ToString("D")),
-                cancellationToken).ConfigureAwait(false);
+                OwnsExecutionContext: false);
         }
 
         var resolvedTenantId = await _tenantResolver
-            .ResolveTenantAsync(trustedContext, cancellationToken)
+            .ResolveTenantAsync(resolutionContext, cancellationToken)
             .ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(resolvedTenantId))
@@ -82,7 +176,7 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
             if (_options.RequireTenant)
                 throw new RpcException(new Status(StatusCode.PermissionDenied, "A tenant is required for this gRPC operation."));
 
-            return await next(request, trustedContext, cancellationToken).ConfigureAwait(false);
+            return new TenantResolutionResult(trustedContext, OwnsExecutionContext: false);
         }
 
         if (!Guid.TryParse(resolvedTenantId, out var tenantId) || tenantId == Guid.Empty)
@@ -121,14 +215,18 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse>
 
         _tenantContextAccessor.Initialize(executionContext);
 
-        try
-        {
-            var tenantContext = trustedContext.WithTenant(tenantId.ToString("D"));
-            return await next(request, tenantContext, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            _tenantContextAccessor.Clear();
-        }
+        return new TenantResolutionResult(
+            trustedContext.WithTenant(tenantId.ToString("D")),
+            OwnsExecutionContext: true);
     }
+
+    private void ClearTenantContext(TenantResolutionResult resolution)
+    {
+        if (resolution.OwnsExecutionContext)
+            _tenantContextAccessor!.Clear();
+    }
+
+    private readonly record struct TenantResolutionResult(
+        GrpcCallContext Context,
+        bool OwnsExecutionContext);
 }

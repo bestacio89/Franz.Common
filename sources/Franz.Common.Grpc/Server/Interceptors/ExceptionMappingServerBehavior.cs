@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Franz.Common.Grpc.Abstractions;
@@ -10,21 +10,27 @@ public sealed class ExceptionMappingServerBehavior<TRequest, TResponse>
     where TRequest : class
     where TResponse : class
 {
-  public async Task<TResponse> InvokeAsync(
-      TRequest request,
-      GrpcCallContext context,
-      GrpcServerPipelineDelegate<TRequest, TResponse> next,
-      CancellationToken cancellationToken = default)
-  {
-    try
+    public int Order => GrpcServerBehaviorOrder.ExceptionMapping;
+
+    public async Task<TResponse> InvokeAsync(
+        TRequest request,
+        GrpcCallContext context,
+        GrpcServerPipelineDelegate<TRequest, TResponse> next,
+        CancellationToken cancellationToken = default)
     {
-      return await next(request, context, cancellationToken)
-          .ConfigureAwait(false);
+        try
+        {
+            return await next(request, context, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            var outcome = GrpcOutcome.FromException(
+                exception,
+                cancellationToken,
+                context.DeadlineUtc,
+                context.CorrelationId);
+
+            throw outcome.ToRpcException();
+        }
     }
-    catch (Exception ex)
-    {
-      var outcome = GrpcOutcome.FromException(ex);
-      throw outcome.ToRpcException();
-    }
-  }
 }

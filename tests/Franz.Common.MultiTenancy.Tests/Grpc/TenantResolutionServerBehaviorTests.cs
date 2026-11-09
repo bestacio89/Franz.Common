@@ -13,7 +13,7 @@ namespace Franz.Common.MultiTenancy.Tests.Grpc;
 public sealed class TenantResolutionServerBehaviorTests
 {
     [Fact]
-    public async Task InvokeAsync_RemovesCallerTenantAndEstablishesValidatedExecutionContext()
+    public async Task InvokeAsync_UsesCallerTenantOnlyAsAnUntrustedResolutionSelector()
     {
         var tenantId = Guid.NewGuid();
         var resolver = Substitute.For<IFranzTenantResolver>();
@@ -37,7 +37,13 @@ public sealed class TenantResolutionServerBehaviorTests
 
         var untrustedTenantId = Guid.NewGuid().ToString("D");
         var callContext = GrpcCallContext.CreateClient(
-            "tests.Service", "Call", tenantId: untrustedTenantId, userId: "untrusted-user") with { IsServerSide = true };
+            "tests.Service", "Call", tenantId: untrustedTenantId, userId: "trusted-user") with { IsServerSide = true };
+        callContext = callContext with
+        {
+            RequestHeaders = callContext.RequestHeaders.SetItem(
+                GrpcCallContext.UserIdHeaderName,
+                "caller-controlled-user")
+        };
 
         var invoked = false;
         await behavior.InvokeAsync(
@@ -48,6 +54,8 @@ public sealed class TenantResolutionServerBehaviorTests
                 invoked = true;
                 Assert.Equal(tenantId.ToString("D"), context.TenantId);
                 Assert.NotEqual(untrustedTenantId, context.TenantId);
+                Assert.Equal("trusted-user", context.UserId);
+                Assert.False(context.RequestHeaders.ContainsKey(GrpcCallContext.UserIdHeaderName));
                 Assert.Equal(tenantId, accessor.Current?.TenantId);
                 return Task.FromResult(new TestResponse());
             });
@@ -57,13 +65,55 @@ public sealed class TenantResolutionServerBehaviorTests
 
         await resolver.Received(1).ResolveTenantAsync(
             Arg.Is<GrpcCallContext>(context =>
+                context.TenantId == untrustedTenantId &&
+                HasHeader(context, GrpcCallContext.TenantIdHeaderName, untrustedTenantId) &&
+                context.UserId == "trusted-user" &&
+                !context.RequestHeaders.ContainsKey(GrpcCallContext.UserIdHeaderName)),
+            Arg.Any<CancellationToken>());
+
+        await authorizer.Received(1).IsAuthorizedAsync(
+            Arg.Is<GrpcCallContext>(context =>
                 context.TenantId == null &&
-                context.UserId == null &&
+                context.UserId == "trusted-user" &&
                 !context.RequestHeaders.ContainsKey(GrpcCallContext.TenantIdHeaderName) &&
                 !context.RequestHeaders.ContainsKey(GrpcCallContext.UserIdHeaderName)),
+            tenantId,
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task InvokeAsync_DoesNotPromoteCallerSuppliedUserMetadataWhenPrincipalIsAnonymous()
+    {
+        var resolver = Substitute.For<IFranzTenantResolver>();
+        resolver.ResolveTenantAsync(Arg.Any<GrpcCallContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<string?>(null));
+
+        var behavior = new TenantResolutionServerBehavior<TestRequest, TestResponse>(
+            resolver,
+            Options.Create(new FranzGrpcOptions()));
+
+        var callContext = GrpcCallContext.CreateClient("tests.Service", "Call")
+            .WithAdditionalHeader(GrpcCallContext.UserIdHeaderName, "caller-controlled-user") with
+            {
+                IsServerSide = true
+            };
+
+        await behavior.InvokeAsync(
+            new TestRequest(),
+            callContext,
+            (_, context, _) =>
+            {
+                Assert.Null(context.UserId);
+                Assert.False(context.RequestHeaders.ContainsKey(GrpcCallContext.UserIdHeaderName));
+                return Task.FromResult(new TestResponse());
+            });
+
+        await resolver.Received(1).ResolveTenantAsync(
+            Arg.Is<GrpcCallContext>(context =>
+                context.UserId == null &&
+                !context.RequestHeaders.ContainsKey(GrpcCallContext.UserIdHeaderName)),
+            Arg.Any<CancellationToken>());
+    }
 
     [Fact]
     public async Task InvokeAsync_ReusesHttpEstablishedTenantWithoutReplacingOrClearingIt()
@@ -175,6 +225,136 @@ public sealed class TenantResolutionServerBehaviorTests
         Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
     }
 
+    [Fact]
+    public async Task InvokeAsync_RejectsTenantWhenMembershipIsDenied()
+    {
+        var tenantId = Guid.NewGuid();
+        var resolver = Substitute.For<IFranzTenantResolver>();
+        resolver.ResolveTenantAsync(Arg.Any<GrpcCallContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<string?>(tenantId.ToString("D")));
+
+        var authorizer = Substitute.For<IFranzTenantAuthorizer>();
+        authorizer.IsAuthorizedAsync(
+                Arg.Any<GrpcCallContext>(), tenantId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(false));
+
+        var accessor = new TestTenantExecutionContextAccessor();
+        var behavior = new TenantResolutionServerBehavior<TestRequest, TestResponse>(
+            resolver,
+            Options.Create(new FranzGrpcOptions { RequireTenant = true }),
+            authorizer,
+            accessor,
+            Substitute.For<ITenantValidator>());
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() =>
+            behavior.InvokeAsync(
+                new TestRequest(),
+                GrpcCallContext.CreateClient("tests.Service", "Call") with { IsServerSide = true },
+                (_, _, _) => Task.FromResult(new TestResponse())));
+
+        Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+        Assert.Null(accessor.Current);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_RejectsMalformedResolvedTenantIdentifier()
+    {
+        var resolver = Substitute.For<IFranzTenantResolver>();
+        resolver.ResolveTenantAsync(Arg.Any<GrpcCallContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<string?>("not-a-guid"));
+
+        var authorizer = Substitute.For<IFranzTenantAuthorizer>();
+        var accessor = new TestTenantExecutionContextAccessor();
+        var behavior = new TenantResolutionServerBehavior<TestRequest, TestResponse>(
+            resolver,
+            Options.Create(new FranzGrpcOptions()),
+            authorizer,
+            accessor);
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() =>
+            behavior.InvokeAsync(
+                new TestRequest(),
+                GrpcCallContext.CreateClient("tests.Service", "Call") with { IsServerSide = true },
+                (_, _, _) => Task.FromResult(new TestResponse())));
+
+        Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+        Assert.Null(accessor.Current);
+        await authorizer.DidNotReceive().IsAuthorizedAsync(
+            Arg.Any<GrpcCallContext>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InvokeAsync_RejectsTenantThatFailsValidation()
+    {
+        var tenantId = Guid.NewGuid();
+        var resolver = Substitute.For<IFranzTenantResolver>();
+        resolver.ResolveTenantAsync(Arg.Any<GrpcCallContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<string?>(tenantId.ToString("D")));
+
+        var authorizer = Substitute.For<IFranzTenantAuthorizer>();
+        authorizer.IsAuthorizedAsync(
+                Arg.Any<GrpcCallContext>(), tenantId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        var validator = Substitute.For<ITenantValidator>();
+        validator.IsValidAsync(tenantId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(false));
+
+        var accessor = new TestTenantExecutionContextAccessor();
+        var behavior = new TenantResolutionServerBehavior<TestRequest, TestResponse>(
+            resolver,
+            Options.Create(new FranzGrpcOptions { RequireTenant = true }),
+            authorizer,
+            accessor,
+            validator);
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() =>
+            behavior.InvokeAsync(
+                new TestRequest(),
+                GrpcCallContext.CreateClient("tests.Service", "Call") with { IsServerSide = true },
+                (_, _, _) => Task.FromResult(new TestResponse())));
+
+        Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+        Assert.Null(accessor.Current);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ClearsTenantContextWhenCallIsCancelled()
+    {
+        var tenantId = Guid.NewGuid();
+        var resolver = Substitute.For<IFranzTenantResolver>();
+        resolver.ResolveTenantAsync(Arg.Any<GrpcCallContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<string?>(tenantId.ToString("D")));
+
+        var authorizer = Substitute.For<IFranzTenantAuthorizer>();
+        authorizer.IsAuthorizedAsync(
+                Arg.Any<GrpcCallContext>(), tenantId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        var validator = Substitute.For<ITenantValidator>();
+        validator.IsValidAsync(tenantId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(true));
+
+        var accessor = new TestTenantExecutionContextAccessor();
+        var behavior = new TenantResolutionServerBehavior<TestRequest, TestResponse>(
+            resolver,
+            Options.Create(new FranzGrpcOptions { RequireTenant = true }),
+            authorizer,
+            accessor,
+            validator);
+
+        using var cancellation = new CancellationTokenSource();
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            behavior.InvokeAsync(
+                new TestRequest(),
+                GrpcCallContext.CreateClient("tests.Service", "Call") with { IsServerSide = true },
+                (_, _, token) =>
+                {
+                    cancellation.Cancel();
+                    throw new OperationCanceledException(token);
+                },
+                cancellation.Token));
+
+        Assert.Null(accessor.Current);
+    }
 
     [Fact]
     public async Task ClientBehavior_PropagatesOnlyValidatedExecutionTenant()
@@ -206,6 +386,9 @@ public sealed class TenantResolutionServerBehaviorTests
                 return Task.FromResult(new TestResponse());
             });
     }
+
+    private static bool HasHeader(GrpcCallContext context, string name, string expectedValue)
+        => context.RequestHeaders.TryGetValue(name, out var value) && value == expectedValue;
 
     private static TenantExecutionContext CreateTenantContext(Guid tenantId)
         => new(

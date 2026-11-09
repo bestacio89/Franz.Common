@@ -1,10 +1,11 @@
 ﻿using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Grpc.Abstractions;
-using Franz.Common.Grpc.Client;
 using Franz.Common.Grpc.Client.Interceptors;
 using Franz.Common.Grpc.Configuration;
+using Franz.Common.Grpc.Client;
 using Franz.Common.Grpc.Hosting;
 using Franz.Common.Grpc.Hosting.NoOp;
+using Franz.Common.Grpc.Hosting.Security;
 using Franz.Common.MultiTenancy;
 using Franz.Common.Grpc.Server;
 using Franz.Common.Grpc.Server.Interceptors;
@@ -36,8 +37,9 @@ public static class GrpcServiceCollectionExtensions
     services.TryAddScoped<ITenantExecutionContextAccessor, GrpcTenantExecutionContextAccessor>();
 
     // Bind global options
-    services.Configure<FranzGrpcOptions>(
-        configuration.GetSection("Franz:Grpc"));
+    services.AddOptions<FranzGrpcOptions>()
+        .Bind(configuration.GetSection("Franz:Grpc"))
+        .ValidateOnStart();
 
     // Server behavior registration (Franz canonical order)
     services
@@ -48,8 +50,44 @@ public static class GrpcServiceCollectionExtensions
         .AddNoDuplicateScoped(typeof(IGrpcServerBehavior<,>), typeof(MetricServerBehavior<,>))
         .AddNoDuplicateScoped(typeof(IGrpcServerBehavior<,>), typeof(ExceptionMappingServerBehavior<,>));
 
-    // Behavior provider (resolves ordered behaviors)
+    // Exception mapping encloses the complete lifetime of every streaming RPC shape.
+    services
+        .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(ExceptionMappingStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(ExceptionMappingStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(ExceptionMappingStreamingBehavior<,>));
+
+    // Validate the unary request or each consumed streaming request before tenancy and authorization.
+    services
+        .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(ValidationStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(ValidationStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(ValidationStreamingBehavior<,>));
+
+    // Apply tenant resolution before authorization for every server-side streaming RPC shape.
+    services
+        .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(TenantResolutionServerBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(TenantResolutionServerBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(TenantResolutionServerBehavior<,>));
+
+    // Apply the same configured authorization policy to all server-side streaming RPC shapes.
+    services
+        .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(AuthorizationStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(AuthorizationStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(AuthorizationStreamingBehavior<,>));
+
+    // Streaming lifecycle logging and metrics remain active through full enumeration.
+    services
+        .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(LoggingStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(LoggingStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(LoggingStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcServerStreamingBehavior<,>), typeof(MetricStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientStreamingBehavior<,>), typeof(MetricStreamingBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcDuplexStreamingBehavior<,>), typeof(MetricStreamingBehavior<,>));
+
+    // Unary and streaming behavior providers are scoped to the RPC service lifetime.
     services.AddNoDuplicateScoped<IGrpcServerBehaviorProvider, GrpcServerBehaviorProvider>();
+    services.AddNoDuplicateScoped<IGrpcServerStreamingBehaviorProvider, GrpcServerStreamingBehaviorProvider>();
+    services.AddNoDuplicateScoped<IGrpcClientStreamingBehaviorProvider, GrpcClientStreamingBehaviorProvider>();
+    services.AddNoDuplicateScoped<IGrpcDuplexStreamingBehaviorProvider, GrpcDuplexStreamingBehaviorProvider>();
 
     return services;
   }
@@ -66,13 +104,30 @@ public static class GrpcServiceCollectionExtensions
     services.TryAddScoped<ITenantExecutionContextAccessor, GrpcTenantExecutionContextAccessor>();
 
     // Bind client-specific options
-    services.Configure<FranzGrpcClientOptions>(
-        configuration.GetSection("Franz:Grpc:Client"));
+    services.AddOptions<FranzGrpcClientOptions>()
+        .Bind(configuration.GetSection("Franz:Grpc:Client"))
+        .Validate(
+            options => options.DefaultClientTimeout > TimeSpan.Zero
+                && options.DefaultClientTimeout <= TimeSpan.FromDays(365),
+            "The default gRPC client timeout must be greater than zero and no longer than 365 days.")
+        .ValidateOnStart();
 
-    // Behavior provider and factory
-    services.AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(TenantResolutionClientBehavior<,>));
+    // Client behaviors are executable defaults. Authorization remains opt-in because
+    // the secure default authorization service intentionally denies every call.
+    services.TryAddScoped<IFranzValidationEngine, NoOpValidationEngine>();
+    services.TryAddScoped<IFranzGrpcLogger, NoOpGrpcLogger>();
+    services.TryAddScoped<IFranzGrpcMetrics, NoOpGrpcMetrics>();
+
+    services
+        .AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(ExceptionMappingClientBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(ValidationClientBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(TenantResolutionClientBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(LoggingClientBehavior<,>))
+        .AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(MetricClientBehavior<,>));
+
+    // The host registers AuthorizationClientBehavior explicitly when a client-side
+    // authorization policy is required; it is never silently made permissive.
     services.AddNoDuplicateScoped<IGrpcClientBehaviorProvider, GrpcClientBehaviorProvider>();
-    services.AddNoDuplicateSingleton<IFranzGrpcClientFactory, FranzGrpcClientFactory>();
 
     return services;
   }
@@ -86,7 +141,9 @@ public static class GrpcServiceCollectionExtensions
       this IServiceCollection services)
   {
     services.TryAddScoped<IFranzValidationEngine, NoOpValidationEngine>();
-    services.TryAddScoped<IFranzAuthorizationService, NoOpAuthorizationService>();
+    // Authorization is fail-closed by default. Hosts must register an explicit
+    // authorization policy to permit calls; allow-all is never selected implicitly.
+    services.TryAddScoped<IFranzAuthorizationService, DenyAllAuthorizationService>();
     services.TryAddScoped<IFranzTenantResolver, NoOpTenantResolver>();
     services.TryAddScoped<IFranzGrpcLogger, NoOpGrpcLogger>();
     services.TryAddScoped<IFranzGrpcMetrics, NoOpGrpcMetrics>();

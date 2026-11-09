@@ -26,6 +26,7 @@
     <Project Path="sources/Franz.Common.EntityFramework/Franz.Common.EntityFramework.csproj" />
     <Project Path="sources/Franz.Common.Errors/Franz.Common.Errors.csproj" />
     <Project Path="sources/Franz.Common.Grpc/Franz.Common.Grpc.csproj" />
+    <Project Path="sources/Franz.Common.Grpc.AspNetCore/Franz.Common.Grpc.AspNetCore.csproj" />
     <Project Path="sources/Franz.Common.Headers/Franz.Common.Headers.csproj" />
     <Project Path="sources/Franz.Common.Hosting/Franz.Common.Hosting.csproj" />
     <Project Path="sources/Franz.Common.Http.Authentication/Franz.Common.Http.Authentication.csproj" />
@@ -99,6 +100,7 @@
     <Project Path="tests/Franz.Common.Messaging.RabbitMQ.Tests/Franz.Common.Messaging.RabbitMQ.Tests.csproj" />
     <Project Path="tests/Franz.Common.Messaging.Tests/Franz.Common.Messaging.Tests.csproj" />
     <Project Path="tests/Franz.Common.Messaging.Sagas.Tests/Franz.Common.Messaging.Sagas.Tests.csproj" />
+    <Project Path="tests/Franz.Common.Grpc.Tests/Franz.Common.Grpc.Tests.csproj" />
     <Project Path="tests/Franz.Common.SSO.Tests/Franz.Common.SSO.Tests.csproj" />
   </Folder>
 </Solution>

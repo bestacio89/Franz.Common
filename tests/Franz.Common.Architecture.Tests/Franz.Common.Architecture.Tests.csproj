@@ -23,6 +23,8 @@
     <ProjectReference Include="../../sources/Franz.Common.Annotations/Franz.Common.Annotations.csproj" />
     <ProjectReference Include="../../sources/Franz.Common.Business/Franz.Common.Business.csproj" />
     <ProjectReference Include="../../sources/Franz.Common.DependencyInjection/Franz.Common.DependencyInjection.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Grpc/Franz.Common.Grpc.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Grpc.AspNetCore/Franz.Common.Grpc.AspNetCore.csproj" />
     <ProjectReference Include="../../sources/Franz.Common.Errors/Franz.Common.Errors.csproj" />
     <ProjectReference Include="../../sources/Franz.Common.Headers/Franz.Common.Headers.csproj" />
     <ProjectReference Include="../../sources/Franz.Common.Mediator/Franz.Common.Mediator.csproj" />

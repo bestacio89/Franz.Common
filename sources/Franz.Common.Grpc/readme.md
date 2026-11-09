@@ -1,10 +1,10 @@
 # Franz.Common.Grpc
 
-> gRPC client/server behavior pipelines, call context, tenant propagation, and client factory abstractions.
+> Hosting-runtime-independent gRPC call context and ordered client/server behavior pipelines.
 
 ## Overview
 
-The package supplies Franz behavior pipelines and shared context for gRPC calls. It deliberately does not register ASP.NET Core gRPC endpoints or generated typed clients; the host application owns those framework registrations.
+The core package owns the Franz call context, execution behaviors, error semantics, and pipeline composition. It does not register ASP.NET Core endpoints, create channels, configure HTTP handlers, or own generated typed-client lifetimes.
 
 ## Installation
 
@@ -14,69 +14,91 @@ dotnet add package Franz.Common.Grpc
 
 ## Dependency injection
 
-Register the default no-op services when an application does not yet provide custom validation, authorization, tenant resolution, logging, or metrics:
+Register the no-op server dependencies where the application has not supplied its own implementations, then add the required side(s):
 
 ```csharp
 using Franz.Common.Grpc.DependencyInjection;
 
-builder.Services.AddFranzGrpcDefaults();
-builder.Services.AddFranzGrpcServer(builder.Configuration);
-builder.Services.AddFranzGrpcClient(builder.Configuration);
+builder.Services
+    .AddFranzGrpcDefaults()
+    .AddFranzGrpcServer(builder.Configuration)
+    .AddFranzGrpcClient(builder.Configuration);
 ```
 
-The registrations are independent; add only the client or server side used by the process.
+The default authorization service denies calls. Replace it with an explicit application policy before exposing server endpoints. Validation, logging, metrics, and tenant resolution defaults are no-op implementations; replace them with application implementations as required.
 
-### Server side
+### Server pipeline
 
-`AddFranzGrpcServer(configuration)` binds `Franz:Grpc` and registers the ordered server behaviors:
+`AddFranzGrpcServer(configuration)` binds `Franz:Grpc` and registers the ordered unary pipeline:
 
-1. Validation
-2. Tenant resolution
-3. Authorization
+1. Exception mapping (outermost)
+2. Validation
+3. Tenant resolution
+4. Authorization
+5. Logging
+6. Metrics
+
+It also registers exception mapping, validation, tenant resolution, authorization, logging, and metrics for server-streaming, client-streaming, and duplex RPCs. Server-streaming validates its single request; client-streaming and duplex validate each request message as the downstream handler consumes it. Streaming behaviors execute for the complete stream lifetime, including enumeration, cancellation, and disposal. Streaming logging records lifecycle events only; it does not enumerate or log payloads.
+
+The host registers ASP.NET Core gRPC hosting and maps its generated service implementations. Add `Franz.Common.Grpc.AspNetCore` to apply these pipelines at the transport boundary.
+
+### Client pipeline
+
+`AddFranzGrpcClient(configuration)` binds `Franz:Grpc:Client` and registers the unary client pipeline:
+
+1. Exception mapping
+2. Validation
+3. Validated tenant propagation
 4. Logging
 5. Metrics
-6. Exception mapping
 
-The host must register its gRPC server services and map its generated service implementations:
+Client authorization is opt-in: register `AuthorizationClientBehavior<TRequest,TResponse>` when the application has an explicit outbound authorization policy. It is not enabled by default because the standard authorization fallback is fail-closed.
 
-```csharp
-builder.Services.AddGrpc();
-// Register application services and Franz behavior dependencies.
-```
-
-The application provides implementations of `IFranzValidationEngine`, `IFranzAuthorizationService`, `IFranzTenantResolver`, `IFranzGrpcLogger`, and `IFranzGrpcMetrics` according to its security and operational requirements. When a tenant is resolved, `IFranzTenantAuthorizer` and an execution-context accessor are also required; with `RequireTenant = true`, an `ITenantValidator` is required as well. The default no-op resolver is not an authorization policy. With `RequireTenant = true`, an unresolved tenant is denied; if a tenant is resolved, the authorizer and execution-context accessor must be registered, and the validator is also mandatory.
-
-### Client side
-
-`AddFranzGrpcClient(configuration)` binds `Franz:Grpc:Client`, registers the tenant-resolution client behavior/provider, and registers `IFranzGrpcClientFactory`. The application must still configure each generated client through the gRPC client factory:
+Use the official `Grpc.Net.ClientFactory` typed-client registration. The host owns channel, handler, endpoint, TLS/mTLS credentials, and disposal:
 
 ```csharp
 builder.Services.AddGrpcClient<Orders.OrdersClient>(options =>
 {
     options.Address = new Uri(
-        builder.Configuration["Franz:Grpc:Client:Services:Orders:BaseAddress"]!);
+        builder.Configuration["Grpc:Services:Orders:Address"]!);
 });
 ```
 
-The package does not call `AddGrpcClient<TClient>()` itself.
+`FranzGrpcClient<TClient>` and `FranzGrpcClientBase<TClient>` wrap unary calls only. Outgoing streaming calls should use the generated typed client's streaming APIs directly; Franz does not currently expose a client-side streaming behavior pipeline. The server-side streaming contracts are independent and cover all three streaming RPC shapes.
 
-## GrpcCallContext
+The former channel-owning `IFranzGrpcClientFactory` and `FranzGrpcClientFactory` APIs are removed. Migrate channel creation to `AddGrpcClient<TClient>` and pass the injected generated client into the Franz wrapper for unary calls.
 
-`GrpcCallContext` is an immutable client/server call context containing correlation ID, request ID, optional tenant/user identifiers, method/service names, peer, deadline, cancellation token, and request/response metadata.
+## Configuration
 
-Use `GrpcCallContext.CreateClient(...)` to create outgoing context and `GrpcCallContext.FromServerCallContext(...)` to adapt an incoming server call. The context can produce gRPC metadata and `CallOptions`, and exposes immutable `WithTenant`, `WithUser`, `WithDeadline`, `WithCancellation`, and `WithAdditionalHeader` helpers.
+Only options with implemented runtime semantics remain in the 3.0.0 configuration surface:
 
-## Tenant trust boundary
+| Section | Property | Default | Semantics |
+|---|---|---|---|
+| `Franz:Grpc` | `RequireTenant` | `false` | Require server-side tenant resolution, validation, and membership authorization |
+| `Franz:Grpc:Client` | `DefaultClientTimeout` | `00:00:15` | Default unary client deadline when no explicit deadline is supplied |
 
-The server tenant behavior removes caller-supplied `x-tenant-id` metadata before invoking the application-provided tenant resolver. The resolver must derive the tenant from authenticated server-side identity or another trusted transport signal. The tenant authorizer must verify membership; metadata is propagation data, not proof of authorization.
+The client timeout must be greater than zero and no longer than 365 days. Invalid values fail options validation at startup. Legacy timeout, retry, metadata, payload-logging, and naming-convention switches were removed because they did not control production behavior. Configure retries and credentials through the standard gRPC host/typed-client mechanisms.
 
-On the client, the tenant behavior propagates only the tenant from a validated `ITenantExecutionContextAccessor`. It does not trust a caller-created tenant header when no validated execution context exists.
+## Observability
 
-When a validated HTTP tenant context already exists for the same request, the gRPC server behavior can reuse it. For gRPC-only hosts, the gRPC behavior owns its scoped tenant execution context lifecycle.
+The package exposes standard .NET diagnostics through `FranzGrpcDiagnostics`:
 
-## Hosting boundary
+- Activity source: `FranzGrpcDiagnostics.ActivitySourceName` (`Franz.Common.Grpc`)
+- Meter: `FranzGrpcDiagnostics.MeterName` (`Franz.Common.Grpc`)
+- Counter: `franz.grpc.calls`
+- Histogram: `franz.grpc.call.duration` (seconds)
 
-The package does not call `AddGrpc()`, map endpoints, or configure ASP.NET Core routing. It also does not provide a separate `Franz.Common.Grpc.AspNetCore` package in this repository state. Use the official gRPC host integration and the Franz behaviors together.
+Subscribe to the activity source and meter through the host's OpenTelemetry configuration. Tags are limited to RPC service, method, shape, direction, and outcome. Tenant IDs, user IDs, correlation IDs, peer addresses, and request IDs are excluded from metric dimensions. Custom `IFranzGrpcMetrics` implementations receive `GrpcMetricContext`, which exposes only those bounded dimensions.
+
+## Call context and security
+
+`GrpcCallContext` is an immutable call context containing correlation and request identifiers, optional tenant/user identifiers, method/service names, peer, deadline, cancellation, and metadata.
+
+Use `GrpcCallContext.CreateClient(...)` for outgoing context and `GrpcCallContext.FromServerCallContext(...)` for incoming server calls. Caller-supplied `x-user-id` is never an identity authority. The ASP.NET Core adapter derives the trusted user identifier only from an authenticated server-side principal. Caller-supplied `x-tenant-id` is a selector only; the server resolves the tenant and independently authorizes membership before establishing tenant execution context.
+
+## Error semantics
+
+The outermost exception mapper maps known platform and Franz failures to deliberate gRPC status codes. Cancellation and deadline expiration remain distinct from unexpected failures. Unexpected exception messages and stack traces are not disclosed in remote status details. Error trailers are restricted to approved error and correlation metadata.
 
 ## License
 

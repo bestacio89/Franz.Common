@@ -61,6 +61,7 @@ public sealed record GrpcCallContext
   public bool IsClientSide => !IsServerSide;
 
   private static readonly StringComparer HeaderComparer = StringComparer.OrdinalIgnoreCase;
+  private static readonly object ServerContextStateKey = new();
 
   private GrpcCallContext(
       string correlationId,
@@ -147,6 +148,16 @@ public sealed record GrpcCallContext
     if (serverContext is null)
       throw new ArgumentNullException(nameof(serverContext));
 
+    // The ASP.NET Core transport adapter establishes the canonical context before
+    // invoking the service. Reuse it so service code and pipeline behaviors observe
+    // the same trusted identity and per-call metadata rather than rebuilding a
+    // context from transport headers and silently losing host-derived identity.
+    if (serverContext.UserState.TryGetValue(ServerContextStateKey, out var existingContext)
+        && existingContext is GrpcCallContext establishedContext)
+    {
+      return establishedContext;
+    }
+
     var requestHeaders = ToImmutableHeaderDictionary(serverContext.RequestHeaders
         .Select(h => new KeyValuePair<string, string>(h.Key, h.Value)));
 
@@ -154,7 +165,18 @@ public sealed record GrpcCallContext
     var correlationId = GetOrCreate(requestHeaders, CorrelationIdHeaderName);
     var requestId = GetOrCreate(requestHeaders, RequestIdHeaderName);
 
-    userId ??= requestHeaders.TryGetValue(UserIdHeaderName, out var u) ? u : null;
+    // A caller-supplied tenant identifier is only a selection hint for the
+    // server-side tenant resolver. It is not validated membership or execution
+    // context; TenantResolutionServerBehavior must authorize the resolved tenant
+    // before establishing it.
+    if (string.IsNullOrWhiteSpace(tenantId) &&
+        requestHeaders.TryGetValue(TenantIdHeaderName, out var requestedTenantId))
+    {
+      tenantId = requestedTenantId;
+    }
+
+    // User identity must be supplied by the hosting adapter from an authenticated
+    // principal. Caller-controlled metadata is never an identity authority.
 
     var method = serverContext.Method ?? string.Empty;
     var serviceName = ExtractServiceName(method);
@@ -163,7 +185,7 @@ public sealed record GrpcCallContext
     ? (DateTime?)null
     : serverContext.Deadline.ToUniversalTime();
 
-    return new GrpcCallContext(
+    var context = new GrpcCallContext(
         correlationId,
         requestId,
         tenantId,
@@ -176,6 +198,27 @@ public sealed record GrpcCallContext
         requestHeaders,
         ImmutableDictionary<string, string>.Empty.WithComparers(HeaderComparer),
         isServerSide: true);
+
+    EstablishServerCallContext(serverContext, context);
+    return context;
+  }
+
+  /// <summary>
+  /// Associates the effective server pipeline context with its transport call so
+  /// service implementations observe the same immutable context as behaviors.
+  /// </summary>
+  internal static void EstablishServerCallContext(
+      ServerCallContext serverContext,
+      GrpcCallContext callContext)
+  {
+    if (serverContext is null)
+      throw new ArgumentNullException(nameof(serverContext));
+    if (callContext is null)
+      throw new ArgumentNullException(nameof(callContext));
+    if (!callContext.IsServerSide)
+      throw new ArgumentException("The established context must be server-side.", nameof(callContext));
+
+    serverContext.UserState[ServerContextStateKey] = callContext;
   }
 
   #endregion
@@ -257,6 +300,13 @@ public sealed record GrpcCallContext
         UserId = userId,
         RequestHeaders = UpdateHeader(UserIdHeaderName, userId)
       };
+
+  /// <summary>
+  /// Removes caller-supplied user identity metadata without changing the trusted
+  /// user identity established by the server hosting adapter.
+  /// </summary>
+  internal GrpcCallContext WithoutUserHeader() =>
+      this with { RequestHeaders = RequestHeaders.Remove(UserIdHeaderName) };
 
   public GrpcCallContext WithDeadline(DateTime? deadlineUtc) =>
       this with { DeadlineUtc = deadlineUtc };

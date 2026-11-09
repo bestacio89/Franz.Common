@@ -3,6 +3,17 @@
 
 ## v3.0.0 — Major platform release (planned)
 
+### gRPC modernization
+- Replace the legacy broad `Grpc` dependency with the supported `Grpc.Core.Api` contract package in `Franz.Common.Grpc`.
+- Remove `Grpc.Net.Client` and custom channel ownership from the core package; use official `Grpc.Net.ClientFactory` typed-client registration and lifecycle management.
+- Remove `IFranzGrpcClientFactory`, `FranzGrpcClientFactory`, and inert configuration switches; migrate through `AddGrpcClient<T>`.
+- Apply the Franz execution pipeline at the ASP.NET Core transport boundary for unary, server-streaming, client-streaming, and duplex RPCs.
+- Preserve per-message server-stream and duplex `WriteOptions` through the bounded transport bridge.
+- Add complete streaming lifecycle logging and metrics, plus standard .NET ActivitySource and Meter instrumentation with bounded metric dimensions.
+- Reduce public configuration to implemented tenant enforcement and unary client deadline settings, with startup validation.
+- Keep the Franz client wrapper unary-only; use generated typed-client methods directly for outgoing streaming calls.
+- Document the 2.3.3-to-3.0.0 migration dispositions and retain the compiled API diff and package-consumer validation as release gates.
+
 ### Caching and performance validation
 - Introduce provider-neutral cache contracts with MemoryCache, DistributedCache, Redis and HybridCache implementations.
 - Enforce deterministic SHA-256 cache keys, explicit JSON metadata, tenant-scoped isolation and process-local same-key single-flight coordination.

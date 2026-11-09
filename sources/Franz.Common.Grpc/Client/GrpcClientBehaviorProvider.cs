@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,10 +8,12 @@ using Franz.Common.Grpc.Client.Interceptors;
 
 namespace Franz.Common.Grpc.Client;
 
+/// <summary>
+/// Resolves and caches client behaviors in deterministic outermost-first order.
+/// </summary>
 public sealed class GrpcClientBehaviorProvider : IGrpcClientBehaviorProvider
 {
   private readonly IServiceProvider _provider;
-
   private readonly ConcurrentDictionary<(Type, Type), object> _cache = new();
 
   public GrpcClientBehaviorProvider(IServiceProvider provider)
@@ -39,26 +41,23 @@ public sealed class GrpcClientBehaviorProvider : IGrpcClientBehaviorProvider
     if (all.Count == 0)
       return Array.Empty<IGrpcClientBehavior<TRequest, TResponse>>();
 
-    // Canonical Franz ordering
-    var ordered = all
-        .OrderBy(b => BehaviorOrder(b))
+    return all
+        .OrderBy(BehaviorOrder)
         .ToArray();
-
-    return ordered;
   }
 
-  private static int BehaviorOrder<TRequest, TResponse>(IGrpcClientBehavior<TRequest, TResponse> b)
+  private static int BehaviorOrder<TRequest, TResponse>(IGrpcClientBehavior<TRequest, TResponse> behavior)
       where TRequest : class
       where TResponse : class
   {
-    return b switch
+    return behavior switch
     {
-      ValidationClientBehavior<TRequest, TResponse> => 0,
-      TenantResolutionClientBehavior<TRequest, TResponse> => 1,
-      AuthorizationClientBehavior<TRequest, TResponse> => 2,
-      LoggingClientBehavior<TRequest, TResponse> => 3,
-      MetricClientBehavior<TRequest, TResponse> => 4,
-      ExceptionMappingClientBehavior<TRequest, TResponse> => 5,
+      ExceptionMappingClientBehavior<TRequest, TResponse> => 0,
+      ValidationClientBehavior<TRequest, TResponse> => 10,
+      TenantResolutionClientBehavior<TRequest, TResponse> => 20,
+      AuthorizationClientBehavior<TRequest, TResponse> => 30,
+      LoggingClientBehavior<TRequest, TResponse> => 40,
+      MetricClientBehavior<TRequest, TResponse> => 50,
       _ => int.MaxValue
     };
   }

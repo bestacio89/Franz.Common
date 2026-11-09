@@ -1,16 +1,16 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Franz.Common.Grpc.Abstractions;
 
-namespace Franz.Common.Grpc.Client.Interceptors; // or .Server.Interceptors
+namespace Franz.Common.Grpc.Client.Interceptors;
 
 /// <summary>
-/// Enforces authorization for incoming gRPC requests using the Franz authorization engine.
-/// This behavior runs after Validation and TenantResolution.
+/// Applies the configured authorization policy before an outgoing gRPC call.
+/// The host supplies the authorization service and its policy context.
 /// </summary>
 public sealed class AuthorizationClientBehavior<TRequest, TResponse>
-    : IGrpcServerBehavior<TRequest, TResponse>
+    : IGrpcClientBehavior<TRequest, TResponse>
     where TRequest : class
     where TResponse : class
 {
@@ -24,15 +24,13 @@ public sealed class AuthorizationClientBehavior<TRequest, TResponse>
   public async Task<TResponse> InvokeAsync(
       TRequest request,
       GrpcCallContext context,
-      GrpcServerPipelineDelegate<TRequest, TResponse> next,
+      GrpcClientPipelineDelegate<TRequest, TResponse> next,
       CancellationToken cancellationToken = default)
   {
-    // Perform authorization — expected to throw if unauthorized.
     await _authorizationService
         .AuthorizeAsync(context, cancellationToken)
         .ConfigureAwait(false);
 
-    // Proceed in pipeline
     return await next(request, context, cancellationToken)
         .ConfigureAwait(false);
   }

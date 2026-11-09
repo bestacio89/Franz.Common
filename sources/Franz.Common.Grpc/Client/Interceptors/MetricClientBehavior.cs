@@ -1,59 +1,62 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Franz.Common.Grpc.Abstractions;
 
-namespace Franz.Common.Grpc.Client.Interceptors; // or .Server.Interceptors
+namespace Franz.Common.Grpc.Client.Interceptors;
 
 /// <summary>
-/// Records request counts, success/failure counts, and execution duration metrics.
-/// Uses IFranzGrpcMetrics abstraction to support any backend (OTel, Prometheus, etc.).
+/// Records outgoing unary calls through the host metrics abstraction and the
+/// standard .NET Meter and ActivitySource diagnostics.
 /// </summary>
 public sealed class MetricClientBehavior<TRequest, TResponse>
-    : IGrpcServerBehavior<TRequest, TResponse>
+    : IGrpcClientBehavior<TRequest, TResponse>
     where TRequest : class
     where TResponse : class
 {
-  private readonly IFranzGrpcMetrics _metrics;
+    private readonly IFranzGrpcMetrics _metrics;
 
-  public MetricClientBehavior(IFranzGrpcMetrics metrics)
-  {
-    _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-  }
-
-  public async Task<TResponse> InvokeAsync(
-      TRequest request,
-      GrpcCallContext context,
-      GrpcServerPipelineDelegate<TRequest, TResponse> next,
-      CancellationToken cancellationToken = default)
-  {
-    // Record request arrival
-    _metrics.RecordRequest(context);
-
-    var sw = Stopwatch.StartNew();
-
-    try
+    public MetricClientBehavior(IFranzGrpcMetrics metrics)
     {
-      // Execute downstream behaviors
-      var response = await next(request, context, cancellationToken)
-          .ConfigureAwait(false);
-
-      sw.Stop();
-
-      // Record success metrics
-      _metrics.RecordSuccess(context, sw.ElapsedMilliseconds);
-
-      return response;
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
-    catch (Exception ex)
+
+    public async Task<TResponse> InvokeAsync(
+        TRequest request,
+        GrpcCallContext context,
+        GrpcClientPipelineDelegate<TRequest, TResponse> next,
+        CancellationToken cancellationToken = default)
     {
-      sw.Stop();
+        var metricContext = GrpcMetricContext.Create(context, "unary", "client");
+        _metrics.RecordRequest(metricContext);
+        var stopwatch = Stopwatch.StartNew();
+        using var activity = FranzGrpcDiagnostics.StartActivity(metricContext);
 
-      // Record failure metrics
-      _metrics.RecordFailure(context, ex, sw.ElapsedMilliseconds);
+        var succeeded = false;
+        Exception? failure = null;
 
-      throw;
+        try
+        {
+            var response = await next(request, context, cancellationToken).ConfigureAwait(false);
+            succeeded = true;
+            return response;
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+            throw;
+        }
+        finally
+        {
+            stopwatch.Stop();
+            if (succeeded)
+                _metrics.RecordSuccess(metricContext, stopwatch.ElapsedMilliseconds);
+            else
+                _metrics.RecordFailure(metricContext, failure!, stopwatch.ElapsedMilliseconds);
+
+            FranzGrpcDiagnostics.RecordCompleted(metricContext, succeeded, stopwatch.Elapsed.TotalSeconds);
+            FranzGrpcDiagnostics.SetActivityOutcome(activity, succeeded, failure);
+        }
     }
-  }
 }
