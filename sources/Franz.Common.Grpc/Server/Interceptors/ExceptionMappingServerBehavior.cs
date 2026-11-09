@@ -24,7 +24,12 @@ public sealed class ExceptionMappingServerBehavior<TRequest, TResponse>
         }
         catch (Exception exception)
         {
-            var outcome = GrpcOutcome.FromException(exception);
+            var outcome = GrpcOutcome.FromException(
+                exception,
+                cancellationToken,
+                context.DeadlineUtc,
+                context.CorrelationId);
+
             throw outcome.ToRpcException();
         }
     }
