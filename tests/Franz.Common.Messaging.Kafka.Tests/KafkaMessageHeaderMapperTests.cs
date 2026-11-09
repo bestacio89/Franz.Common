@@ -46,7 +46,7 @@ public sealed class KafkaMessageHeaderMapperTests
   {
     var messageId = Guid.CreateVersion7();
     var message = new Message("{}") { Id = Guid.Empty };
-    var headers = new Headers
+    var headers = new KafkaHeaders
     {
       { "X-Message-ID", Encode(messageId.ToString("D")) }
     };
@@ -60,7 +60,7 @@ public sealed class KafkaMessageHeaderMapperTests
   public void Restore_ShouldRejectConflictingNativeAndEnvelopeIdentity()
   {
     var message = new Message("{}") { Id = Guid.CreateVersion7() };
-    var headers = new Headers
+    var headers = new KafkaHeaders
     {
       { "X-Message-ID", Encode(Guid.CreateVersion7().ToString("D")) }
     };
@@ -75,7 +75,7 @@ public sealed class KafkaMessageHeaderMapperTests
   public void Restore_ShouldRejectConflictingCorrelationMetadata()
   {
     var message = new Message("{}") { CorrelationId = Guid.CreateVersion7() };
-    var headers = new Headers
+    var headers = new KafkaHeaders
     {
       { Message.CorrelationHeader, Encode(Guid.CreateVersion7().ToString("D")) }
     };
@@ -91,7 +91,7 @@ public sealed class KafkaMessageHeaderMapperTests
   {
     var messageId = Guid.CreateVersion7();
     var message = new Message("{}") { Id = messageId };
-    var headers = new Headers
+    var headers = new KafkaHeaders
     {
       { "X-Message-ID", Encode(messageId.ToString("D")) },
       { "X-Message-ID", Encode(messageId.ToString("D")) }
