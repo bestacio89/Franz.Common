@@ -98,6 +98,39 @@ public sealed class FranzGrpcClientLifecycleTests
     }
 
     [Fact]
+    public async Task ClientWrapper_ReusesInjectedTypedClientWithoutOwningItsLifetime()
+    {
+        using var channel = GrpcChannel.ForAddress("http://localhost");
+        var typedClient = new GrpcProbe.GrpcProbeClient(channel);
+        var client = new ProbeFranzGrpcClient(
+            typedClient,
+            CreateBehaviorProvider(),
+            Options.Create(new FranzGrpcClientOptions()));
+        var observedClients = new List<GrpcProbe.GrpcProbeClient>();
+
+        await client.InvokeAsync(
+            new ProbeRequest { Value = "first-call" },
+            (innerClient, _, _) =>
+            {
+                observedClients.Add(innerClient);
+                return Task.FromResult(new ProbeReply());
+            });
+
+        await client.InvokeAsync(
+            new ProbeRequest { Value = "second-call" },
+            (innerClient, _, _) =>
+            {
+                observedClients.Add(innerClient);
+                return Task.FromResult(new ProbeReply());
+            });
+
+        Assert.Equal(2, observedClients.Count);
+        Assert.All(observedClients, observedClient => Assert.Same(typedClient, observedClient));
+        Assert.DoesNotContain(typeof(IDisposable), typeof(ProbeFranzGrpcClient).GetInterfaces());
+        Assert.DoesNotContain(typeof(IAsyncDisposable), typeof(ProbeFranzGrpcClient).GetInterfaces());
+    }
+
+    [Fact]
     public async Task UnaryCall_DoesNotRetryTransportFailuresImplicitly()
     {
         using var channel = GrpcChannel.ForAddress("http://localhost");
