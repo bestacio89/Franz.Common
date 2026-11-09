@@ -61,8 +61,8 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
     var tenantContext = new TenantExecutionContext(
         new TenantInfo(tenantId, "tenant-a"),
         domainId: null,
-        TenantResolutionSource.Header,
-        DateTimeOffset.UtcNow);
+        source: TenantResolutionSource.Header,
+        resolvedAt: DateTimeOffset.UtcNow);
 
     await fixture.CreateHandler(new FixedTenantExecutionContextAccessor(tenantContext))
         .ProcessAsync(message);
@@ -71,6 +71,47 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
         fixture.Saga.SagaId, tenantId.ToString("D"), typeof(TestSagaState))).Should().NotBeNull();
     (await fixture.Repository.LoadAsync(
         fixture.Saga.SagaId, null, typeof(TestSagaState))).Should().BeNull();
+  }
+
+  [Fact]
+  public async Task ProcessAsync_RejectsTenantHeaderThatDoesNotMatchValidatedContext()
+  {
+    var fixture = new Fixture();
+    var headerTenantId = Guid.CreateVersion7();
+    var validatedTenantId = Guid.CreateVersion7();
+    var message = fixture.CreateMessage();
+    message.Headers[HeaderConstants.TenantId] = [headerTenantId.ToString("D")];
+    var tenantContext = new TenantExecutionContext(
+        new TenantInfo(validatedTenantId, "validated-tenant"),
+        domainId: null,
+        source: TenantResolutionSource.Header,
+        resolvedAt: DateTimeOffset.UtcNow);
+
+    var act = () => fixture.CreateHandler(new FixedTenantExecutionContextAccessor(tenantContext))
+        .ProcessAsync(message);
+
+    await act.Should().ThrowAsync<PermanentMessagingException>()
+        .WithMessage("*does not match the validated tenant execution context*");
+  }
+
+  [Fact]
+  public async Task ProcessAsync_RejectsEmptyMessageIdentityWhenInboxIsEnabled()
+  {
+    var fixture = new Fixture();
+    var operations = new List<string>();
+    var message = fixture.CreateMessage();
+    message.Id = Guid.Empty;
+    var handler = new SagaDispatchingMessageHandler(
+        fixture.Orchestrator,
+        new JsonMessageSerializer(),
+        new RecordingInboxStore(operations),
+        new RecordingUnitOfWork(operations));
+
+    var act = () => handler.ProcessAsync(message);
+
+    await act.Should().ThrowAsync<PermanentMessagingException>()
+        .WithMessage("*non-empty message identity*");
+    operations.Should().BeEmpty();
   }
 
   [Fact]
@@ -202,7 +243,7 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
             new JsonMessageSerializer(),
             inboxStore: null,
             persistenceUnitOfWork: null,
-            tenantExecutionContextAccessor);
+            tenantExecutionContextAccessor: tenantExecutionContextAccessor);
 
     public Message CreateMessage()
         => new("{}")

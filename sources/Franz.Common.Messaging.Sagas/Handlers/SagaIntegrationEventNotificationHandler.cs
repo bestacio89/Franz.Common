@@ -3,7 +3,6 @@
 using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Core;
-using Franz.Common.Headers;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
