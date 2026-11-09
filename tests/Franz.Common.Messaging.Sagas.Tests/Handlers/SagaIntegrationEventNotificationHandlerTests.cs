@@ -16,6 +16,7 @@ using Franz.Common.Messaging.Sagas.Configuration;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
+using Franz.Common.Messaging.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -55,6 +56,77 @@ public sealed class SagaIntegrationEventNotificationHandlerTests
 
     await act.Should().ThrowAsync<PermanentMessagingException>()
         .WithMessage("*validated tenant execution context*");
+    provider.GetRequiredService<InMemorySagaStateStore>().Store.Should().BeEmpty();
+  }
+
+  [Fact]
+  public async Task NotificationPipeline_RejectsMissingOriginalMessageContextWhenInboxIsEnabled()
+  {
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddSingleton<IMessagingPublisher>(new TestMessagingPublisher());
+    var inboxStore = new RecordingInboxStore();
+    services.AddSingleton<IInboxStore>(inboxStore);
+
+    var message = new Message("{}");
+    message.Headers[MessagingConstants.ClassName] =
+        [HeaderNamer.GetEventClassName(typeof(StartedEvent))];
+
+    services
+        .AddFranzSagas(options => options.Persistence = "Memory")
+        .AddSaga<StartedEventSaga>();
+
+    using var provider = services.BuildServiceProvider();
+    provider.BuildFranzSagas();
+
+    await using var scope = provider.CreateAsyncScope();
+    var dispatcher = new FranzDispatcher(scope.ServiceProvider);
+    var executer = new MessagingStrategyExecuter(
+        Array.Empty<IAsyncMessageActionFilter>(),
+        dispatcher);
+
+    var act = () => executer.ExecuteAsync(message);
+
+    await act.Should().ThrowAsync<PermanentMessagingException>()
+        .WithMessage("*original inbound message context*");
+    inboxStore.RegistrationAttempts.Should().Be(0);
+    provider.GetRequiredService<InMemorySagaStateStore>().Store.Should().BeEmpty();
+  }
+
+  [Fact]
+  public async Task NotificationPipeline_RejectsTransportGeneratedIdentityWhenInboxIsEnabled()
+  {
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddSingleton<IMessagingPublisher>(new TestMessagingPublisher());
+    var inboxStore = new RecordingInboxStore();
+    services.AddSingleton<IInboxStore>(inboxStore);
+
+    var message = new Message("{}");
+    message.SetProperty(MessagingConstants.TransportGeneratedMessageId, true);
+    message.Headers[MessagingConstants.ClassName] =
+        [HeaderNamer.GetEventClassName(typeof(StartedEvent))];
+    services.AddSingleton<IMessageContextAccessor>(
+        new TestMessageContextAccessor(new MessageContext(message)));
+
+    services
+        .AddFranzSagas(options => options.Persistence = "Memory")
+        .AddSaga<StartedEventSaga>();
+
+    using var provider = services.BuildServiceProvider();
+    provider.BuildFranzSagas();
+
+    await using var scope = provider.CreateAsyncScope();
+    var dispatcher = new FranzDispatcher(scope.ServiceProvider);
+    var executer = new MessagingStrategyExecuter(
+        Array.Empty<IAsyncMessageActionFilter>(),
+        dispatcher);
+
+    var act = () => executer.ExecuteAsync(message);
+
+    await act.Should().ThrowAsync<PermanentMessagingException>()
+        .WithMessage("*stable broker-supplied message identity*");
+    inboxStore.RegistrationAttempts.Should().Be(0);
     provider.GetRequiredService<InMemorySagaStateStore>().Store.Should().BeEmpty();
   }
 
@@ -138,6 +210,23 @@ public sealed class SagaIntegrationEventNotificationHandlerTests
       : IMessageContextAccessor
   {
     public IMessageContext? Current => messageContext;
+  }
+
+  private sealed class RecordingInboxStore : IInboxStore
+  {
+    public int RegistrationAttempts { get; private set; }
+
+    public Task<bool> HasProcessedAsync(Guid messageId, CancellationToken ct = default)
+        => Task.FromResult(false);
+
+    public Task<bool> TryRegisterAsync(Guid messageId, CancellationToken ct = default)
+    {
+      RegistrationAttempts++;
+      return Task.FromResult(true);
+    }
+
+    public Task MarkProcessedAsync(Guid messageId, CancellationToken ct = default)
+        => Task.CompletedTask;
   }
 
   private sealed class TestMessagingPublisher : IMessagingPublisher
