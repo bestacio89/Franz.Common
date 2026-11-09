@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Franz.Common.Grpc.Tests.Integration;
 
@@ -14,19 +15,23 @@ public sealed class GrpcClientFactoryLifecycleIntegrationTests
     [Fact]
     public async Task GrpcClientFactory_ReusesHostManagedHandlerUntilServiceProviderDisposal()
     {
-        using var server = new TestServer(new WebHostBuilder()
-            .ConfigureServices(services =>
-            {
-                services.AddSingleton(new GrpcPipelineProbe());
-                services.AddSingleton(new GrpcStreamingLifecycleProbe());
-                services.AddGrpc();
-            })
-            .Configure(app =>
-            {
-                app.UseRouting();
-                app.UseEndpoints(endpoints => endpoints.MapGrpcService<GrpcProbeService>());
-            }));
+        await using var host = await new HostBuilder()
+            .ConfigureWebHost(webHost => webHost
+                .UseTestServer()
+                .ConfigureServices(services =>
+                {
+                    services.AddSingleton(new GrpcPipelineProbe());
+                    services.AddSingleton(new GrpcStreamingLifecycleProbe());
+                    services.AddGrpc();
+                })
+                .Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseEndpoints(endpoints => endpoints.MapGrpcService<GrpcProbeService>());
+                }))
+            .StartAsync();
 
+        var server = host.GetTestServer();
         var handlerCreationCount = 0;
         var handlerDisposalCount = 0;
         var services = new ServiceCollection();
@@ -45,8 +50,9 @@ public sealed class GrpcClientFactoryLifecycleIntegrationTests
         await using (var provider = services.BuildServiceProvider())
         {
             var clientFactory = provider.GetRequiredService<GrpcClientFactory>();
-            var firstClient = clientFactory.CreateClient<GrpcProbe.GrpcProbeClient>(nameof(GrpcProbe.GrpcProbeClient));
-            var secondClient = clientFactory.CreateClient<GrpcProbe.GrpcProbeClient>();
+            var clientName = nameof(GrpcProbe.GrpcProbeClient);
+            var firstClient = clientFactory.CreateClient<GrpcProbe.GrpcProbeClient>(clientName);
+            var secondClient = clientFactory.CreateClient<GrpcProbe.GrpcProbeClient>(clientName);
 
             var firstResponse = await firstClient.UnaryAsync(new ProbeRequest { Value = "first" });
             var secondResponse = await secondClient.UnaryAsync(new ProbeRequest { Value = "second" });
