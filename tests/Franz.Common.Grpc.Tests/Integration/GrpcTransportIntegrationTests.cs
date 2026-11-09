@@ -176,6 +176,65 @@ public sealed class GrpcTransportIntegrationTests
         Assert.Equal(1, host.PipelineProbe.AuthorizationInvocationCount);
     }
 
+
+    [Fact]
+    public async Task ServerStreamingCall_ResolvesAndAuthorizesTenantBeforeServiceExecution()
+    {
+        await using var host = await GrpcTestHost.StartAsync(authenticated: true);
+        using var channel = host.CreateChannel();
+        var client = new GrpcProbe.GrpcProbeClient(channel);
+        var tenantId = Guid.NewGuid().ToString("D");
+        var headers = new Metadata { { GrpcCallContext.TenantIdHeaderName, tenantId } };
+        using var call = client.ServerStream(new ProbeRequest { Value = "tenant-server" }, headers: headers);
+
+        Assert.True(await call.ResponseStream.MoveNext(CancellationToken.None));
+        Assert.Equal(tenantId, host.PipelineProbe.LastServiceTenantId);
+        Assert.Equal(1, host.PipelineProbe.TenantResolutionInvocationCount);
+        Assert.Equal(1, host.PipelineProbe.TenantAuthorizationInvocationCount);
+        Assert.Equal(Guid.Parse(tenantId), host.PipelineProbe.LastAuthorizedTenantId);
+        while (await call.ResponseStream.MoveNext(CancellationToken.None)) { }
+    }
+
+    [Fact]
+    public async Task ClientStreamingCall_ResolvesAndAuthorizesTenantBeforeServiceExecution()
+    {
+        await using var host = await GrpcTestHost.StartAsync(authenticated: true);
+        using var channel = host.CreateChannel();
+        var client = new GrpcProbe.GrpcProbeClient(channel);
+        var tenantId = Guid.NewGuid().ToString("D");
+        var headers = new Metadata { { GrpcCallContext.TenantIdHeaderName, tenantId } };
+        using var call = client.ClientStream(headers: headers);
+        await call.RequestStream.WriteAsync(new ProbeRequest { Value = "tenant-client" });
+        await call.RequestStream.CompleteAsync();
+
+        var response = await call.ResponseAsync;
+        Assert.Equal("tenant-client", response.Value);
+        Assert.Equal(tenantId, host.PipelineProbe.LastServiceTenantId);
+        Assert.Equal(1, host.PipelineProbe.TenantResolutionInvocationCount);
+        Assert.Equal(1, host.PipelineProbe.TenantAuthorizationInvocationCount);
+        Assert.Equal(Guid.Parse(tenantId), host.PipelineProbe.LastAuthorizedTenantId);
+    }
+
+    [Fact]
+    public async Task DuplexCall_ResolvesAndAuthorizesTenantBeforeServiceExecution()
+    {
+        await using var host = await GrpcTestHost.StartAsync(authenticated: true);
+        using var channel = host.CreateChannel();
+        var client = new GrpcProbe.GrpcProbeClient(channel);
+        var tenantId = Guid.NewGuid().ToString("D");
+        var headers = new Metadata { { GrpcCallContext.TenantIdHeaderName, tenantId } };
+        using var call = client.Duplex(headers: headers);
+        await call.RequestStream.WriteAsync(new ProbeRequest { Value = "tenant-duplex" });
+        await call.RequestStream.CompleteAsync();
+
+        Assert.True(await call.ResponseStream.MoveNext(CancellationToken.None));
+        Assert.Equal(tenantId, host.PipelineProbe.LastServiceTenantId);
+        Assert.Equal(1, host.PipelineProbe.TenantResolutionInvocationCount);
+        Assert.Equal(1, host.PipelineProbe.TenantAuthorizationInvocationCount);
+        Assert.Equal(Guid.Parse(tenantId), host.PipelineProbe.LastAuthorizedTenantId);
+        while (await call.ResponseStream.MoveNext(CancellationToken.None)) { }
+    }
+
     [Fact]
     public async Task UnaryCall_PassesTenantMetadataToResolverOnlyAsAnUntrustedSelector()
     {
