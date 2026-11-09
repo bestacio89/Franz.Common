@@ -187,6 +187,26 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
   }
 
   [Fact]
+  public async Task ProcessAsync_RejectsTransportGeneratedIdentityWhenInboxIsEnabled()
+  {
+    var fixture = new Fixture();
+    var operations = new List<string>();
+    var message = fixture.CreateMessage();
+    message.SetProperty(MessagingConstants.TransportGeneratedMessageId, true);
+    var handler = new SagaDispatchingMessageHandler(
+        fixture.Orchestrator,
+        new JsonMessageSerializer(),
+        new RecordingInboxStore(operations),
+        new RecordingUnitOfWork(operations));
+
+    var act = () => handler.ProcessAsync(message);
+
+    await act.Should().ThrowAsync<PermanentMessagingException>()
+        .WithMessage("*stable broker-supplied message identity*");
+    operations.Should().BeEmpty();
+  }
+
+  [Fact]
   public async Task ProcessAsync_RejectsTenantHeaderWithoutValidatedExecutionContext()
   {
     var fixture = new Fixture();
