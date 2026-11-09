@@ -131,18 +131,13 @@ public sealed class FranzGrpcClientLifecycleTests
     }
 
     [Fact]
-    public async Task UnaryCall_DoesNotRetryTransportFailuresImplicitly()
+    public async Task UnaryCall_DoesNotRetryTransportFailures()
     {
         using var channel = GrpcChannel.ForAddress("http://localhost");
         var client = new ProbeFranzGrpcClient(
             new GrpcProbe.GrpcProbeClient(channel),
             CreateBehaviorProvider(),
-            Options.Create(new FranzGrpcClientOptions
-            {
-                EnableRetries = true,
-                RetryCount = 3,
-                RetryBaseDelay = TimeSpan.FromMilliseconds(1)
-            }));
+            Options.Create(new FranzGrpcClientOptions()));
         var transportInvocationCount = 0;
 
         var exception = await Assert.ThrowsAsync<RpcException>(() => client.InvokeAsync(

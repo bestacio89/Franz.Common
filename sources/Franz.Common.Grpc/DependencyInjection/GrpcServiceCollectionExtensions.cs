@@ -37,8 +37,9 @@ public static class GrpcServiceCollectionExtensions
     services.TryAddScoped<ITenantExecutionContextAccessor, GrpcTenantExecutionContextAccessor>();
 
     // Bind global options
-    services.Configure<FranzGrpcOptions>(
-        configuration.GetSection("Franz:Grpc"));
+    services.AddOptions<FranzGrpcOptions>()
+        .Bind(configuration.GetSection("Franz:Grpc"))
+        .ValidateOnStart();
 
     // Server behavior registration (Franz canonical order)
     services
@@ -88,8 +89,13 @@ public static class GrpcServiceCollectionExtensions
     services.TryAddScoped<ITenantExecutionContextAccessor, GrpcTenantExecutionContextAccessor>();
 
     // Bind client-specific options
-    services.Configure<FranzGrpcClientOptions>(
-        configuration.GetSection("Franz:Grpc:Client"));
+    services.AddOptions<FranzGrpcClientOptions>()
+        .Bind(configuration.GetSection("Franz:Grpc:Client"))
+        .Validate(
+            options => options.DefaultClientTimeout > TimeSpan.Zero
+                && options.DefaultClientTimeout <= TimeSpan.FromDays(365),
+            "The default gRPC client timeout must be greater than zero and no longer than 365 days.")
+        .ValidateOnStart();
 
     // Behavior provider; transport clients and channel lifetime belong to Grpc.Net.ClientFactory.
     services.AddNoDuplicateScoped(typeof(IGrpcClientBehavior<,>), typeof(TenantResolutionClientBehavior<,>));
