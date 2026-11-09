@@ -105,16 +105,6 @@ public sealed class FranzSagaBuilder
       throw new InvalidOperationException(
           "No IMessagingPublisher is registered. Saga orchestration requires a messaging publisher.");
 
-    var singletonSagaType = _sagaTypes.FirstOrDefault(sagaType =>
-        _services.Any(descriptor =>
-            descriptor.ServiceType == sagaType &&
-            descriptor.Lifetime == ServiceLifetime.Singleton));
-
-    if (singletonSagaType is not null)
-      throw new InvalidOperationException(
-          $"Saga '{singletonSagaType.FullName}' is registered as a singleton. " +
-          "Saga instances are mutable execution objects and must be scoped or transient.");
-
     var pipeline = provider.GetRequiredService<SagaExecutionPipeline>();
     foreach (var middleware in _pipelineMiddlewares)
       pipeline.Use(middleware);

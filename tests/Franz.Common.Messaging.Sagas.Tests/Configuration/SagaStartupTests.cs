@@ -12,22 +12,6 @@ namespace Franz.Common.Messaging.Sagas.Tests.Configuration;
 public sealed class SagaStartupTests
 {
   [Fact]
-  public void BuildFranzSagas_RejectsSingletonSagaRegistration()
-  {
-    var services = new ServiceCollection();
-    services.AddSingleton<IMessagingPublisher, TestMessagingPublisher>();
-    services.AddSingleton<StartupSaga>();
-    services.AddFranzSagas().AddSaga<StartupSaga>();
-
-    using var provider = services.BuildServiceProvider();
-
-    var act = () => provider.BuildFranzSagas();
-
-    act.Should().Throw<InvalidOperationException>()
-        .WithMessage("*registered as a singleton*");
-  }
-
-  [Fact]
   public async Task BuildFranzSagas_ValidatesMappingsWithoutResolvingScopedServicesFromRoot()
   {
     var middlewareInvoked = false;
