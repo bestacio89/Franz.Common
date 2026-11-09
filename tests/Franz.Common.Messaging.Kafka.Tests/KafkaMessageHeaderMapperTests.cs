@@ -3,7 +3,7 @@
 using System.Text;
 using Confluent.Kafka;
 using FluentAssertions;
-using Franz.Common.Messaging.Kafka;
+using Franz.Common.Messaging.Kafka.Headers;
 using Franz.Common.Messaging.Messages;
 using Xunit;
 
