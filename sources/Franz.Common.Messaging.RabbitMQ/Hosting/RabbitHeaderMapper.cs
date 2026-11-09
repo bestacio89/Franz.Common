@@ -25,13 +25,16 @@ public static class RabbitHeaderMapper
     {
       foreach (var header in rabbitHeaders)
       {
-        // Keep the causation header: it is part of the message envelope, not
+        // Keep and normalize causation: it is part of the message envelope, not
         // disposable RabbitMQ infrastructure metadata.
-        if (header.Key.StartsWith("x-", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(header.Key, Message.CausationHeader, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(header.Key, Message.CausationHeader, StringComparison.OrdinalIgnoreCase))
         {
+          headers[Message.CausationHeader] = MapValue(header.Value);
           continue;
         }
+
+        if (header.Key.StartsWith("x-", StringComparison.OrdinalIgnoreCase))
+          continue;
 
         headers[header.Key] = MapValue(header.Value);
       }

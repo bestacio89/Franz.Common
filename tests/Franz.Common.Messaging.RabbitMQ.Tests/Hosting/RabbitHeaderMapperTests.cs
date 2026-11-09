@@ -52,7 +52,7 @@ public class RabbitHeaderMapperTests
             CorrelationId = correlationId.ToString("D"),
             Headers = new Dictionary<string, object?>
             {
-                [Message.CausationHeader] = causationId.ToString("D"),
+                ["X-Causation-Id"] = causationId.ToString("D"),
                 ["x-ignore-me"] = "ignored"
             }
         };
