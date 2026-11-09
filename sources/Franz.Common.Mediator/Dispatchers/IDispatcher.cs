@@ -30,7 +30,12 @@ public interface IDispatcher
     INotification notification,
     CancellationToken cancellationToken = default,
     PublishStrategy strategy = PublishStrategy.Sequential,
-    NotificationErrorHandling errorHandling = NotificationErrorHandling.ContinueOnError);
+    NotificationErrorHandling errorHandling = NotificationErrorHandling.ContinueOnError)
+  {
+    System.ArgumentNullException.ThrowIfNull(notification);
+    throw new System.NotSupportedException(
+        "This dispatcher does not support runtime-typed notification dispatch.");
+  }
 
   public Task PublishNotificationAsync<TNotification>(
     TNotification notification,
