@@ -113,8 +113,27 @@ public sealed class GrpcOutcomeMappingTests
         Assert.Equal(StatusCode.Unavailable, rpcException.StatusCode);
         Assert.Equal("The requested service is temporarily unavailable.", rpcException.Status.Detail);
         Assert.Equal("UPSTREAM_FAILURE", rpcException.Trailers.GetValue("x-error-code"));
+        Assert.Null(rpcException.Trailers.GetValue("x-correlation-id"));
         Assert.Null(rpcException.Trailers.GetValue("authorization"));
         Assert.Null(rpcException.Trailers.GetValue("x-private-detail"));
+    }
+
+    [Fact]
+    public void FromException_OverridesUpstreamCorrelationWithTheCurrentCallIdentifier()
+    {
+        var trailers = new Metadata
+        {
+            { "x-correlation-id", "upstream-controlled-correlation" }
+        };
+        var exception = new RpcException(
+            new Status(StatusCode.Unavailable, "upstream detail"),
+            trailers);
+
+        var rpcException = GrpcOutcome.FromException(
+            exception,
+            correlationId: "current-call-correlation").ToRpcException();
+
+        Assert.Equal("current-call-correlation", rpcException.Trailers.GetValue("x-correlation-id"));
     }
 
     [Fact]
