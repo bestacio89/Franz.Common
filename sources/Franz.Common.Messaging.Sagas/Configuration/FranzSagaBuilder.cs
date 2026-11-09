@@ -6,6 +6,7 @@ using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Logging;
 using Franz.Common.Messaging.Sagas.Handlers;
 using Franz.Common.Mediator;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Validation;
 using Microsoft.Extensions.DependencyInjection;
