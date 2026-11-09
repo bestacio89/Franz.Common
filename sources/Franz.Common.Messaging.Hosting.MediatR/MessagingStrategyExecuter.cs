@@ -76,7 +76,7 @@ public class MessagingStrategyExecuter : IMessagingStrategyExecuter
     {
       case IIntegrationEvent integrationEvent:
         await dispatcher.PublishNotificationAsync(
-            integrationEvent,
+            (INotification)integrationEvent,
             errorHandling: Franz.Common.Mediator.Dispatchers.DispatchingStrategies.NotificationErrorHandling.StopOnFirstFailure);
         break;
 
