@@ -4,6 +4,7 @@ using FluentAssertions;
 using Franz.Common.Headers;
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.Mediator.Registration;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Exceptions;
@@ -24,6 +25,12 @@ namespace Franz.Common.Messaging.Sagas.Tests.Handlers;
 
 public sealed class SagaIntegrationEventNotificationHandlerTests
 {
+  static SagaIntegrationEventNotificationHandlerTests()
+  {
+    // Mirrors the generated module registration for this test-owned event contract.
+    GeneratedMediatorInvokerRegistry.RegisterNotification<StartedEvent>();
+  }
+
   [Fact]
   public async Task NotificationPipeline_RejectsTenantHeaderWithoutValidatedExecutionContext()
   {
