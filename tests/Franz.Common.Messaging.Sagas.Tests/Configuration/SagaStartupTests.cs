@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Franz.Common.Mediator;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Configuration;
