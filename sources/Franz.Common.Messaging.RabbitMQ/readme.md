@@ -54,7 +54,7 @@ Both `RabbitMQMessagingSender` and `RabbitMQMessagingPublisher` map the Franz me
 
 On consumption, the listener restores a valid AMQP `MessageId` as `Message.Id`, projects AMQP `CorrelationId` into the Franz correlation header, and retains causation metadata. Other `x-` headers remain filtered as transport infrastructure metadata.
 
-External producers should send a non-empty GUID `MessageId` and a GUID `CorrelationId`. For backward compatibility, missing or invalid message IDs are replaced with a new local ID; those deliveries do not have stable message identity across redelivery and cannot provide reliable inbox deduplication.
+External producers should send a non-empty GUID `MessageId` and a GUID `CorrelationId`. For backward compatibility, missing or invalid message IDs are replaced with a new local ID and marked with `MessagingConstants.TransportGeneratedMessageId` in `Message.Properties`. That local identity is not stable across redelivery and must not be used as an inbox deduplication key. Saga inbox processing rejects these marked deliveries; other consumers may still process them if they do not depend on message-level idempotency. Outbound publication rejects an empty `Message.Id`.
 
 ## Topology provisioning
 

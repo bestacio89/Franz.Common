@@ -14,10 +14,6 @@ public static class RabbitMQMessageExtensions
   {
     ArgumentNullException.ThrowIfNull(message);
 
-    if (message.Id == Guid.Empty)
-      throw new Franz.Common.Messaging.Exceptions.PermanentMessagingException(
-          "RabbitMQ messages must have a non-empty message identity before publication.");
-
     var properties = message.Headers.ToBasicProperties();
     properties.MessageId = message.Id.ToString("D");
 
