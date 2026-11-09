@@ -150,6 +150,16 @@ namespace Franz.Common.Testing.Mediator
 
     // -------------------- NOTIFICATIONS --------------------
 
+    public Task PublishNotificationAsync(
+        INotification notification,
+        CancellationToken cancellationToken = default,
+        DispatchingStrategies.PublishStrategy strategy = DispatchingStrategies.PublishStrategy.Sequential,
+        DispatchingStrategies.NotificationErrorHandling errorHandling = DispatchingStrategies.NotificationErrorHandling.StopOnFirstFailure)
+    {
+      ArgumentNullException.ThrowIfNull(notification);
+      return PublishNotificationAsync((dynamic)notification, cancellationToken, strategy, errorHandling);
+    }
+
     public async Task PublishNotificationAsync<TNotification>(
         TNotification notification,
         CancellationToken cancellationToken = default,
