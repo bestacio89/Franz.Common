@@ -54,6 +54,31 @@ public sealed class FranzGrpcClientLifecycleTests
         Assert.Equal(explicitDeadline, client.CapturedOptions?.Deadline);
     }
 
+    [Fact]
+    public async Task UnaryCall_PropagatesCancellationTokenPassedThroughBehaviorPipeline()
+    {
+        using var channel = GrpcChannel.ForAddress("http://localhost");
+        using var originalCancellation = new CancellationTokenSource();
+        using var behaviorCancellation = new CancellationTokenSource();
+        var provider = Substitute.For<IGrpcClientBehaviorProvider>();
+        provider.ResolveBehaviors<ProbeRequest, ProbeReply>()
+            .Returns(new IGrpcClientBehavior<ProbeRequest, ProbeReply>[]
+            {
+                new CancellationOverrideBehavior(behaviorCancellation.Token)
+            });
+
+        var client = new ProbeFranzGrpcClient(
+            new GrpcProbe.GrpcProbeClient(channel),
+            provider,
+            Options.Create(new FranzGrpcClientOptions()));
+
+        await client.InvokeAsync(
+            new ProbeRequest { Value = "pipeline-cancellation" },
+            cancellationToken: originalCancellation.Token);
+
+        Assert.Equal(behaviorCancellation.Token, client.CapturedOptions?.CancellationToken);
+    }
+
     private sealed class ProbeFranzGrpcClient : FranzGrpcClientBase<GrpcProbe.GrpcProbeClient>
     {
         public CallOptions? CapturedOptions { get; private set; }
@@ -68,7 +93,8 @@ public sealed class FranzGrpcClientLifecycleTests
 
         public Task<ProbeReply> InvokeAsync(
             ProbeRequest request,
-            DateTime? deadlineUtc = null)
+            DateTime? deadlineUtc = null,
+            CancellationToken cancellationToken = default)
         {
             return ExecuteUnaryAsync(
                 request,
@@ -79,7 +105,21 @@ public sealed class FranzGrpcClientLifecycleTests
                     CapturedOptions = callOptions;
                     return Task.FromResult(new ProbeReply());
                 },
+                cancellationToken: cancellationToken,
                 deadlineUtc: deadlineUtc);
+        }
+    }
+
+    private sealed class CancellationOverrideBehavior(CancellationToken cancellationToken)
+        : IGrpcClientBehavior<ProbeRequest, ProbeReply>
+    {
+        public Task<ProbeReply> InvokeAsync(
+            ProbeRequest request,
+            GrpcCallContext context,
+            GrpcClientPipelineDelegate<ProbeRequest, ProbeReply> next,
+            CancellationToken pipelineCancellationToken = default)
+        {
+            return next(request, context, cancellationToken);
         }
     }
 }
