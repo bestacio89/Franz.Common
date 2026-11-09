@@ -104,7 +104,7 @@ public static class KafkaMessageHeaderMapper
     message.CorrelationId = transportCorrelationId;
   }
 
-  private static string Decode(Confluent.Kafka.Header header)
+  private static string Decode(Confluent.Kafka.IHeader header)
   {
     if (header.GetValueBytes() is not { } bytes)
       throw new InvalidDataException($"Kafka header '{header.Key}' has a null value.");
