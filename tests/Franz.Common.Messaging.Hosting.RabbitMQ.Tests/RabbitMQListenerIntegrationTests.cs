@@ -5,6 +5,7 @@ using Franz.Common.Messaging.Hosting.RabbitMQ.Tests.Fixtures;
 using Franz.Common.Messaging.RabbitMQ;
 using Franz.Common.Messaging.RabbitMQ.Connections;
 using Franz.Common.Messaging;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -81,6 +82,74 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
     }
     finally
     {
+      await listener.StopListenAsync();
+    }
+  }
+
+  [Fact]
+  [Trait("Category", "MessagingContract")]
+  public async Task Listener_ShouldRestoreMessageIdentityCorrelationAndCausationFromDelivery()
+  {
+    var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
+    var channelPool = _fixture.Services.GetRequiredService<IChannelPool>();
+    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+    var messageId = Guid.CreateVersion7();
+    var correlationId = Guid.CreateVersion7();
+    var causationId = Guid.CreateVersion7();
+    var body = $"saga-envelope-{Guid.NewGuid():N}";
+    var received = new TaskCompletionSource<Message>(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    var previousHandler = listener.OnMessageReceivedAsync;
+
+    listener.OnMessageReceivedAsync = args =>
+    {
+      if (string.Equals(args.Message.Body, body, StringComparison.Ordinal))
+        received.TrySetResult(args.Message);
+
+      return Task.CompletedTask;
+    };
+
+    try
+    {
+      await listener.Listen(cts.Token);
+      await listener.WaitUntilReadyAsync().WaitAsync(cts.Token);
+
+      var publisher = await channelPool.GetAsync(cts.Token);
+      try
+      {
+        var properties = new BasicProperties
+        {
+          MessageId = messageId.ToString("D"),
+          CorrelationId = correlationId.ToString("D"),
+          Headers = new Dictionary<string, object?>
+          {
+            [Message.CausationHeader] = causationId.ToString("D")
+          }
+        };
+
+        await publisher.BasicPublishAsync(
+            exchange: string.Empty,
+            routingKey: ListenerQueueName,
+            mandatory: true,
+            basicProperties: properties,
+            body: Encoding.UTF8.GetBytes(body),
+            cancellationToken: cts.Token);
+      }
+      finally
+      {
+        channelPool.Return(publisher);
+      }
+
+      var message = await received.Task.WaitAsync(cts.Token);
+
+      message.Id.Should().Be(messageId);
+      message.CorrelationId.Should().Be(correlationId);
+      message.Headers.Should().ContainKey(Message.CausationHeader)
+          .WhoseValue.Should().ContainSingle(causationId.ToString("D"));
+    }
+    finally
+    {
+      listener.OnMessageReceivedAsync = previousHandler;
       await listener.StopListenAsync();
     }
   }
