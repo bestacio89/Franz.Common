@@ -17,7 +17,8 @@ public static class MessageMappingExtensions
   public static StoredMessage ToStored(this Message message)
   {
     ArgumentNullException.ThrowIfNull(message);
-    ArgumentNullException.ThrowIfNull(message.Body);
+    if (message.Body is null)
+      throw new ArgumentNullException(nameof(message.Body));
 
     var headers = message.Headers
         .Where(kv => !StringValues.IsNullOrEmpty(kv.Value) &&
