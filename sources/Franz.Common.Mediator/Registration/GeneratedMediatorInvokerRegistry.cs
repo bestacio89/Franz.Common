@@ -23,6 +23,7 @@ public static class GeneratedMediatorInvokerRegistry
   private static readonly ConcurrentDictionary<Type, Func<IServiceProvider, object, CancellationToken, Task>> PreProcessorInvokers = new();
   private static readonly ConcurrentDictionary<(Type Request, Type Response), Func<IServiceProvider, object, object?, CancellationToken, Task>> PostProcessorInvokers = new();
   private static readonly ConcurrentDictionary<Type, Func<FranzDispatcher, IEvent, CancellationToken, Task>> EventPublishers = new();
+  private static readonly ConcurrentDictionary<Type, Func<FranzDispatcher, INotification, CancellationToken, DispatchingStrategies.PublishStrategy, DispatchingStrategies.NotificationErrorHandling, Task>> NotificationPublishers = new();
 
   public static void RegisterCommand<TCommand, TResponse>()
       where TCommand : ICommand<TResponse>
@@ -57,6 +58,27 @@ public static class GeneratedMediatorInvokerRegistry
     RegisterPreProcessor<TCommand>();
     RegisterPostProcessor<TCommand, Unit>();
   }
+
+  /// <summary>
+  /// Registers a strongly typed notification publisher for runtime dispatch boundaries.
+  /// </summary>
+  public static void RegisterNotification<TNotification>()
+      where TNotification : INotification
+  {
+    NotificationPublishers.TryAdd(
+        typeof(TNotification),
+        static (dispatcher, notification, cancellationToken, strategy, errorHandling) =>
+            dispatcher.PublishNotificationAsync(
+                (TNotification)notification,
+                cancellationToken,
+                strategy,
+                errorHandling));
+  }
+
+  public static bool TryGetNotificationPublisher(
+      Type notificationType,
+      out Func<FranzDispatcher, INotification, CancellationToken, DispatchingStrategies.PublishStrategy, DispatchingStrategies.NotificationErrorHandling, Task>? publisher)
+      => NotificationPublishers.TryGetValue(notificationType, out publisher);
 
   public static void RegisterEvent<TEvent>()
       where TEvent : IEvent
