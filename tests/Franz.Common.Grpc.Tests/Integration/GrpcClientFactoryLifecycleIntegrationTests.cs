@@ -15,7 +15,7 @@ public sealed class GrpcClientFactoryLifecycleIntegrationTests
     [Fact]
     public async Task GrpcClientFactory_ReusesHostManagedHandlerUntilServiceProviderDisposal()
     {
-        await using var host = await new HostBuilder()
+        using var host = await new HostBuilder()
             .ConfigureWebHost(webHost => webHost
                 .UseTestServer()
                 .ConfigureServices(services =>
