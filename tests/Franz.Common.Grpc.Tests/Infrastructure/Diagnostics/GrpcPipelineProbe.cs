@@ -12,6 +12,9 @@ internal sealed class GrpcPipelineProbe : IFranzTenantResolver
     public const string ContextMarkerHeaderName = "x-franz-test-pipeline-context";
 
     private int _invocationCount;
+    private int _serverStreamingBehaviorInvocationCount;
+    private int _clientStreamingBehaviorInvocationCount;
+    private int _duplexStreamingBehaviorInvocationCount;
     private string? _lastUserId;
     private string? _lastAuthorizedUserId;
     private string? _lastServiceUserId;
@@ -20,22 +23,17 @@ internal sealed class GrpcPipelineProbe : IFranzTenantResolver
     private string? _lastRequestedTenantHeader;
 
     public int InvocationCount => Volatile.Read(ref _invocationCount);
-
+    public int ServerStreamingBehaviorInvocationCount => Volatile.Read(ref _serverStreamingBehaviorInvocationCount);
+    public int ClientStreamingBehaviorInvocationCount => Volatile.Read(ref _clientStreamingBehaviorInvocationCount);
+    public int DuplexStreamingBehaviorInvocationCount => Volatile.Read(ref _duplexStreamingBehaviorInvocationCount);
     public string? LastUserId => Volatile.Read(ref _lastUserId);
-
     public string? LastAuthorizedUserId => Volatile.Read(ref _lastAuthorizedUserId);
-
     public string? LastServiceUserId => Volatile.Read(ref _lastServiceUserId);
-
     public string? LastServiceContextMarker => Volatile.Read(ref _lastServiceContextMarker);
-
     public string? LastRequestedTenantId => Volatile.Read(ref _lastRequestedTenantId);
-
     public string? LastRequestedTenantHeader => Volatile.Read(ref _lastRequestedTenantHeader);
 
-    public Task<string?> ResolveTenantAsync(
-        GrpcCallContext context,
-        CancellationToken cancellationToken = default)
+    public Task<string?> ResolveTenantAsync(GrpcCallContext context, CancellationToken cancellationToken = default)
     {
         Volatile.Write(ref _lastRequestedTenantId, context.TenantId);
         context.RequestHeaders.TryGetValue(GrpcCallContext.TenantIdHeaderName, out var selector);
@@ -49,8 +47,10 @@ internal sealed class GrpcPipelineProbe : IFranzTenantResolver
         Interlocked.Increment(ref _invocationCount);
     }
 
-    public void RecordAuthorization(string? userId)
-        => Volatile.Write(ref _lastAuthorizedUserId, userId);
+    public void RecordServerStreamingBehaviorInvocation() => Interlocked.Increment(ref _serverStreamingBehaviorInvocationCount);
+    public void RecordClientStreamingBehaviorInvocation() => Interlocked.Increment(ref _clientStreamingBehaviorInvocationCount);
+    public void RecordDuplexStreamingBehaviorInvocation() => Interlocked.Increment(ref _duplexStreamingBehaviorInvocationCount);
+    public void RecordAuthorization(string? userId) => Volatile.Write(ref _lastAuthorizedUserId, userId);
 
     public void RecordServiceContext(GrpcCallContext context)
     {

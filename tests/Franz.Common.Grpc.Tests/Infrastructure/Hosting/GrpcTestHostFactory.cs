@@ -31,27 +31,24 @@ internal static class GrpcTestHostFactory
             .ConfigureWebHost(webHost =>
             {
                 webHost.UseTestServer();
-
                 webHost.ConfigureServices(services =>
                 {
                     services.AddSingleton(pipelineProbe);
-
                     services.AddFranzGrpcServer(new ConfigurationBuilder().Build());
                     services.AddFranzGrpcDefaults();
                     services.AddSingleton<IFranzTenantResolver>(pipelineProbe);
                     services.AddSingleton<IFranzAuthorizationService, AllowAllGrpcAuthorizationService>();
                     services.AddScoped<IGrpcServerBehavior<ProbeRequest, ProbeReply>, ProbeContextBehavior>();
+                    services.AddScoped<IGrpcServerStreamingBehavior<ProbeRequest, ProbeReply>, ProbeStreamingBehavior>();
+                    services.AddScoped<IGrpcClientStreamingBehavior<ProbeRequest, ProbeReply>, ProbeStreamingBehavior>();
+                    services.AddScoped<IGrpcDuplexStreamingBehavior<ProbeRequest, ProbeReply>, ProbeStreamingBehavior>();
                     services.AddFranzGrpcAspNetCore();
-
-                    services
-                        .AddAuthentication(TestAuthenticationHandler.SchemeName)
+                    services.AddAuthentication(TestAuthenticationHandler.SchemeName)
                         .AddScheme<TestAuthenticationOptions, TestAuthenticationHandler>(
                             TestAuthenticationHandler.SchemeName,
                             options => options.Authenticate = authenticated);
-
                     services.AddAuthorization();
                 });
-
                 webHost.Configure(app =>
                 {
                     app.UseRouting();

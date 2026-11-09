@@ -15,7 +15,6 @@ internal sealed class GrpcProbeService(GrpcPipelineProbe probe) : GrpcProbe.Grpc
     {
         var franzContext = GrpcCallContext.FromServerCallContext(context);
         probe.RecordServiceContext(franzContext);
-
         return Task.FromResult(new ProbeReply
         {
             Value = request.Value,
@@ -24,36 +23,26 @@ internal sealed class GrpcProbeService(GrpcPipelineProbe probe) : GrpcProbe.Grpc
         });
     }
 
-    public override async Task ServerStream(
-        ProbeRequest request,
-        IServerStreamWriter<ProbeReply> responseStream,
-        ServerCallContext context)
+    public override async Task ServerStream(ProbeRequest request, IServerStreamWriter<ProbeReply> responseStream, ServerCallContext context)
     {
+        probe.RecordServiceContext(GrpcCallContext.FromServerCallContext(context));
         await responseStream.WriteAsync(new ProbeReply { Value = $"{request.Value}-1" });
         await responseStream.WriteAsync(new ProbeReply { Value = $"{request.Value}-2" });
     }
 
-    public override async Task<ProbeReply> ClientStream(
-        IAsyncStreamReader<ProbeRequest> requestStream,
-        ServerCallContext context)
+    public override async Task<ProbeReply> ClientStream(IAsyncStreamReader<ProbeRequest> requestStream, ServerCallContext context)
     {
+        probe.RecordServiceContext(GrpcCallContext.FromServerCallContext(context));
         var values = new List<string>();
-
         while (await requestStream.MoveNext(context.CancellationToken))
             values.Add(requestStream.Current.Value);
-
         return new ProbeReply { Value = string.Join(',', values) };
     }
 
-    public override async Task Duplex(
-        IAsyncStreamReader<ProbeRequest> requestStream,
-        IServerStreamWriter<ProbeReply> responseStream,
-        ServerCallContext context)
+    public override async Task Duplex(IAsyncStreamReader<ProbeRequest> requestStream, IServerStreamWriter<ProbeReply> responseStream, ServerCallContext context)
     {
+        probe.RecordServiceContext(GrpcCallContext.FromServerCallContext(context));
         while (await requestStream.MoveNext(context.CancellationToken))
-        {
-            await responseStream.WriteAsync(
-                new ProbeReply { Value = $"{requestStream.Current.Value}-duplex" });
-        }
+            await responseStream.WriteAsync(new ProbeReply { Value = $"{requestStream.Current.Value}-duplex" });
     }
 }
