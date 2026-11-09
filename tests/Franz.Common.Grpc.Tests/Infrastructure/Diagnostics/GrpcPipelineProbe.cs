@@ -51,7 +51,7 @@ internal sealed class GrpcPipelineProbe : IFranzTenantResolver, IFranzTenantAuth
         Volatile.Write(ref _lastRequestedTenantId, context.TenantId);
         context.RequestHeaders.TryGetValue(GrpcCallContext.TenantIdHeaderName, out var selector);
         Volatile.Write(ref _lastRequestedTenantHeader, selector);
-        return Task.FromResult(selector);
+        return Task.FromResult<string?>(Guid.TryParse(selector, out _) ? selector : null);
     }
 
     public Task<bool> IsAuthorizedAsync(

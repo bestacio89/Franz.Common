@@ -40,6 +40,7 @@ internal static class GrpcTestHostFactory
                     services.AddFranzGrpcServer(new ConfigurationBuilder().Build());
                     services.AddFranzGrpcDefaults();
                     services.AddSingleton<IFranzTenantResolver>(pipelineProbe);
+                    services.AddSingleton<IFranzTenantAuthorizer>(pipelineProbe);
                     services.AddSingleton<IFranzAuthorizationService, AllowAllGrpcAuthorizationService>();
                     services.AddScoped<IGrpcServerBehavior<ProbeRequest, ProbeReply>, ProbeContextBehavior>();
                     services.AddScoped<IGrpcServerStreamingBehavior<ProbeRequest, ProbeReply>, ProbeStreamingBehavior>();
