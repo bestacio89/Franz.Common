@@ -136,6 +136,9 @@ jobs:
           dotnet restore "$consumer/Consumer.csproj" --source "$feed" --source https://api.nuget.org/v3/index.json
           dotnet run --project "$consumer/Consumer.csproj" --configuration Release --no-restore
 
+      - name: Validate gRPC package consumer
+        run: bash scripts/validate-grpc-package-consumer.sh
+
       - name: Publish and execute Native AOT mapper smoke test
         run: |
           dotnet publish tests/Franz.Common.AotSmokeTest/Franz.Common.AotSmokeTest.csproj --configuration Release --runtime linux-x64 --self-contained true -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=full -p:ILLinkTreatWarningsAsErrors=true
