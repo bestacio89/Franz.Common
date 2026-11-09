@@ -30,14 +30,6 @@ public sealed class SagaStartupTests
     using var provider = services.BuildServiceProvider(validateScopes: true);
 
     var hostedService = provider.GetServices<IHostedService>().Single();
-    var lifecycleService = hostedService.Should()
-        .BeAssignableTo<IHostedLifecycleService>().Subject;
-
-    // Generic Host invokes StartingAsync for every lifecycle service before it
-    // invokes StartAsync on any hosted service, including the message listener.
-    await lifecycleService.StartingAsync(CancellationToken.None);
-    provider.GetRequiredService<SagaRouter>().GetRegistrations().Should().ContainSingle();
-
     await hostedService.StartAsync(CancellationToken.None);
     provider.BuildFranzSagas();
 

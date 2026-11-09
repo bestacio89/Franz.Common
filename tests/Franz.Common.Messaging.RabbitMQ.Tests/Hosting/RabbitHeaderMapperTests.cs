@@ -69,6 +69,48 @@ public class RabbitHeaderMapperTests
     }
 
     [Fact]
+    public void ExtractHeaders_ShouldPreserveLegacyCorrelationHeaderWhenAmqpPropertyIsMissing()
+    {
+        var correlationId = Guid.CreateVersion7();
+        var properties = new BasicProperties
+        {
+            Headers = new Dictionary<string, object?>
+            {
+                ["X-Correlation-Id"] = correlationId.ToString("D")
+            }
+        };
+        var eventArgs = new BasicDeliverEventArgs(
+            "tag", 1, false, "exchange", "routingKey", properties, default);
+
+        var headers = RabbitHeaderMapper.ExtractHeaders(eventArgs);
+
+        headers.Should().ContainKey(Message.CorrelationHeader)
+            .WhoseValue.Should().ContainSingle(correlationId.ToString("D"));
+    }
+
+    [Fact]
+    public void ExtractHeaders_ShouldPreferAmqpCorrelationPropertyOverLegacyHeader()
+    {
+        var propertyCorrelationId = Guid.CreateVersion7();
+        var headerCorrelationId = Guid.CreateVersion7();
+        var properties = new BasicProperties
+        {
+            CorrelationId = propertyCorrelationId.ToString("D"),
+            Headers = new Dictionary<string, object?>
+            {
+                [Message.CorrelationHeader] = headerCorrelationId.ToString("D")
+            }
+        };
+        var eventArgs = new BasicDeliverEventArgs(
+            "tag", 1, false, "exchange", "routingKey", properties, default);
+
+        var headers = RabbitHeaderMapper.ExtractHeaders(eventArgs);
+
+        headers.Should().ContainKey(Message.CorrelationHeader)
+            .WhoseValue.Should().ContainSingle(propertyCorrelationId.ToString("D"));
+    }
+
+    [Fact]
     public void ExtractHeaders_ShouldHandleNullHeaders()
     {
         // Arrange

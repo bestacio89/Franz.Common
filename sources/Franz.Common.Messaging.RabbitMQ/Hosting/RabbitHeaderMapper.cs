@@ -33,6 +33,14 @@ public static class RabbitHeaderMapper
           continue;
         }
 
+        // Correlation is also envelope metadata. Preserve the legacy header form;
+        // the AMQP basic property below takes precedence when both are present.
+        if (string.Equals(header.Key, Message.CorrelationHeader, StringComparison.OrdinalIgnoreCase))
+        {
+          headers[Message.CorrelationHeader] = MapValue(header.Value);
+          continue;
+        }
+
         if (header.Key.StartsWith("x-", StringComparison.OrdinalIgnoreCase))
           continue;
 
