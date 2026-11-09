@@ -1,6 +1,5 @@
 #nullable enable
 
-using Franz.Common.Mediator;
 using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Core;
