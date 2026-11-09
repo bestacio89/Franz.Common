@@ -42,6 +42,52 @@ public class MessageTests
  
 
   [Fact]
+  public void Headers_WhenReplacedWithoutCorrelationHeader_ShouldPreserveCorrelationProjection()
+  {
+    var correlationId = Guid.CreateVersion7();
+    var message = new Message { CorrelationId = correlationId };
+
+    message.Headers = new Dictionary<string, string[]>
+    {
+      ["Custom-Header"] = ["custom-value"]
+    };
+
+    message.CorrelationId.Should().Be(correlationId);
+    message.Headers.Should().ContainKey(Message.CorrelationHeader)
+        .WhoseValue.Should().ContainSingle(correlationId.ToString("D"));
+  }
+
+  [Fact]
+  public void Headers_WhenReplacedWithCorrelationHeader_ShouldHydrateCorrelationProperty()
+  {
+    var correlationId = Guid.CreateVersion7();
+    var message = new Message
+    {
+      Headers = new Dictionary<string, string[]>
+      {
+        [Message.CorrelationHeader] = [correlationId.ToString("D")]
+      }
+    };
+
+    message.CorrelationId.Should().Be(correlationId);
+  }
+
+  [Fact]
+  public void Headers_WhenReplacedWithInvalidCorrelationHeader_ShouldRestoreCurrentProjection()
+  {
+    var correlationId = Guid.CreateVersion7();
+    var message = new Message { CorrelationId = correlationId };
+
+    message.Headers = new Dictionary<string, string[]>
+    {
+      [Message.CorrelationHeader] = ["not-a-guid"]
+    };
+
+    message.CorrelationId.Should().Be(correlationId);
+    message.Headers[Message.CorrelationHeader].Should().ContainSingle(correlationId.ToString("D"));
+  }
+
+  [Fact]
   public void GetProperty_ShouldReturnDefault_WhenTypeMismatch()
   {
     // Arrange

@@ -9,6 +9,7 @@ namespace Franz.Common.Messaging.Messages;
 public class Message : INotification, IEvent
 {
   private Guid? _correlationId;
+  private IDictionary<string, string[]> _headers = new MessageHeaders();
 
   public const string CorrelationHeader = "x-correlation-id";
   public const string CausationHeader = "x-causation-id";
@@ -27,10 +28,13 @@ public class Message : INotification, IEvent
 
   public Message(string? body, IDictionary<string, string[]> headers) : this(body)
   {
-    foreach (var kv in headers)
-      Headers[kv.Key] = kv.Value;
+    ArgumentNullException.ThrowIfNull(headers);
 
-    HydrateFromHeaders(headers);
+    var copiedHeaders = new MessageHeaders();
+    foreach (var header in headers)
+      copiedHeaders[header.Key] = header.Value;
+
+    Headers = copiedHeaders;
   }
 
   public Guid Id { get; set; }
@@ -38,8 +42,15 @@ public class Message : INotification, IEvent
   public virtual string? Body { get; set; }
   public MessageKind Kind { get; set; } = MessageKind.Command;
 
-  public virtual IDictionary<string, string[]> Headers { get; set; }
-      = new MessageHeaders();
+  public virtual IDictionary<string, string[]> Headers
+  {
+    get => _headers;
+    set
+    {
+      _headers = value ?? throw new ArgumentNullException(nameof(value));
+      HydrateFromHeaders(_headers);
+    }
+  }
 
   public virtual IDictionary<string, object> Properties { get; set; }
       = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
@@ -77,9 +88,9 @@ public class Message : INotification, IEvent
   private void SyncProjection()
   {
     if (_correlationId.HasValue)
-      Headers[CorrelationHeader] = new[] { _correlationId.Value.ToString() };
+      _headers[CorrelationHeader] = new[] { _correlationId.Value.ToString("D") };
     else
-      Headers.Remove(CorrelationHeader);
+      _headers.Remove(CorrelationHeader);
   }
 
   private void HydrateFromHeaders(IDictionary<string, string[]> headers)
@@ -90,6 +101,10 @@ public class Message : INotification, IEvent
     {
       _correlationId = correlationId;
       Properties[nameof(CorrelationId)] = correlationId;
+    }
+    else
+    {
+      SyncProjection();
     }
   }
 }
