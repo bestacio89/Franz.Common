@@ -74,7 +74,7 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse> :
         }
     }
 
-    public async IAsyncEnumerable<TResponse> InvokeAsync(
+    async IAsyncEnumerable<TResponse> IGrpcServerStreamingBehavior<TRequest, TResponse>.InvokeAsync(
         TRequest request,
         GrpcCallContext context,
         GrpcServerStreamingPipelineDelegate<TRequest, TResponse> next,
@@ -101,7 +101,7 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse> :
         }
     }
 
-    public async Task<TResponse> InvokeAsync(
+    async Task<TResponse> IGrpcClientStreamingBehavior<TRequest, TResponse>.InvokeAsync(
         IAsyncEnumerable<TRequest> requestStream,
         GrpcCallContext context,
         GrpcClientStreamingPipelineDelegate<TRequest, TResponse> next,
@@ -123,7 +123,7 @@ public sealed class TenantResolutionServerBehavior<TRequest, TResponse> :
         }
     }
 
-    public async IAsyncEnumerable<TResponse> InvokeAsync(
+    async IAsyncEnumerable<TResponse> IGrpcDuplexStreamingBehavior<TRequest, TResponse>.InvokeAsync(
         IAsyncEnumerable<TRequest> requestStream,
         GrpcCallContext context,
         GrpcDuplexStreamingPipelineDelegate<TRequest, TResponse> next,
