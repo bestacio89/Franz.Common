@@ -171,7 +171,8 @@ public sealed class FranzGrpcServerInterceptor : Interceptor
         {
             await foreach (var response in bridge.ReadAllAsync(linkedCancellation.Token).ConfigureAwait(false))
             {
-                yield return response;
+                responseStream.WriteOptions = response.WriteOptions;
+                yield return response.Message;
             }
 
             await producer.ConfigureAwait(false);
@@ -217,7 +218,8 @@ public sealed class FranzGrpcServerInterceptor : Interceptor
         {
             await foreach (var response in bridge.ReadAllAsync(linkedCancellation.Token).ConfigureAwait(false))
             {
-                yield return response;
+                responseStream.WriteOptions = response.WriteOptions;
+                yield return response.Message;
             }
 
             await producer.ConfigureAwait(false);

@@ -12,6 +12,9 @@ public sealed class GrpcServerStreamBridgeTests
         var firstOptions = new WriteOptions(WriteFlags.BufferHint);
         var secondOptions = new WriteOptions(WriteFlags.NoCompress);
 
+        var messages = new List<(string Message, WriteOptions? WriteOptions)>();
+        var reader = ReadMessagesAsync();
+
         bridge.WriteOptions = firstOptions;
         await bridge.WriteAsync("first");
 
@@ -19,9 +22,13 @@ public sealed class GrpcServerStreamBridgeTests
         await bridge.WriteAsync("second");
         bridge.Complete();
 
-        var messages = new List<(string Message, WriteOptions? WriteOptions)>();
-        await foreach (var message in bridge.ReadAllAsync(CancellationToken.None))
-            messages.Add(message);
+        await reader;
+
+        async Task ReadMessagesAsync()
+        {
+            await foreach (var message in bridge.ReadAllAsync(CancellationToken.None))
+                messages.Add(message);
+        }
 
         Assert.Collection(
             messages,
