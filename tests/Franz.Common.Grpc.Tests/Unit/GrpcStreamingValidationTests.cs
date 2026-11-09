@@ -79,11 +79,12 @@ public sealed class GrpcStreamingValidationTests
     }
 
     [Fact]
-    public async Task ClientStreaming_StopsBeforeHandlerWhenARequestFailsValidation()
+    public async Task ClientStreaming_DoesNotPassInvalidRequestToHandler()
     {
         var validation = new RecordingValidationEngine(shouldFail: true);
         var behavior = new ValidationStreamingBehavior<ProbeRequest, ProbeResponse>(validation);
         var handlerInvoked = false;
+        var received = new List<ProbeRequest>();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             ((IGrpcClientStreamingBehavior<ProbeRequest, ProbeResponse>)behavior)
@@ -93,11 +94,13 @@ public sealed class GrpcStreamingValidationTests
                     async (requests, _, _) =>
                     {
                         handlerInvoked = true;
-                        await foreach (var _ in requests) { }
+                        await foreach (var request in requests)
+                            received.Add(request);
                         return new ProbeResponse();
                     }));
 
-        Assert.False(handlerInvoked);
+        Assert.True(handlerInvoked);
+        Assert.Empty(received);
     }
 
     private static GrpcCallContext CreateContext()
