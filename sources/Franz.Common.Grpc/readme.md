@@ -70,7 +70,9 @@ Use `GrpcCallContext.CreateClient(...)` to create outgoing context and `GrpcCall
 
 ## Tenant trust boundary
 
-The server tenant behavior removes caller-supplied `x-tenant-id` metadata before invoking the application-provided tenant resolver. The resolver must derive the tenant from authenticated server-side identity or another trusted transport signal. The tenant authorizer must verify membership; metadata is propagation data, not proof of authorization.
+The server tenant behavior treats caller-supplied `x-tenant-id` as an untrusted selection hint and makes it available to the application-provided tenant resolver. The resolver must resolve that selector against trusted server-side data; the supplied value is never accepted directly as validated tenant context. After resolution, `IFranzTenantAuthorizer` independently verifies that the authenticated principal belongs to the resolved tenant. Only then is the resolved tenant placed into the effective call context and tenant execution scope. A missing tenant is rejected when `RequireTenant = true`.
+
+Caller-supplied `x-user-id` metadata is removed and never used as identity. The authenticated principal supplied by the host remains the only source of the trusted Franz user identifier.
 
 On the client, the tenant behavior propagates only the tenant from a validated `ITenantExecutionContextAccessor`. It does not trust a caller-created tenant header when no validated execution context exists.
 
