@@ -28,6 +28,25 @@ public sealed class GrpcPipelineCharacterizationTests
     }
 
     [Fact]
+    public async Task ExceptionMappingBehavior_PropagatesTrustedCorrelationIdentifier()
+    {
+        var behavior = new ExceptionMappingServerBehavior<ProbeRequest, ProbeResponse>();
+        var context = GrpcCallContext.CreateClient(
+            "tests.Service",
+            "Call",
+            correlationId: "trusted-correlation");
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() =>
+            behavior.InvokeAsync(
+                new ProbeRequest(),
+                context,
+                (_, _, _) => throw new InvalidOperationException("private failure detail")));
+
+        Assert.Equal("trusted-correlation", exception.Trailers.GetValue("x-correlation-id"));
+        Assert.DoesNotContain("private failure detail", exception.Status.Detail);
+    }
+
+    [Fact]
     public void FromException_DoesNotExposeUnexpectedExceptionMessageInRpcStatusDetail()
     {
         const string sensitiveMessage = "database endpoint and credentials must not be exposed";
