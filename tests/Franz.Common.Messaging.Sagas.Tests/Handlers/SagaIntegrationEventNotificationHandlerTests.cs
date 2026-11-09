@@ -2,13 +2,16 @@
 
 using FluentAssertions;
 using Franz.Common.Mediator;
-using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.Hosting;
+using Franz.Common.Messaging.Hosting.Delegating;
+using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Configuration;
 using Franz.Common.Messaging.Sagas.Core;
+using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -33,6 +36,8 @@ public sealed class SagaIntegrationEventNotificationHandlerTests
       CorrelationId = correlationId
     };
     message.Headers[Message.CausationHeader] = [causationId.ToString("D")];
+    message.Headers[MessagingConstants.ClassName] =
+        [HeaderNamer.GetEventClassName(typeof(StartedEvent))];
 
     services.AddSingleton<IMessageContextAccessor>(
         new TestMessageContextAccessor(new MessageContext(message)));
@@ -47,9 +52,12 @@ public sealed class SagaIntegrationEventNotificationHandlerTests
     await using var scope = provider.CreateAsyncScope();
     var dispatcher = new FranzDispatcher(scope.ServiceProvider);
 
-    await dispatcher.PublishNotificationAsync(
-        new StartedEvent(),
-        errorHandling: DispatchingStrategies.NotificationErrorHandling.StopOnFirstFailure);
+    var executer = new MessagingStrategyExecuter(
+        Array.Empty<IAsyncMessageActionFilter>(),
+        dispatcher);
+
+    (await executer.CanExecuteAsync(message)).Should().BeTrue();
+    await executer.ExecuteAsync(message);
 
     var records = provider.GetRequiredService<InMemorySagaStateStore>().Store;
     records.Should().ContainSingle();
