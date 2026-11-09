@@ -51,7 +51,17 @@ internal sealed class GrpcProbeService(
     public override async Task Duplex(IAsyncStreamReader<ProbeRequest> requestStream, IServerStreamWriter<ProbeReply> responseStream, ServerCallContext context)
     {
         probe.RecordServiceContext(GrpcCallContext.FromServerCallContext(context));
+        var firstMessage = true;
+
         while (await requestStream.MoveNext(context.CancellationToken))
+        {
             await responseStream.WriteAsync(new ProbeReply { Value = $"{requestStream.Current.Value}-duplex" });
+
+            if (firstMessage)
+            {
+                firstMessage = false;
+                await streamingLifecycleProbe.PauseDuplexStreamingIfRequestedAsync(context.CancellationToken);
+            }
+        }
     }
 }

@@ -9,9 +9,12 @@ internal sealed class GrpcStreamingLifecycleProbe
     private readonly TaskCompletionSource _releaseServerStreaming = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _clientStreamingPaused = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _releaseClientStreaming = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _duplexStreamingPaused = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _releaseDuplexStreaming = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _scopeDisposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _holdServerStreaming;
     private int _holdClientStreaming;
+    private int _holdDuplexStreaming;
     private int _scopeDisposalCount;
 
     public int ScopeDisposalCount => Volatile.Read(ref _scopeDisposalCount);
@@ -19,6 +22,8 @@ internal sealed class GrpcStreamingLifecycleProbe
     public void HoldServerStreaming() => Volatile.Write(ref _holdServerStreaming, 1);
 
     public void HoldClientStreaming() => Volatile.Write(ref _holdClientStreaming, 1);
+
+    public void HoldDuplexStreaming() => Volatile.Write(ref _holdDuplexStreaming, 1);
 
     public async Task PauseServerStreamingIfRequestedAsync(CancellationToken cancellationToken)
     {
@@ -38,15 +43,29 @@ internal sealed class GrpcStreamingLifecycleProbe
         await _releaseClientStreaming.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task PauseDuplexStreamingIfRequestedAsync(CancellationToken cancellationToken)
+    {
+        if (Volatile.Read(ref _holdDuplexStreaming) == 0)
+            return;
+
+        _duplexStreamingPaused.TrySetResult();
+        await _releaseDuplexStreaming.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public Task WaitForServerStreamingPauseAsync()
         => _serverStreamingPaused.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
     public Task WaitForClientStreamingPauseAsync()
         => _clientStreamingPaused.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
+    public Task WaitForDuplexStreamingPauseAsync()
+        => _duplexStreamingPaused.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
     public void ReleaseServerStreaming() => _releaseServerStreaming.TrySetResult();
 
     public void ReleaseClientStreaming() => _releaseClientStreaming.TrySetResult();
+
+    public void ReleaseDuplexStreaming() => _releaseDuplexStreaming.TrySetResult();
 
     public void RecordScopeDisposal()
     {
