@@ -68,6 +68,12 @@ The package does not construct channels or clients. The former `IFranzGrpcClient
 
 Use `GrpcCallContext.CreateClient(...)` to create outgoing context and `GrpcCallContext.FromServerCallContext(...)` to adapt an incoming server call. The context can produce gRPC metadata and `CallOptions`, and exposes immutable `WithTenant`, `WithUser`, `WithDeadline`, `WithCancellation`, and `WithAdditionalHeader` helpers.
 
+## Server error semantics
+
+The outermost `ExceptionMappingServerBehavior` maps known platform and Franz exceptions to deliberate gRPC status codes: validation and functional failures to `InvalidArgument`, authentication failures to `Unauthenticated`, authorization failures to `PermissionDenied`, missing resources to `NotFound`, business/precondition conflicts to `FailedPrecondition`, and unsupported operations to `Unimplemented`. Call cancellation maps to `Cancelled`; an expired call deadline maps to `DeadlineExceeded`. An unrelated `OperationCanceledException` is treated as an unexpected server failure rather than misreported as caller cancellation.
+
+Remote status details are sanitized and never contain raw exception messages or stack traces. The original exception remains available to trusted local diagnostics. Error trailers are restricted to error code, error domain, and the current call's trusted correlation identifier; arbitrary upstream trailers and upstream correlation identifiers are not forwarded.
+
 ## Tenant trust boundary
 
 The server tenant behavior treats caller-supplied `x-tenant-id` as an untrusted selection hint and makes it available to the application-provided tenant resolver. The resolver must resolve that selector against trusted server-side data; the supplied value is never accepted directly as validated tenant context. After resolution, `IFranzTenantAuthorizer` independently verifies that the authenticated principal belongs to the resolved tenant. Only then is the resolved tenant placed into the effective call context and tenant execution scope. A missing tenant is rejected when `RequireTenant = true`.
