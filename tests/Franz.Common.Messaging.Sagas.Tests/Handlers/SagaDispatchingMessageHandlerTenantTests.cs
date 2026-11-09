@@ -11,6 +11,8 @@ using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Handlers;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Storage;
+using Franz.Common.MultiTenancy;
+using Franz.Common.MultiTenancy.Models;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Franz.Common.Messaging.Serialization;
@@ -50,16 +52,23 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
   }
 
   [Fact]
-  public async Task ProcessAsync_PreservesValidTenantHeaderAsRepositoryScope()
+  public async Task ProcessAsync_PreservesValidatedTenantContextAsRepositoryScope()
   {
     var fixture = new Fixture();
+    var tenantId = Guid.CreateVersion7();
     var message = fixture.CreateMessage();
-    message.Headers[HeaderConstants.TenantId] = ["tenant-a"];
+    message.Headers[HeaderConstants.TenantId] = [tenantId.ToString("D")];
+    var tenantContext = new TenantExecutionContext(
+        new TenantInfo(tenantId, "tenant-a"),
+        domainId: null,
+        TenantResolutionSource.Header,
+        DateTimeOffset.UtcNow);
 
-    await fixture.Handler.ProcessAsync(message);
+    await fixture.CreateHandler(new FixedTenantExecutionContextAccessor(tenantContext))
+        .ProcessAsync(message);
 
     (await fixture.Repository.LoadAsync(
-        fixture.Saga.SagaId, "tenant-a", typeof(TestSagaState))).Should().NotBeNull();
+        fixture.Saga.SagaId, tenantId.ToString("D"), typeof(TestSagaState))).Should().NotBeNull();
     (await fixture.Repository.LoadAsync(
         fixture.Saga.SagaId, null, typeof(TestSagaState))).Should().BeNull();
   }
@@ -137,6 +146,19 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
   }
 
   [Fact]
+  public async Task ProcessAsync_RejectsTenantHeaderWithoutValidatedExecutionContext()
+  {
+    var fixture = new Fixture();
+    var message = fixture.CreateMessage();
+    message.Headers[HeaderConstants.TenantId] = [Guid.CreateVersion7().ToString("D")];
+
+    var act = () => fixture.Handler.ProcessAsync(message);
+
+    await act.Should().ThrowAsync<PermanentMessagingException>()
+        .WithMessage("*validated tenant execution context*");
+  }
+
+  [Fact]
   public async Task ProcessAsync_UsesDefaultScopeOnlyWhenTenantHeaderIsAbsent()
   {
     var fixture = new Fixture();
@@ -151,7 +173,7 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
   {
     public TestSaga Saga { get; } = new();
     public InMemorySagaRepository Repository { get; }
-    public SagaDispatchingMessageHandler Handler { get; }
+    public SagaDispatchingMessageHandler Handler => CreateHandler();
     public SagaOrchestrator Orchestrator { get; }
 
     public Fixture()
@@ -171,8 +193,16 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
           new TestMessagingPublisher(),
           services);
 
-      Handler = new SagaDispatchingMessageHandler(Orchestrator, new JsonMessageSerializer());
     }
+
+    public SagaDispatchingMessageHandler CreateHandler(
+        ITenantExecutionContextAccessor? tenantExecutionContextAccessor = null)
+        => new(
+            Orchestrator,
+            new JsonMessageSerializer(),
+            inboxStore: null,
+            persistenceUnitOfWork: null,
+            tenantExecutionContextAccessor);
 
     public Message CreateMessage()
         => new("{}")
@@ -198,6 +228,16 @@ public sealed class SagaDispatchingMessageHandlerTenantTests
           ? context.Fail(new InvalidOperationException("Expected saga failure."))
           : context.Continue());
     }
+  }
+
+  private sealed class FixedTenantExecutionContextAccessor(TenantExecutionContext context)
+      : ITenantExecutionContextAccessor
+  {
+    public TenantExecutionContext? Current { get; private set; } = context;
+
+    public void Initialize(TenantExecutionContext value) => Current = value;
+
+    public void Clear() => Current = null;
   }
 
   private sealed class RecordingInboxStore(List<string> operations) : IInboxStore

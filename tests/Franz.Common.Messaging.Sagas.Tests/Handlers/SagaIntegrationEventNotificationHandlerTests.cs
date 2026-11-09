@@ -5,6 +5,7 @@ using Franz.Common.Headers;
 using Franz.Common.Mediator;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Contexting;
+using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Hosting;
 using Franz.Common.Messaging.Hosting.Delegating;
@@ -22,6 +23,41 @@ namespace Franz.Common.Messaging.Sagas.Tests.Handlers;
 public sealed class SagaIntegrationEventNotificationHandlerTests
 {
   [Fact]
+  public async Task NotificationPipeline_RejectsTenantHeaderWithoutValidatedExecutionContext()
+  {
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddSingleton<IMessagingPublisher>(new TestMessagingPublisher());
+
+    var message = new Message("{}");
+    message.Headers[HeaderConstants.TenantId] = [Guid.CreateVersion7().ToString("D")];
+    message.Headers[MessagingConstants.ClassName] =
+        [HeaderNamer.GetEventClassName(typeof(StartedEvent))];
+
+    services.AddSingleton<IMessageContextAccessor>(
+        new TestMessageContextAccessor(new MessageContext(message)));
+
+    services
+        .AddFranzSagas(options => options.Persistence = "Memory")
+        .AddSaga<StartedEventSaga>();
+
+    using var provider = services.BuildServiceProvider();
+    provider.BuildFranzSagas();
+
+    await using var scope = provider.CreateAsyncScope();
+    var dispatcher = new FranzDispatcher(scope.ServiceProvider);
+    var executer = new MessagingStrategyExecuter(
+        Array.Empty<IAsyncMessageActionFilter>(),
+        dispatcher);
+
+    var act = () => executer.ExecuteAsync(message);
+
+    await act.Should().ThrowAsync<PermanentMessagingException>()
+        .WithMessage("*validated tenant execution context*");
+    provider.GetRequiredService<InMemorySagaStateStore>().Store.Should().BeEmpty();
+  }
+
+  [Fact]
   public async Task NotificationPipeline_DispatchesInboundIntegrationEventToRegisteredSaga()
   {
     var services = new ServiceCollection();
@@ -37,7 +73,6 @@ public sealed class SagaIntegrationEventNotificationHandlerTests
       CorrelationId = correlationId
     };
     message.Headers[Message.CausationHeader] = [causationId.ToString("D")];
-    message.Headers[HeaderConstants.TenantId] = [Guid.CreateVersion7().ToString("D")];
     message.Headers[MessagingConstants.ClassName] =
         [HeaderNamer.GetEventClassName(typeof(StartedEvent))];
 

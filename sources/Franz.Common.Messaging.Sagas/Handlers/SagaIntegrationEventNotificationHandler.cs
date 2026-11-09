@@ -3,7 +3,9 @@
 using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Core;
+using Franz.Common.Headers;
 using Franz.Common.Messaging.Contexting;
+using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Exceptions;
@@ -50,11 +52,18 @@ internal sealed class SagaIntegrationEventNotificationHandler<TNotification> : I
       correlationId = MediatorContext.EnsureCorrelationId();
 
     var causationId = ResolveCausationId(message);
-    var messageId = message?.Id;
+    Guid? messageId = message is { Id: var id } && id != Guid.Empty ? id : null;
+    var tenantId = SagaTenantContextResolver.ResolveTenantId(message, _tenantExecutionContextAccessor);
 
-    // Tenant identity comes only from the validated execution context established
-    // by ITenantMessageContextInitializer, never directly from an untrusted header.
-    var tenantId = _tenantExecutionContextAccessor?.Current?.Tenant.Id.ToString("D");
+    if (_inboxStore is not null && message is not null && !messageId.HasValue)
+      throw new PermanentMessagingException(
+          "Saga inbox processing requires a non-empty message identity.");
+
+    var executionContext = MediatorContext.Current
+        .WithCorrelationId(correlationId)
+        .WithCausationId(causationId)
+        .WithTenant(tenantId);
+    using var contextScope = MediatorContext.BeginScope(executionContext);
 
     if (_inboxStore is not null && _persistenceUnitOfWork is null)
       throw new InvalidOperationException(
