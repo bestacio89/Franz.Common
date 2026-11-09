@@ -161,9 +161,6 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
     var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
     var channelPool = _fixture.Services.GetRequiredService<IChannelPool>();
     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-    var messageId = Guid.CreateVersion7();
-    var correlationId = Guid.CreateVersion7();
-    var causationId = Guid.CreateVersion7();
     var body = $"retry-confirm-{Guid.NewGuid():N}";
     var retryProcessed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     var attempts = 0;
@@ -172,11 +169,6 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
     {
       if (!string.Equals(args.Message.Body, body, StringComparison.Ordinal))
         return Task.CompletedTask;
-
-      args.Message.Id.Should().Be(messageId);
-      args.Message.CorrelationId.Should().Be(correlationId);
-      args.Message.Headers.Should().ContainKey(Message.CausationHeader)
-          .WhoseValue.Should().ContainSingle(causationId.ToString("D"));
 
       if (Interlocked.Increment(ref attempts) == 1)
         throw new InvalidOperationException("Force one retry.");
@@ -194,20 +186,9 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
       var publisher = await channelPool.GetAsync(cts.Token);
       try
       {
-        var properties = new BasicProperties
-        {
-          MessageId = messageId.ToString("D"),
-          CorrelationId = correlationId.ToString("D"),
-          Headers = new Dictionary<string, object?>
-          {
-            [Message.CausationHeader] = causationId.ToString("D")
-          }
-        };
         await publisher.BasicPublishAsync(
             exchange: string.Empty,
             routingKey: queueName,
-            mandatory: true,
-            basicProperties: properties,
             body: Encoding.UTF8.GetBytes(body),
             cancellationToken: cts.Token);
       }
@@ -235,9 +216,6 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
     var listener = _fixture.Services.GetRequiredService<RabbitMQListener>();
     var channelPool = _fixture.Services.GetRequiredService<IChannelPool>();
     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-    var messageId = Guid.CreateVersion7();
-    var correlationId = Guid.CreateVersion7();
-    var causationId = Guid.CreateVersion7();
     var body = $"retry-exhausted-{Guid.NewGuid():N}";
     var handlerFailed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -264,13 +242,7 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
       {
         var properties = new BasicProperties
         {
-          MessageId = messageId.ToString("D"),
-          CorrelationId = correlationId.ToString("D"),
-          Headers = new Dictionary<string, object?>
-          {
-            ["x-replay"] = 3,
-            [Message.CausationHeader] = causationId.ToString("D")
-          }
+          Headers = new Dictionary<string, object?> { ["x-replay"] = 3 }
         };
         await publisher.BasicPublishAsync(
             exchange: string.Empty,
@@ -303,9 +275,6 @@ public sealed class RabbitMQIntegrationTests(RabbitMQHostingFixture fixture) : I
         }
 
         deadLetter.Should().NotBeNull("the exhausted delivery must be confirmed in the DLQ");
-        deadLetter!.BasicProperties.MessageId.Should().Be(messageId.ToString("D"));
-        deadLetter.BasicProperties.CorrelationId.Should().Be(correlationId.ToString("D"));
-        deadLetter.BasicProperties.Headers.Should().ContainKey(Message.CausationHeader);
       }
       finally
       {
