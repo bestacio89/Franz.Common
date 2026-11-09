@@ -12,6 +12,7 @@ public sealed class GrpcOutcomeMappingTests
     [InlineData(typeof(ArgumentException), StatusCode.InvalidArgument)]
     [InlineData(typeof(InvalidOperationException), StatusCode.FailedPrecondition)]
     [InlineData(typeof(UnauthorizedAccessException), StatusCode.Unauthenticated)]
+    [InlineData(typeof(NotImplementedException), StatusCode.Unimplemented)]
     public void FromException_MapsKnownPlatformFailures(Type exceptionType, StatusCode expectedStatus)
     {
         var exception = (Exception)Activator.CreateInstance(exceptionType, "sensitive internal detail")!;
