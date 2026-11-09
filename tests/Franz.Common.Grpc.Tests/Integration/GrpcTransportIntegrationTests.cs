@@ -90,6 +90,24 @@ public sealed class GrpcTransportIntegrationTests
     }
 
     [Fact]
+    public async Task UnaryCall_PassesTenantMetadataToResolverOnlyAsAnUntrustedSelector()
+    {
+        await using var host = await GrpcTestHost.StartAsync();
+        using var channel = host.CreateChannel();
+        var client = new GrpcProbe.GrpcProbeClient(channel);
+        const string requestedTenantId = "requested-tenant";
+        var headers = new Metadata
+        {
+            { GrpcCallContext.TenantIdHeaderName, requestedTenantId }
+        };
+
+        await client.UnaryAsync(new ProbeRequest { Value = "tenant-selector" }, headers);
+
+        Assert.Equal(requestedTenantId, host.PipelineProbe.LastRequestedTenantId);
+        Assert.Equal(requestedTenantId, host.PipelineProbe.LastRequestedTenantHeader);
+    }
+
+    [Fact]
     public async Task UnaryCall_DoesNotTreatCallerSuppliedUserMetadataAsAuthenticatedIdentity()
     {
         await using var host = await GrpcTestHost.StartAsync();
