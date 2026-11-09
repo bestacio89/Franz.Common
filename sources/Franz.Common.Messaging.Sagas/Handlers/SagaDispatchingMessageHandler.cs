@@ -4,6 +4,7 @@ using Franz.Common.Headers;
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Pipelines.Core;
+using Franz.Common.Messaging;
 using Franz.Common.Messaging.Delegating;
 using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
@@ -46,6 +47,14 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
     ArgumentNullException.ThrowIfNull(message);
 
     var typeName = message.MessageType;
+
+    // IntegrationEventMessageBuilderStrategy publishes this canonical header.
+    // Read it before the legacy "type" fallback so standard Franz envelopes work.
+    if (string.IsNullOrWhiteSpace(typeName) &&
+        message.Headers.TryGetValue(MessagingConstants.ClassName, out var classNameValues) &&
+        classNameValues.Length > 0)
+      typeName = classNameValues[0];
+
     if (string.IsNullOrWhiteSpace(typeName) &&
         message.Headers.TryGetValue("type", out var typeValues) &&
         typeValues.Length > 0)

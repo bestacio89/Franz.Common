@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Abstractions;
 
 namespace Franz.Common.Messaging.Sagas.Core;
@@ -74,6 +75,22 @@ public sealed class SagaRouter
     if (assemblyQualifiedMatch is not null)
     {
       messageType = assemblyQualifiedMatch;
+      return true;
+    }
+
+    // HeaderNamer emits "FullName, AssemblySimpleName". This is deliberately
+    // matched against registered saga contracts rather than passed to Type.GetType.
+    var canonicalMatches = registeredTypes
+        .Where(type => string.Equals(
+            HeaderNamer.GetEventClassName(type),
+            typeName,
+            StringComparison.Ordinal))
+        .Take(2)
+        .ToArray();
+
+    if (canonicalMatches.Length == 1)
+    {
+      messageType = canonicalMatches[0];
       return true;
     }
 
