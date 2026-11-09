@@ -217,6 +217,137 @@ public sealed class TenantResolutionServerBehaviorTests
     }
 
     [Fact]
+    public async Task InvokeAsync_RejectsTenantWhenMembershipIsDenied()
+    {
+        var tenantId = Guid.NewGuid();
+        var resolver = Substitute.For<IFranzTenantResolver>();
+        resolver.ResolveTenantAsync(Arg.Any<GrpcCallContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<string?>(tenantId.ToString("D")));
+
+        var authorizer = Substitute.For<IFranzTenantAuthorizer>();
+        authorizer.IsAuthorizedAsync(
+                Arg.Any<GrpcCallContext>(), tenantId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(false));
+
+        var accessor = new TestTenantExecutionContextAccessor();
+        var behavior = new TenantResolutionServerBehavior<TestRequest, TestResponse>(
+            resolver,
+            Options.Create(new FranzGrpcOptions { RequireTenant = true }),
+            authorizer,
+            accessor,
+            Substitute.For<ITenantValidator>());
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() =>
+            behavior.InvokeAsync(
+                new TestRequest(),
+                GrpcCallContext.CreateClient("tests.Service", "Call") with { IsServerSide = true },
+                (_, _, _) => Task.FromResult(new TestResponse())));
+
+        Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+        Assert.Null(accessor.Current);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_RejectsMalformedResolvedTenantIdentifier()
+    {
+        var resolver = Substitute.For<IFranzTenantResolver>();
+        resolver.ResolveTenantAsync(Arg.Any<GrpcCallContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<string?>("not-a-guid"));
+
+        var authorizer = Substitute.For<IFranzTenantAuthorizer>();
+        var accessor = new TestTenantExecutionContextAccessor();
+        var behavior = new TenantResolutionServerBehavior<TestRequest, TestResponse>(
+            resolver,
+            Options.Create(new FranzGrpcOptions()),
+            authorizer,
+            accessor);
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() =>
+            behavior.InvokeAsync(
+                new TestRequest(),
+                GrpcCallContext.CreateClient("tests.Service", "Call") with { IsServerSide = true },
+                (_, _, _) => Task.FromResult(new TestResponse())));
+
+        Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+        Assert.Null(accessor.Current);
+        await authorizer.DidNotReceive().IsAuthorizedAsync(
+            Arg.Any<GrpcCallContext>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InvokeAsync_RejectsTenantThatFailsValidation()
+    {
+        var tenantId = Guid.NewGuid();
+        var resolver = Substitute.For<IFranzTenantResolver>();
+        resolver.ResolveTenantAsync(Arg.Any<GrpcCallContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<string?>(tenantId.ToString("D")));
+
+        var authorizer = Substitute.For<IFranzTenantAuthorizer>();
+        authorizer.IsAuthorizedAsync(
+                Arg.Any<GrpcCallContext>(), tenantId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        var validator = Substitute.For<ITenantValidator>();
+        validator.IsValidAsync(tenantId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(false));
+
+        var accessor = new TestTenantExecutionContextAccessor();
+        var behavior = new TenantResolutionServerBehavior<TestRequest, TestResponse>(
+            resolver,
+            Options.Create(new FranzGrpcOptions { RequireTenant = true }),
+            authorizer,
+            accessor,
+            validator);
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() =>
+            behavior.InvokeAsync(
+                new TestRequest(),
+                GrpcCallContext.CreateClient("tests.Service", "Call") with { IsServerSide = true },
+                (_, _, _) => Task.FromResult(new TestResponse())));
+
+        Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+        Assert.Null(accessor.Current);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ClearsTenantContextWhenCallIsCancelled()
+    {
+        var tenantId = Guid.NewGuid();
+        var resolver = Substitute.For<IFranzTenantResolver>();
+        resolver.ResolveTenantAsync(Arg.Any<GrpcCallContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<string?>(tenantId.ToString("D")));
+
+        var authorizer = Substitute.For<IFranzTenantAuthorizer>();
+        authorizer.IsAuthorizedAsync(
+                Arg.Any<GrpcCallContext>(), tenantId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        var validator = Substitute.For<ITenantValidator>();
+        validator.IsValidAsync(tenantId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(true));
+
+        var accessor = new TestTenantExecutionContextAccessor();
+        var behavior = new TenantResolutionServerBehavior<TestRequest, TestResponse>(
+            resolver,
+            Options.Create(new FranzGrpcOptions { RequireTenant = true }),
+            authorizer,
+            accessor,
+            validator);
+
+        using var cancellation = new CancellationTokenSource();
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            behavior.InvokeAsync(
+                new TestRequest(),
+                GrpcCallContext.CreateClient("tests.Service", "Call") with { IsServerSide = true },
+                (_, _, token) =>
+                {
+                    cancellation.Cancel();
+                    throw new OperationCanceledException(token);
+                },
+                cancellation.Token));
+
+        Assert.Null(accessor.Current);
+    }
+
+    [Fact]
     public async Task ClientBehavior_PropagatesOnlyValidatedExecutionTenant()
     {
         var tenantId = Guid.NewGuid();
