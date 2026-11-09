@@ -165,6 +165,16 @@ public sealed record GrpcCallContext
     var correlationId = GetOrCreate(requestHeaders, CorrelationIdHeaderName);
     var requestId = GetOrCreate(requestHeaders, RequestIdHeaderName);
 
+    // A caller-supplied tenant identifier is only a selection hint for the
+    // server-side tenant resolver. It is not validated membership or execution
+    // context; TenantResolutionServerBehavior must authorize the resolved tenant
+    // before establishing it.
+    if (string.IsNullOrWhiteSpace(tenantId) &&
+        requestHeaders.TryGetValue(TenantIdHeaderName, out var requestedTenantId))
+    {
+      tenantId = requestedTenantId;
+    }
+
     // User identity must be supplied by the hosting adapter from an authenticated
     // principal. Caller-controlled metadata is never an identity authority.
 
