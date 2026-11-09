@@ -126,9 +126,12 @@ public sealed class GrpcStreamingObservabilityTests
     private static void AssertBehaviorRegistration<TContract, TBehavior>(IServiceCollection services)
         where TBehavior : TContract
     {
+        var contractDefinition = typeof(TContract).GetGenericTypeDefinition();
+        var behaviorDefinition = typeof(TBehavior).GetGenericTypeDefinition();
+
         Assert.Contains(services, descriptor =>
-            descriptor.ServiceType == typeof(TContract) &&
-            descriptor.ImplementationType == typeof(TBehavior));
+            descriptor.ServiceType == contractDefinition &&
+            descriptor.ImplementationType == behaviorDefinition);
     }
 
     private static GrpcCallContext CreateServerContext()
