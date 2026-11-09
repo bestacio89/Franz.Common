@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Franz.Common.Grpc.Abstractions;
@@ -95,23 +96,48 @@ public sealed class LoggingStreamingBehavior<TRequest, TResponse> :
         using var scope = _logger.BeginScope(context);
         var stopwatch = Stopwatch.StartNew();
         _logger.LogStreamStarted(context, rpcShape);
-        var completed = false;
+
+        var enumerator = next().GetAsyncEnumerator(cancellationToken);
         Exception? failure = null;
+        Exception? disposalFailure = null;
+        var completed = false;
 
         try
         {
-            await foreach (var response in next().WithCancellation(cancellationToken).ConfigureAwait(false))
-                yield return response;
+            while (true)
+            {
+                bool hasNext;
+                try
+                {
+                    hasNext = await enumerator.MoveNextAsync().ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                    throw;
+                }
 
-            completed = true;
-        }
-        catch (Exception exception)
-        {
-            failure = exception;
-            throw;
+                if (!hasNext)
+                {
+                    completed = true;
+                    break;
+                }
+
+                yield return enumerator.Current;
+            }
         }
         finally
         {
+            try
+            {
+                await enumerator.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                disposalFailure = exception;
+                failure ??= exception;
+            }
+
             stopwatch.Stop();
             if (completed)
                 _logger.LogStreamCompleted(context, rpcShape, stopwatch.ElapsedMilliseconds);
@@ -119,6 +145,9 @@ public sealed class LoggingStreamingBehavior<TRequest, TResponse> :
                 _logger.LogStreamError(context, rpcShape, failure, stopwatch.ElapsedMilliseconds);
             else
                 _logger.LogStreamAborted(context, rpcShape, stopwatch.ElapsedMilliseconds);
+
+            if (disposalFailure is not null && ReferenceEquals(failure, disposalFailure))
+                ExceptionDispatchInfo.Capture(disposalFailure).Throw();
         }
     }
 }

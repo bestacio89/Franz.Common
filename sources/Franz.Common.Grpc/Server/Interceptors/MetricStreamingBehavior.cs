@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Franz.Common.Grpc.Abstractions;
@@ -100,27 +101,55 @@ public sealed class MetricStreamingBehavior<TRequest, TResponse> :
         _metrics.RecordRequest(metricContext);
         var stopwatch = Stopwatch.StartNew();
         using var activity = FranzGrpcDiagnostics.StartActivity(metricContext);
-        var succeeded = false;
+
+        var enumerator = next().GetAsyncEnumerator(cancellationToken);
         Exception? failure = null;
+        Exception? disposalFailure = null;
+        var succeeded = false;
 
         try
         {
-            await foreach (var response in next().WithCancellation(cancellationToken).ConfigureAwait(false))
-                yield return response;
+            while (true)
+            {
+                bool hasNext;
+                try
+                {
+                    hasNext = await enumerator.MoveNextAsync().ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                    throw;
+                }
 
-            succeeded = true;
-        }
-        catch (Exception exception)
-        {
-            failure = exception;
-            throw;
+                if (!hasNext)
+                {
+                    succeeded = true;
+                    break;
+                }
+
+                yield return enumerator.Current;
+            }
         }
         finally
         {
+            try
+            {
+                await enumerator.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                disposalFailure = exception;
+                failure ??= exception;
+            }
+
             if (!succeeded && failure is null)
                 failure = new OperationCanceledException("The response stream ended before normal completion.");
 
             Complete(metricContext, stopwatch, activity, succeeded, failure);
+
+            if (disposalFailure is not null && ReferenceEquals(failure, disposalFailure))
+                ExceptionDispatchInfo.Capture(disposalFailure).Throw();
         }
     }
 
