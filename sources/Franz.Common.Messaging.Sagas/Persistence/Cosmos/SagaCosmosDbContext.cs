@@ -54,10 +54,16 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
     {
       entity.ToContainer("SagaStates");
       entity.HasPartitionKey(x => x.TenantId);
+      entity.UseETagConcurrency();
       entity.Property(x => x.Id).ToJsonProperty("id");
       entity.Property(x => x.TenantId).ToJsonProperty("tenantId").IsRequired();
       entity.Property(x => x.Payload).IsRequired();
       entity.Property(x => x.CreatedOn).IsRequired();
+      entity.Property(x => x.SentOn).ToJsonProperty("sentOn");
+      entity.Property(x => x.NextAttemptAt).ToJsonProperty("nextAttemptAt");
+      entity.Property(x => x.LeaseOwnerId).ToJsonProperty("leaseOwnerId");
+      entity.Property(x => x.LeaseExpiresAt).ToJsonProperty("leaseExpiresAt");
+      entity.Property(x => x.IsDeadLetter).ToJsonProperty("isDeadLetter");
     });
   }
 }

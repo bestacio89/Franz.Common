@@ -34,6 +34,23 @@ public interface IMessageStore
     return pending.Take(batchSize).ToArray();
   }
 
+  /// <summary>Atomically claims pending messages for a dispatcher.</summary>
+  Task<IReadOnlyList<StoredMessage>> ClaimPendingAsync(
+      Guid leaseOwnerId, TimeSpan leaseDuration, int batchSize, CancellationToken cancellationToken = default)
+      => throw new NotSupportedException("This message store does not support atomic outbox claims.");
+
+  /// <summary>Marks a claimed message as sent while its lease is still valid.</summary>
+  Task MarkAsSentAsync(Guid messageId, Guid leaseOwnerId, CancellationToken cancellationToken = default)
+      => throw new NotSupportedException("This message store does not support ownership-checked completion.");
+
+  /// <summary>Persists retry state and releases a valid lease.</summary>
+  Task UpdateRetryAsync(StoredMessage message, Guid leaseOwnerId, CancellationToken cancellationToken = default)
+      => throw new NotSupportedException("This message store does not support ownership-checked retry updates.");
+
+  /// <summary>Moves a claimed message to dead-letter storage while its lease is valid.</summary>
+  Task MoveToDeadLetterAsync(StoredMessage message, Guid leaseOwnerId, CancellationToken cancellationToken = default)
+      => throw new NotSupportedException("This message store does not support ownership-checked dead-lettering.");
+
   /// <summary>
   /// Marks a message as successfully dispatched using its unique Guid identifier.
   /// </summary>

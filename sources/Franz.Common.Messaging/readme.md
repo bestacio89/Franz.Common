@@ -48,6 +48,18 @@ The core `AddOutboxPublisher` helper currently registers the configured options 
 
 Do not assume that registering a message store alone starts an outbox worker. Register the relevant hosted listener explicitly and configure its polling/retry policy.
 
+### Multi-dispatcher coordination
+
+Both the background outbox publisher and the hosted outbox listener use the same ownership-based claim contract:
+
+- A dispatcher atomically claims one eligible message with a unique owner token and a bounded lease.
+- Completion, retry updates, and dead-letter transitions require that token and reject expired or superseded ownership.
+- Expired leases make abandoned work eligible for recovery after a process crash.
+- Dispatchers claim one message at a time. This avoids leasing an entire sequential batch while earlier messages are still being processed.
+- MongoDB uses atomic `findOneAndUpdate` claims; EF Core relational Saga storage uses conditional database updates; EF Core Cosmos storage uses document ETag optimistic concurrency.
+
+The guarantee is **at-least-once delivery**, not exactly-once side effects. A process can publish successfully and crash before recording completion; a later lease holder may publish again. Consumers must remain idempotent. Configure `OutboxOptions.LeaseDuration` to exceed the expected maximum duration of one dispatch operation. The legacy unowned store methods remain for compatibility, but framework-managed dispatchers exclusively use the ownership-checked methods. Custom `IMessageStore` implementations must implement the atomic claim and ownership-aware methods before they can be used by these dispatchers; the default interface implementations fail closed.
+
 ## Related packages
 
 - `Franz.Common.Messaging.Kafka`, `Franz.Common.Messaging.RabbitMQ`, and Azure transport packages.

@@ -8,6 +8,9 @@ public class OutboxOptions
   /// </summary>
   public bool Enabled { get; set; } = false;
 
+  /// <summary>Maximum ownership window for a claimed batch before abandoned work can be reclaimed.</summary>
+  public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromMinutes(2);
+
   /// <summary>
   /// Polling interval for checking pending messages.
   /// Default = 5 seconds.

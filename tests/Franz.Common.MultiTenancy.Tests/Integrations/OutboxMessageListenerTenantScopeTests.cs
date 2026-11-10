@@ -25,7 +25,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
         };
 
         var messageStore = Substitute.For<IMessageStore>();
-        messageStore.GetPendingAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+        messageStore.ClaimPendingAsync(Arg.Any<Guid>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>([stored]));
 
         var inboxStore = Substitute.For<IInboxStore>();
@@ -64,7 +64,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
             messageContextAccessor.Clear();
             return Task.CompletedTask;
         };
-        messageStore.MarkAsSentAsync(stored.Id, Arg.Any<CancellationToken>())
+        messageStore.MarkAsSentAsync(stored.Id, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
                 cancellation.Cancel();
@@ -77,7 +77,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
         Assert.Equal(1, initializer.BeginCount);
         Assert.NotNull(initializer.LastMessage);
         Assert.Equal(1, initializer.DisposeCount);
-        await messageStore.Received(1).MarkAsSentAsync(stored.Id, Arg.Any<CancellationToken>());
+        await messageStore.Received(1).MarkAsSentAsync(stored.Id, Arg.Any<Guid>(), Arg.Any<CancellationToken>());
         await inboxStore.Received(1).MarkProcessedAsync(stored.Id, Arg.Any<CancellationToken>());
         Assert.Null(messageContextAccessor.Current);
     }
@@ -93,7 +93,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
         };
 
         var messageStore = Substitute.For<IMessageStore>();
-        messageStore.GetPendingAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+        messageStore.ClaimPendingAsync(Arg.Any<Guid>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>([stored]));
 
         var inboxStore = Substitute.For<IInboxStore>();
@@ -148,7 +148,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
         };
 
         var messageStore = Substitute.For<IMessageStore>();
-        messageStore.GetPendingAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+        messageStore.ClaimPendingAsync(Arg.Any<Guid>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>([stored]));
 
         var inboxStore = Substitute.For<IInboxStore>();
@@ -197,7 +197,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
         };
 
         var messageStore = Substitute.For<IMessageStore>();
-        messageStore.GetPendingAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+        messageStore.ClaimPendingAsync(Arg.Any<Guid>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>([stored]));
 
         var inboxStore = Substitute.For<IInboxStore>();
@@ -245,7 +245,7 @@ public sealed class OutboxMessageListenerTenantScopeTests
         };
 
         var messageStore = Substitute.For<IMessageStore>();
-        messageStore.GetPendingAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+        messageStore.ClaimPendingAsync(Arg.Any<Guid>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>([stored]));
 
         var inboxStore = Substitute.For<IInboxStore>();

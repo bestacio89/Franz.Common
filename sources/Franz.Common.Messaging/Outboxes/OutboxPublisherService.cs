@@ -75,27 +75,31 @@ public sealed class OutboxPublisherService : BackgroundService
   // =====================================================
   public async Task ProcessOutboxOnceAsync(CancellationToken ct)
   {
-    var pending = await _messageStore.GetPendingAsync(_options.BatchSize, ct);
+    if (_options.LeaseDuration <= TimeSpan.Zero)
+      throw new InvalidOperationException("Outbox LeaseDuration must be greater than zero.");
 
-    if (pending.Count == 0)
+    for (var index = 0; index < _options.BatchSize; index++)
     {
-      _logger.LogDebug("📭 No pending messages found in outbox");
-      return;
-    }
+      ct.ThrowIfCancellationRequested();
+      var leaseOwnerId = Guid.CreateVersion7();
+      var claimed = await _messageStore.ClaimPendingAsync(
+          leaseOwnerId, _options.LeaseDuration, 1, ct);
 
-    foreach (var stored in pending)
-    {
-      if (ct.IsCancellationRequested)
+      if (claimed.Count == 0)
+      {
+        if (index == 0)
+          _logger.LogDebug("📭 No pending messages found in outbox");
         return;
+      }
 
-      await ProcessSingleMessageAsync(stored, ct);
+      await ProcessSingleMessageAsync(claimed[0], leaseOwnerId, ct);
     }
   }
 
   // =====================================================
   // MESSAGE PROCESSING UNIT (ISOLATED FAILURE DOMAIN)
   // =====================================================
-  private async Task ProcessSingleMessageAsync(StoredMessage stored, CancellationToken ct)
+  private async Task ProcessSingleMessageAsync(StoredMessage stored, Guid leaseOwnerId, CancellationToken ct)
   {
     try
     {
@@ -109,7 +113,7 @@ public sealed class OutboxPublisherService : BackgroundService
 
       await _sender.SendAsync(message, ct);
 
-      await _messageStore.MarkAsSentAsync(stored.Id, ct);
+      await _messageStore.MarkAsSentAsync(stored.Id, leaseOwnerId, ct);
 
       _logger.LogInformation("✅ Successfully sent message {MessageId}", stored.Id);
     }
@@ -123,7 +127,7 @@ public sealed class OutboxPublisherService : BackgroundService
     {
       stored.LastError = ex.Message;
       stored.LastTriedOn = DateTime.UtcNow;
-      await _messageStore.MoveToDeadLetterAsync(stored, ct);
+      await _messageStore.MoveToDeadLetterAsync(stored, leaseOwnerId, ct);
 
       _logger.LogError(
           ex,
@@ -150,7 +154,7 @@ public sealed class OutboxPublisherService : BackgroundService
         else
         {
           stored.NextAttemptAt = CalculateNextAttempt(Math.Max(1, stored.RetryCount), stored.LastTriedOn.Value);
-          await _messageStore.UpdateRetryAsync(stored, ct);
+          await _messageStore.UpdateRetryAsync(stored, leaseOwnerId, ct);
 
           _logger.LogError(
               ex,

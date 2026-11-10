@@ -34,6 +34,7 @@ public class CosmosMessagingDbContext : DbContextBase
 
       // Partition key = id (one message per partition = fine for outbox)
       entity.HasPartitionKey(m => m.Id);
+      entity.UseETagConcurrency();
 
       // Optional: explicit JSON property names
       entity.Property(m => m.Id).ToJsonProperty("id");
@@ -43,6 +44,8 @@ public class CosmosMessagingDbContext : DbContextBase
       entity.Property(m => m.LastError).ToJsonProperty("lastError");
       entity.Property(m => m.LastTriedOn).ToJsonProperty("lastTriedOn");
       entity.Property(m => m.NextAttemptAt).ToJsonProperty("nextAttemptAt");
+      entity.Property(m => m.LeaseOwnerId).ToJsonProperty("leaseOwnerId");
+      entity.Property(m => m.LeaseExpiresAt).ToJsonProperty("leaseExpiresAt");
       entity.Property(m => m.IsDeadLetter).ToJsonProperty("isDeadLetter");
     });
 

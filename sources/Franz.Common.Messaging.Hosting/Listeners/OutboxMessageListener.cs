@@ -21,6 +21,7 @@ public sealed class OutboxMessageListener : IListener
   private readonly IServiceScopeFactory _scopeFactory;
   private readonly ILogger<OutboxMessageListener> _logger;
   private readonly int _batchSize;
+  private readonly TimeSpan _leaseDuration;
 
   /// <summary>
   /// Creates a listener with the default polling batch size for binary compatibility.
@@ -47,7 +48,10 @@ public sealed class OutboxMessageListener : IListener
     _scopeFactory = scopeFactory;
     _logger = logger;
     _batchSize = options.Value.BatchSize;
+    _leaseDuration = options.Value.LeaseDuration;
     ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_batchSize);
+    if (_leaseDuration <= TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(nameof(options), "Outbox LeaseDuration must be greater than zero.");
   }
 
   public Func<MessageEventArgs, Task>? OnMessageReceivedAsync { get; set; }
@@ -63,18 +67,23 @@ public sealed class OutboxMessageListener : IListener
     {
       try
       {
-        IReadOnlyList<StoredMessage> pending;
-
-        await using (var pollingScope = _scopeFactory.CreateAsyncScope())
-        {
-          var messageStore = pollingScope.ServiceProvider.GetRequiredService<IMessageStore>();
-          pending = await messageStore.GetPendingAsync(_batchSize, stoppingToken).ConfigureAwait(false);
-        }
-
-        foreach (var stored in pending)
+        for (var index = 0; index < _batchSize; index++)
         {
           stoppingToken.ThrowIfCancellationRequested();
-          await ProcessMessageAsync(stored, stoppingToken).ConfigureAwait(false);
+          var leaseOwnerId = Guid.CreateVersion7();
+          IReadOnlyList<StoredMessage> claimed;
+
+          await using (var pollingScope = _scopeFactory.CreateAsyncScope())
+          {
+            var messageStore = pollingScope.ServiceProvider.GetRequiredService<IMessageStore>();
+            claimed = await messageStore.ClaimPendingAsync(
+                leaseOwnerId, _leaseDuration, 1, stoppingToken).ConfigureAwait(false);
+          }
+
+          if (claimed.Count == 0)
+            break;
+
+          await ProcessMessageAsync(claimed[0], leaseOwnerId, stoppingToken).ConfigureAwait(false);
         }
       }
       catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -90,7 +99,7 @@ public sealed class OutboxMessageListener : IListener
     }
   }
 
-  private async Task ProcessMessageAsync(StoredMessage stored, CancellationToken cancellationToken)
+  private async Task ProcessMessageAsync(StoredMessage stored, Guid leaseOwnerId, CancellationToken cancellationToken)
   {
     await using var scope = _scopeFactory.CreateAsyncScope();
     var services = scope.ServiceProvider;
@@ -106,7 +115,7 @@ public sealed class OutboxMessageListener : IListener
       if (await inbox.HasProcessedAsync(message.Id, cancellationToken).ConfigureAwait(false))
       {
         _logger.LogInformation("Skipping already processed message {MessageId}.", message.Id);
-        await messageStore.MarkAsSentAsync(stored.Id, cancellationToken).ConfigureAwait(false);
+        await messageStore.MarkAsSentAsync(stored.Id, leaseOwnerId, cancellationToken).ConfigureAwait(false);
         return;
       }
 
