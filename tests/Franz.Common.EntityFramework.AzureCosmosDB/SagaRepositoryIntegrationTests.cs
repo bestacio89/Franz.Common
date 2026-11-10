@@ -2,6 +2,7 @@ using System.Net.Http;
 using FluentAssertions;
 using Franz.Common.AzureCosmosDB.Options;
 using Franz.Common.Mediator.Dispatchers;
+using Franz.Common.Mediator.Context;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence;
@@ -238,6 +239,75 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<CosmosFixture
     await using var verifyContext = CreateContext(databaseName);
     (await new CosmosSagaMessageStore(verifyContext, new CosmosSagaUnitOfWork(verifyContext))
         .GetPendingAsync()).Should().BeEmpty();
+  }
+
+  [Fact]
+  public async Task ScheduledOutboxMessages_AreRecoveredAfterContextRestartAndDueTime()
+  {
+    const string tenantId = "tenant-a";
+    var databaseName = $"SagaRetryRecovery_{Guid.CreateVersion7():N}";
+    using var tenantScope = MediatorContext.BeginScope(
+        MediatorExecutionContext.Empty.WithTenant(tenantId));
+
+    await using (var schemaContext = CreateContext(databaseName))
+      await schemaContext.Database.EnsureCreatedAsync();
+
+    var sagaId = Guid.CreateVersion7();
+    var messageId = Guid.CreateVersion7();
+    var notBefore = DateTimeOffset.UtcNow.AddSeconds(2);
+    var record = CreateRecord(sagaId, tenantId) with
+    {
+      Status = SagaLifecycleStatus.RetryScheduled,
+      RetryCount = 1,
+      LastMessageId = messageId,
+      NextAttemptAt = notBefore
+    };
+    var message = new Franz.Common.Messaging.Messages.Message("{}")
+    {
+      Id = messageId,
+      MessageType = "saga-retry-contract"
+    };
+    message.Headers[Franz.Common.Headers.HeaderConstants.TenantId] = [tenantId];
+
+    await using (var context = CreateContext(databaseName))
+    {
+      var unitOfWork = new CosmosSagaUnitOfWork(context);
+      var repository = new CosmosSagaRepository(
+          context, new JsonSagaStateSerializer(), unitOfWork);
+      var store = new CosmosSagaMessageStore(context, unitOfWork);
+
+      await unitOfWork.BeginAsync();
+      await repository.SaveAsync(record, expectedVersion: null);
+      await store.SaveScheduledAsync(message, notBefore);
+      await unitOfWork.CommitAsync();
+    }
+
+    await using (var restartedContext = CreateContext(databaseName))
+    {
+      var persisted = await CreateRepository(restartedContext).LoadAsync(
+          sagaId, tenantId, typeof(CosmosSagaState));
+      persisted.Should().NotBeNull();
+      persisted!.Status.Should().Be(SagaLifecycleStatus.RetryScheduled);
+      persisted.RetryCount.Should().Be(1);
+      persisted.LastMessageId.Should().Be(messageId);
+      persisted.NextAttemptAt.Should().BeCloseTo(notBefore, TimeSpan.FromMilliseconds(100));
+
+      var restartedStore = new CosmosSagaMessageStore(
+          restartedContext, new CosmosSagaUnitOfWork(restartedContext));
+      (await restartedStore.GetPendingAsync()).Should().BeEmpty();
+    }
+
+    var remaining = notBefore - DateTimeOffset.UtcNow;
+    if (remaining > TimeSpan.Zero)
+      await Task.Delay(remaining + TimeSpan.FromMilliseconds(100));
+
+    await using (var recoveredContext = CreateContext(databaseName))
+    {
+      var recoveredStore = new CosmosSagaMessageStore(
+          recoveredContext, new CosmosSagaUnitOfWork(recoveredContext));
+      var recovered = await recoveredStore.GetPendingAsync();
+      recovered.Should().ContainSingle().Which.Id.Should().Be(messageId);
+    }
   }
 
   private CosmosSagaDbContext CreateContext(string databaseName)

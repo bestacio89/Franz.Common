@@ -31,6 +31,18 @@ public static class FranzSagaServiceCollectionExtensions
     var options = new FranzSagaOptions();
     configure?.Invoke(options);
 
+    if (options.MaxRetryAttempts < 1)
+      throw new ArgumentOutOfRangeException(
+          nameof(options.MaxRetryAttempts),
+          options.MaxRetryAttempts,
+          "Saga MaxRetryAttempts must be greater than zero.");
+
+    if (options.DefaultRetryDelay <= TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(
+          nameof(options.DefaultRetryDelay),
+          options.DefaultRetryDelay,
+          "Saga DefaultRetryDelay must be greater than zero.");
+
     if (!new[] { "Memory", "EntityFramework", "Mongo", "Cosmos" }
         .Contains(options.Persistence, StringComparer.OrdinalIgnoreCase))
       throw new NotSupportedException(

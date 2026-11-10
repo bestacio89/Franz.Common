@@ -66,6 +66,30 @@ public sealed class SagaStartupTests
         service.ServiceType == typeof(INotificationHandler<>));
   }
 
+  [Theory]
+  [InlineData(0)]
+  [InlineData(-1)]
+  public void AddFranzSagas_RejectsNonPositiveMaximumRetryAttempts(int maxRetryAttempts)
+  {
+    var act = () => new ServiceCollection().AddFranzSagas(
+        options => options.MaxRetryAttempts = maxRetryAttempts);
+
+    act.Should().Throw<ArgumentOutOfRangeException>()
+        .WithParameterName("MaxRetryAttempts");
+  }
+
+  [Theory]
+  [InlineData(0)]
+  [InlineData(-1)]
+  public void AddFranzSagas_RejectsNonPositiveDefaultRetryDelay(int seconds)
+  {
+    var act = () => new ServiceCollection().AddFranzSagas(
+        options => options.DefaultRetryDelay = TimeSpan.FromSeconds(seconds));
+
+    act.Should().Throw<ArgumentOutOfRangeException>()
+        .WithParameterName("DefaultRetryDelay");
+  }
+
   private sealed class StartupSaga : SagaBase<StartupSagaState>, IStartWith<StartEvent>
   {
     public Task<ISagaTransition> HandleAsync(

@@ -42,6 +42,21 @@ internal static class SagaRetryMessageRehydrator
         request.Properties is null)
       throw new PermanentMessagingException("Saga retry envelope is missing its original event data.");
 
+    var originalHeaders = new Dictionary<string, string[]>(
+        request.Headers,
+        StringComparer.OrdinalIgnoreCase);
+
+    if (originalHeaders.ContainsKey(SagaRetryHeaders.TargetSagaId))
+      throw new PermanentMessagingException(
+          "Saga retry original envelope contains reserved retry-routing metadata.");
+
+    if (!originalHeaders.TryGetValue(Message.CausationHeader, out var originalCausationValues) ||
+        originalCausationValues is not { Length: 1 } ||
+        !Guid.TryParse(originalCausationValues[0], out var originalCausationId) ||
+        originalCausationId != request.OriginalMessageId)
+      throw new PermanentMessagingException(
+          "Saga retry original envelope causation does not match its original message identity.");
+
     if (!retryMessage.Headers.TryGetValue(Message.CausationHeader, out var retryCausationValues) ||
         retryCausationValues is not { Length: 1 } ||
         !Guid.TryParse(retryCausationValues[0], out var retryCausationId) ||
@@ -52,7 +67,7 @@ internal static class SagaRetryMessageRehydrator
         retryCorrelationValues is not { Length: 1 } ||
         !Guid.TryParse(retryCorrelationValues[0], out var retryCorrelationId) ||
         retryMessage.CorrelationId != retryCorrelationId ||
-        !request.Headers.TryGetValue(Message.CorrelationHeader, out var originalCorrelationValues) ||
+        !originalHeaders.TryGetValue(Message.CorrelationHeader, out var originalCorrelationValues) ||
         originalCorrelationValues is not { Length: 1 } ||
         !Guid.TryParse(originalCorrelationValues[0], out var originalCorrelationId) ||
         originalCorrelationId != retryCorrelationId)
@@ -63,7 +78,7 @@ internal static class SagaRetryMessageRehydrator
       if (request.Headers.ContainsKey(HeaderConstants.TenantId))
         throw new PermanentMessagingException("Saga retry envelope contains an unexpected tenant identity.");
     }
-    else if (!request.Headers.TryGetValue(HeaderConstants.TenantId, out var originalTenantValues) ||
+    else if (!originalHeaders.TryGetValue(HeaderConstants.TenantId, out var originalTenantValues) ||
              originalTenantValues is not { Length: 1 } ||
              !string.Equals(originalTenantValues[0], tenantId, StringComparison.Ordinal))
     {
@@ -114,7 +129,7 @@ internal static class SagaRetryMessageRehydrator
 
     properties.Remove(MessagingConstants.TransportGeneratedMessageId);
 
-    var originalMessage = new Message(request.Body, request.Headers)
+    var originalMessage = new Message(request.Body, originalHeaders)
     {
       Id = retryMessage.Id,
       OccurredOn = request.OccurredOn,

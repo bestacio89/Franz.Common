@@ -214,6 +214,64 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<PostgresFixtu
     (await new EfSagaMessageStore(verifyContext).GetPendingAsync()).Should().BeEmpty();
   }
 
+  [Fact]
+  public async Task ScheduledOutboxMessages_AreRecoveredAfterContextRestartAndDueTime()
+  {
+    await using (var schemaContext = CreateContext())
+    {
+      await schemaContext.Database.EnsureCreatedAsync();
+      await schemaContext.Database.ExecuteSqlRawAsync("DELETE FROM \"SagaOutbox\"");
+    }
+
+    var sagaId = Guid.CreateVersion7();
+    var messageId = Guid.CreateVersion7();
+    var notBefore = DateTimeOffset.UtcNow.AddSeconds(2);
+    var record = CreateRecord(sagaId) with
+    {
+      Status = SagaLifecycleStatus.RetryScheduled,
+      RetryCount = 1,
+      LastMessageId = messageId,
+      NextAttemptAt = notBefore
+    };
+    var message = new Message("{}")
+    {
+      Id = messageId,
+      MessageType = "saga-retry-contract"
+    };
+
+    await using (var context = CreateContext())
+    {
+      var unitOfWork = new EfUnitOfWork<SagaDbContext>(context);
+      await unitOfWork.BeginAsync();
+      await CreateRepository(context).SaveAsync(record, expectedVersion: null);
+      await new EfSagaMessageStore(context).SaveScheduledAsync(message, notBefore);
+      await unitOfWork.CommitAsync();
+    }
+
+    await using (var restartedContext = CreateContext())
+    {
+      var persisted = await CreateRepository(restartedContext).LoadAsync(
+          sagaId, record.TenantId, typeof(PostgresSagaState));
+      persisted.Should().NotBeNull();
+      persisted!.Status.Should().Be(SagaLifecycleStatus.RetryScheduled);
+      persisted.RetryCount.Should().Be(1);
+      persisted.LastMessageId.Should().Be(messageId);
+      persisted.NextAttemptAt.Should().BeCloseTo(notBefore, TimeSpan.FromMilliseconds(100));
+
+      (await new EfSagaMessageStore(restartedContext).GetPendingAsync()).Should().BeEmpty();
+    }
+
+    var remaining = notBefore - DateTimeOffset.UtcNow;
+    if (remaining > TimeSpan.Zero)
+      await Task.Delay(remaining + TimeSpan.FromMilliseconds(100));
+
+    await using (var recoveredContext = CreateContext())
+    {
+      var recovered = await new EfSagaMessageStore(recoveredContext).GetPendingAsync();
+      recovered.Should().ContainSingle().Which.Id.Should().Be(messageId);
+    }
+  }
+
   private SagaDbContext CreateContext()
   {
     var options = new DbContextOptionsBuilder<SagaDbContext>()

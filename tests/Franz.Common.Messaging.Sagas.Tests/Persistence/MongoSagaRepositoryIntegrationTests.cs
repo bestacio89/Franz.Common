@@ -233,6 +233,68 @@ public sealed class MongoSagaRepositoryIntegrationTests : IAsyncLifetime
     (await storeA.GetPendingAsync()).Should().BeEmpty();
   }
 
+  [Fact]
+  public async Task ScheduledOutboxMessages_AreRecoveredAfterSessionRestartAndDueTime()
+  {
+    await _database.GetCollection<MongoDB.Bson.BsonDocument>("sagaOutbox")
+        .DeleteManyAsync(MongoDB.Driver.Builders<MongoDB.Bson.BsonDocument>.Filter.Empty);
+
+    var sagaId = Guid.CreateVersion7();
+    var messageId = Guid.CreateVersion7();
+    var notBefore = DateTimeOffset.UtcNow.AddSeconds(2);
+    var record = CreateRecord(sagaId) with
+    {
+      Status = SagaLifecycleStatus.RetryScheduled,
+      RetryCount = 1,
+      LastMessageId = messageId,
+      NextAttemptAt = notBefore
+    };
+    var message = new Message("{}")
+    {
+      Id = messageId,
+      MessageType = "saga-retry-contract"
+    };
+
+    await using (var unitOfWork = new MongoSagaUnitOfWork(_database))
+    {
+      var repository = new MongoSagaRepository(
+          _database, new JsonSagaStateSerializer(), unitOfWork);
+      var store = new MongoSagaMessageStore(_database, unitOfWork);
+
+      await unitOfWork.BeginAsync();
+      await repository.SaveAsync(record, expectedVersion: null);
+      await store.SaveScheduledAsync(message, notBefore);
+      await unitOfWork.CommitAsync();
+    }
+
+    await using (var restartedUnitOfWork = new MongoSagaUnitOfWork(_database))
+    {
+      var repository = new MongoSagaRepository(_database, new JsonSagaStateSerializer());
+      var store = new MongoSagaMessageStore(_database, restartedUnitOfWork);
+
+      var persisted = await repository.LoadAsync(
+          sagaId, record.TenantId, typeof(MongoSagaState));
+      persisted.Should().NotBeNull();
+      persisted!.Status.Should().Be(SagaLifecycleStatus.RetryScheduled);
+      persisted.RetryCount.Should().Be(1);
+      persisted.LastMessageId.Should().Be(messageId);
+      persisted.NextAttemptAt.Should().BeCloseTo(notBefore, TimeSpan.FromMilliseconds(100));
+
+      (await store.GetPendingAsync()).Should().BeEmpty();
+    }
+
+    var remaining = notBefore - DateTimeOffset.UtcNow;
+    if (remaining > TimeSpan.Zero)
+      await Task.Delay(remaining + TimeSpan.FromMilliseconds(100));
+
+    await using (var recoveredUnitOfWork = new MongoSagaUnitOfWork(_database))
+    {
+      var recoveredStore = new MongoSagaMessageStore(_database, recoveredUnitOfWork);
+      var recovered = await recoveredStore.GetPendingAsync();
+      recovered.Should().ContainSingle().Which.Id.Should().Be(messageId);
+    }
+  }
+
   private static SagaPersistenceRecord CreateRecord(
       Guid? sagaId = null,
       string? tenantId = "tenant-a",
