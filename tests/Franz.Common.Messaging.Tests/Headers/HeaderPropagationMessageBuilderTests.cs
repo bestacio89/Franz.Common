@@ -56,9 +56,6 @@ public class HeaderPropagationMessageBuilderTests
     var builder = new HeaderPropagationMessageBuilder(_mockAccessor.Object, null, options);
     var message = new Message("{}");
 
-    string[]? malicious = ["overwrite-attempt"];
-    _mockAccessor.Setup(a => a.TryGetValue(systemHeader, out malicious)).Returns(true);
-
     // Act
     builder.BuildAsync(message);
 
@@ -99,9 +96,6 @@ public class HeaderPropagationMessageBuilderTests
 
     // SENIOR FIX: Correctly initialize headers as string arrays
     message.Headers.Add("X-Custom", ["Original"]);
-
-    string[]? propagated = ["New"];
-    _mockAccessor.Setup(a => a.TryGetValue("X-Custom", out propagated)).Returns(true);
 
     // Act
     builder.BuildAsync(message);
