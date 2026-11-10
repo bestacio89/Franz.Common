@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using System.Text.Json;
 using FluentAssertions;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Messages;
@@ -88,6 +89,17 @@ public class MessageTests
   }
 
   [Fact]
+  public void GetProperty_ShouldDeserializeJsonElementValues()
+  {
+    var message = new Message();
+    using var document = JsonDocument.Parse("{\"count\":42}");
+    message.Properties["Payload"] = document.RootElement.Clone();
+
+    message.GetProperty<TestPayload>("Payload")
+        .Should().BeEquivalentTo(new TestPayload { Count = 42 });
+  }
+
+  [Fact]
   public void GetProperty_ShouldReturnDefault_WhenTypeMismatch()
   {
     // Arrange
@@ -99,6 +111,11 @@ public class MessageTests
 
     // Assert
     result.Should().Be(0);
+  }
+
+  private sealed class TestPayload
+  {
+    public int Count { get; set; }
   }
 
   [Fact]

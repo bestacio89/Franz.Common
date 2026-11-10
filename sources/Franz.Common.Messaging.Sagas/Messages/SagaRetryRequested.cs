@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Text.Json;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Messages;
 
@@ -17,7 +16,7 @@ public sealed record SagaRetryRequested : IIntegrationEvent
   public string OriginalMessageType { get; init; } = string.Empty;
   public string Body { get; init; } = string.Empty;
   public Dictionary<string, string[]> Headers { get; init; } = new(StringComparer.OrdinalIgnoreCase);
-  public Dictionary<string, JsonElement> Properties { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+  public Dictionary<string, string> Properties { get; init; } = new(StringComparer.OrdinalIgnoreCase);
   public DateTimeOffset OccurredOn { get; init; }
   public Guid? AggregateId { get; init; }
   public MessageKind Kind { get; init; } = MessageKind.IntegrationEvent;

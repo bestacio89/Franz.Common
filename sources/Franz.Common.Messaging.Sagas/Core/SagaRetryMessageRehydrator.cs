@@ -6,6 +6,8 @@ using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Messages;
 using Franz.Common.Messaging.Serialization;
+using Franz.Common.Serialization;
+using System.Text.Json;
 
 namespace Franz.Common.Messaging.Sagas.Core;
 
@@ -63,10 +65,21 @@ internal static class SagaRetryMessageRehydrator
           exception);
     }
 
-    var properties = request.Properties.ToDictionary(
-        property => property.Key,
-        property => (object)property.Value.Clone(),
-        StringComparer.OrdinalIgnoreCase);
+    var properties = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+    foreach (var property in request.Properties)
+    {
+      try
+      {
+        using var document = JsonDocument.Parse(property.Value);
+        properties[property.Key] = document.RootElement.Clone();
+      }
+      catch (JsonException exception)
+      {
+        throw new PermanentMessagingException(
+            $"Saga retry property '{property.Key}' contains invalid JSON.",
+            exception);
+      }
+    }
 
     properties.Remove(MessagingConstants.TransportGeneratedMessageId);
 

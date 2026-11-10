@@ -21,6 +21,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
+using Franz.Common.Serialization;
 
 namespace Franz.Common.Messaging.Sagas.Core;
 
@@ -586,9 +587,10 @@ public sealed class SagaOrchestrator
 
         var retryProperties = originalMessage.Properties.ToDictionary(
             property => property.Key,
-            property => JsonSerializer.SerializeToElement(
+            property => JsonSerializer.Serialize(
                 property.Value,
-                property.Value?.GetType() ?? typeof(object)),
+                property.Value?.GetType() ?? typeof(object),
+                FranzJson.Default),
             StringComparer.OrdinalIgnoreCase);
         retryProperties.Remove(MessagingConstants.TransportGeneratedMessageId);
 

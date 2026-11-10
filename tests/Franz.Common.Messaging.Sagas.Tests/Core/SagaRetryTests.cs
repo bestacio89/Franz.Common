@@ -65,7 +65,7 @@ public sealed class SagaRetryTests
     retryRequest.Body.Should().Be(originalMessage.Body);
     retryRequest.OriginalMessageType.Should().Be(typeof(RetryEvent).AssemblyQualifiedName);
     retryRequest.Headers["x-original-trace"].Should().ContainSingle().Which.Should().Be("trace-1");
-    retryRequest.Properties["custom-property"].GetString().Should().Be("preserved");
+    retryRequest.Properties["custom-property"].Should().Be("\"preserved\"");
     scheduled.Message.CorrelationId.Should().Be(correlationId);
     scheduled.Message.Headers[Message.CausationHeader].Should().ContainSingle()
         .Which.Should().Be(originalMessageId.ToString("D"));
@@ -130,6 +130,9 @@ public sealed class SagaRetryTests
         originalMessage);
 
     var scheduled = fixture.MessageStore.ScheduledMessages.Should().ContainSingle().Which;
+    var retryRequest = JsonSerializer.Deserialize<SagaRetryRequested>(
+        scheduled.Message.Body!,
+        new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
     await Task.Delay(scheduled.NotBefore - DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(20));
 
     var retrySagaId = retryRequest.SagaId;
@@ -191,7 +194,11 @@ public sealed class SagaRetryTests
   {
     var properties = request.Properties.ToDictionary(
         property => property.Key,
-        property => (object)property.Value.Clone(),
+        property =>
+        {
+          using var document = JsonDocument.Parse(property.Value);
+          return (object)document.RootElement.Clone();
+        },
         StringComparer.OrdinalIgnoreCase);
     properties.Remove(MessagingConstants.TransportGeneratedMessageId);
 

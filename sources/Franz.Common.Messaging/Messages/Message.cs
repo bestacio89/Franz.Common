@@ -2,6 +2,8 @@
 
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Headers;
+using Franz.Common.Serialization;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Franz.Common.Messaging.Messages;
@@ -81,7 +83,27 @@ public class Message : INotification, IEvent
   }
 
   public T? GetProperty<T>(string key)
-      => Properties.TryGetValue(key, out var value) && value is T cast ? cast : default;
+  {
+    if (!Properties.TryGetValue(key, out var value))
+      return default;
+
+    if (value is T typed)
+      return typed;
+
+    if (value is JsonElement json)
+    {
+      try
+      {
+        return json.Deserialize<T>(FranzJson.Default);
+      }
+      catch (JsonException)
+      {
+        return default;
+      }
+    }
+
+    return default;
+  }
 
   public void SetProperty<T>(string key, T value) => Properties[key] = value!;
 
