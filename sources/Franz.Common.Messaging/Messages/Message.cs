@@ -80,7 +80,9 @@ public class Message : INotification, IEvent
 
   public virtual string? MessageType
   {
-    get => Properties.TryGetValue(nameof(MessageType), out var value) ? value as string : null;
+    get => Properties.TryGetValue(nameof(MessageType), out var value)
+        ? value as string ?? (value is JsonElement json && json.ValueKind == JsonValueKind.String ? json.GetString() : null)
+        : null;
     set => SetProperty(nameof(MessageType), value);
   }
 
