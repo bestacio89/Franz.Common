@@ -1,12 +1,17 @@
 using Franz.Common.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Scrutor;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace Franz.Common.DependencyInjection.Extensions
 {
   public static class ServiceCollectionExtensions
   {
+    private const string RuntimeScanningWarning =
+        "Assembly scanning discovers types at runtime and is not supported by trimmed or Native AOT applications. Use explicit or source-generated registrations instead.";
+
+    [RequiresUnreferencedCode(RuntimeScanningWarning)]
     public static IServiceCollection AddDependencies(this IServiceCollection services, Func<Assembly, bool>? assemblyPredicate = null)
     {
       services = services
@@ -16,18 +21,21 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
+    [RequiresUnreferencedCode(RuntimeScanningWarning)]
     public static IServiceCollection AddScopedDependencies(this IServiceCollection services, Func<Assembly, bool>? assemblyPredicate = null)
     {
       services = services.AddImplementedInterfaceWithoutMarkerScoped<IScopedDependency>(assemblyPredicate);
       return services;
     }
 
+    [RequiresUnreferencedCode(RuntimeScanningWarning)]
     public static IServiceCollection AddSingletonDependencies(this IServiceCollection services, Func<Assembly, bool>? assemblyPredicate = null)
     {
       services = services.AddImplementedInterfaceWithoutMarkerSingleton<ISingletonDependency>(assemblyPredicate);
       return services;
     }
 
+    [RequiresUnreferencedCode(RuntimeScanningWarning)]
     public static IServiceCollection AddSelfScoped<TInterface>(this IServiceCollection services, Func<Assembly, bool>? assemblyPredicate = null)
     {
       services = services.Scan(scan => scan
@@ -40,6 +48,7 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
+    [RequiresUnreferencedCode(RuntimeScanningWarning)]
     public static IServiceCollection AddMatchingInterfaceScoped<TInterface>(this IServiceCollection services, Func<Assembly, bool>? assemblyPredicate = null)
     {
       services = services.Scan(scan => scan
@@ -52,6 +61,7 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
+    [RequiresUnreferencedCode(RuntimeScanningWarning)]
     public static IServiceCollection AddImplementedInterfaceScoped<TInterface>(this IServiceCollection services, Func<Assembly, bool>? assemblyPredicate = null)
     {
       services = services.Scan(scan => scan
@@ -64,6 +74,7 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
+    [RequiresUnreferencedCode(RuntimeScanningWarning)]
     public static IServiceCollection AddImplementedInterfaceTransient<TInterface>(this IServiceCollection services, Func<Assembly, bool>? assemblyPredicate = null)
     {
       services = services.Scan(scan => scan
@@ -76,6 +87,11 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
+    [RequiresUnreferencedCode(RuntimeScanningWarning)]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2070",
+        Justification = "This API intentionally selects implemented interfaces from runtime-discovered types. It is marked RequiresUnreferencedCode; Native AOT callers must use explicit or source-generated registrations.")]
     public static IServiceCollection AddImplementedInterfaceWithoutMarkerScoped<TInterface>(this IServiceCollection services, Func<Assembly, bool>? assemblyPredicate = null)
     {
       var markerType = typeof(TInterface);
@@ -89,6 +105,11 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
+    [RequiresUnreferencedCode(RuntimeScanningWarning)]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2070",
+        Justification = "This API intentionally selects implemented interfaces from runtime-discovered types. It is marked RequiresUnreferencedCode; Native AOT callers must use explicit or source-generated registrations.")]
     public static IServiceCollection AddImplementedInterfaceWithoutMarkerSingleton<TInterface>(this IServiceCollection services, Func<Assembly, bool>? assemblyPredicate = null)
     {
       var markerType = typeof(TInterface);
@@ -102,6 +123,7 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
+    [RequiresUnreferencedCode(RuntimeScanningWarning)]
     public static IServiceCollection AddImplementedInterfaceSingleton<TInterface>(this IServiceCollection services, Func<Assembly, bool>? assemblyPredicate = null, RegistrationStrategy? registrationStrategy = null)
     {
       registrationStrategy ??= new RegistrationStrategySkipExistingPair();
@@ -116,6 +138,7 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
+    [RequiresUnreferencedCode(RuntimeScanningWarning)]
     public static IServiceCollection AddInheritedClassSingleton<TType>(this IServiceCollection services, Func<Assembly, bool>? assemblyPredicate = null, RegistrationStrategy? registrationStrategy = null)
     {
       registrationStrategy ??= new RegistrationStrategySkipExistingPair();
@@ -130,7 +153,11 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
-    public static IServiceCollection AddNoDuplicateService(this IServiceCollection services, Type serviceType, Type implementationType, ServiceLifetime serviceLifetime)
+    public static IServiceCollection AddNoDuplicateService(
+        this IServiceCollection services,
+        Type serviceType,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type implementationType,
+        ServiceLifetime serviceLifetime)
     {
       var serviceDescriptrToAdd = new ServiceDescriptor(serviceType, implementationType, serviceLifetime);
 
@@ -139,7 +166,10 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
-    public static IServiceCollection AddNoDuplicateService<TServiceType, TImplementationType>(this IServiceCollection services, ServiceLifetime serviceLifetime)
+    public static IServiceCollection AddNoDuplicateService<TServiceType,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementationType>(
+        this IServiceCollection services,
+        ServiceLifetime serviceLifetime)
         where TServiceType : class
         where TImplementationType : class, TServiceType
     {
@@ -158,7 +188,8 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
-    public static IServiceCollection AddNoDuplicateSingleton<TServiceType, TImplementationType>(this IServiceCollection services)
+    public static IServiceCollection AddNoDuplicateSingleton<TServiceType,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementationType>(this IServiceCollection services)
         where TServiceType : class
         where TImplementationType : class, TServiceType
     {
@@ -166,13 +197,15 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
-    public static IServiceCollection AddNoDuplicateSingleton(this IServiceCollection services, Type serviceType, Type implementationType)
+    public static IServiceCollection AddNoDuplicateSingleton(this IServiceCollection services, Type serviceType,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type implementationType)
     {
       services = services.AddNoDuplicateService(serviceType, implementationType, ServiceLifetime.Singleton);
       return services;
     }
 
-    public static IServiceCollection AddNoDuplicateSingleton<TImplementationType>(this IServiceCollection services)
+    public static IServiceCollection AddNoDuplicateSingleton<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementationType>(this IServiceCollection services)
         where TImplementationType : class
     {
       services = services.AddNoDuplicateService<TImplementationType, TImplementationType>(ServiceLifetime.Singleton);
@@ -193,7 +226,8 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
-    public static IServiceCollection AddNoDuplicateTransient<TServiceType, TImplementationType>(this IServiceCollection services)
+    public static IServiceCollection AddNoDuplicateTransient<TServiceType,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementationType>(this IServiceCollection services)
         where TServiceType : class
         where TImplementationType : class, TServiceType
     {
@@ -201,13 +235,15 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
-    public static IServiceCollection AddNoDuplicateTransient(this IServiceCollection services, Type serviceType, Type implementationType)
+    public static IServiceCollection AddNoDuplicateTransient(this IServiceCollection services, Type serviceType,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type implementationType)
     {
       services = services.AddNoDuplicateService(serviceType, implementationType, ServiceLifetime.Transient);
       return services;
     }
 
-    public static IServiceCollection AddNoDuplicateTransient<TImplementationType>(this IServiceCollection services)
+    public static IServiceCollection AddNoDuplicateTransient<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementationType>(this IServiceCollection services)
         where TImplementationType : class
     {
       services = services.AddNoDuplicateService<TImplementationType, TImplementationType>(ServiceLifetime.Transient);
@@ -217,7 +253,7 @@ namespace Franz.Common.DependencyInjection.Extensions
     public static IServiceCollection AddNoDuplicateTransient<TImplementationType>(this IServiceCollection services, TImplementationType instanceImplementation)
         where TImplementationType : class
     {
-      services = services.AddNoDuplicateService(ServiceLifetime.Transient, (serviceProvder) => instanceImplementation);
+      services = services.AddNoDuplicateService(ServiceLifetime.Transient, (serviceProvider) => instanceImplementation);
       return services;
     }
 
@@ -228,7 +264,8 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
-    public static IServiceCollection AddNoDuplicateScoped<TServiceType, TImplementationType>(this IServiceCollection services)
+    public static IServiceCollection AddNoDuplicateScoped<TServiceType,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementationType>(this IServiceCollection services)
         where TServiceType : class
         where TImplementationType : class, TServiceType
     {
@@ -236,13 +273,15 @@ namespace Franz.Common.DependencyInjection.Extensions
       return services;
     }
 
-    public static IServiceCollection AddNoDuplicateScoped(this IServiceCollection services, Type serviceType, Type implementationType)
+    public static IServiceCollection AddNoDuplicateScoped(this IServiceCollection services, Type serviceType,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type implementationType)
     {
       services = services.AddNoDuplicateService(serviceType, implementationType, ServiceLifetime.Scoped);
       return services;
     }
 
-    public static IServiceCollection AddNoDuplicateScoped<TImplementationType>(this IServiceCollection services)
+    public static IServiceCollection AddNoDuplicateScoped<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementationType>(this IServiceCollection services)
         where TImplementationType : class
     {
       services = services.AddNoDuplicateService<TImplementationType, TImplementationType>(ServiceLifetime.Scoped);
