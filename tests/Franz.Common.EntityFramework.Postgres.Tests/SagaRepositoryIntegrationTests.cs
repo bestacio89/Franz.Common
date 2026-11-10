@@ -3,13 +3,16 @@ using Franz.Common.EntityFramework;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging.Sagas.Abstractions;
+using Franz.Common.Messaging.Sagas.Configuration;
 using Franz.Common.Messaging.Sagas.Exceptions;
+using Franz.Common.Messaging.Sagas.Logging;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.EntityFramework;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
 namespace Franz.Common.EntityFramework.Postgres.Tests;
@@ -172,6 +175,181 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<PostgresFixtu
       (await outbox.GetPendingAsync()).Should().ContainSingle();
     }
   }
+
+  [Fact]
+  public async Task OutboxClaims_AreExclusiveAndExpiredLeasesCanBeReclaimed()
+  {
+    await using (var schemaContext = CreateContext())
+    {
+      await schemaContext.Database.EnsureCreatedAsync();
+      await schemaContext.Database.ExecuteSqlRawAsync("DELETE FROM \"SagaOutbox\"");
+    }
+
+    var message = new Message("{}") { MessageType = "lease-contract" };
+    await using (var seedContext = CreateContext())
+      await new EfSagaMessageStore(seedContext).SaveAsync(message);
+
+    await using var contextA = CreateContext();
+    await using var contextB = CreateContext();
+    var storeA = new EfSagaMessageStore(contextA);
+    var storeB = new EfSagaMessageStore(contextB);
+    var ownerA = Guid.CreateVersion7();
+    var ownerB = Guid.CreateVersion7();
+
+    var initialClaims = await Task.WhenAll(
+        storeA.ClaimPendingAsync(ownerA, TimeSpan.FromSeconds(2), 1),
+        storeB.ClaimPendingAsync(ownerB, TimeSpan.FromSeconds(2), 1));
+
+    initialClaims.Sum(claim => claim.Count).Should().Be(1);
+    var originalOwner = initialClaims[0].Count == 1 ? ownerA : ownerB;
+
+    await Task.Delay(TimeSpan.FromMilliseconds(2200));
+
+    var recoveryOwner = Guid.CreateVersion7();
+    var recovered = await storeB.ClaimPendingAsync(recoveryOwner, TimeSpan.FromMinutes(1), 1);
+    recovered.Should().ContainSingle().Which.Id.Should().Be(message.Id);
+
+    var staleCompletion = () => storeA.MarkAsSentAsync(message.Id, originalOwner);
+    await staleCompletion.Should().ThrowAsync<InvalidOperationException>();
+
+    await storeB.MarkAsSentAsync(message.Id, recoveryOwner);
+    await using var verifyContext = CreateContext();
+    (await new EfSagaMessageStore(verifyContext).GetPendingAsync()).Should().BeEmpty();
+  }
+
+  [Fact]
+  public async Task ScheduledOutboxMessages_AreRecoveredAfterContextRestartAndDueTime()
+  {
+    await using (var schemaContext = CreateContext())
+    {
+      await schemaContext.Database.EnsureCreatedAsync();
+      await schemaContext.Database.ExecuteSqlRawAsync("DELETE FROM \"SagaOutbox\"");
+    }
+
+    var sagaId = Guid.CreateVersion7();
+    var messageId = Guid.CreateVersion7();
+    var notBefore = DateTimeOffset.UtcNow.AddSeconds(2);
+    var record = CreateRecord(sagaId) with
+    {
+      Status = SagaLifecycleStatus.RetryScheduled,
+      RetryCount = 1,
+      LastMessageId = messageId,
+      NextAttemptAt = notBefore
+    };
+    var message = new Message("{}")
+    {
+      Id = messageId,
+      MessageType = "saga-retry-contract"
+    };
+
+    await using (var context = CreateContext())
+    {
+      var unitOfWork = new EfUnitOfWork<SagaDbContext>(context);
+      await unitOfWork.BeginAsync();
+      await CreateRepository(context).SaveAsync(record, expectedVersion: null);
+      await new EfSagaMessageStore(context).SaveScheduledAsync(message, notBefore);
+      await unitOfWork.CommitAsync();
+    }
+
+    await using (var restartedContext = CreateContext())
+    {
+      var persisted = await CreateRepository(restartedContext).LoadAsync(
+          sagaId, record.TenantId, typeof(PostgresSagaState));
+      persisted.Should().NotBeNull();
+      persisted!.Status.Should().Be(SagaLifecycleStatus.RetryScheduled);
+      persisted.RetryCount.Should().Be(1);
+      persisted.LastMessageId.Should().Be(messageId);
+      persisted.NextAttemptAt.Should().BeCloseTo(notBefore, TimeSpan.FromMilliseconds(100));
+
+      (await new EfSagaMessageStore(restartedContext).GetPendingAsync()).Should().BeEmpty();
+    }
+
+    var remaining = notBefore - DateTimeOffset.UtcNow;
+    if (remaining > TimeSpan.Zero)
+      await Task.Delay(remaining + TimeSpan.FromMilliseconds(100));
+
+    await using (var recoveredContext = CreateContext())
+    {
+      var recovered = await new EfSagaMessageStore(recoveredContext).GetPendingAsync();
+      recovered.Should().ContainSingle().Which.Id.Should().Be(messageId);
+    }
+  }
+
+  [Fact]
+  public async Task AuditStore_RollsBackWithSagaTransactionAndDeletesExpiredRecordsInBoundedBatches()
+  {
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddSingleton(Substitute.For<IDispatcher>());
+    services.AddDbContext<SagaDbContext>(options =>
+        options.UseNpgsql(_fixture.Container.GetConnectionString()));
+    services.AddFranzSagas(options =>
+    {
+      options.Persistence = "EntityFramework";
+      options.EnableAuditing = true;
+    });
+
+    await using var provider = services.BuildServiceProvider();
+    await using (var setupScope = provider.CreateAsyncScope())
+    {
+      var context = setupScope.ServiceProvider.GetRequiredService<SagaDbContext>();
+      await context.Database.EnsureCreatedAsync();
+    }
+
+    var rollbackRecord = CreateAuditRecord(DateTimeOffset.UtcNow.AddDays(-10));
+    await using (var rollbackScope = provider.CreateAsyncScope())
+    {
+      var store = rollbackScope.ServiceProvider.GetRequiredService<ISagaAuditStore>();
+      var unitOfWork = rollbackScope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+      await unitOfWork.BeginAsync();
+      await store.WriteAsync(rollbackRecord);
+      await unitOfWork.RollbackAsync();
+    }
+
+    await using (var verifyRollbackScope = provider.CreateAsyncScope())
+    {
+      var context = verifyRollbackScope.ServiceProvider.GetRequiredService<SagaDbContext>();
+      var count = await context.Database
+          .SqlQueryRaw<long>("SELECT COUNT(*) AS \"Value\" FROM \"SagaAudit\"")
+          .SingleAsync();
+      count.Should().Be(0L);
+    }
+
+    await using (var commitScope = provider.CreateAsyncScope())
+    {
+      var store = commitScope.ServiceProvider.GetRequiredService<ISagaAuditStore>();
+      var unitOfWork = commitScope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+      await unitOfWork.BeginAsync();
+      await store.WriteAsync(rollbackRecord);
+      await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow.AddDays(-20)));
+      await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow));
+      await unitOfWork.CommitAsync();
+
+      (await store.DeleteExpiredAsync(DateTimeOffset.UtcNow.AddDays(-1), batchSize: 1))
+          .Should().Be(1);
+      (await store.DeleteExpiredAsync(DateTimeOffset.UtcNow.AddDays(-1), batchSize: 1))
+          .Should().Be(1);
+
+      var context = commitScope.ServiceProvider.GetRequiredService<SagaDbContext>();
+      var remaining = await context.Database
+          .SqlQueryRaw<long>("SELECT COUNT(*) AS \"Value\" FROM \"SagaAudit\"")
+          .SingleAsync();
+      remaining.Should().Be(1L);
+    }
+  }
+
+  private static SagaAuditRecord CreateAuditRecord(DateTimeOffset timestamp)
+      => new()
+      {
+        SagaId = Guid.CreateVersion7(),
+        SagaType = "postgres-audit-saga",
+        StateType = "postgres-audit-state",
+        StepType = "Start",
+        IncomingMessageType = "postgres-audit-event",
+        CorrelationId = Guid.CreateVersion7(),
+        Status = SagaLifecycleStatus.Completed,
+        Timestamp = timestamp
+      };
 
   private SagaDbContext CreateContext()
   {

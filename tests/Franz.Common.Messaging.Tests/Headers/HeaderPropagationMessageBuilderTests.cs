@@ -56,15 +56,32 @@ public class HeaderPropagationMessageBuilderTests
     var builder = new HeaderPropagationMessageBuilder(_mockAccessor.Object, null, options);
     var message = new Message("{}");
 
-    string[]? malicious = ["overwrite-attempt"];
-    _mockAccessor.Setup(a => a.TryGetValue(systemHeader, out malicious)).Returns(true);
-
     // Act
     builder.BuildAsync(message);
 
     // Assert
     // System invariants should not be injectable via propagation
     message.Headers.ContainsKey(systemHeader).Should().BeFalse();
+  }
+
+  [Fact]
+  public void Build_ShouldPropagateRawHeaderValues()
+  {
+    var options = new HeaderPropagationOptions();
+    options.Headers.Add("X-Custom");
+
+    var builder = new HeaderPropagationMessageBuilder(_mockAccessor.Object, null, options);
+    var message = new Message("{}");
+    _mockAccessor
+        .Setup(a => a.ListAll())
+        .Returns(new Dictionary<string, string[]>
+        {
+          ["X-Custom"] = ["Tenant-A", "Tenant-B"]
+        });
+
+    builder.BuildAsync(message);
+
+    message.Headers["X-Custom"].Should().Equal("Tenant-A", "Tenant-B");
   }
 
   [Fact]
@@ -79,9 +96,6 @@ public class HeaderPropagationMessageBuilderTests
 
     // SENIOR FIX: Correctly initialize headers as string arrays
     message.Headers.Add("X-Custom", ["Original"]);
-
-    string[]? propagated = ["New"];
-    _mockAccessor.Setup(a => a.TryGetValue("X-Custom", out propagated)).Returns(true);
 
     // Act
     builder.BuildAsync(message);

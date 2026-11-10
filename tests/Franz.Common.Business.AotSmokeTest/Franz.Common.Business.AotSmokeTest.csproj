@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL3050;IL2067;IL2070;IL2090;IL2046;IL3051</WarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../sources/Franz.Common.Business/Franz.Common.Business.csproj" />
+    <ProjectReference Include="../../sources/Franz.Common.Mediator.SourceGenerator/Franz.Common.Mediator.SourceGenerator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      GlobalPropertiesToRemove="PublishAot;PublishTrimmed;TrimMode" />
+  </ItemGroup>
+</Project>

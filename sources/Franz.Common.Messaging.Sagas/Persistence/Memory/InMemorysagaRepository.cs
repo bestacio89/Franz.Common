@@ -46,6 +46,7 @@ public sealed class InMemorySagaRepository : ISagaRepository
       CompletedAt = existing?.CompletedAt,
       FailedAt = existing?.FailedAt,
       NextAttemptAt = existing?.NextAttemptAt,
+      RetryCount = existing?.RetryCount ?? 0,
       LastMessageId = existing?.LastMessageId,
       LastError = existing?.LastError
     };

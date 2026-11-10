@@ -175,6 +175,26 @@ public class FranzDispatcher : IDispatcher
 
   // ==================== NOTIFICATIONS ====================
 
+  /// <summary>
+  /// Publishes a notification using the generated invoker registered for its concrete runtime type.
+  /// This overload is intended for deserialization and transport boundaries that only know INotification.
+  /// </summary>
+  public Task PublishNotificationAsync(
+      INotification notification,
+      CancellationToken cancellationToken = default,
+      PublishStrategy strategy = PublishStrategy.Sequential,
+      NotificationErrorHandling errorHandling = NotificationErrorHandling.ContinueOnError)
+  {
+    ArgumentNullException.ThrowIfNull(notification);
+
+    if (!GeneratedMediatorInvokerRegistry.TryGetNotificationPublisher(notification.GetType(), out var publisher))
+      throw new InvalidOperationException(
+          $"No generated mediator notification publisher exists for '{notification.GetType().FullName}'. " +
+          "Ensure the notification contract is compiled in a project using the Franz Mediator source generator.");
+
+    return publisher!(this, notification, cancellationToken, strategy, errorHandling);
+  }
+
   public async Task PublishNotificationAsync<TNotification>(
       TNotification notification,
       CancellationToken cancellationToken = default,

@@ -77,7 +77,7 @@ public sealed class MediatorRegistrationGenerator : IIncrementalGenerator
                     }
                 }
 
-                var source = RegistrationSourceEmitter.Generate(handlers);
+                var source = RegistrationSourceEmitter.Generate(handlers, integrationEventTypes);
                 productionContext.AddSource("GeneratedMediatorRegistration.g.cs", source);
 
                 if (hasMessagingManifest)

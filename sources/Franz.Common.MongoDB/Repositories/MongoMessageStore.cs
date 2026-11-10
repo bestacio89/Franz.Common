@@ -33,6 +33,9 @@ public class MongoMessageStore : IMessageStore
             new CreateIndexModel<StoredMessage>(
                 Builders<StoredMessage>.IndexKeys.Ascending(m => m.NextAttemptAt)),
 
+            new CreateIndexModel<StoredMessage>(
+                Builders<StoredMessage>.IndexKeys.Ascending(m => m.LeaseExpiresAt)),
+
             // For retry cycle handling and DLQ triage
             new CreateIndexModel<StoredMessage>(
                 Builders<StoredMessage>.IndexKeys.Ascending(m => m.RetryCount)),

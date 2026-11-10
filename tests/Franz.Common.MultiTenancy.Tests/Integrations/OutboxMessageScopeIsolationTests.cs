@@ -24,8 +24,20 @@ public sealed class OutboxMessageScopeIsolationTests
         };
 
         var messageStore = Substitute.For<IMessageStore>();
-        messageStore.GetPendingAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IReadOnlyList<StoredMessage>>(messages));
+        var claimCount = 0;
+        messageStore.ClaimPendingAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<TimeSpan>(),
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                var index = Interlocked.Increment(ref claimCount) - 1;
+                IReadOnlyList<StoredMessage> claimed = index < messages.Length
+                    ? [messages[index]]
+                    : [];
+                return Task.FromResult(claimed);
+            });
 
         var inboxStore = Substitute.For<IInboxStore>();
         inboxStore.HasProcessedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -50,7 +62,10 @@ public sealed class OutboxMessageScopeIsolationTests
         });
 
         var sentCount = 0;
-        messageStore.MarkAsSentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        messageStore.MarkAsSentAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
                 if (Interlocked.Increment(ref sentCount) == messages.Length)
@@ -69,7 +84,7 @@ public sealed class OutboxMessageScopeIsolationTests
         Assert.Equal(messages.Length, dispatchers.Count);
         Assert.NotSame(dispatchers[0], dispatchers[1]);
         await messageStore.Received(messages.Length)
-            .MarkAsSentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+            .MarkAsSentAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     private static StoredMessage CreateStoredMessage()

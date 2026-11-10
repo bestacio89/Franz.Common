@@ -71,7 +71,7 @@ public sealed class RabbitMQMessagingPublisher(
         await _transaction.BeginAsync(ct).ConfigureAwait(false);
 
       var body = Encoding.UTF8.GetBytes(message.Body ?? string.Empty);
-      var properties = message.Headers.ToBasicProperties();
+      var properties = message.ToBasicProperties();
 
       await channel.BasicPublishAsync(
           exchange: exchange,

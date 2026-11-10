@@ -6,9 +6,10 @@ namespace Franz.Common.Mediator.SourceGenerator.Generation;
 
 internal static class RegistrationSourceEmitter
 {
-  public static string Generate(IEnumerable<HandlerInfo> handlers)
+  public static string Generate(IEnumerable<HandlerInfo> handlers, IEnumerable<string> integrationEventTypes)
   {
     var handlerList = new List<HandlerInfo>(handlers);
+    var integrationEventList = new List<string>(integrationEventTypes);
     var builder = new StringBuilder();
     var invokers = new StringBuilder();
     var defaultPipelines = new StringBuilder();
@@ -112,6 +113,12 @@ internal static class FranzMediatorGeneratedRegistration
           AppendNotificationPipelineRegistrations(defaultPipelines, registeredPipelineServices, handler.RequestType);
           break;
       }
+    }
+
+    foreach (var integrationEventType in integrationEventList)
+    {
+      invokers.AppendLine(
+          $"        GeneratedMediatorInvokerRegistry.RegisterNotification<{integrationEventType}>();");
     }
 
     builder.AppendLine(@"    }

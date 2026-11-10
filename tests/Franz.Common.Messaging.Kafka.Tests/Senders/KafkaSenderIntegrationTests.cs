@@ -78,6 +78,19 @@ public sealed class KafkaSenderTests : IClassFixture<KafkaContainerFixture>, IAs
       var payload = Encoding.UTF8.GetString(result.Message.Value);
       payload.Should().Contain("Integration-Test-Data");
 
+      var roundTrippedMessage = _scope.ServiceProvider
+          .GetRequiredService<IMessageSerializer>()
+          .Deserialize<Message>(payload);
+
+      roundTrippedMessage.Should().NotBeNull();
+      roundTrippedMessage!.Id.Should().Be(messageId);
+      roundTrippedMessage.CorrelationId.Should().Be(correlationId);
+      roundTrippedMessage.Body.Should().Be("Integration-Test-Data");
+      roundTrippedMessage.Headers.Should().ContainKey(Message.CorrelationHeader)
+          .WhoseValue.Should().ContainSingle(correlationId.ToString("D"));
+      roundTrippedMessage.Headers.Should().ContainKey("Custom-Header")
+          .WhoseValue.Should().ContainSingle("Value1");
+
       var headers = result.Message.Headers.ToDictionary(
         h => h.Key,
         h => Encoding.UTF8.GetString(h.GetValueBytes()));

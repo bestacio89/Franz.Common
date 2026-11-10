@@ -22,6 +22,21 @@ public interface IDispatcher
 
   // 🔹 NEW: Overload for notifications (includes DomainEvents, IntegrationEvents, etc.)
 
+  /// <summary>
+  /// Publishes a notification using its concrete runtime type and generated dispatch registration.
+  /// Use this overload at deserialization boundaries where the static type is only INotification.
+  /// </summary>
+  Task PublishNotificationAsync(
+    INotification notification,
+    CancellationToken cancellationToken = default,
+    PublishStrategy strategy = PublishStrategy.Sequential,
+    NotificationErrorHandling errorHandling = NotificationErrorHandling.ContinueOnError)
+  {
+    System.ArgumentNullException.ThrowIfNull(notification);
+    throw new System.NotSupportedException(
+        "This dispatcher does not support runtime-typed notification dispatch.");
+  }
+
   public Task PublishNotificationAsync<TNotification>(
     TNotification notification,
     CancellationToken cancellationToken = default,

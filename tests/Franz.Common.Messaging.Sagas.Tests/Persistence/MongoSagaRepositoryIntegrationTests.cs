@@ -1,11 +1,15 @@
 using Franz.Common.Messaging.Messages;
 using FluentAssertions;
 using Franz.Common.Messaging.Sagas.Abstractions;
+using Franz.Common.Messaging.Sagas.Configuration;
 using Franz.Common.Messaging.Sagas.Exceptions;
+using Franz.Common.Messaging.Sagas.Logging;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Mongo;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using MongoDB.Driver;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Testcontainers.MongoDb;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Persistence;
@@ -197,6 +201,159 @@ public sealed class MongoSagaRepositoryIntegrationTests : IAsyncLifetime
     await load.Should().ThrowAsync<ArgumentException>().WithParameterName("tenantId");
     await delete.Should().ThrowAsync<ArgumentException>().WithParameterName("tenantId");
   }
+
+  [Fact]
+  public async Task OutboxClaims_AreExclusiveAndExpiredLeasesCanBeReclaimed()
+  {
+    await _database.GetCollection<MongoDB.Bson.BsonDocument>("sagaOutbox")
+        .DeleteManyAsync(MongoDB.Driver.Builders<MongoDB.Bson.BsonDocument>.Filter.Empty);
+
+    await using var unitOfWorkA = new MongoSagaUnitOfWork(_database);
+    await using var unitOfWorkB = new MongoSagaUnitOfWork(_database);
+    var storeA = new MongoSagaMessageStore(_database, unitOfWorkA);
+    var storeB = new MongoSagaMessageStore(_database, unitOfWorkB);
+    var message = new Message("{}") { MessageType = "lease-contract" };
+    await storeA.SaveAsync(message);
+
+    var ownerA = Guid.CreateVersion7();
+    var ownerB = Guid.CreateVersion7();
+    var initialClaims = await Task.WhenAll(
+        storeA.ClaimPendingAsync(ownerA, TimeSpan.FromSeconds(2), 1),
+        storeB.ClaimPendingAsync(ownerB, TimeSpan.FromSeconds(2), 1));
+
+    initialClaims.Sum(claim => claim.Count).Should().Be(1);
+    var originalOwner = initialClaims[0].Count == 1 ? ownerA : ownerB;
+
+    await Task.Delay(TimeSpan.FromMilliseconds(2200));
+
+    var recoveryOwner = Guid.CreateVersion7();
+    var recovered = await storeB.ClaimPendingAsync(recoveryOwner, TimeSpan.FromMinutes(1), 1);
+    recovered.Should().ContainSingle().Which.Id.Should().Be(message.Id);
+
+    var staleCompletion = () => storeA.MarkAsSentAsync(message.Id, originalOwner);
+    await staleCompletion.Should().ThrowAsync<InvalidOperationException>();
+
+    await storeB.MarkAsSentAsync(message.Id, recoveryOwner);
+    (await storeA.GetPendingAsync()).Should().BeEmpty();
+  }
+
+  [Fact]
+  public async Task ScheduledOutboxMessages_AreRecoveredAfterSessionRestartAndDueTime()
+  {
+    await _database.GetCollection<MongoDB.Bson.BsonDocument>("sagaOutbox")
+        .DeleteManyAsync(MongoDB.Driver.Builders<MongoDB.Bson.BsonDocument>.Filter.Empty);
+
+    var sagaId = Guid.CreateVersion7();
+    var messageId = Guid.CreateVersion7();
+    var notBefore = DateTimeOffset.UtcNow.AddSeconds(2);
+    var record = CreateRecord(sagaId) with
+    {
+      Status = SagaLifecycleStatus.RetryScheduled,
+      RetryCount = 1,
+      LastMessageId = messageId,
+      NextAttemptAt = notBefore
+    };
+    var message = new Message("{}")
+    {
+      Id = messageId,
+      MessageType = "saga-retry-contract"
+    };
+
+    await using (var unitOfWork = new MongoSagaUnitOfWork(_database))
+    {
+      var repository = new MongoSagaRepository(
+          _database, new JsonSagaStateSerializer(), unitOfWork);
+      var store = new MongoSagaMessageStore(_database, unitOfWork);
+
+      await unitOfWork.BeginAsync();
+      await repository.SaveAsync(record, expectedVersion: null);
+      await store.SaveScheduledAsync(message, notBefore);
+      await unitOfWork.CommitAsync();
+    }
+
+    await using (var restartedUnitOfWork = new MongoSagaUnitOfWork(_database))
+    {
+      var repository = new MongoSagaRepository(_database, new JsonSagaStateSerializer());
+      var store = new MongoSagaMessageStore(_database, restartedUnitOfWork);
+
+      var persisted = await repository.LoadAsync(
+          sagaId, record.TenantId, typeof(MongoSagaState));
+      persisted.Should().NotBeNull();
+      persisted!.Status.Should().Be(SagaLifecycleStatus.RetryScheduled);
+      persisted.RetryCount.Should().Be(1);
+      persisted.LastMessageId.Should().Be(messageId);
+      persisted.NextAttemptAt.Should().BeCloseTo(notBefore, TimeSpan.FromMilliseconds(100));
+
+      (await store.GetPendingAsync()).Should().BeEmpty();
+    }
+
+    var remaining = notBefore - DateTimeOffset.UtcNow;
+    if (remaining > TimeSpan.Zero)
+      await Task.Delay(remaining + TimeSpan.FromMilliseconds(100));
+
+    await using (var recoveredUnitOfWork = new MongoSagaUnitOfWork(_database))
+    {
+      var recoveredStore = new MongoSagaMessageStore(_database, recoveredUnitOfWork);
+      var recovered = await recoveredStore.GetPendingAsync();
+      recovered.Should().ContainSingle().Which.Id.Should().Be(messageId);
+    }
+  }
+
+  [Fact]
+  public async Task AuditStore_RollsBackWithSagaTransactionAndDeletesExpiredRecordsInBoundedBatches()
+  {
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddSingleton(_database);
+    services.AddFranzSagas(options =>
+    {
+      options.Persistence = "Mongo";
+      options.EnableAuditing = true;
+    });
+
+    await using var provider = services.BuildServiceProvider();
+    await using var scope = provider.CreateAsyncScope();
+    var store = scope.ServiceProvider.GetRequiredService<ISagaAuditStore>();
+    var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoSagaUnitOfWork>();
+    await store.InitializeAsync();
+
+    await unitOfWork.BeginAsync();
+    await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow.AddDays(-10)));
+    await unitOfWork.RollbackAsync();
+
+    var collection = _database.GetCollection<MongoDB.Bson.BsonDocument>("sagaAudit");
+    (await collection.CountDocumentsAsync(
+        MongoDB.Driver.Builders<MongoDB.Bson.BsonDocument>.Filter.Empty)).Should().Be(0);
+
+    await unitOfWork.BeginAsync();
+    await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow.AddDays(-10)));
+    await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow.AddDays(-20)));
+    await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow));
+    await unitOfWork.CommitAsync();
+
+    (await store.DeleteExpiredAsync(DateTimeOffset.UtcNow.AddDays(-1), batchSize: 1))
+        .Should().Be(1);
+    (await collection.CountDocumentsAsync(
+        MongoDB.Driver.Builders<MongoDB.Bson.BsonDocument>.Filter.Empty)).Should().Be(2);
+
+    (await store.DeleteExpiredAsync(DateTimeOffset.UtcNow.AddDays(-1), batchSize: 1))
+        .Should().Be(1);
+    (await collection.CountDocumentsAsync(
+        MongoDB.Driver.Builders<MongoDB.Bson.BsonDocument>.Filter.Empty)).Should().Be(1);
+  }
+
+  private static SagaAuditRecord CreateAuditRecord(DateTimeOffset timestamp)
+      => new()
+      {
+        SagaId = Guid.CreateVersion7(),
+        SagaType = "mongo-audit-saga",
+        StateType = "mongo-audit-state",
+        StepType = "Start",
+        IncomingMessageType = "mongo-audit-event",
+        CorrelationId = Guid.CreateVersion7(),
+        Status = SagaLifecycleStatus.Completed,
+        Timestamp = timestamp
+      };
 
   private static SagaPersistenceRecord CreateRecord(
       Guid? sagaId = null,

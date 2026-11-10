@@ -1,27 +1,42 @@
-﻿using Franz.Common.Messaging.Messages;
-using Franz.Common.Serialization;
-using Microsoft.Extensions.Primitives;
-using System.Text.Json;
+using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.Serialization;
 
 namespace Franz.Common.Messaging.Factories;
 
-public sealed class ExecutionFaultMessageBuilderStrategy
-    : IMessageBuilderStrategy
+public sealed class ExecutionFaultMessageBuilderStrategy : IMessageBuilderStrategy
 {
-  public bool CanBuild(object value)
-      => value is Exception || value is IExecutionFault;
+  private readonly IMessageSerializer _serializer;
+
+  public ExecutionFaultMessageBuilderStrategy()
+      : this(new JsonMessageSerializer())
+  {
+  }
+
+  public ExecutionFaultMessageBuilderStrategy(IMessageSerializer serializer)
+      => _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+
+  public bool CanBuild(object value) => value is Exception or IExecutionFault;
 
   public Message Build(object value)
   {
+    ArgumentNullException.ThrowIfNull(value);
+
     var fault = value switch
     {
-      IExecutionFault f => f,
-      Exception ex => ExecutionFault.FromException(ex),
-      _ => throw new InvalidOperationException()
+      IExecutionFault executionFault => new ExecutionFault(
+          executionFault.Code,
+          executionFault.Message,
+          executionFault.Source,
+          executionFault.StackTrace)
+      {
+        OccurredAt = executionFault.OccurredAt
+      },
+      Exception exception => ExecutionFault.FromException(exception),
+      _ => throw new InvalidOperationException(
+          $"Type '{value.GetType().FullName}' cannot be converted to an execution fault.")
     };
 
-    var body = JsonSerializer.Serialize(fault, FranzJson.Default);
-
+    var body = _serializer.Serialize(fault, typeof(ExecutionFault));
     var message = new Message(body)
     {
       Body = body,
@@ -29,13 +44,8 @@ public sealed class ExecutionFaultMessageBuilderStrategy
       MessageType = nameof(ExecutionFault)
     };
 
-    message.Headers.Add(
-    MessagingConstants.ClassName,
-    new[] { nameof(ExecutionFault) });
-
-    message.Headers.Add(
-        MessagingConstants.FaultCode,
-        new[] { fault.Code });
+    message.Headers.Add(MessagingConstants.ClassName, new[] { nameof(ExecutionFault) });
+    message.Headers.Add(MessagingConstants.FaultCode, new[] { fault.Code });
 
     return message;
   }

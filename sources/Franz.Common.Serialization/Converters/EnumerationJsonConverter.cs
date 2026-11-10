@@ -1,38 +1,56 @@
-using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Franz.Common.Business.Domain;
 
 namespace Franz.Common.Serialization.Converters;
 
+/// <summary>
+/// Reflection-based convenience factory for domain enumeration converters.
+/// Native AOT applications should register closed
+/// <see cref="EnumerationValueJsonConverter{TEnumeration, TId}"/> instances directly.
+/// </summary>
+[RequiresUnreferencedCode("This factory discovers enumeration types and closes converter types at runtime. Native AOT applications must register EnumerationValueJsonConverter<TEnumeration, TId> directly.")]
+[RequiresDynamicCode("This factory constructs closed generic converters at runtime. Native AOT applications must register EnumerationValueJsonConverter<TEnumeration, TId> directly.")]
 public sealed class EnumerationJsonConverter : JsonConverterFactory
 {
   public override bool CanConvert(Type typeToConvert)
-  {
-    return IsEnumeration(typeToConvert);
-  }
+      => FindEnumerationBase(typeToConvert) is not null;
 
+  [UnconditionalSuppressMessage(
+      "Trimming",
+      "IL2026",
+      Justification = "The factory type is marked RequiresUnreferencedCode; callers are warned and Native AOT applications must use the explicit generic converter.")]
+  [UnconditionalSuppressMessage(
+      "AOT",
+      "IL3050",
+      Justification = "The factory type is marked RequiresDynamicCode; callers are warned and Native AOT applications must use the explicit generic converter.")]
   public override JsonConverter CreateConverter(
-    Type typeToConvert,
-    JsonSerializerOptions options)
+      Type typeToConvert,
+      JsonSerializerOptions options)
   {
-    var converterType = typeof(EnumerationJsonConverter)
-      .MakeGenericType(typeToConvert);
+    var enumerationBase = FindEnumerationBase(typeToConvert)
+        ?? throw new InvalidOperationException(
+            $"'{typeToConvert}' is not a Franz enumeration type.");
 
-    return (JsonConverter)Activator.CreateInstance(converterType)!;
+    var idType = enumerationBase.GetGenericArguments()[0];
+    var converterType = typeof(EnumerationValueJsonConverter<,>)
+        .MakeGenericType(typeToConvert, idType);
+
+    return (JsonConverter)(Activator.CreateInstance(converterType)
+        ?? throw new InvalidOperationException(
+            $"Could not create an enumeration converter for '{typeToConvert}'."));
   }
 
-  private static bool IsEnumeration(Type type)
+  private static Type? FindEnumerationBase(Type type)
   {
-    while (type != null)
+    for (var current = type; current is not null; current = current.BaseType)
     {
-      if (type.IsGenericType &&
-          type.GetGenericTypeDefinition() == typeof(Enumeration<>))
-        return true;
-
-      type = type.BaseType!;
+      if (current.IsGenericType &&
+          current.GetGenericTypeDefinition() == typeof(Enumeration<>))
+        return current;
     }
 
-    return false;
+    return null;
   }
 }

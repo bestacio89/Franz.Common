@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using System.Text.Json;
 using FluentAssertions;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Messages;
@@ -42,6 +43,63 @@ public class MessageTests
  
 
   [Fact]
+  public void Headers_WhenReplacedWithoutCorrelationHeader_ShouldPreserveCorrelationProjection()
+  {
+    var correlationId = Guid.CreateVersion7();
+    var message = new Message { CorrelationId = correlationId };
+
+    message.Headers = new Dictionary<string, string[]>
+    {
+      ["Custom-Header"] = ["custom-value"]
+    };
+
+    message.CorrelationId.Should().Be(correlationId);
+    message.Headers.Should().ContainKey(Message.CorrelationHeader)
+        .WhoseValue.Should().ContainSingle(correlationId.ToString("D"));
+  }
+
+  [Fact]
+  public void Headers_WhenReplacedWithCorrelationHeader_ShouldHydrateCorrelationProperty()
+  {
+    var correlationId = Guid.CreateVersion7();
+    var message = new Message
+    {
+      Headers = new Dictionary<string, string[]>
+      {
+        [Message.CorrelationHeader] = [correlationId.ToString("D")]
+      }
+    };
+
+    message.CorrelationId.Should().Be(correlationId);
+  }
+
+  [Fact]
+  public void Headers_WhenReplacedWithInvalidCorrelationHeader_ShouldRestoreCurrentProjection()
+  {
+    var correlationId = Guid.CreateVersion7();
+    var message = new Message { CorrelationId = correlationId };
+
+    message.Headers = new Dictionary<string, string[]>
+    {
+      [Message.CorrelationHeader] = ["not-a-guid"]
+    };
+
+    message.CorrelationId.Should().Be(correlationId);
+    message.Headers[Message.CorrelationHeader].Should().ContainSingle(correlationId.ToString("D"));
+  }
+
+  [Fact]
+  public void GetProperty_ShouldDeserializeJsonElementValues()
+  {
+    var message = new Message();
+    using var document = JsonDocument.Parse("{\"count\":42}");
+    message.Properties["Payload"] = document.RootElement.Clone();
+
+    message.GetProperty<TestPayload>("Payload")
+        .Should().BeEquivalentTo(new TestPayload { Count = 42 });
+  }
+
+  [Fact]
   public void GetProperty_ShouldReturnDefault_WhenTypeMismatch()
   {
     // Arrange
@@ -53,6 +111,11 @@ public class MessageTests
 
     // Assert
     result.Should().Be(0);
+  }
+
+  public sealed class TestPayload
+  {
+    public int Count { get; set; }
   }
 
   [Fact]

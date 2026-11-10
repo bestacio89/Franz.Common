@@ -44,14 +44,16 @@ public class ExecutionFaultMessageBuilderStrategyTests
   }
 
   [Fact]
-  public void Build_WhenValueIsIExecutionFault_ShouldReturnCorrectMessage()
+  public void Build_WhenValueIsIExecutionFault_ShouldReturnConcreteFaultMessage()
   {
     // Arrange
+    var occurredAt = DateTimeOffset.UtcNow;
     var mockFault = new Mock<IExecutionFault>();
     mockFault.Setup(f => f.Code).Returns("ERR_001");
     mockFault.Setup(f => f.Message).Returns("System Error");
-
-    var expectedBody = JsonSerializer.Serialize(mockFault.Object, FranzJson.Default);
+    mockFault.Setup(f => f.Source).Returns("Messaging.Tests");
+    mockFault.Setup(f => f.StackTrace).Returns("fault-stack");
+    mockFault.Setup(f => f.OccurredAt).Returns(occurredAt);
 
     // Act
     var message = _strategy.Build(mockFault.Object);
@@ -59,7 +61,16 @@ public class ExecutionFaultMessageBuilderStrategyTests
     // Assert
     message.Kind.Should().Be(MessageKind.Fault);
     message.MessageType.Should().Be(nameof(ExecutionFault));
-    message.Body.Should().Be(expectedBody);
+    message.Body.Should().NotBeNullOrWhiteSpace();
+    message.Body.Should().NotContain("Castle.Proxies");
+
+    var fault = JsonSerializer.Deserialize<ExecutionFault>(message.Body!, FranzJson.Default);
+    fault.Should().NotBeNull();
+    fault!.Code.Should().Be("ERR_001");
+    fault.Message.Should().Be("System Error");
+    fault.Source.Should().Be("Messaging.Tests");
+    fault.StackTrace.Should().Be("fault-stack");
+    fault.OccurredAt.Should().Be(occurredAt);
 
     // Headers
     message.Headers[MessagingConstants.ClassName].Should().BeEquivalentTo(new StringValues(nameof(ExecutionFault)));

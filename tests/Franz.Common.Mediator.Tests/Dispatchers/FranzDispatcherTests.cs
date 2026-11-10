@@ -40,6 +40,18 @@ public class FranzDispatcherTests
   public record TestVoidCommand(string Payload) : ICommand;
   public record TestQuery(int Id) : IQuery<int>;
   public record TestNotification(string Message) : INotification;
+  public sealed record TestIntegrationNotification : IIntegrationEvent;
+
+  public sealed class TestIntegrationNotificationHandler : INotificationHandler<TestIntegrationNotification>
+  {
+    public bool Executed { get; private set; }
+
+    public Task Handle(TestIntegrationNotification notification, CancellationToken cancellationToken)
+    {
+      Executed = true;
+      return Task.CompletedTask;
+    }
+  }
  public record TestEvent(Guid EventId, DateTimeOffset OccurredOn) : IEvent
 {
     public TestEvent(Guid eventId) : this(eventId, DateTimeOffset.UtcNow) { }
@@ -284,6 +296,25 @@ public class FranzDispatcherTests
     await dispatcher.PublishNotificationAsync(new TestNotification("Info"), strategy: PublishStrategy.Sequential);
 
     // Assert
+    handler.Executed.Should().BeTrue();
+  }
+
+
+  [Fact]
+  public async Task PublishNotificationAsync_NonGenericContract_DispatchesUsingGeneratedConcreteType()
+  {
+    var handler = new TestIntegrationNotificationHandler();
+    var services = new ServiceCollection();
+    services.AddSingleton<INotificationHandler<TestIntegrationNotification>>(handler);
+    using var provider = services.BuildServiceProvider();
+    var dispatcher = new FranzDispatcher(provider);
+
+    INotification notification = new TestIntegrationNotification();
+
+    await dispatcher.PublishNotificationAsync(
+        notification,
+        errorHandling: NotificationErrorHandling.StopOnFirstFailure);
+
     handler.Executed.Should().BeTrue();
   }
 

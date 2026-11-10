@@ -5,6 +5,7 @@ using Confluent.Kafka;
 using Franz.Common.Messaging.Configuration;
 using Franz.Common.Messaging.Kafka.Configuration;
 using Franz.Common.Messaging.Kafka;
+using Franz.Common.Messaging.Kafka.Headers;
 using System.Collections.Concurrent;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
@@ -110,6 +111,10 @@ public sealed class KafkaMessageListener : IListener
         {
           transport = _serializer.Deserialize<Message>(result.Message.Value);
           if (transport is null) throw new InvalidDataException("The serialized Kafka value deserialized to null.");
+
+          // Reconcile Kafka's native metadata projection with the serialized Franz
+          // envelope before tenant validation, inbox registration, or Saga dispatch.
+          KafkaMessageHeaderMapper.Restore(transport, result.Message.Headers);
         }
         catch (Exception ex)
         {

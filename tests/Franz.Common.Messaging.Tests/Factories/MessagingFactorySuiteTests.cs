@@ -41,6 +41,8 @@ public class MessagingFactorySuiteTests
 
     result.Kind.Should().Be(MessageKind.IntegrationEvent);
     result.Headers[MessagingConstants.ClassName].Should().BeEquivalentTo(new StringValues(HeaderNamer.GetEventClassName(typeof(TestIntegrationEvent))));
+    using var body = JsonDocument.Parse(result.Body!);
+    body.RootElement.GetProperty("eventId").GetString().Should().Be("EVT-123");
   }
   #endregion
 

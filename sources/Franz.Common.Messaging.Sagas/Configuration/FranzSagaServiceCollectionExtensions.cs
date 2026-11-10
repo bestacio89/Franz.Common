@@ -1,10 +1,13 @@
 #nullable enable
 
 using Franz.Common.EntityFramework.Extensions;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Storage;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Logging;
+using Franz.Common.Messaging.Sagas.Handlers;
+using Franz.Common.Messaging.Sagas.Messages;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Cosmos;
 using Franz.Common.Messaging.Sagas.Persistence.EntityFramework;
@@ -28,6 +31,41 @@ public static class FranzSagaServiceCollectionExtensions
     var options = new FranzSagaOptions();
     configure?.Invoke(options);
 
+    if (options.MaxRetryAttempts < 1)
+      throw new ArgumentOutOfRangeException(
+          nameof(options.MaxRetryAttempts),
+          options.MaxRetryAttempts,
+          "Saga MaxRetryAttempts must be greater than zero.");
+
+    if (options.DefaultRetryDelay <= TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(
+          nameof(options.DefaultRetryDelay),
+          options.DefaultRetryDelay,
+          "Saga DefaultRetryDelay must be greater than zero.");
+
+    if (options.AuditRetentionPeriod is { } retentionPeriod && retentionPeriod <= TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(
+          nameof(options.AuditRetentionPeriod),
+          retentionPeriod,
+          "Saga audit retention period must be greater than zero.");
+
+    if (options.AuditRetentionCleanupInterval <= TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(
+          nameof(options.AuditRetentionCleanupInterval),
+          options.AuditRetentionCleanupInterval,
+          "Saga audit retention cleanup interval must be greater than zero.");
+
+    if (options.AuditRetentionBatchSize <= 0)
+      throw new ArgumentOutOfRangeException(
+          nameof(options.AuditRetentionBatchSize),
+          options.AuditRetentionBatchSize,
+          "Saga audit retention batch size must be greater than zero.");
+
+    if (options.AuditRetentionPeriod.HasValue &&
+        options.Persistence.Equals("Memory", StringComparison.OrdinalIgnoreCase))
+      throw new NotSupportedException(
+          "Saga audit retention requires durable EF Core, MongoDB, or Cosmos persistence.");
+
     if (!new[] { "Memory", "EntityFramework", "Mongo", "Cosmos" }
         .Contains(options.Persistence, StringComparer.OrdinalIgnoreCase))
       throw new NotSupportedException(
@@ -42,7 +80,17 @@ public static class FranzSagaServiceCollectionExtensions
 
     RegisterPersistenceAdapter(services, options.Persistence);
 
-    services.TryAddSingleton<ISagaAuditSink, DefaultSagaAuditSink>();
+    services.TryAddEnumerable(
+        ServiceDescriptor.Singleton<ISagaAuditSink, DefaultSagaAuditSink>());
+
+    if (!options.Persistence.Equals("Memory", StringComparison.OrdinalIgnoreCase) &&
+        (options.EnableAuditing || options.AuditRetentionPeriod.HasValue))
+      services.TryAddEnumerable(
+          ServiceDescriptor.Singleton<IHostedService, SagaAuditRetentionHostedService>());
+
+    services.TryAddEnumerable(ServiceDescriptor.Scoped(
+        typeof(INotificationHandler<SagaRetryRequested>),
+        typeof(SagaIntegrationEventNotificationHandler<SagaRetryRequested>)));
 
     var builder = new FranzSagaBuilder(services);
     services.AddSingleton(builder);
@@ -83,6 +131,7 @@ public static class FranzSagaServiceCollectionExtensions
         services.AddUnitOfWork<SagaDbContext>();
         services.AddScoped<IInboxStore, EfSagaInboxStore>();
         services.AddScoped<IMessageStore, EfSagaMessageStore>();
+        RegisterAuditStore<EfSagaAuditStore>(services);
         break;
 
       case "MONGO":
@@ -92,6 +141,7 @@ public static class FranzSagaServiceCollectionExtensions
             provider => provider.GetRequiredService<MongoSagaUnitOfWork>());
         services.AddScoped<IInboxStore, MongoSagaInboxStore>();
         services.AddScoped<IMessageStore, MongoSagaMessageStore>();
+        RegisterAuditStore<MongoSagaAuditStore>(services);
         break;
 
       case "COSMOS":
@@ -101,12 +151,23 @@ public static class FranzSagaServiceCollectionExtensions
             provider => provider.GetRequiredService<CosmosSagaUnitOfWork>());
         services.AddScoped<IInboxStore, CosmosSagaInboxStore>();
         services.AddScoped<IMessageStore, CosmosSagaMessageStore>();
+        RegisterAuditStore<CosmosSagaAuditStore>(services);
         break;
 
       default:
         throw new NotSupportedException(
             $"Saga persistence provider '{persistence}' is not supported.");
     }
+  }
+
+  private static void RegisterAuditStore<TAuditStore>(IServiceCollection services)
+      where TAuditStore : class, ISagaAuditStore
+  {
+    services.TryAddScoped<TAuditStore>();
+    services.TryAddScoped<ISagaAuditStore>(
+        provider => provider.GetRequiredService<TAuditStore>());
+    services.AddScoped<ISagaAuditSink>(
+        provider => provider.GetRequiredService<ISagaAuditStore>());
   }
 
   private static void RegisterRepository<TRepository>(IServiceCollection services)

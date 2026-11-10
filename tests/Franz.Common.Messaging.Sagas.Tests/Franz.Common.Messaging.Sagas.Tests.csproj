@@ -25,7 +25,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Sagas\Franz.Common.Messaging.Sagas.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Messaging.Hosting.MediatR\Franz.Common.Messaging.Hosting.Mediator.csproj" />
   </ItemGroup>
+
 
   <ItemGroup>
     <Using Include="Xunit" />

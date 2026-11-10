@@ -69,6 +69,7 @@ public sealed class MongoSagaRepository : ISagaRepository
       CompletedAt = document.CompletedAt,
       FailedAt = document.FailedAt,
       NextAttemptAt = document.NextAttemptAt,
+      RetryCount = document.RetryCount,
       LastMessageId = document.LastMessageId,
       LastError = document.LastError
     };
@@ -110,6 +111,7 @@ public sealed class MongoSagaRepository : ISagaRepository
         CompletedAt = record.CompletedAt,
         FailedAt = record.FailedAt,
         NextAttemptAt = record.NextAttemptAt,
+        RetryCount = record.RetryCount,
         LastMessageId = record.LastMessageId,
         LastError = record.LastError
       };
@@ -152,6 +154,7 @@ public sealed class MongoSagaRepository : ISagaRepository
           .Set(x => x.CompletedAt, record.CompletedAt)
           .Set(x => x.FailedAt, record.FailedAt)
           .Set(x => x.NextAttemptAt, record.NextAttemptAt)
+          .Set(x => x.RetryCount, record.RetryCount)
           .Set(x => x.LastMessageId, record.LastMessageId)
           .Set(x => x.LastError, record.LastError);
 
@@ -205,6 +208,7 @@ public sealed class MongoSagaRepository : ISagaRepository
     public DateTimeOffset? CompletedAt { get; set; }
     public DateTimeOffset? FailedAt { get; set; }
     public DateTimeOffset? NextAttemptAt { get; set; }
+    public int RetryCount { get; set; }
     [BsonGuidRepresentation(GuidRepresentation.Standard)]
     public Guid? LastMessageId { get; set; }
     public string? LastError { get; set; }

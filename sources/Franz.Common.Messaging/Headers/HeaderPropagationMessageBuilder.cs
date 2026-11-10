@@ -2,7 +2,6 @@
 
 using Franz.Common.Headers;
 using Franz.Common.Messaging.Messages;
-using Microsoft.Extensions.Primitives;
 using System;
 using System.Linq;
 using System.Threading;
@@ -63,18 +62,16 @@ public sealed class HeaderPropagationMessageBuilder(
     if (ShouldSkip(headers, headerName))
       return;
 
-    if (headerContextAccessor.TryGetValue(headerName, out StringValues value))
-    {
-      var sanitized = value
-          .Where(v => v is not null)
-          .Select(v => v!)
-          .ToArray();
+    var sourceHeaders = headerContextAccessor.ListAll();
+    if (sourceHeaders is null || !sourceHeaders.TryGetValue(headerName, out var values))
+      return;
 
-      if (sanitized.Length > 0)
-      {
-        headers[headerName] = sanitized;
-      }
-    }
+    var sanitized = values
+        .Where(v => v is not null)
+        .ToArray();
+
+    if (sanitized.Length > 0)
+      headers[headerName] = sanitized;
   }
 
   private static bool ShouldSkip(

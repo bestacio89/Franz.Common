@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Franz.Common.Messaging.RabbitMQ.Hosting;
+using Franz.Common.Messaging.Messages;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Collections.Generic;
@@ -38,6 +39,32 @@ public class RabbitHeaderMapperTests
         headers.Should().ContainKey("ListHeader")
             .WhoseValue.Should().BeEquivalentTo(new[] { "val1", "val2" });
 
+        headers.Should().NotContainKey("x-ignore-me");
+    }
+
+    [Fact]
+    public void ExtractHeaders_ShouldProjectCorrelationPropertyAndPreserveCausationHeader()
+    {
+        var correlationId = Guid.CreateVersion7();
+        var causationId = Guid.CreateVersion7();
+        var properties = new BasicProperties
+        {
+            CorrelationId = correlationId.ToString("D"),
+            Headers = new Dictionary<string, object?>
+            {
+                ["X-Causation-Id"] = causationId.ToString("D"),
+                ["x-ignore-me"] = "ignored"
+            }
+        };
+        var eventArgs = new BasicDeliverEventArgs(
+            "tag", 1, false, "exchange", "routingKey", properties, default);
+
+        var headers = RabbitHeaderMapper.ExtractHeaders(eventArgs);
+
+        headers.Should().ContainKey(Message.CorrelationHeader)
+            .WhoseValue.Should().ContainSingle(correlationId.ToString("D"));
+        headers.Should().ContainKey(Message.CausationHeader)
+            .WhoseValue.Should().ContainSingle(causationId.ToString("D"));
         headers.Should().NotContainKey("x-ignore-me");
     }
 

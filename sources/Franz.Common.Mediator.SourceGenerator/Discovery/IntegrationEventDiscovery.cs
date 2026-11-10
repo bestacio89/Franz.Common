@@ -17,6 +17,17 @@ internal static class IntegrationEventDiscovery
     if (symbol.IsAbstract || symbol.IsGenericType || symbol.TypeKind == TypeKind.Interface)
       return null;
 
+    // Generated module-initializer code lives at namespace scope. It cannot legally
+    // reference private or protected nested contracts, so only emit types accessible
+    // from another type in the same assembly.
+    for (var current = symbol; current is not null; current = current.ContainingType)
+    {
+      if (current.DeclaredAccessibility is Accessibility.Private
+          or Accessibility.Protected
+          or Accessibility.ProtectedAndInternal)
+        return null;
+    }
+
     var isIntegrationEvent = symbol.AllInterfaces.Any(static implementedInterface =>
         implementedInterface.ToDisplayString() == "Franz.Common.Mediator.IIntegrationEvent");
 

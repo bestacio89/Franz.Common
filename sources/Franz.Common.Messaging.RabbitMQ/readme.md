@@ -44,6 +44,18 @@ The default configuration section is `Messaging:RabbitMQ`. The helper registers 
 
 `BootStrapServers` must be an absolute `amqp://` or `amqps://` URI with explicit username/password credentials, or configure host/user/password separately. When TLS is enabled, the URI must use `amqps://`.
 
+## Message envelope mapping
+
+Both `RabbitMQMessagingSender` and `RabbitMQMessagingPublisher` map the Franz message envelope to AMQP basic properties:
+
+- `Message.Id` → `BasicProperties.MessageId` as a GUID in `D` format.
+- `Message.CorrelationId` → `BasicProperties.CorrelationId`.
+- `Message.CausationHeader` (`x-causation-id`) remains in the AMQP headers table.
+
+On consumption, the listener restores a valid AMQP `MessageId` as `Message.Id`, projects AMQP `CorrelationId` into the Franz correlation header, and retains causation metadata. Other `x-` headers remain filtered as transport infrastructure metadata.
+
+External producers should send a non-empty GUID `MessageId` and a GUID `CorrelationId`. For backward compatibility, missing or invalid message IDs are replaced with a new local ID; those deliveries do not have stable message identity across redelivery and cannot provide reliable inbox deduplication.
+
 ## Topology provisioning
 
 `ProvisioningMode` supports:

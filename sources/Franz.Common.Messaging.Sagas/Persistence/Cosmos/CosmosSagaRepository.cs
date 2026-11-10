@@ -66,6 +66,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
       CompletedAt = document.CompletedAt,
       FailedAt = document.FailedAt,
       NextAttemptAt = document.NextAttemptAt,
+      RetryCount = document.RetryCount,
       LastMessageId = document.LastMessageId,
       LastError = document.LastError
     };
@@ -103,6 +104,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
         CompletedAt = record.CompletedAt,
         FailedAt = record.FailedAt,
         NextAttemptAt = record.NextAttemptAt,
+        RetryCount = record.RetryCount,
         LastMessageId = record.LastMessageId,
         LastError = record.LastError
       };
@@ -130,6 +132,7 @@ public sealed class CosmosSagaRepository : ISagaRepository
       document.CompletedAt = record.CompletedAt;
       document.FailedAt = record.FailedAt;
       document.NextAttemptAt = record.NextAttemptAt;
+      document.RetryCount = record.RetryCount;
       document.LastMessageId = record.LastMessageId;
       document.LastError = record.LastError;
       document.MarkUpdated("saga-orchestrator");

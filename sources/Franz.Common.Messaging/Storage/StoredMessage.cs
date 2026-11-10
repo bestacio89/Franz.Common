@@ -39,6 +39,12 @@ public class StoredMessage
   /// <summary>Earliest UTC time at which this message may be retried.</summary>
   public DateTime? NextAttemptAt { get; set; }
 
+  /// <summary>Dispatcher currently owning this outbox message.</summary>
+  public Guid? LeaseOwnerId { get; set; }
+
+  /// <summary>UTC expiry of the current dispatcher lease.</summary>
+  public DateTime? LeaseExpiresAt { get; set; }
+
   public bool IsDeadLetter { get; set; } = false;
 
   // =====================================================

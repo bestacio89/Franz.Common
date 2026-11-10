@@ -87,7 +87,7 @@ public sealed class KafkaSender : IMessagingSender, IAsyncDisposable, IDisposabl
   {
     try
     {
-      var value = _serializer.Serialize(message.Body);
+      var value = _serializer.Serialize(message);
       return string.IsNullOrEmpty(value) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(value);
     }
     catch (Exception ex) when (

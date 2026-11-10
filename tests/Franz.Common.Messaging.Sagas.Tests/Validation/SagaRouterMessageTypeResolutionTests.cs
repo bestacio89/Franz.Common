@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Franz.Common.Mediator;
+using Franz.Common.Messaging;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Core;
 
@@ -15,6 +16,18 @@ public sealed class SagaRouterMessageTypeResolutionTests
     var resolved = router.TryResolveMessageType(
         typeof(RegisteredEvent).AssemblyQualifiedName!,
         out var messageType);
+
+    resolved.Should().BeTrue();
+    messageType.Should().Be(typeof(RegisteredEvent));
+  }
+
+  [Fact]
+  public void TryResolveMessageType_ResolvesCanonicalMessagingHeaderName()
+  {
+    var router = CreateRouter();
+    var canonicalName = HeaderNamer.GetEventClassName(typeof(RegisteredEvent));
+
+    var resolved = router.TryResolveMessageType(canonicalName, out var messageType);
 
     resolved.Should().BeTrue();
     messageType.Should().Be(typeof(RegisteredEvent));

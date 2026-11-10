@@ -1,11 +1,10 @@
-﻿using Franz.Common.Mediator.Messages;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Franz.Common.Business.Domain.Factories;
 
-public interface IAggregateFactory<TAggregate>
+public interface IAggregateFactory<
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors |
+                                DynamicallyAccessedMemberTypes.NonPublicConstructors)] TAggregate>
 {
   TAggregate Create();
 }

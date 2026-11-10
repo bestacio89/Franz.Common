@@ -22,6 +22,7 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
 
   public DbSet<CosmosSagaStateDocument> SagaStates => Set<CosmosSagaStateDocument>();
 
+
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
@@ -41,6 +42,20 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
       entity.Property(x => x.UpdatedAt).IsRequired();
     });
 
+    modelBuilder.Entity<CosmosSagaAuditDocument>(entity =>
+    {
+      entity.ToContainer("SagaStates");
+      entity.HasPartitionKey(x => x.TenantId);
+      entity.Property(x => x.Id).ToJsonProperty("id");
+      entity.Property(x => x.TenantId).ToJsonProperty("tenantId").IsRequired();
+      entity.Property(x => x.SagaId).IsRequired();
+      entity.Property(x => x.SagaType).IsRequired();
+      entity.Property(x => x.StateType).IsRequired();
+      entity.Property(x => x.StepType).IsRequired();
+      entity.Property(x => x.IncomingMessageType).IsRequired();
+      entity.Property(x => x.Timestamp).IsRequired();
+    });
+
     modelBuilder.Entity<CosmosSagaInboxDocument>(entity =>
     {
       entity.ToContainer("SagaStates");
@@ -54,10 +69,16 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
     {
       entity.ToContainer("SagaStates");
       entity.HasPartitionKey(x => x.TenantId);
+      entity.UseETagConcurrency();
       entity.Property(x => x.Id).ToJsonProperty("id");
       entity.Property(x => x.TenantId).ToJsonProperty("tenantId").IsRequired();
       entity.Property(x => x.Payload).IsRequired();
       entity.Property(x => x.CreatedOn).IsRequired();
+      entity.Property(x => x.SentOn).ToJsonProperty("sentOn");
+      entity.Property(x => x.NextAttemptAt).ToJsonProperty("nextAttemptAt");
+      entity.Property(x => x.LeaseOwnerId).ToJsonProperty("leaseOwnerId");
+      entity.Property(x => x.LeaseExpiresAt).ToJsonProperty("leaseExpiresAt");
+      entity.Property(x => x.IsDeadLetter).ToJsonProperty("isDeadLetter");
     });
   }
 }

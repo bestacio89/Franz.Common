@@ -81,6 +81,38 @@ public sealed class RabbitMQMessagingPublisherTests
     _channelPoolMock.Verify(p => p.Return(_channelMock.Object), Times.Once);
   }
 
+  [Fact]
+  public async Task Publish_MapsMessageIdentityAndCorrelationToRabbitProperties()
+  {
+    var evt = new TestIntegrationEvent();
+    var correlationId = Guid.CreateVersion7();
+    var causationId = Guid.CreateVersion7();
+    var message = new Message("{}") { CorrelationId = correlationId };
+    message.Headers[Message.CausationHeader] = [causationId.ToString("D")];
+    BasicProperties? publishedProperties = null;
+
+    _messageFactoryMock.Setup(factory => factory.Build(evt)).Returns(message);
+    _channelMock
+        .Setup(channel => channel.BasicPublishAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<bool>(),
+            It.IsAny<BasicProperties>(),
+            It.IsAny<ReadOnlyMemory<byte>>(),
+            It.IsAny<CancellationToken>()))
+        .Callback<string, string, bool, BasicProperties, ReadOnlyMemory<byte>, CancellationToken>(
+            (_, _, _, properties, _, _) => publishedProperties = properties)
+        .Returns(ValueTask.CompletedTask);
+
+    await _sut.Publish(evt);
+
+    publishedProperties.Should().NotBeNull();
+    publishedProperties!.MessageId.Should().Be(message.Id.ToString("D"));
+    publishedProperties.CorrelationId.Should().Be(correlationId.ToString("D"));
+    publishedProperties.Headers.Should().ContainKey(Message.CausationHeader)
+        .WhoseValue.Should().Be(causationId.ToString("D"));
+  }
+
   #endregion
 
   #region Error Handling & Rollback

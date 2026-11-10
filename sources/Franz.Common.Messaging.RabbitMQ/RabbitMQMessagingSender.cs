@@ -67,7 +67,7 @@ public sealed class RabbitMQMessagingSender : IMessagingSender, IAsyncDisposable
         await _transaction.BeginAsync(cancellationToken).ConfigureAwait(false);
 
       var body = Encoding.UTF8.GetBytes(message.Body);
-      var properties = message.Headers.ToBasicProperties();
+      var properties = message.ToBasicProperties();
       var basicProperties = properties ?? new BasicProperties
       {
         Headers = new Dictionary<string, object?>()

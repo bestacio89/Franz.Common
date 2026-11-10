@@ -1,10 +1,11 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Franz.Common.Mediator.Context;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Logging;
 using Franz.Common.Messaging.Adapters;
-using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Manifest;
+using Franz.Common.Messaging.Messages;
+using Franz.Common.Messaging.Serialization;
 using System.Text.Json;
 using Xunit;
 
@@ -21,16 +22,16 @@ public class MessageDeserializerExtensionsTests
         existing.Subscriptions.Concat(new[] { typeof(TestEvent), typeof(NoCorrelationTestEvent) }),
         existing.KnownTypes.Concat(new[] { typeof(TestCommand), typeof(TestEvent), typeof(UnsubscribedTestEvent), typeof(NoCorrelationTestEvent) })));
   }
-  // Define concrete types for testing reflection logic
-  public record TestCommand(string Data) : ICommand
+
+  public record TestCommand(string Data) : ICommand, ICorrelatedMessage
   {
-    public Guid CorrelationId { get; set; }
+    public Guid? CorrelationId { get; set; }
   }
 
-  public record TestEvent(string Info) : IEvent
+  public record TestEvent(string Info) : IEvent, ICorrelatedMessage
   {
     public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
-    public Guid CorrelationId { get; set; }
+    public Guid? CorrelationId { get; set; }
   }
 
   public record UnsubscribedTestEvent(string Info) : IEvent
@@ -48,11 +49,13 @@ public class MessageDeserializerExtensionsTests
     public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
   }
 
+  private static readonly IMessageSerializer Serializer = new JsonMessageSerializer();
+
   [Fact]
   public void ToEvent_WhenTypeIsKnownButNotSubscribed_ShouldReturnNull()
   {
     var message = new Message("{}") { MessageType = typeof(UnsubscribedTestEvent).FullName };
-    message.ToEvent().Should().BeNull();
+    message.ToEvent(Serializer).Should().BeNull();
   }
 
   [Fact]
@@ -63,7 +66,7 @@ public class MessageDeserializerExtensionsTests
       MessageType = typeof(LateRegisteredTestEvent).FullName
     };
 
-    message.ToEvent().Should().BeNull();
+    message.ToEvent(Serializer).Should().BeNull();
 
     var assembly = typeof(MessageDeserializerExtensionsTests).Assembly;
     var existing = MessagingManifestRegistry.Get(assembly);
@@ -72,21 +75,21 @@ public class MessageDeserializerExtensionsTests
         existing.Subscriptions.Concat(new[] { typeof(LateRegisteredTestEvent) }),
         existing.KnownTypes.Concat(new[] { typeof(LateRegisteredTestEvent) })));
 
-    var result = message.ToEvent();
+    var result = message.ToEvent(Serializer);
 
     result.Should().BeOfType<LateRegisteredTestEvent>()
         .Which.Info.Should().Be("late");
   }
 
   [Fact]
-  public void ToEvent_WithoutCorrelationProperty_ShouldDeserializeWithoutCachingANullDictionaryValue()
+  public void ToEvent_WithoutCorrelationContract_ShouldDeserializeWithoutCorrelationHydration()
   {
     var message = new Message(JsonSerializer.Serialize(new NoCorrelationTestEvent("no-correlation"), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }))
     {
       MessageType = typeof(NoCorrelationTestEvent).FullName
     };
 
-    var result = message.ToEvent();
+    var result = message.ToEvent(Serializer);
 
     result.Should().BeOfType<NoCorrelationTestEvent>()
         .Which.Info.Should().Be("no-correlation");
@@ -95,31 +98,27 @@ public class MessageDeserializerExtensionsTests
   [Fact]
   public void ToCommand_WithValidMessage_ShouldDeserializeAndSetCorrelation()
   {
-    // Arrange
     var expectedId = Guid.CreateVersion7();
     var command = new TestCommand("Hello World");
     var json = JsonSerializer.Serialize(command, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
     var message = new Message(json)
     {
-      MessageType = typeof(TestCommand).FullName, // Use FullName or AssemblyQualifiedName
+      MessageType = typeof(TestCommand).FullName,
       CorrelationId = expectedId
     };
 
-    // Act
-    var result = message.ToCommand() as TestCommand;
+    var result = message.ToCommand(Serializer) as TestCommand;
 
-    // Assert
     result.Should().NotBeNull();
     result!.Data.Should().Be("Hello World");
     result.CorrelationId.Should().Be(expectedId);
-    MediatorContext.Current.CorrelationId.Should().Be(expectedId); // Verify ambient context
+    MediatorContext.Current.CorrelationId.Should().Be(expectedId);
   }
 
   [Fact]
   public void ToEvent_WithValidMessage_ShouldDeserializeAndSetCorrelation()
   {
-    // Arrange
     var expectedId = Guid.CreateVersion7();
     var @event = new TestEvent("EventData");
     var json = JsonSerializer.Serialize(@event, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
@@ -130,10 +129,8 @@ public class MessageDeserializerExtensionsTests
       CorrelationId = expectedId
     };
 
-    // Act
-    var result = message.ToEvent() as TestEvent;
+    var result = message.ToEvent(Serializer) as TestEvent;
 
-    // Assert
     result.Should().NotBeNull();
     result!.Info.Should().Be("EventData");
     result.CorrelationId.Should().Be(expectedId);
@@ -146,36 +143,25 @@ public class MessageDeserializerExtensionsTests
   [InlineData(" ")]
   public void ToCommand_WithInvalidMessageType_ShouldReturnNull(string? invalidType)
   {
-    // Arrange
     var message = new Message("{}") { MessageType = invalidType };
-
-    // Act
-    var result = message.ToCommand();
-
-    // Assert
-    result.Should().BeNull();
+    message.ToCommand(Serializer).Should().BeNull();
   }
 
   [Fact]
   public void ToCommand_WhenTypeIsNotInManifest_ShouldReturnNull()
   {
     var message = new Message("{}") { MessageType = "Unregistered.Namespace.Command" };
-    message.ToCommand().Should().BeNull();
+    message.ToCommand(Serializer).Should().BeNull();
   }
 
   [Fact]
   public void ToCommand_WhenTypeMismatch_ShouldReturnNull()
   {
-    // Arrange - Sending an Event type name to the ToCommand method
     var message = new Message("{}")
     {
       MessageType = typeof(TestEvent).FullName
     };
 
-    // Act
-    var result = message.ToCommand();
-
-    // Assert
-    result.Should().BeNull();
+    message.ToCommand(Serializer).Should().BeNull();
   }
 }
