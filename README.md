@@ -187,12 +187,9 @@ The GitHub workflow deliberately separates validation into independent jobs:
 
 This is a suite-based pipeline, not one monolithic test command with a short global timeout. Each suite has its own timeout, logs and test-result artifacts. The test-suite manifest is checked for exact ownership so that adding a test project without assigning it to CI fails validation.
 
-### Caching performance validation
+### Caching workload validation
 
-Caching changes have additional performance validation:
-
-- BenchmarkDotNet microbenchmarks measure isolated provider operations, deterministic key generation, payload-size sensitivity and concurrent access. See [the benchmark methodology](benchmarks/Franz.Common.Caching.Benchmarks/README.md).
-- A production-style workload runner exercises MemoryCache, Redis-backed DistributedCache, HybridCache with Redis L2 and direct Redis. It models multi-tenant access, hot-key skew, mixed payloads, warm-up, ramp-up, sustained concurrency and ramp-down. See [the workload methodology and profiles](benchmarks/Franz.Common.Caching.LoadTests/README.md).
+Caching performance validation uses the production-style workload runner. It exercises MemoryCache, Redis-backed DistributedCache, HybridCache with Redis L2 and direct Redis. The workload models multi-tenant access, hot-key skew, mixed payloads, warm-up, ramp-up, sustained concurrency and ramp-down. See [the workload methodology and profiles](benchmarks/Franz.Common.Caching.LoadTests/README.md).
 
 CI publishes machine-readable and human-readable reports. Absolute performance thresholds remain disabled on variable hosted runners until controlled-runner baselines are established.
 
