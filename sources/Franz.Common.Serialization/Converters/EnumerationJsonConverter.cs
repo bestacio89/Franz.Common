@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Franz.Common.Business.Domain;
@@ -18,8 +17,14 @@ public sealed class EnumerationJsonConverter : JsonConverterFactory
   public override bool CanConvert(Type typeToConvert)
       => FindEnumerationBase(typeToConvert) is not null;
 
-  [RequiresUnreferencedCode("The factory discovers enumeration base types and closes a converter at runtime. Native AOT applications must register EnumerationValueJsonConverter<TEnumeration, TId> directly.")]
-  [RequiresDynamicCode("The factory closes a generic converter at runtime. Native AOT applications must register EnumerationValueJsonConverter<TEnumeration, TId> directly.")]
+  [UnconditionalSuppressMessage(
+      "Trimming",
+      "IL2026",
+      Justification = "The factory type is marked RequiresUnreferencedCode; callers are warned and Native AOT applications must use the explicit generic converter.")]
+  [UnconditionalSuppressMessage(
+      "AOT",
+      "IL3050",
+      Justification = "The factory type is marked RequiresDynamicCode; callers are warned and Native AOT applications must use the explicit generic converter.")]
   public override JsonConverter CreateConverter(
       Type typeToConvert,
       JsonSerializerOptions options)
