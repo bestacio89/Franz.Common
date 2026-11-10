@@ -10,6 +10,8 @@ namespace Franz.Common.Serialization.Converters;
 /// Native AOT applications should register closed
 /// <see cref="EnumerationValueJsonConverter{TEnumeration, TId}"/> instances directly.
 /// </summary>
+[RequiresUnreferencedCode("This factory discovers enumeration types and closes converter types at runtime. Native AOT applications must register EnumerationValueJsonConverter<TEnumeration, TId> directly.")]
+[RequiresDynamicCode("This factory constructs closed generic converters at runtime. Native AOT applications must register EnumerationValueJsonConverter<TEnumeration, TId> directly.")]
 public sealed class EnumerationJsonConverter : JsonConverterFactory
 {
   public override bool CanConvert(Type typeToConvert)
