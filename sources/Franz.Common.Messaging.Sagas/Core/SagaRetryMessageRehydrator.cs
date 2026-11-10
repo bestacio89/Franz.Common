@@ -42,9 +42,15 @@ internal static class SagaRetryMessageRehydrator
         request.Properties is null)
       throw new PermanentMessagingException("Saga retry envelope is missing its original event data.");
 
-    var originalHeaders = new Dictionary<string, string[]>(
-        request.Headers,
-        StringComparer.OrdinalIgnoreCase);
+    var originalHeaders = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+    foreach (var (key, values) in request.Headers)
+    {
+      if (string.IsNullOrWhiteSpace(key) ||
+          values is null ||
+          !originalHeaders.TryAdd(key, values))
+        throw new PermanentMessagingException(
+            "Saga retry original envelope contains invalid or ambiguous header metadata.");
+    }
 
     if (originalHeaders.ContainsKey(SagaRetryHeaders.TargetSagaId))
       throw new PermanentMessagingException(
@@ -75,7 +81,7 @@ internal static class SagaRetryMessageRehydrator
 
     if (string.IsNullOrWhiteSpace(tenantId))
     {
-      if (request.Headers.ContainsKey(HeaderConstants.TenantId))
+      if (originalHeaders.ContainsKey(HeaderConstants.TenantId))
         throw new PermanentMessagingException("Saga retry envelope contains an unexpected tenant identity.");
     }
     else if (!originalHeaders.TryGetValue(HeaderConstants.TenantId, out var originalTenantValues) ||
