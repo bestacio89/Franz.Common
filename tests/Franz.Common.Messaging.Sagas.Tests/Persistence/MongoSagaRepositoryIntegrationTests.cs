@@ -202,7 +202,7 @@ public sealed class MongoSagaRepositoryIntegrationTests : IAsyncLifetime
   public async Task OutboxClaims_AreExclusiveAndExpiredLeasesCanBeReclaimed()
   {
     await _database.GetCollection<MongoDB.Bson.BsonDocument>("sagaOutbox")
-        .DeleteManyAsync(MongoDB.Driver.FilterDefinition<MongoDB.Bson.BsonDocument>.Empty);
+        .DeleteManyAsync(MongoDB.Driver.Builders<MongoDB.Bson.BsonDocument>.Filter.Empty);
 
     await using var unitOfWorkA = new MongoSagaUnitOfWork(_database);
     await using var unitOfWorkB = new MongoSagaUnitOfWork(_database);
