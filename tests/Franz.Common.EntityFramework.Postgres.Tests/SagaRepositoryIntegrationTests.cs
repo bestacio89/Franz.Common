@@ -3,6 +3,7 @@ using Franz.Common.EntityFramework;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging.Sagas.Abstractions;
+using Franz.Common.Messaging.Sagas.Configuration;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Logging;
 using Franz.Common.Messaging.Sagas.Persistence;
