@@ -173,6 +173,44 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<PostgresFixtu
     }
   }
 
+  [Fact]
+  public async Task OutboxClaims_AreExclusiveAndExpiredLeasesCanBeReclaimed()
+  {
+    await using (var schemaContext = CreateContext())
+      await schemaContext.Database.EnsureCreatedAsync();
+
+    var message = new Message("{}") { MessageType = "lease-contract" };
+    await using (var seedContext = CreateContext())
+      await new EfSagaMessageStore(seedContext).SaveAsync(message);
+
+    await using var contextA = CreateContext();
+    await using var contextB = CreateContext();
+    var storeA = new EfSagaMessageStore(contextA);
+    var storeB = new EfSagaMessageStore(contextB);
+    var ownerA = Guid.CreateVersion7();
+    var ownerB = Guid.CreateVersion7();
+
+    var initialClaims = await Task.WhenAll(
+        storeA.ClaimPendingAsync(ownerA, TimeSpan.FromMilliseconds(100), 1),
+        storeB.ClaimPendingAsync(ownerB, TimeSpan.FromMilliseconds(100), 1));
+
+    initialClaims.Sum(claim => claim.Count).Should().Be(1);
+    var originalOwner = initialClaims[0].Count == 1 ? ownerA : ownerB;
+
+    await Task.Delay(TimeSpan.FromMilliseconds(250));
+
+    var recoveryOwner = Guid.CreateVersion7();
+    var recovered = await storeB.ClaimPendingAsync(recoveryOwner, TimeSpan.FromMinutes(1), 1);
+    recovered.Should().ContainSingle().Which.Id.Should().Be(message.Id);
+
+    var staleCompletion = () => storeA.MarkAsSentAsync(message.Id, originalOwner);
+    await staleCompletion.Should().ThrowAsync<InvalidOperationException>();
+
+    await storeB.MarkAsSentAsync(message.Id, recoveryOwner);
+    await using var verifyContext = CreateContext();
+    (await new EfSagaMessageStore(verifyContext).GetPendingAsync()).Should().BeEmpty();
+  }
+
   private SagaDbContext CreateContext()
   {
     var options = new DbContextOptionsBuilder<SagaDbContext>()

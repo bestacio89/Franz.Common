@@ -198,6 +198,38 @@ public sealed class MongoSagaRepositoryIntegrationTests : IAsyncLifetime
     await delete.Should().ThrowAsync<ArgumentException>().WithParameterName("tenantId");
   }
 
+  [Fact]
+  public async Task OutboxClaims_AreExclusiveAndExpiredLeasesCanBeReclaimed()
+  {
+    await using var unitOfWorkA = new MongoSagaUnitOfWork(_database);
+    await using var unitOfWorkB = new MongoSagaUnitOfWork(_database);
+    var storeA = new MongoSagaMessageStore(_database, unitOfWorkA);
+    var storeB = new MongoSagaMessageStore(_database, unitOfWorkB);
+    var message = new Message("{}") { MessageType = "lease-contract" };
+    await storeA.SaveAsync(message);
+
+    var ownerA = Guid.CreateVersion7();
+    var ownerB = Guid.CreateVersion7();
+    var initialClaims = await Task.WhenAll(
+        storeA.ClaimPendingAsync(ownerA, TimeSpan.FromMilliseconds(100), 1),
+        storeB.ClaimPendingAsync(ownerB, TimeSpan.FromMilliseconds(100), 1));
+
+    initialClaims.Sum(claim => claim.Count).Should().Be(1);
+    var originalOwner = initialClaims[0].Count == 1 ? ownerA : ownerB;
+
+    await Task.Delay(TimeSpan.FromMilliseconds(250));
+
+    var recoveryOwner = Guid.CreateVersion7();
+    var recovered = await storeB.ClaimPendingAsync(recoveryOwner, TimeSpan.FromMinutes(1), 1);
+    recovered.Should().ContainSingle().Which.Id.Should().Be(message.Id);
+
+    var staleCompletion = () => storeA.MarkAsSentAsync(message.Id, originalOwner);
+    await staleCompletion.Should().ThrowAsync<InvalidOperationException>();
+
+    await storeB.MarkAsSentAsync(message.Id, recoveryOwner);
+    (await storeA.GetPendingAsync()).Should().BeEmpty();
+  }
+
   private static SagaPersistenceRecord CreateRecord(
       Guid? sagaId = null,
       string? tenantId = "tenant-a",

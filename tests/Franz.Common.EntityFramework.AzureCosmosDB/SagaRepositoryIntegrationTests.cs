@@ -193,6 +193,53 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<CosmosFixture
     }
   }
 
+  [Fact]
+  public async Task OutboxClaims_UseETagConcurrencyAndRecoverExpiredLeases()
+  {
+    var databaseName = $"SagaOutboxLeases_{Guid.NewGuid():N}";
+    await using (var schemaContext = CreateContext(databaseName))
+      await schemaContext.Database.EnsureCreatedAsync();
+
+    var message = new Franz.Common.Messaging.Messages.Message("{}")
+    {
+      MessageType = "lease-contract"
+    };
+    await using (var seedContext = CreateContext(databaseName))
+    {
+      var seedStore = new CosmosSagaMessageStore(
+          seedContext, new CosmosSagaUnitOfWork(seedContext));
+      await seedStore.SaveAsync(message);
+    }
+
+    await using var contextA = CreateContext(databaseName);
+    await using var contextB = CreateContext(databaseName);
+    var storeA = new CosmosSagaMessageStore(contextA, new CosmosSagaUnitOfWork(contextA));
+    var storeB = new CosmosSagaMessageStore(contextB, new CosmosSagaUnitOfWork(contextB));
+    var ownerA = Guid.CreateVersion7();
+    var ownerB = Guid.CreateVersion7();
+
+    var initialClaims = await Task.WhenAll(
+        storeA.ClaimPendingAsync(ownerA, TimeSpan.FromMilliseconds(100), 1),
+        storeB.ClaimPendingAsync(ownerB, TimeSpan.FromMilliseconds(100), 1));
+
+    initialClaims.Sum(claim => claim.Count).Should().Be(1);
+    var originalOwner = initialClaims[0].Count == 1 ? ownerA : ownerB;
+
+    await Task.Delay(TimeSpan.FromMilliseconds(250));
+
+    var recoveryOwner = Guid.CreateVersion7();
+    var recovered = await storeB.ClaimPendingAsync(recoveryOwner, TimeSpan.FromMinutes(1), 1);
+    recovered.Should().ContainSingle().Which.Id.Should().Be(message.Id);
+
+    var staleCompletion = () => storeA.MarkAsSentAsync(message.Id, originalOwner);
+    await staleCompletion.Should().ThrowAsync<InvalidOperationException>();
+
+    await storeB.MarkAsSentAsync(message.Id, recoveryOwner);
+    await using var verifyContext = CreateContext(databaseName);
+    (await new CosmosSagaMessageStore(verifyContext, new CosmosSagaUnitOfWork(verifyContext))
+        .GetPendingAsync()).Should().BeEmpty();
+  }
+
   private CosmosSagaDbContext CreateContext(string databaseName)
   {
     var endpoint = $"https://localhost:{_fixture.Container.GetMappedPublicPort(8081)}/";
