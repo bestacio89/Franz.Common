@@ -4,12 +4,14 @@ using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Exceptions;
+using Franz.Common.Messaging.Sagas.Logging;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.EntityFramework;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
 namespace Franz.Common.EntityFramework.Postgres.Tests;
@@ -271,6 +273,82 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<PostgresFixtu
       recovered.Should().ContainSingle().Which.Id.Should().Be(messageId);
     }
   }
+
+  [Fact]
+  public async Task AuditStore_RollsBackWithSagaTransactionAndDeletesExpiredRecordsInBoundedBatches()
+  {
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddSingleton(Substitute.For<IDispatcher>());
+    services.AddDbContext<SagaDbContext>(options =>
+        options.UseNpgsql(_fixture.Container.GetConnectionString()));
+    services.AddFranzSagas(options =>
+    {
+      options.Persistence = "EntityFramework";
+      options.EnableAuditing = true;
+    });
+
+    await using var provider = services.BuildServiceProvider();
+    await using (var setupScope = provider.CreateAsyncScope())
+    {
+      var context = setupScope.ServiceProvider.GetRequiredService<SagaDbContext>();
+      await context.Database.EnsureCreatedAsync();
+    }
+
+    var rollbackRecord = CreateAuditRecord(DateTimeOffset.UtcNow.AddDays(-10));
+    await using (var rollbackScope = provider.CreateAsyncScope())
+    {
+      var store = rollbackScope.ServiceProvider.GetRequiredService<ISagaAuditStore>();
+      var unitOfWork = rollbackScope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+      await unitOfWork.BeginAsync();
+      await store.WriteAsync(rollbackRecord);
+      await unitOfWork.RollbackAsync();
+    }
+
+    await using (var verifyRollbackScope = provider.CreateAsyncScope())
+    {
+      var context = verifyRollbackScope.ServiceProvider.GetRequiredService<SagaDbContext>();
+      var count = await context.Database
+          .SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"SagaAudit\"")
+          .SingleAsync();
+      count.Should().Be(0);
+    }
+
+    await using (var commitScope = provider.CreateAsyncScope())
+    {
+      var store = commitScope.ServiceProvider.GetRequiredService<ISagaAuditStore>();
+      var unitOfWork = commitScope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+      await unitOfWork.BeginAsync();
+      await store.WriteAsync(rollbackRecord);
+      await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow.AddDays(-20)));
+      await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow));
+      await unitOfWork.CommitAsync();
+
+      (await store.DeleteExpiredAsync(DateTimeOffset.UtcNow.AddDays(-1), batchSize: 1))
+          .Should().Be(1);
+      (await store.DeleteExpiredAsync(DateTimeOffset.UtcNow.AddDays(-1), batchSize: 1))
+          .Should().Be(1);
+
+      var context = commitScope.ServiceProvider.GetRequiredService<SagaDbContext>();
+      var remaining = await context.Database
+          .SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"SagaAudit\"")
+          .SingleAsync();
+      remaining.Should().Be(1);
+    }
+  }
+
+  private static SagaAuditRecord CreateAuditRecord(DateTimeOffset timestamp)
+      => new()
+      {
+        SagaId = Guid.CreateVersion7(),
+        SagaType = "postgres-audit-saga",
+        StateType = "postgres-audit-state",
+        StepType = "Start",
+        IncomingMessageType = "postgres-audit-event",
+        CorrelationId = Guid.CreateVersion7(),
+        Status = SagaLifecycleStatus.Completed,
+        Timestamp = timestamp
+      };
 
   private SagaDbContext CreateContext()
   {

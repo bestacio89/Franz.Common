@@ -2,10 +2,13 @@ using Franz.Common.Messaging.Messages;
 using FluentAssertions;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Exceptions;
+using Franz.Common.Messaging.Sagas.Logging;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Mongo;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using MongoDB.Driver;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Testcontainers.MongoDb;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Persistence;
@@ -294,6 +297,62 @@ public sealed class MongoSagaRepositoryIntegrationTests : IAsyncLifetime
       recovered.Should().ContainSingle().Which.Id.Should().Be(messageId);
     }
   }
+
+  [Fact]
+  public async Task AuditStore_RollsBackWithSagaTransactionAndDeletesExpiredRecordsInBoundedBatches()
+  {
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddSingleton(_database);
+    services.AddFranzSagas(options =>
+    {
+      options.Persistence = "Mongo";
+      options.EnableAuditing = true;
+    });
+
+    await using var provider = services.BuildServiceProvider();
+    await using var scope = provider.CreateAsyncScope();
+    var store = scope.ServiceProvider.GetRequiredService<ISagaAuditStore>();
+    var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoSagaUnitOfWork>();
+    await store.InitializeAsync();
+
+    await unitOfWork.BeginAsync();
+    await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow.AddDays(-10)));
+    await unitOfWork.RollbackAsync();
+
+    var collection = _database.GetCollection<MongoDB.Bson.BsonDocument>("sagaAudit");
+    (await collection.CountDocumentsAsync(
+        MongoDB.Driver.Builders<MongoDB.Bson.BsonDocument>.Filter.Empty)).Should().Be(0);
+
+    await unitOfWork.BeginAsync();
+    await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow.AddDays(-10)));
+    await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow.AddDays(-20)));
+    await store.WriteAsync(CreateAuditRecord(DateTimeOffset.UtcNow));
+    await unitOfWork.CommitAsync();
+
+    (await store.DeleteExpiredAsync(DateTimeOffset.UtcNow.AddDays(-1), batchSize: 1))
+        .Should().Be(1);
+    (await collection.CountDocumentsAsync(
+        MongoDB.Driver.Builders<MongoDB.Bson.BsonDocument>.Filter.Empty)).Should().Be(2);
+
+    (await store.DeleteExpiredAsync(DateTimeOffset.UtcNow.AddDays(-1), batchSize: 1))
+        .Should().Be(1);
+    (await collection.CountDocumentsAsync(
+        MongoDB.Driver.Builders<MongoDB.Bson.BsonDocument>.Filter.Empty)).Should().Be(1);
+  }
+
+  private static SagaAuditRecord CreateAuditRecord(DateTimeOffset timestamp)
+      => new()
+      {
+        SagaId = Guid.CreateVersion7(),
+        SagaType = "mongo-audit-saga",
+        StateType = "mongo-audit-state",
+        StepType = "Start",
+        IncomingMessageType = "mongo-audit-event",
+        CorrelationId = Guid.CreateVersion7(),
+        Status = SagaLifecycleStatus.Completed,
+        Timestamp = timestamp
+      };
 
   private static SagaPersistenceRecord CreateRecord(
       Guid? sagaId = null,
