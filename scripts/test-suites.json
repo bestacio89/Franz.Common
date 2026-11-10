@@ -4,7 +4,6 @@
     "database": {
       "parallelism": 2,
       "projects": [
-        "tests/Franz.Common.Entity.Tests/Franz.Common.EntityFramework.Tests.csproj",
         "tests/Franz.Common.EntityFramework.MariaDB.Tests/Franz.Common.EntityFramework.MariaDB.Tests.csproj",
         "tests/Franz.Common.EntityFramework.MySql.Tests/Franz.Common.EntityFramework.MySql.Tests.csproj",
         "tests/Franz.Common.EntityFramework.Oracle.Tests/Franz.Common.EntityFramework.Oracle.Tests.csproj",
