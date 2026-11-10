@@ -1,6 +1,8 @@
-﻿using System.Linq.Expressions;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Franz.Common.Business.Domain.IdGenerators;
 
 namespace Franz.Common.Business.Domain.Factories;
@@ -11,7 +13,10 @@ namespace Franz.Common.Business.Domain.Factories;
 /// The constructor delegate is compiled once per closed generic type and cached
 /// for the lifetime of the application.
 /// </summary>
-public sealed class EntityFactory<TKey, TEntity> : IEntityFactory<TKey, TEntity>
+public sealed class EntityFactory<TKey,
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors |
+                                DynamicallyAccessedMemberTypes.NonPublicConstructors)] TEntity>
+    : IEntityFactory<TKey, TEntity>
     where TEntity : Entity<TKey>
 {
   private static readonly Func<TKey, TEntity> _activator;
@@ -34,10 +39,18 @@ public sealed class EntityFactory<TKey, TEntity> : IEntityFactory<TKey, TEntity>
               $"{entityType.Name} must define a constructor that accepts a single {keyType.Name} parameter. " +
               $"Add: protected {entityType.Name}({keyType.Name} id) {{ }}"));
 
-    var idParam = Expression.Parameter(keyType, "id");
-    _activator = Expression.Lambda<Func<TKey, TEntity>>(
-                      Expression.New(ctor, idParam), idParam)
-                  .Compile();
+    _activator = RuntimeFeature.IsDynamicCodeSupported
+        ? CreateCompiledActivator(ctor)
+        : id => (TEntity)ctor.Invoke(new object?[] { id });
+  }
+
+  [RequiresDynamicCode("Expression compilation requires runtime code generation. Native AOT uses the preserved constructor directly.")]
+  private static Func<TKey, TEntity> CreateCompiledActivator(ConstructorInfo constructor)
+  {
+    var idParam = Expression.Parameter(typeof(TKey), "id");
+    return Expression.Lambda<Func<TKey, TEntity>>(
+            Expression.New(constructor, idParam), idParam)
+        .Compile();
   }
 
   private readonly IIdGenerator<TKey> _idGenerator;
