@@ -1,0 +1,1 @@
+return await Franz.Common.Business.AotSmokeTest.BusinessAotSmoke.RunAsync();
