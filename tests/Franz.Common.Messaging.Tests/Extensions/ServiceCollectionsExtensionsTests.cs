@@ -20,7 +20,7 @@ public class ServiceCollectionExtensionsTests
 
     _services.Should().ContainSingle(descriptor =>
         descriptor.ServiceType == typeof(IHeaderContextAccessor) &&
-        descriptor.ImplementationType == typeof(HeaderContextAccessor) &&
+        descriptor.ImplementationFactory != null &&
         descriptor.Lifetime == ServiceLifetime.Scoped);
   }
 
