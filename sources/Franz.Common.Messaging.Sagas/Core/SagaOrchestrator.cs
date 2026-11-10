@@ -544,9 +544,11 @@ public sealed class SagaOrchestrator
         throw new SagaConfigurationError(
             "Durable saga retry requires EF Core, MongoDB, or Cosmos persistence with its transactional IUnitOfWork and scheduled IMessageStore.");
 
-      if (!messageId.HasValue || messageId.Value == Guid.Empty)
+      if (!messageId.HasValue || messageId.Value == Guid.Empty ||
+          originalMessage is null ||
+          originalMessage.GetProperty<bool>(MessagingConstants.TransportGeneratedMessageId))
         throw new SagaConfigurationError(
-            "Durable saga retry requires the original inbound message to have a stable, non-empty identity.");
+            "Durable saga retry requires the original inbound message to have a stable, broker-supplied identity.");
 
       if (_options.MaxRetryAttempts < 1)
         throw new SagaConfigurationError("Saga MaxRetryAttempts must be greater than zero.");

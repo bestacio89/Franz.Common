@@ -113,7 +113,7 @@ public class MessageTests
     result.Should().Be(0);
   }
 
-  private sealed class TestPayload
+  public sealed class TestPayload
   {
     public int Count { get; set; }
   }

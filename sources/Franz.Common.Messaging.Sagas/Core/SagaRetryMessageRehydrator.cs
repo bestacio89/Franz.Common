@@ -6,7 +6,6 @@ using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Messages;
 using Franz.Common.Messaging.Serialization;
-using Franz.Common.Serialization;
 using System.Text.Json;
 
 namespace Franz.Common.Messaging.Sagas.Core;
@@ -42,6 +41,34 @@ internal static class SagaRetryMessageRehydrator
         request.Properties is null)
       throw new PermanentMessagingException("Saga retry envelope is missing its original event data.");
 
+    if (!retryMessage.Headers.TryGetValue(Message.CausationHeader, out var retryCausationValues) ||
+        retryCausationValues is not { Length: 1 } ||
+        !Guid.TryParse(retryCausationValues[0], out var retryCausationId) ||
+        retryCausationId != request.OriginalMessageId)
+      throw new PermanentMessagingException("Saga retry envelope causation does not match its original message identity.");
+
+    if (!retryMessage.Headers.TryGetValue(Message.CorrelationHeader, out var retryCorrelationValues) ||
+        retryCorrelationValues is not { Length: 1 } ||
+        !Guid.TryParse(retryCorrelationValues[0], out var retryCorrelationId) ||
+        retryMessage.CorrelationId != retryCorrelationId ||
+        !request.Headers.TryGetValue(Message.CorrelationHeader, out var originalCorrelationValues) ||
+        originalCorrelationValues is not { Length: 1 } ||
+        !Guid.TryParse(originalCorrelationValues[0], out var originalCorrelationId) ||
+        originalCorrelationId != retryCorrelationId)
+      throw new PermanentMessagingException("Saga retry envelope correlation metadata is inconsistent.");
+
+    if (string.IsNullOrWhiteSpace(tenantId))
+    {
+      if (request.Headers.ContainsKey(HeaderConstants.TenantId))
+        throw new PermanentMessagingException("Saga retry envelope contains an unexpected tenant identity.");
+    }
+    else if (!request.Headers.TryGetValue(HeaderConstants.TenantId, out var originalTenantValues) ||
+             originalTenantValues is not { Length: 1 } ||
+             !string.Equals(originalTenantValues[0], tenantId, StringComparison.Ordinal))
+    {
+      throw new PermanentMessagingException("Saga retry envelope tenant does not match the validated tenant context.");
+    }
+
     if (!orchestrator.TryResolveMessageType(request.OriginalMessageType, out var originalType) ||
         originalType is null ||
         !typeof(IIntegrationEvent).IsAssignableFrom(originalType))
@@ -68,6 +95,9 @@ internal static class SagaRetryMessageRehydrator
     var properties = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
     foreach (var property in request.Properties)
     {
+      if (string.IsNullOrWhiteSpace(property.Value))
+        throw new PermanentMessagingException($"Saga retry property '{property.Key}' is empty.");
+
       try
       {
         using var document = JsonDocument.Parse(property.Value);

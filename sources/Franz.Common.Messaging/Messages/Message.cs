@@ -96,7 +96,8 @@ public class Message : INotification, IEvent
       {
         return json.Deserialize<T>(FranzJson.Default);
       }
-      catch (JsonException)
+      catch (Exception exception) when (
+          exception is JsonException or NotSupportedException or InvalidOperationException)
       {
         return default;
       }

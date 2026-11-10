@@ -75,6 +75,7 @@ public sealed class SagaRetryTests
 
     var retrySagaId = retryRequest.SagaId;
     var retryEnvelope = RehydrateOriginalEnvelope(retryRequest, scheduled.Message);
+    retryEnvelope.GetProperty<string>("custom-property").Should().Be("preserved");
 
     var earlyDelivery = () => fixture.Orchestrator.HandleEventAsync(
         new RetryEvent(),
