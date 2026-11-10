@@ -48,7 +48,7 @@ public class OutboxPublisherServiceTests
     // Assert
     _mockStore.Verify(s =>
         s.ClaimPendingAsync(It.IsAny<Guid>(), _options.LeaseDuration, 1, It.IsAny<CancellationToken>()),
-        Times.Once);
+        Times.Exactly(2));
 
     _mockSender.Verify(s =>
         s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()),
