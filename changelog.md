@@ -30,6 +30,41 @@
 
 ---
 
+## v3.0.0 — Major platform release (planned)
+
+### Saga orchestration and messaging execution
+- Add the dedicated `Franz.Common.Messaging.Sagas` orchestration package with explicit start, step and compensation roles, Saga identity resolution, lifecycle validation and optimistic concurrency.
+- Register inbound integration-event notification handlers from Saga message contracts and route them through the existing Franz Mediator execution boundary.
+- Make inbound integration-event processing fail fast so handler failures reach the transport listener and its configured retry/dead-letter policy.
+- Add provider-native Saga persistence for in-memory, EF Core, MongoDB and Cosmos DB, with documented transaction boundaries and provider prerequisites.
+- Atomically persist inbox receipts, Saga transitions, durable retry messages and outgoing outbox records within supported provider transactions.
+- Add persisted delayed retry and recovery, bounded retry attempts, metadata-only durable auditing and configurable retention for supported durable providers.
+- Preserve at-least-once broker delivery semantics; exactly-once side effects across a database and broker are not claimed. Consumers and external effects remain responsible for idempotency.
+- Split provider-specific inbox, message, audit and Saga persistence responsibilities into focused source files and adapters.
+
+### Native AOT and trimming qualification
+- Add package-level Native AOT smoke consumers for Business, DependencyInjection and Serialization, alongside the existing framework and messaging smoke coverage.
+- Preserve entity and aggregate constructor metadata and enumeration fields for the supported Business AOT path; exercise generated handler registration in the native consumer.
+- Mark runtime assembly-scanning DI APIs as requiring unreferenced code and document explicit generic registration as the supported AOT path.
+- Add source-generated JSON metadata support to serializer registration and use `JsonTypeInfo` for supported generic and runtime-type serialization operations.
+- Add an explicit closed generic enumeration converter for AOT applications; retain the reflection-based converter factory as a JIT compatibility path.
+- Treat AOT compatibility as a tested package/API contract. Optional integrations, runtime discovery APIs and external provider dependencies require independent qualification; no blanket application-wide AOT guarantee is implied.
+
+### CI and architecture validation
+- Keep the Saga-era suite-based CI as the canonical validation pipeline: core, messaging/Sagas, database and cross-cutting integration execute as separate jobs with independent timeouts and artifacts.
+- Add independent package-level Native AOT publish-and-execute jobs without replacing the suite-based test execution with a monolithic test step.
+- Validate exact test-project ownership through the suite manifest; newly added test projects must be assigned to one suite.
+- Retain serial project builds within each suite to avoid shared MSBuild output races, with test concurrency and isolated provider execution controlled by the manifest.
+- Run package README validation, package-consumer checks, NuGet vulnerability auditing and framework architecture tests as quality gates.
+
+### Release metadata and compatibility
+- The shared build target sets package, assembly and file versions to 3.0.0 / 3.0.0.0.
+- Package publication remains separate from source integration and is gated on full Release validation, API compatibility review and explicit release approval.
+- Provider-specific schema updates, deployment prerequisites and API migration details remain documented by the affected package guides and the release migration records below.
+
+---
+
+
 ## v2.3.5 — Tenant-aware HTTP, document persistence and gRPC
 
 ### HTTP request lifecycle
