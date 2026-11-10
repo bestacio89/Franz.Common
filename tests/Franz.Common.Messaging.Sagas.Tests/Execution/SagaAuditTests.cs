@@ -7,6 +7,7 @@ using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Logging;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Franz.Common.Messaging.Sagas.Tests.Execution;
@@ -62,6 +63,36 @@ public sealed class SagaAuditTests
     await act.Should().ThrowAsync<InvalidOperationException>()
         .WithMessage("durable audit write failed");
     store.WriteAttempts.Should().Be(1);
+  }
+
+  [Fact]
+  public void Registration_RejectsAuditRetentionForMemoryPersistence()
+  {
+    var services = new ServiceCollection();
+
+    var act = () => services.AddFranzSagas(options =>
+    {
+      options.Persistence = "Memory";
+      options.AuditRetentionPeriod = TimeSpan.FromDays(30);
+    });
+
+    act.Should().Throw<NotSupportedException>()
+        .WithMessage("*durable EF Core, MongoDB, or Cosmos persistence*");
+  }
+
+  [Fact]
+  public void Registration_RejectsNonPositiveAuditRetentionPeriod()
+  {
+    var services = new ServiceCollection();
+
+    var act = () => services.AddFranzSagas(options =>
+    {
+      options.Persistence = "EntityFramework";
+      options.AuditRetentionPeriod = TimeSpan.Zero;
+    });
+
+    act.Should().Throw<ArgumentOutOfRangeException>()
+        .WithParameterName("AuditRetentionPeriod");
   }
 
   private sealed class FailingAuditStore : ISagaAuditStore
