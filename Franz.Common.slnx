@@ -80,6 +80,9 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj" />
+    <Project Path="tests/Franz.Common.Business.AotSmokeTest/Franz.Common.Business.AotSmokeTest.csproj" />
+    <Project Path="tests/Franz.Common.DependencyInjection.AotSmokeTest/Franz.Common.DependencyInjection.AotSmokeTest.csproj" />
+    <Project Path="tests/Franz.Common.Serialization.AotSmokeTest/Franz.Common.Serialization.AotSmokeTest.csproj" />
     <Project Path="tests/Franz.Common.Business.Test/Franz.Common.Business.Tests.csproj" />
     <Project Path="tests/Franz.Common.Caching.Testing/Franz.Common.Caching.Tests.csproj" />
     <Project Path="tests/Franz.Common.Entity.Tests/Franz.Common.EntityFramework.Tests.csproj" />
