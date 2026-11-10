@@ -1,50 +1,40 @@
-﻿using Franz.Common.Mediator.Messages;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
-using Franz.Common.Serialization;
-using Microsoft.Extensions.Primitives;
-using System.Text.Json;
 
 namespace Franz.Common.Messaging.Factories;
 
 public sealed class QueryMessageBuilderStrategy : IMessageBuilderStrategy
 {
-  public bool CanBuild(object value)
+  private readonly IMessageSerializer _serializer;
+
+  public QueryMessageBuilderStrategy()
+      : this(new JsonMessageSerializer())
   {
-    if (value is null)
-      return false;
-
-    var type = value.GetType();
-
-    return type
-      .GetInterfaces()
-      .Any(i =>
-        i.IsGenericType &&
-        i.GetGenericTypeDefinition() == typeof(IQuery<>));
   }
+
+  public QueryMessageBuilderStrategy(IMessageSerializer serializer)
+      => _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+
+  public bool CanBuild(object value) => value is IQueryMessage;
 
   public Message Build(object value)
   {
+    ArgumentNullException.ThrowIfNull(value);
     if (!CanBuild(value))
       throw new InvalidOperationException(
-        $"Type '{value.GetType().FullName}' does not implement IQuery<TResponse>.");
+          $"Type '{value.GetType().FullName}' does not implement IQuery<TResponse>.");
 
-    // Serialize query payload
-    var body = JsonSerializer.Serialize(
-      value,
-      FranzJson.Default);
-
-      var message = new Message(body)
+    var body = _serializer.Serialize(value, value.GetType());
+    var message = new Message(body)
     {
-        Body = body,
-        Kind = MessageKind.Query
+      Body = body,
+      Kind = MessageKind.Query
     };
-    // Logical message identity
-    var className = HeaderNamer.GetEventClassName(value.GetType());
 
     message.Headers.Add(
-      MessagingConstants.ClassName,
-       new[] { className });
+        MessagingConstants.ClassName,
+        new[] { HeaderNamer.GetEventClassName(value.GetType()) });
 
     return message;
   }
