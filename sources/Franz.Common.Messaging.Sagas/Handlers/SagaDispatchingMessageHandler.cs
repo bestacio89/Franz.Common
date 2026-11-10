@@ -166,6 +166,7 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
           messageId,
           tenantId,
           retrySagaId,
+          message,
           ct).ConfigureAwait(false);
 
       if (_persistenceUnitOfWork is not null)

@@ -106,6 +106,7 @@ internal sealed class SagaIntegrationEventNotificationHandler<TNotification> : I
           messageId,
           tenantId,
           retrySagaId,
+          message,
           cancellationToken).ConfigureAwait(false);
 
       if (_persistenceUnitOfWork is not null)

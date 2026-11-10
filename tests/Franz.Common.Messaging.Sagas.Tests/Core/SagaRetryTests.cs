@@ -5,6 +5,7 @@ using Franz.Common.Mediator;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Exceptions;
+using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Configuration;
@@ -28,13 +29,18 @@ public sealed class SagaRetryTests
     var originalMessageId = Guid.CreateVersion7();
     var correlationId = Guid.CreateVersion7();
     var causationId = Guid.CreateVersion7();
+    var originalMessage = new IntegrationEventMessageBuilderStrategy().Build(new RetryEvent());
+    originalMessage.Id = originalMessageId;
+    originalMessage.CorrelationId = correlationId;
 
     await fixture.Orchestrator.HandleEventAsync(
         new RetryEvent(),
         correlationId,
         causationId,
         originalMessageId,
-        tenantId: null);
+        tenantId: null,
+        retrySagaId: null,
+        originalMessage);
 
     var scheduled = fixture.MessageStore.ScheduledMessages.Should().ContainSingle().Which;
     var persisted = await fixture.Repository.LoadAsync(
@@ -62,7 +68,8 @@ public sealed class SagaRetryTests
         originalMessageId,
         scheduled.Message.Id,
         tenantId: null,
-        retrySagaId);
+        retrySagaId,
+        scheduled.Message);
 
     await earlyDelivery.Should().ThrowAsync<PermanentMessagingException>()
         .WithMessage("*not due*");
@@ -75,7 +82,8 @@ public sealed class SagaRetryTests
         originalMessageId,
         scheduled.Message.Id,
         tenantId: null,
-        retrySagaId);
+        retrySagaId,
+        scheduled.Message);
 
     persisted = await fixture.Repository.LoadAsync(
         fixture.Saga.SagaId, null, typeof(RetrySagaState));
@@ -94,13 +102,18 @@ public sealed class SagaRetryTests
     var fixture = new Fixture(maxRetryAttempts: 1, alwaysRetry: true);
     var correlationId = Guid.CreateVersion7();
     var originalMessageId = Guid.CreateVersion7();
+    var originalMessage = new IntegrationEventMessageBuilderStrategy().Build(new RetryEvent());
+    originalMessage.Id = originalMessageId;
+    originalMessage.CorrelationId = correlationId;
 
     await fixture.Orchestrator.HandleEventAsync(
         new RetryEvent(),
         correlationId,
         causationId: null,
         originalMessageId,
-        tenantId: null);
+        tenantId: null,
+        retrySagaId: null,
+        originalMessage);
 
     var scheduled = fixture.MessageStore.ScheduledMessages.Should().ContainSingle().Which;
     await Task.Delay(scheduled.NotBefore - DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(20));
@@ -114,7 +127,8 @@ public sealed class SagaRetryTests
         originalMessageId,
         scheduled.Message.Id,
         tenantId: null,
-        retrySagaId);
+        retrySagaId,
+        scheduled.Message);
 
     await act.Should().ThrowAsync<SagaFailedException>();
 

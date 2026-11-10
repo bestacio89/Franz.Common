@@ -2,9 +2,11 @@
 
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Context;
+using Franz.Common.Headers;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Exceptions;
+using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Storage;
 using Franz.Common.Messaging.Sagas.Abstractions;
@@ -99,6 +101,7 @@ public sealed class SagaOrchestrator
           messageId: null,
           tenantId: null,
           retrySagaId: null,
+          originalMessage: null,
           cancellationToken);
 
   public Task HandleEventAsync(
@@ -115,6 +118,25 @@ public sealed class SagaOrchestrator
           messageId,
           tenantId,
           retrySagaId: null,
+          originalMessage: null,
+          cancellationToken);
+
+  public Task HandleEventAsync(
+      IIntegrationEvent incomingEvent,
+      Guid correlationId,
+      Guid? causationId,
+      Guid? messageId,
+      string? tenantId,
+      Guid? retrySagaId,
+      CancellationToken cancellationToken = default)
+      => HandleEventAsync(
+          incomingEvent,
+          correlationId,
+          causationId,
+          messageId,
+          tenantId,
+          retrySagaId,
+          originalMessage: null,
           cancellationToken);
 
   public async Task HandleEventAsync(
@@ -124,6 +146,7 @@ public sealed class SagaOrchestrator
       Guid? messageId,
       string? tenantId,
       Guid? retrySagaId,
+      Message? originalMessage,
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(incomingEvent);
@@ -150,6 +173,7 @@ public sealed class SagaOrchestrator
               causationId,
               messageId,
               tenantId,
+              originalMessage,
               cancellationToken).ConfigureAwait(false);
         }
         else
@@ -161,6 +185,7 @@ public sealed class SagaOrchestrator
               causationId,
               messageId,
               tenantId,
+              originalMessage,
               cancellationToken).ConfigureAwait(false);
         }
       }
@@ -188,6 +213,7 @@ public sealed class SagaOrchestrator
       Guid? causationId,
       Guid? messageId,
       string? tenantId,
+      Message? originalMessage,
       CancellationToken cancellationToken)
   {
     if (!messageId.HasValue || messageId.Value == Guid.Empty)
@@ -278,6 +304,7 @@ public sealed class SagaOrchestrator
         record.Version,
         result,
         message,
+        originalMessage,
         messageId,
         message.GetType(),
         registration.CanCompensate(message.GetType()) ? "Compensate" : "Retry",
@@ -297,6 +324,7 @@ public sealed class SagaOrchestrator
       Guid? causationId,
       Guid? messageId,
       string? tenantId,
+      Message? originalMessage,
       CancellationToken cancellationToken)
   {
     var messageType = message.GetType();
@@ -376,6 +404,7 @@ public sealed class SagaOrchestrator
           expectedVersion: null,
           transition,
           message,
+          originalMessage,
           messageId,
           messageType,
           "Start",
@@ -466,6 +495,7 @@ public sealed class SagaOrchestrator
         existingRecord.Version,
         result,
         message,
+        originalMessage,
         messageId,
         messageType,
         registration.CanCompensate(messageType) ? "Compensate" : "Step",
@@ -481,6 +511,7 @@ public sealed class SagaOrchestrator
       long? expectedVersion,
       ISagaTransition transition,
       IIntegrationEvent incomingEvent,
+      Message? originalMessage,
       Guid? messageId,
       Type incomingMessageType,
       string stepType,
@@ -532,17 +563,31 @@ public sealed class SagaOrchestrator
         if (delay <= TimeSpan.Zero)
           throw new SagaConfigurationError("Saga retry delay must be greater than zero.");
 
-        var scheduledAt = DateTimeOffset.UtcNow.Add(delay);
-        var retryContext = MediatorContext.Current
-            .WithCorrelationId(correlationId)
-            .WithCausationId(messageId)
-            .WithTenant(tenantId);
-        using var retryContextScope = MediatorContext.BeginScope(retryContext);
+        if (originalMessage is null ||
+            originalMessage.Id != messageId.Value ||
+            string.IsNullOrWhiteSpace(originalMessage.Body))
+          throw new SagaConfigurationError(
+              "Durable saga retry requires the original inbound message envelope and its non-empty body.");
 
-        var retryMessage = new IntegrationEventMessageBuilderStrategy().Build(incomingEvent);
+        var scheduledAt = DateTimeOffset.UtcNow.Add(delay);
+        var retryMessage = new Message(originalMessage.Body, originalMessage.Headers)
+        {
+          Id = Guid.CreateVersion7(),
+          OccurredOn = originalMessage.OccurredOn,
+          Kind = MessageKind.IntegrationEvent,
+          AggregateId = originalMessage.AggregateId,
+          Properties = new Dictionary<string, object>(
+              originalMessage.Properties,
+              StringComparer.OrdinalIgnoreCase)
+        };
+        retryMessage.Properties.Remove(MessagingConstants.TransportGeneratedMessageId);
+        retryMessage.CorrelationId = correlationId;
         retryMessage.MessageType = incomingEvent.GetType().AssemblyQualifiedName
             ?? incomingEvent.GetType().FullName
             ?? incomingEvent.GetType().Name;
+        retryMessage.Headers[Message.CausationHeader] = [messageId.Value.ToString("D")];
+        if (!string.IsNullOrWhiteSpace(tenantId))
+          retryMessage.Headers[HeaderConstants.TenantId] = [tenantId];
         retryMessage.Headers[SagaRetryHeaders.TargetSagaId] = [record.SagaId.ToString("D")];
 
         var scheduledRecord = record with

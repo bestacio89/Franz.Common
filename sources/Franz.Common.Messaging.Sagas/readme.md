@@ -107,7 +107,7 @@ Inbound integration-event notifications use `StopOnFirstFailure`. A handler fail
 A handler can request a durable retry with `context.Retry(delay?, error?)`. The retry path is part of the same persistence unit of work as the saga state transition:
 
 1. Persist `RetryScheduled`, `NextAttemptAt`, the incremented retry count, and the identity of the scheduled retry message.
-2. Rebuild the original integration event as a new Franz message. Preserve correlation and tenant metadata, set causation to the message that requested the retry, and add the reserved `franz-saga-retry-target` header.
+2. Clone the original inbound Franz envelope with its exact body, headers, properties, aggregate identity, and occurrence timestamp. Assign a fresh message ID, preserve correlation and validated tenant metadata, set causation to the message that requested the retry, and add the reserved `franz-saga-retry-target` header. The transport-generated identity marker is removed because the retry message now has a stable outbox identity.
 3. Save the retry message through `IMessageStore.SaveScheduledAsync` with the same due timestamp.
 4. Commit the saga state and outbox record together. The existing `OutboxPublisherService` does not claim the message before `NextAttemptAt`; it must be enabled and running for scheduled retries to be dispatched. No separate scheduler process is required.
 
