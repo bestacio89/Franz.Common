@@ -265,7 +265,10 @@ public sealed class SagaRetryTests
     public RecordingMessageStore MessageStore { get; } = new();
     public SagaOrchestrator Orchestrator { get; }
 
-    public Fixture(int maxRetryAttempts, bool alwaysRetry = false)
+    public Fixture(
+        int maxRetryAttempts,
+        bool alwaysRetry = false,
+        TimeSpan? retryDelay = null)
     {
       Saga.AlwaysRetry = alwaysRetry;
       Saga.RetryDelay = retryDelay ?? TimeSpan.FromMilliseconds(75);
