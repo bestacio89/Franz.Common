@@ -2,6 +2,7 @@
 
 using System.Text.Json;
 using FluentAssertions;
+using Franz.Common.Errors;
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging;
@@ -184,7 +185,7 @@ public sealed class SagaRetryTests
         Guid.CreateVersion7(),
         tenantId: null);
 
-    await act.Should().ThrowAsync<SagaConfigurationError>()
+    await act.Should().ThrowAsync<TechnicalException>()
         .WithMessage("*durable retry*");
     (await repository.LoadAsync(saga.SagaId, null, typeof(RetrySagaState))).Should().BeNull();
   }
