@@ -1,17 +1,15 @@
 #nullable enable
 
-using Franz.Common.Business.Domain;
-
 namespace Franz.Common.Messaging.Sagas.Persistence.Cosmos;
 
 /// <summary>
 /// Cosmos audit document stored in the same tenant partition and container as saga state.
+/// It intentionally does not inherit Entity<Guid>: retention must physically delete audit data,
+/// not trigger the framework's normal soft-delete behavior.
 /// </summary>
-internal sealed class CosmosSagaAuditDocument : Entity<Guid>
+internal sealed class CosmosSagaAuditDocument
 {
-  public CosmosSagaAuditDocument() { }
-  public CosmosSagaAuditDocument(Guid auditId) : base(auditId) { }
-
+  public Guid Id { get; set; }
   public string TenantId { get; set; } = string.Empty;
   public Guid SagaId { get; set; }
   public string SagaType { get; set; } = string.Empty;

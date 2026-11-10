@@ -26,8 +26,9 @@ internal sealed class CosmosSagaAuditStore : ISagaAuditStore
       throw new InvalidOperationException(
           "Durable saga audit writes require the active Cosmos saga persistence unit.");
 
-    var document = new CosmosSagaAuditDocument(record.AuditId)
+    var document = new CosmosSagaAuditDocument
     {
+      Id = record.AuditId,
       TenantId = record.TenantId ?? string.Empty,
       SagaId = record.SagaId,
       SagaType = record.SagaType,
@@ -43,7 +44,6 @@ internal sealed class CosmosSagaAuditStore : ISagaAuditStore
       DurationTicks = record.Duration.Ticks,
       ErrorType = record.ErrorType
     };
-    document.MarkCreated("saga-audit");
     await _db.Set<CosmosSagaAuditDocument>().AddAsync(document, cancellationToken).ConfigureAwait(false);
   }
 
