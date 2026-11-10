@@ -78,10 +78,10 @@ public static class FranzSagaServiceCollectionExtensions
     services.TryAddTransient<SagaOrchestrator>();
     services.TryAddScoped<ISagaStateSerializer, JsonSagaStateSerializer>();
 
+    RegisterPersistenceAdapter(services, options.Persistence);
+
     services.TryAddEnumerable(
         ServiceDescriptor.Singleton<ISagaAuditSink, DefaultSagaAuditSink>());
-
-    RegisterPersistenceAdapter(services, options.Persistence);
 
     if (options.AuditRetentionPeriod.HasValue)
       services.TryAddEnumerable(

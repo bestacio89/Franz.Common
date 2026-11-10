@@ -57,11 +57,12 @@ internal sealed class CosmosSagaAuditStore : ISagaAuditStore
     if (_unitOfWork.IsActive)
       throw new InvalidOperationException("Saga audit retention cannot run inside a saga execution transaction.");
 
+    // Cosmos transactional batches are limited to 100 operations per logical partition.
+    var effectiveBatchSize = Math.Min(batchSize, 100);
     var expired = await _db.SagaAuditRecords
         .Where(record => record.Timestamp < cutoff.ToUniversalTime())
         .OrderBy(record => record.Timestamp)
-        .ThenBy(record => record.Id)
-        .Take(batchSize)
+        .Take(effectiveBatchSize)
         .ToListAsync(cancellationToken)
         .ConfigureAwait(false);
 

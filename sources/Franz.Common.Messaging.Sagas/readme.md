@@ -176,7 +176,7 @@ var sagaBuilder = services.AddFranzSagas(options =>
 
 A null `AuditRetentionPeriod` retains records indefinitely. When configured, a hosted service removes at most `AuditRetentionBatchSize` expired records per cleanup interval. The cutoff is based on the audit timestamp in UTC. MongoDB creates the timestamp index during hosted-service startup; relational EF creates an index through the model; Cosmos audit documents share the existing `SagaStates` container and tenant partition so audit writes remain in the same transactional batch as saga state. Retention cleanup deletes Cosmos records one tenant partition at a time.
 
-The in-memory provider does not support durable audit or retention. Configuring retention with `Persistence = "Memory"` is rejected at registration. Hosts must apply the updated EF Core migration to create the `SagaAudit` table and indexes before enabling durable audit on relational persistence.
+The in-memory provider does not support durable audit or retention. Configuring retention with `Persistence = "Memory"` is rejected at registration. Hosts must generate and apply an EF Core migration from the updated `SagaDbContext` to create the `SagaAudit` table and indexes before enabling durable audit on relational persistence. The package does not ship a host-specific migration.
 
 ## Current limitations
 

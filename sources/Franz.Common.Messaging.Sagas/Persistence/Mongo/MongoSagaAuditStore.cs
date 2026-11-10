@@ -23,7 +23,9 @@ internal sealed class MongoSagaAuditStore : ISagaAuditStore
   public async Task InitializeAsync(CancellationToken cancellationToken = default)
   {
     var index = new CreateIndexModel<MongoSagaAuditDocument>(
-        Builders<MongoSagaAuditDocument>.IndexKeys.Ascending(record => record.TimestampUtc));
+        Builders<MongoSagaAuditDocument>.IndexKeys
+            .Ascending(record => record.TimestampUtc)
+            .Ascending(record => record.AuditId));
     await _collection.Indexes.CreateOneAsync(index, cancellationToken: cancellationToken).ConfigureAwait(false);
   }
 
