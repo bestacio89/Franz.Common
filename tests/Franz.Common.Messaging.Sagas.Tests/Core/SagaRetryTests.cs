@@ -211,6 +211,7 @@ public sealed class SagaRetryTests
           Array.Empty<ISagaAuditSink>(),
           new FranzSagaOptions
           {
+            Persistence = "EntityFramework",
             MaxRetryAttempts = maxRetryAttempts,
             DefaultRetryDelay = TimeSpan.FromMilliseconds(75)
           },

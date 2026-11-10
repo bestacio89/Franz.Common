@@ -504,9 +504,11 @@ public sealed class SagaOrchestrator
       if (transition.OutgoingMessage is not null)
         throw new SagaConfigurationError("A retry transition cannot publish a separate outgoing message.");
 
-      if (_messageStore is null || _persistenceUnitOfWork is null)
+      if (_options.Persistence.Equals("Memory", StringComparison.OrdinalIgnoreCase) ||
+          _messageStore is null ||
+          _persistenceUnitOfWork is null)
         throw new SagaConfigurationError(
-            "Durable saga retry requires a transactional persistence IUnitOfWork and a scheduled IMessageStore.");
+            "Durable saga retry requires EF Core, MongoDB, or Cosmos persistence with its transactional IUnitOfWork and scheduled IMessageStore.");
 
       if (!messageId.HasValue || messageId.Value == Guid.Empty)
         throw new SagaConfigurationError(

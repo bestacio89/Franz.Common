@@ -109,7 +109,7 @@ A handler can request a durable retry with `context.Retry(delay?, error?)`. The 
 1. Persist `RetryScheduled`, `NextAttemptAt`, the incremented retry count, and the identity of the scheduled retry message.
 2. Rebuild the original integration event as a new Franz message. Preserve correlation and tenant metadata, set causation to the message that requested the retry, and add the reserved `franz-saga-retry-target` header.
 3. Save the retry message through `IMessageStore.SaveScheduledAsync` with the same due timestamp.
-4. Commit the saga state and outbox record together. The existing `OutboxPublisherService` does not claim the message before `NextAttemptAt`; no separate scheduler process is required.
+4. Commit the saga state and outbox record together. The existing `OutboxPublisherService` does not claim the message before `NextAttemptAt`; it must be enabled and running for scheduled retries to be dispatched. No separate scheduler process is required.
 
 After restart, the persisted outbox record remains pending and becomes eligible at its due time. The inbound Saga adapter accepts a retry only when its target saga, message ID, lifecycle status, and due timestamp match the persisted retry schedule. This also handles retries of start events: the existing saga state is rehydrated rather than creating a second saga instance. Other saga registrations for the same event are not invoked by a targeted retry.
 
