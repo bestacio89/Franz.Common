@@ -93,7 +93,9 @@ jobs:
           feed="$temp_dir/feed"
           consumer="$temp_dir/consumer"
           mkdir -p "$feed" "$consumer"
-          find sources -path '*/bin/Release/*.nupkg' -exec cp -n {} "$feed/" \\;
+          while IFS= read -r -d '' package_file; do
+            cp -n "$package_file" "$feed/"
+          done < <(find sources -path '*/bin/Release/*.nupkg' -print0)
 
           cat > "$consumer/Consumer.csproj" <<'EOF'
           <Project Sdk="Microsoft.NET.Sdk">
