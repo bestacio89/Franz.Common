@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Franz.Common.Business.Domain.IdGenerators;
 using Franz.Common.Mediator.Messages;
 
@@ -14,7 +13,10 @@ namespace Franz.Common.Business.Domain.Factories;
 /// The constructor delegate is compiled once per closed generic type and cached
 /// for the lifetime of the application.
 /// </summary>
-public sealed class AggregateFactory<TAggregate, TEvent> : IAggregateFactory<TAggregate>
+public sealed class AggregateFactory<
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors |
+                                DynamicallyAccessedMemberTypes.NonPublicConstructors)] TAggregate,
+    TEvent> : IAggregateFactory<TAggregate>
     where TAggregate : AggregateRoot<TEvent>
     where TEvent : IEvent
 {
