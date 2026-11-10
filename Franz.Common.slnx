@@ -75,7 +75,6 @@
     <Project Path="sources/Franz.Common.Mediator.SourceGenerator/Franz.Common.Mediator.SourceGenerator.csproj" Id="af59ed84-f6a3-44cb-9347-b32b22ed27b8" />
   </Folder>
   <Folder Name="/benchmarks/">
-    <Project Path="benchmarks/Franz.Common.Caching.Benchmarks/Franz.Common.Caching.Benchmarks.csproj" />
     <Project Path="benchmarks/Franz.Common.Caching.LoadTests/Franz.Common.Caching.LoadTests.csproj" />
   </Folder>
   <Folder Name="/tests/">
