@@ -139,11 +139,6 @@ jobs:
       - name: Validate gRPC package consumer
         run: bash scripts/validate-grpc-package-consumer.sh
 
-      - name: Publish and execute Native AOT mapper smoke test
-        run: |
-          dotnet publish tests/Franz.Common.AotSmokeTest/Franz.Common.AotSmokeTest.csproj --configuration Release --runtime linux-x64 --self-contained true -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=full -p:ILLinkTreatWarningsAsErrors=true
-          ./tests/Franz.Common.AotSmokeTest/bin/Release/net10.0/linux-x64/publish/Franz.Common.AotSmokeTest
-
       - name: Test framework architecture policies
         run: dotnet test tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=architecture-tests.trx"
 
@@ -198,3 +193,41 @@ jobs:
             **/CompatibilitySuppressions.xml
             container-diagnostics/**
           if-no-files-found: warn
+
+  native-aot:
+    name: Native AOT - ${{ matrix.package }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: Framework
+            project: tests/Franz.Common.AotSmokeTest/Franz.Common.AotSmokeTest.csproj
+            executable: tests/Franz.Common.AotSmokeTest/bin/Release/net10.0/linux-x64/publish/Franz.Common.AotSmokeTest
+          - package: Business
+            project: tests/Franz.Common.Business.AotSmokeTest/Franz.Common.Business.AotSmokeTest.csproj
+            executable: tests/Franz.Common.Business.AotSmokeTest/bin/Release/net10.0/linux-x64/publish/Franz.Common.Business.AotSmokeTest
+          - package: DependencyInjection
+            project: tests/Franz.Common.DependencyInjection.AotSmokeTest/Franz.Common.DependencyInjection.AotSmokeTest.csproj
+            executable: tests/Franz.Common.DependencyInjection.AotSmokeTest/bin/Release/net10.0/linux-x64/publish/Franz.Common.DependencyInjection.AotSmokeTest
+          - package: Serialization
+            project: tests/Franz.Common.Serialization.AotSmokeTest/Franz.Common.Serialization.AotSmokeTest.csproj
+            executable: tests/Franz.Common.Serialization.AotSmokeTest/bin/Release/net10.0/linux-x64/publish/Franz.Common.Serialization.AotSmokeTest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.403
+
+      - name: Publish with trimming and Native AOT
+        shell: bash
+        run: |
+          dotnet publish "${{ matrix.project }}" --configuration Release --runtime linux-x64 --self-contained true -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=full -p:ILLinkTreatWarningsAsErrors=true "-p:WarningsAsErrors=IL2026;IL3050;IL2067;IL2070;IL2090;IL2046;IL3051"
+
+      - name: Execute native smoke test
+        shell: bash
+        run: "${{ matrix.executable }}"
