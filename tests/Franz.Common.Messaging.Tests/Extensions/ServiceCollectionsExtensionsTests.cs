@@ -31,7 +31,7 @@ public class ServiceCollectionExtensionsTests
 
     _services.Should().ContainSingle(descriptor =>
         descriptor.ServiceType == typeof(IMessageSerializer) &&
-        descriptor.ImplementationFactory is not null &&
+        descriptor.ImplementationFactory != null &&
         descriptor.Lifetime == ServiceLifetime.Scoped);
 
     using var provider = _services.BuildServiceProvider(validateScopes: true);
@@ -47,14 +47,14 @@ public class ServiceCollectionExtensionsTests
 
     _services.Should().ContainSingle(descriptor =>
         descriptor.ServiceType == typeof(IMessageFactory) &&
-        descriptor.ImplementationFactory is not null &&
+        descriptor.ImplementationFactory != null &&
         descriptor.Lifetime == ServiceLifetime.Scoped);
 
     var strategies = _services.Where(descriptor =>
         descriptor.ServiceType == typeof(IMessageBuilderStrategy)).ToArray();
     strategies.Should().HaveCount(4);
     strategies.Should().OnlyContain(descriptor =>
-        descriptor.ImplementationFactory is not null &&
+        descriptor.ImplementationFactory != null &&
         descriptor.Lifetime == ServiceLifetime.Scoped);
 
     using var provider = _services.BuildServiceProvider(
