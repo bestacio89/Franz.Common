@@ -16,7 +16,7 @@ public sealed class CommandMessageBuilderStrategy : IMessageBuilderStrategy
   public CommandMessageBuilderStrategy(IMessageSerializer serializer)
       => _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
 
-  public bool CanBuild(object value) => value is ICommand;
+  public bool CanBuild(object value) => value is ICommandMessage;
 
   public Message Build(object value)
   {
