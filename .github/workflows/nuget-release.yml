@@ -132,7 +132,7 @@ jobs:
           fi
 
       - name: Build Release solution
-        run: dotnet build Franz.Common.slnx --configuration Release --no-restore
+        run: dotnet build Franz.Common.slnx --configuration Release --no-restore --maxcpucount:1 -p:BuildInParallel=false -p:GeneratePackageOnBuild=false
 
       - name: Run complete test suite
         run: dotnet test Franz.Common.slnx --configuration Release --no-build --blame-hang-timeout 10m --logger "trx;LogFileName=main-release.trx"
