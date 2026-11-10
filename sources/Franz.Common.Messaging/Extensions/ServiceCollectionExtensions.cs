@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Errors;
 using Franz.Common.Headers;
@@ -30,6 +31,18 @@ public static class ServiceCollectionExtensions
 
     return services;
   }
+
+  /// <summary>Registers messaging serialization with application-owned source-generated JSON metadata.</summary>
+  public static IServiceCollection AddMessagingSerialization(
+      this IServiceCollection services,
+      JsonSerializerContext jsonSerializerContext)
+  {
+    ArgumentNullException.ThrowIfNull(services);
+    ArgumentNullException.ThrowIfNull(jsonSerializerContext);
+    services.AddSingleton<JsonSerializerContext>(jsonSerializerContext);
+    return services.AddMessagingSerialization();
+  }
+
 
   public static IServiceCollection AddMessagingFactories(this IServiceCollection services)
   {
