@@ -156,7 +156,29 @@ public sealed class SagaOrchestrator
               $"Could not create saga state '{registration.StateType.FullName}'.");
 
       SetSagaState(saga, registration, state);
-      var sagaId = GetSagaId(saga);
+
+      // A start contract may opt into deterministic business identity. Without a
+      // resolver, SagaBase's generated Guid remains the backwards-compatible default.
+      var startResolverType = typeof(ISagaIdResolver<>).MakeGenericType(messageType);
+      var sagaId = startResolverType.IsInstanceOfType(saga)
+          ? ResolveSagaId(saga, message, registration)
+          : GetSagaId(saga);
+
+      if (GetSagaId(saga) != sagaId)
+        SetSagaId(saga, sagaId);
+
+      // Reject an already-persisted instance before invoking application handlers.
+      // The repository's unique tenant-scoped create remains the concurrency arbiter
+      // when two start deliveries race after this preflight check.
+      var existingStart = await _repository.LoadAsync(
+          sagaId,
+          tenantId,
+          registration.StateType,
+          cancellationToken).ConfigureAwait(false);
+
+      if (existingStart is not null)
+        throw new SagaConcurrencyException(sagaId, expectedVersion: null);
+
       var context = new SagaContext(
           sagaId,
           registration.SagaType,
@@ -587,7 +609,7 @@ public sealed class SagaOrchestrator
     if (!resolverType.IsInstanceOfType(saga))
       throw new SagaConfigurationError(
           $"Saga '{registration.SagaType.Name}' must implement " +
-          $"ISagaIdResolver<{messageType.Name}> to process non-start message '{messageType.Name}'.");
+          $"ISagaIdResolver<{messageType.Name}> to resolve the saga identity for message '{messageType.Name}'.");
 
     var resolver = resolverType.GetMethod(nameof(ISagaIdResolver<IIntegrationEvent>.ResolveSagaId))
         ?? throw new SagaConfigurationError(
