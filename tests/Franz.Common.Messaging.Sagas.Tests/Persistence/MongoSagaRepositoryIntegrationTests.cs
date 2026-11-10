@@ -214,13 +214,13 @@ public sealed class MongoSagaRepositoryIntegrationTests : IAsyncLifetime
     var ownerA = Guid.CreateVersion7();
     var ownerB = Guid.CreateVersion7();
     var initialClaims = await Task.WhenAll(
-        storeA.ClaimPendingAsync(ownerA, TimeSpan.FromMilliseconds(100), 1),
-        storeB.ClaimPendingAsync(ownerB, TimeSpan.FromMilliseconds(100), 1));
+        storeA.ClaimPendingAsync(ownerA, TimeSpan.FromSeconds(2), 1),
+        storeB.ClaimPendingAsync(ownerB, TimeSpan.FromSeconds(2), 1));
 
     initialClaims.Sum(claim => claim.Count).Should().Be(1);
     var originalOwner = initialClaims[0].Count == 1 ? ownerA : ownerB;
 
-    await Task.Delay(TimeSpan.FromMilliseconds(250));
+    await Task.Delay(TimeSpan.FromMilliseconds(2200));
 
     var recoveryOwner = Guid.CreateVersion7();
     var recovered = await storeB.ClaimPendingAsync(recoveryOwner, TimeSpan.FromMinutes(1), 1);
