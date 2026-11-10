@@ -27,6 +27,10 @@ public static class Program
 {
     public static async Task<int> Main()
     {
+        var messagingResult = await MessagingAotSmoke.RunAsync();
+        if (messagingResult != 0)
+            return messagingResult;
+
         var cacheKeyStrategy = new DefaultCacheKeyStrategy(new JsonSerializerOptions
         {
             TypeInfoResolver = AotCacheKeyJsonContext.Default
