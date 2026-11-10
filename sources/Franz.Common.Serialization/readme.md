@@ -58,6 +58,30 @@ public sealed class EventPublisher(IJsonSerializer serializer)
 
 The registered `SystemTextJsonSerializer` creates its own options instance and adds the converters supplied through DI; it does not use `FranzJson.Default` directly.
 
+## Native AOT and source-generated metadata
+
+Provide metadata for every root and runtime concrete type that the serializer can process:
+
+```csharp
+[JsonSerializable(typeof(OrderCreated))]
+[JsonSerializable(typeof(OrderLine))]
+internal partial class AppJsonContext : JsonSerializerContext { }
+
+builder.Services.AddSerializers(AppJsonContext.Default);
+```
+
+The serializer resolves `JsonTypeInfo` from the supplied context for both generic and runtime-type operations. Missing metadata fails explicitly; it does not fall back to reflection. `SystemTextCreationConverter<T>` uses the active options resolver for its concrete runtime type, so that type must also be present in the context.
+
+For domain enumerations, register a closed converter instance explicitly:
+
+```csharp
+services.AddSingleton<JsonConverter>(
+    new EnumerationValueJsonConverter<OrderStatus, int>());
+services.AddSerializers(AppJsonContext.Default);
+```
+
+The reflection-based `EnumerationJsonConverter` factory is retained for JIT compatibility and is annotated as requiring dynamic code. It is not the Native AOT path.
+
 ## Custom converters
 
 The assembly contains converter types such as `DateTimeJsonConverter`, `DateTimeOffsetJsonConverter`, and `EnumerationJsonConverter`. Their presence does not mean they are automatically registered. Register the required `JsonConverter` instances with DI before calling `AddSerializers()`, or configure a serializer instance explicitly where appropriate.
