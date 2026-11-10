@@ -779,9 +779,12 @@ public sealed class SagaOrchestrator
       }
       catch (Exception exception)
       {
+        if (sink is ISagaAuditStore)
+          throw;
+
         _logger.LogError(
             exception,
-            "Saga audit sink {AuditSink} failed after saga {SagaId} committed transition {Status}.",
+            "Best-effort saga audit sink {AuditSink} failed for saga {SagaId} transition {Status}.",
             sink.GetType().FullName,
             updatedRecord.SagaId,
             updatedRecord.Status);
