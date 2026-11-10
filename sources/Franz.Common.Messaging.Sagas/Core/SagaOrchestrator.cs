@@ -11,6 +11,7 @@ using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Storage;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Exceptions;
+using Franz.Common.Messaging.Sagas.Messages;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Configuration;
 using Franz.Common.Messaging.Sagas.Logging;
@@ -19,6 +20,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using System.Text.Json;
 
 namespace Franz.Common.Messaging.Sagas.Core;
 
@@ -570,21 +572,45 @@ public sealed class SagaOrchestrator
               "Durable saga retry requires the original inbound message envelope and its non-empty body.");
 
         var scheduledAt = DateTimeOffset.UtcNow.Add(delay);
-        var retryMessage = new Message(originalMessage.Body, originalMessage.Headers)
+        var retryHeaders = originalMessage.Headers.ToDictionary(
+            header => header.Key,
+            header => header.Value.ToArray(),
+            StringComparer.OrdinalIgnoreCase);
+        retryHeaders.Remove(SagaRetryHeaders.TargetSagaId);
+        retryHeaders[Message.CorrelationHeader] = [correlationId.ToString("D")];
+        retryHeaders[Message.CausationHeader] = [messageId.Value.ToString("D")];
+        if (!string.IsNullOrWhiteSpace(tenantId))
+          retryHeaders[HeaderConstants.TenantId] = [tenantId];
+        else
+          retryHeaders.Remove(HeaderConstants.TenantId);
+
+        var retryProperties = originalMessage.Properties.ToDictionary(
+            property => property.Key,
+            property => JsonSerializer.SerializeToElement(
+                property.Value,
+                property.Value?.GetType() ?? typeof(object)),
+            StringComparer.OrdinalIgnoreCase);
+        retryProperties.Remove(MessagingConstants.TransportGeneratedMessageId);
+
+        var retryRequest = new SagaRetryRequested
         {
-          Id = Guid.CreateVersion7(),
+          SagaId = record.SagaId,
+          OriginalMessageId = originalMessage.Id,
+          OriginalMessageType = incomingEvent.GetType().AssemblyQualifiedName
+              ?? incomingEvent.GetType().FullName
+              ?? incomingEvent.GetType().Name,
+          Body = originalMessage.Body!,
+          Headers = retryHeaders,
+          Properties = retryProperties,
           OccurredOn = originalMessage.OccurredOn,
-          Kind = MessageKind.IntegrationEvent,
           AggregateId = originalMessage.AggregateId,
-          Properties = new Dictionary<string, object>(
-              originalMessage.Properties,
-              StringComparer.OrdinalIgnoreCase)
+          Kind = originalMessage.Kind
         };
-        retryMessage.Properties.Remove(MessagingConstants.TransportGeneratedMessageId);
+
+        var retryMessage = new IntegrationEventMessageBuilderStrategy().Build(retryRequest);
+        retryMessage.MessageType = typeof(SagaRetryRequested).AssemblyQualifiedName
+            ?? typeof(SagaRetryRequested).FullName!;
         retryMessage.CorrelationId = correlationId;
-        retryMessage.MessageType = incomingEvent.GetType().AssemblyQualifiedName
-            ?? incomingEvent.GetType().FullName
-            ?? incomingEvent.GetType().Name;
         retryMessage.Headers[Message.CausationHeader] = [messageId.Value.ToString("D")];
         if (!string.IsNullOrWhiteSpace(tenantId))
           retryMessage.Headers[HeaderConstants.TenantId] = [tenantId];

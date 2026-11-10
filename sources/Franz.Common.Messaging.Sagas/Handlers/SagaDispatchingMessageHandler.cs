@@ -9,6 +9,7 @@ using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Exceptions;
+using Franz.Common.Messaging.Sagas.Messages;
 using Franz.Common.Messaging.Serialization;
 using Franz.Common.Messaging.Storage;
 using Franz.Common.MultiTenancy;
@@ -54,6 +55,20 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
     _tenantExecutionContextAccessor = tenantExecutionContextAccessor;
   }
 
+  private static bool IsSagaRetryRequestedType(string typeName)
+      => string.Equals(
+             typeName,
+             typeof(SagaRetryRequested).AssemblyQualifiedName,
+             StringComparison.Ordinal)
+         || string.Equals(
+             typeName,
+             HeaderNamer.GetEventClassName(typeof(SagaRetryRequested)),
+             StringComparison.Ordinal)
+         || string.Equals(
+             typeName,
+             typeof(SagaRetryRequested).FullName,
+             StringComparison.Ordinal);
+
   public async Task ProcessAsync(Message message, CancellationToken ct = default)
   {
     ArgumentNullException.ThrowIfNull(message);
@@ -75,7 +90,10 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
     if (string.IsNullOrWhiteSpace(typeName))
       throw new PermanentMessagingException("Saga message does not declare a message type.");
 
-    if (!_orchestrator.TryResolveMessageType(typeName, out var type) || type is null)
+    Type? type;
+    if (IsSagaRetryRequestedType(typeName))
+      type = typeof(SagaRetryRequested);
+    else if (!_orchestrator.TryResolveMessageType(typeName, out type) || type is null)
       throw new PermanentMessagingException(
           $"Saga message type '{typeName}' could not be resolved.");
 
@@ -117,12 +135,25 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
 
     var tenantId = SagaTenantContextResolver.ResolveTenantId(message, _tenantExecutionContextAccessor);
     Guid? messageId = message.Id == Guid.Empty ? null : message.Id;
-    var retrySagaId = SagaRetryHeaders.ReadTargetSagaId(message);
+    Guid? retrySagaId = null;
+    Message? originalMessage = message;
 
-    if (retrySagaId.HasValue &&
-        (!messageId.HasValue || message.GetProperty<bool>(MessagingConstants.TransportGeneratedMessageId)))
-      throw new PermanentMessagingException(
-          "Saga retry delivery requires a stable, non-empty message identity.");
+    if (integrationEvent is SagaRetryRequested retryRequest)
+    {
+      if (!messageId.HasValue || message.GetProperty<bool>(MessagingConstants.TransportGeneratedMessageId))
+        throw new PermanentMessagingException(
+            "Saga retry delivery requires a stable, non-empty message identity.");
+
+      var delivery = SagaRetryMessageRehydrator.Rehydrate(
+          retryRequest,
+          message,
+          _serializer,
+          _orchestrator,
+          tenantId);
+      integrationEvent = delivery.Event;
+      originalMessage = delivery.OriginalMessage;
+      retrySagaId = retryRequest.SagaId;
+    }
 
     if (_inboxStore is not null)
     {
@@ -166,7 +197,7 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
           messageId,
           tenantId,
           retrySagaId,
-          message,
+          originalMessage,
           ct).ConfigureAwait(false);
 
       if (_persistenceUnitOfWork is not null)

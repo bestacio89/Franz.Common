@@ -1,10 +1,13 @@
 #nullable enable
 
 using Franz.Common.EntityFramework.Extensions;
+using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Storage;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Logging;
+using Franz.Common.Messaging.Sagas.Handlers;
+using Franz.Common.Messaging.Sagas.Messages;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Cosmos;
 using Franz.Common.Messaging.Sagas.Persistence.EntityFramework;
@@ -41,6 +44,10 @@ public static class FranzSagaServiceCollectionExtensions
     services.TryAddScoped<ISagaStateSerializer, JsonSagaStateSerializer>();
 
     RegisterPersistenceAdapter(services, options.Persistence);
+
+    services.TryAddEnumerable(ServiceDescriptor.Scoped(
+        typeof(INotificationHandler<SagaRetryRequested>),
+        typeof(SagaIntegrationEventNotificationHandler<SagaRetryRequested>)));
 
     services.TryAddSingleton<ISagaAuditSink, DefaultSagaAuditSink>();
 

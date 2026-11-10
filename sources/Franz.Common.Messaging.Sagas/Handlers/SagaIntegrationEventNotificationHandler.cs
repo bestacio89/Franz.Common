@@ -9,7 +9,9 @@ using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Exceptions;
+using Franz.Common.Messaging.Sagas.Messages;
 using Franz.Common.Messaging.Storage;
+using Franz.Common.Messaging.Serialization;
 using Franz.Common.MultiTenancy;
 
 namespace Franz.Common.Messaging.Sagas.Handlers;
@@ -26,26 +28,26 @@ internal sealed class SagaIntegrationEventNotificationHandler<TNotification> : I
   private readonly ITenantExecutionContextAccessor? _tenantExecutionContextAccessor;
   private readonly IInboxStore? _inboxStore;
   private readonly IUnitOfWork? _persistenceUnitOfWork;
+  private readonly IMessageSerializer? _serializer;
 
   public SagaIntegrationEventNotificationHandler(
       SagaOrchestrator orchestrator,
       IMessageContextAccessor? messageContextAccessor = null,
       ITenantExecutionContextAccessor? tenantExecutionContextAccessor = null,
       IInboxStore? inboxStore = null,
-      IUnitOfWork? persistenceUnitOfWork = null)
+      IUnitOfWork? persistenceUnitOfWork = null,
+      IMessageSerializer? serializer = null)
   {
     _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
     _messageContextAccessor = messageContextAccessor;
     _tenantExecutionContextAccessor = tenantExecutionContextAccessor;
     _inboxStore = inboxStore;
     _persistenceUnitOfWork = persistenceUnitOfWork;
+    _serializer = serializer;
   }
 
   public async Task Handle(TNotification notification, CancellationToken cancellationToken = default)
   {
-    if (notification is not IIntegrationEvent integrationEvent)
-      return;
-
     var message = _messageContextAccessor?.Current?.Message;
     var correlationId = message?.CorrelationId ?? MediatorContext.EnsureCorrelationId();
     if (correlationId == Guid.Empty)
@@ -53,13 +55,41 @@ internal sealed class SagaIntegrationEventNotificationHandler<TNotification> : I
 
     var causationId = ResolveCausationId(message);
     Guid? messageId = message is { Id: var id } && id != Guid.Empty ? id : null;
-    var retrySagaId = SagaRetryHeaders.ReadTargetSagaId(message);
     var tenantId = SagaTenantContextResolver.ResolveTenantId(message, _tenantExecutionContextAccessor);
 
-    if (retrySagaId.HasValue &&
-        (!messageId.HasValue || message!.GetProperty<bool>(MessagingConstants.TransportGeneratedMessageId)))
-      throw new PermanentMessagingException(
-          "Saga retry delivery requires a stable, non-empty message identity.");
+    IIntegrationEvent integrationEvent;
+    Guid? retrySagaId = null;
+    Message? originalMessage = message;
+
+    if (notification is SagaRetryRequested retryRequest)
+    {
+      if (message is null || _serializer is null)
+        throw new PermanentMessagingException(
+            "Saga retry delivery requires its inbound message context and a configured message serializer.");
+
+      if (!messageId.HasValue ||
+          message.GetProperty<bool>(MessagingConstants.TransportGeneratedMessageId))
+        throw new PermanentMessagingException(
+            "Saga retry delivery requires a stable, non-empty message identity.");
+
+      var delivery = SagaRetryMessageRehydrator.Rehydrate(
+          retryRequest,
+          message,
+          _serializer,
+          _orchestrator,
+          tenantId);
+      integrationEvent = delivery.Event;
+      originalMessage = delivery.OriginalMessage;
+      retrySagaId = retryRequest.SagaId;
+    }
+    else if (notification is IIntegrationEvent incomingEvent)
+    {
+      integrationEvent = incomingEvent;
+    }
+    else
+    {
+      return;
+    }
 
     if (_inboxStore is not null)
     {
@@ -106,7 +136,7 @@ internal sealed class SagaIntegrationEventNotificationHandler<TNotification> : I
           messageId,
           tenantId,
           retrySagaId,
-          message,
+          originalMessage,
           cancellationToken).ConfigureAwait(false);
 
       if (_persistenceUnitOfWork is not null)

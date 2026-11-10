@@ -1,5 +1,6 @@
 #nullable enable
 
+using System.Text.Json;
 using FluentAssertions;
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Pipelines.Core;
@@ -12,6 +13,7 @@ using Franz.Common.Messaging.Sagas.Configuration;
 using Franz.Common.Messaging.Sagas.Core;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Logging;
+using Franz.Common.Messaging.Sagas.Messages;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Memory;
 using Franz.Common.Messaging.Sagas.Persistence.Serializer;
@@ -32,6 +34,8 @@ public sealed class SagaRetryTests
     var originalMessage = new IntegrationEventMessageBuilderStrategy().Build(new RetryEvent());
     originalMessage.Id = originalMessageId;
     originalMessage.CorrelationId = correlationId;
+    originalMessage.Headers["x-original-trace"] = ["trace-1"];
+    originalMessage.Properties["custom-property"] = "preserved";
 
     await fixture.Orchestrator.HandleEventAsync(
         new RetryEvent(),
@@ -43,6 +47,9 @@ public sealed class SagaRetryTests
         originalMessage);
 
     var scheduled = fixture.MessageStore.ScheduledMessages.Should().ContainSingle().Which;
+    var retryRequest = JsonSerializer.Deserialize<SagaRetryRequested>(
+        scheduled.Message.Body!,
+        new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
     var persisted = await fixture.Repository.LoadAsync(
         fixture.Saga.SagaId, null, typeof(RetrySagaState));
 
@@ -52,6 +59,13 @@ public sealed class SagaRetryTests
     persisted.LastMessageId.Should().Be(scheduled.Message.Id);
     persisted.NextAttemptAt.Should().Be(scheduled.NotBefore);
     scheduled.Message.Id.Should().NotBe(originalMessageId);
+    scheduled.Message.MessageType.Should().Be(typeof(SagaRetryRequested).AssemblyQualifiedName);
+    scheduled.Message.Body.Should().NotBe(originalMessage.Body);
+    retryRequest.SagaId.Should().Be(fixture.Saga.SagaId);
+    retryRequest.Body.Should().Be(originalMessage.Body);
+    retryRequest.OriginalMessageType.Should().Be(typeof(RetryEvent).AssemblyQualifiedName);
+    retryRequest.Headers["x-original-trace"].Should().ContainSingle().Which.Should().Be("trace-1");
+    retryRequest.Properties["custom-property"].GetString().Should().Be("preserved");
     scheduled.Message.CorrelationId.Should().Be(correlationId);
     scheduled.Message.Headers[Message.CausationHeader].Should().ContainSingle()
         .Which.Should().Be(originalMessageId.ToString("D"));
@@ -59,8 +73,8 @@ public sealed class SagaRetryTests
         .Which.Should().Be(fixture.Saga.SagaId.ToString("D"));
     scheduled.NotBefore.Should().BeAfter(DateTimeOffset.UtcNow);
 
-    var retrySagaId = Guid.Parse(
-        scheduled.Message.Headers[SagaRetryHeaders.TargetSagaId].Single());
+    var retrySagaId = retryRequest.SagaId;
+    var retryEnvelope = RehydrateOriginalEnvelope(retryRequest, scheduled.Message);
 
     var earlyDelivery = () => fixture.Orchestrator.HandleEventAsync(
         new RetryEvent(),
@@ -69,7 +83,7 @@ public sealed class SagaRetryTests
         scheduled.Message.Id,
         tenantId: null,
         retrySagaId,
-        scheduled.Message);
+        retryEnvelope);
 
     await earlyDelivery.Should().ThrowAsync<PermanentMessagingException>()
         .WithMessage("*not due*");
@@ -83,7 +97,7 @@ public sealed class SagaRetryTests
         scheduled.Message.Id,
         tenantId: null,
         retrySagaId,
-        scheduled.Message);
+        retryEnvelope);
 
     persisted = await fixture.Repository.LoadAsync(
         fixture.Saga.SagaId, null, typeof(RetrySagaState));
@@ -118,8 +132,8 @@ public sealed class SagaRetryTests
     var scheduled = fixture.MessageStore.ScheduledMessages.Should().ContainSingle().Which;
     await Task.Delay(scheduled.NotBefore - DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(20));
 
-    var retrySagaId = Guid.Parse(
-        scheduled.Message.Headers[SagaRetryHeaders.TargetSagaId].Single());
+    var retrySagaId = retryRequest.SagaId;
+    var retryEnvelope = RehydrateOriginalEnvelope(retryRequest, scheduled.Message);
 
     var act = () => fixture.Orchestrator.HandleEventAsync(
         new RetryEvent(),
@@ -128,7 +142,7 @@ public sealed class SagaRetryTests
         scheduled.Message.Id,
         tenantId: null,
         retrySagaId,
-        scheduled.Message);
+        retryEnvelope);
 
     await act.Should().ThrowAsync<SagaFailedException>();
 
@@ -169,6 +183,29 @@ public sealed class SagaRetryTests
     await act.Should().ThrowAsync<SagaConfigurationError>()
         .WithMessage("*durable retry*");
     (await repository.LoadAsync(saga.SagaId, null, typeof(RetrySagaState))).Should().BeNull();
+  }
+
+  private static Message RehydrateOriginalEnvelope(
+      SagaRetryRequested request,
+      Message retryMessage)
+  {
+    var properties = request.Properties.ToDictionary(
+        property => property.Key,
+        property => (object)property.Value.Clone(),
+        StringComparer.OrdinalIgnoreCase);
+    properties.Remove(MessagingConstants.TransportGeneratedMessageId);
+
+    var originalMessage = new Message(request.Body, request.Headers)
+    {
+      Id = retryMessage.Id,
+      OccurredOn = request.OccurredOn,
+      Kind = request.Kind,
+      AggregateId = request.AggregateId,
+      Properties = properties
+    };
+    originalMessage.CorrelationId = retryMessage.CorrelationId;
+    originalMessage.MessageType = request.OriginalMessageType;
+    return originalMessage;
   }
 
   public sealed record RetryEvent : IIntegrationEvent;
