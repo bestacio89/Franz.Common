@@ -70,11 +70,11 @@ public sealed class SagaRetryDispatchTests
     services.AddSingleton<IMessageSerializer>(serializer);
     services.AddSingleton<IMessageContextAccessor>(
         new TestMessageContextAccessor(new MessageContext(retryMessage)));
+    services.AddFranzSagas(options => options.Persistence = "Memory")
+        .AddSaga<RetrySaga>();
     services.AddSingleton(businessEventObserver);
     services.AddScoped<INotificationHandler<RetryEvent>>(
         serviceProvider => serviceProvider.GetRequiredService<BusinessEventObserver>());
-    services.AddFranzSagas(options => options.Persistence = "Memory")
-        .AddSaga<RetrySaga>();
 
     using var provider = services.BuildServiceProvider();
     provider.BuildFranzSagas();
