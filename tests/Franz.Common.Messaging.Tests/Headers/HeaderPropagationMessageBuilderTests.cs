@@ -68,6 +68,22 @@ public class HeaderPropagationMessageBuilderTests
   }
 
   [Fact]
+  public void Build_ShouldPropagateRawHeaderValues()
+  {
+    var options = new HeaderPropagationOptions();
+    options.Headers.Add("X-Custom");
+
+    var builder = new HeaderPropagationMessageBuilder(_mockAccessor.Object, null, options);
+    var message = new Message("{}");
+    string[]? propagated = ["Tenant-A", "Tenant-B"];
+    _mockAccessor.Setup(a => a.TryGetValue("X-Custom", out propagated)).Returns(true);
+
+    builder.BuildAsync(message);
+
+    message.Headers["X-Custom"].Should().Equal("Tenant-A", "Tenant-B");
+  }
+
+  [Fact]
   public void Build_ShouldNotOverwriteExistingMessageHeaders()
   {
     // Arrange
