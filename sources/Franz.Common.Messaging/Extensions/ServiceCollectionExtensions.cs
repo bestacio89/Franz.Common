@@ -26,8 +26,18 @@ public static class ServiceCollectionExtensions
 
   public static IServiceCollection AddMessagingSerialization(this IServiceCollection services)
   {
-    services
-      .AddNoDuplicateScoped<IMessageSerializer, JsonMessageSerializer>();
+    ArgumentNullException.ThrowIfNull(services);
+
+    if (!services.Any(descriptor => descriptor.ServiceType == typeof(IMessageSerializer)))
+    {
+      services.AddScoped<IMessageSerializer>(serviceProvider =>
+      {
+        var jsonSerializerContext = serviceProvider.GetService<JsonSerializerContext>();
+        return jsonSerializerContext is null
+            ? new JsonMessageSerializer()
+            : new JsonMessageSerializer(jsonSerializerContext);
+      });
+    }
 
     return services;
   }
@@ -39,22 +49,59 @@ public static class ServiceCollectionExtensions
   {
     ArgumentNullException.ThrowIfNull(services);
     ArgumentNullException.ThrowIfNull(jsonSerializerContext);
-    services.AddSingleton<JsonSerializerContext>(jsonSerializerContext);
+
+    if (!services.Any(descriptor => descriptor.ServiceType == typeof(JsonSerializerContext)))
+      services.AddSingleton<JsonSerializerContext>(jsonSerializerContext);
+
     return services.AddMessagingSerialization();
   }
 
-
   public static IServiceCollection AddMessagingFactories(this IServiceCollection services)
   {
-    services.AddNoDuplicateSingleton<IMessageFactory, MessageFactory>();
+    ArgumentNullException.ThrowIfNull(services);
 
-    services.AddNoDuplicateSingleton<IMessageBuilderStrategy, CommandMessageBuilderStrategy>();
-    services.AddNoDuplicateSingleton<IMessageBuilderStrategy, QueryMessageBuilderStrategy>();
-    services.AddNoDuplicateSingleton<IMessageBuilderStrategy, IntegrationEventMessageBuilderStrategy>();
-    services.AddNoDuplicateSingleton<IMessageBuilderStrategy, ExecutionFaultMessageBuilderStrategy>();
+    RegisterStrategy<CommandMessageBuilderStrategy>(
+        services,
+        static _ => new CommandMessageBuilderStrategy());
+
+    RegisterStrategy<QueryMessageBuilderStrategy>(
+        services,
+        static _ => new QueryMessageBuilderStrategy());
+
+    RegisterStrategy<IntegrationEventMessageBuilderStrategy>(
+        services,
+        static serviceProvider =>
+        {
+          var jsonSerializerContext = serviceProvider.GetService<JsonSerializerContext>();
+          return jsonSerializerContext is null
+              ? new IntegrationEventMessageBuilderStrategy()
+              : new IntegrationEventMessageBuilderStrategy(jsonSerializerContext);
+        });
+
+    RegisterStrategy<ExecutionFaultMessageBuilderStrategy>(
+        services,
+        static _ => new ExecutionFaultMessageBuilderStrategy());
+
+    if (!services.Any(descriptor => descriptor.ServiceType == typeof(IMessageFactory)))
+    {
+      services.AddSingleton<IMessageFactory>(
+          serviceProvider => new MessageFactory(
+              serviceProvider.GetServices<IMessageBuilderStrategy>()));
+    }
 
     return services;
   }
 
+  private static void RegisterStrategy<TStrategy>(
+      IServiceCollection services,
+      Func<IServiceProvider, TStrategy> factory)
+      where TStrategy : class, IMessageBuilderStrategy
+  {
+    if (services.Any(descriptor => descriptor.ServiceType == typeof(TStrategy)))
+      return;
 
+    services.AddSingleton(factory);
+    services.AddSingleton<IMessageBuilderStrategy>(
+        serviceProvider => serviceProvider.GetRequiredService<TStrategy>());
+  }
 }
