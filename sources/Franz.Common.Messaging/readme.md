@@ -23,6 +23,24 @@ builder.Services
     .AddMessagingHeaderContext()
     .AddMessagingSerialization()
     .AddMessagingFactories();
+
+For Native AOT applications, provide source-generated metadata for every application message contract used by the messaging serializer and integration-event builder:
+
+```csharp
+using System.Text.Json.Serialization;
+
+[JsonSerializable(typeof(OrderPlaced))]
+internal partial class MessagingJsonContext : JsonSerializerContext
+{
+}
+
+builder.Services
+    .AddMessagingHeaderContext()
+    .AddMessagingSerialization(MessagingJsonContext.Default)
+    .AddMessagingFactories();
+```
+
+The source-generated overload is required for Native AOT-safe JSON serialization of application-defined integration events. The parameterless overload remains available for existing reflection-based applications. Missing generated metadata fails explicitly instead of silently falling back to reflection.
 ```
 
 Transport packages register the core services they require as part of their own composition. Compose only the focused registration extensions exposed by the current package.
