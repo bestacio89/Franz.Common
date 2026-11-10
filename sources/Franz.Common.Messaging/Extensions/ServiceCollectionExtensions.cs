@@ -1,7 +1,8 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
-using Franz.Common.DependencyInjection.Extensions;
 using Franz.Common.Headers;
 using Franz.Common.Mediator;
+using Franz.Common.Messaging.Contexting;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Messaging.Serialization;
@@ -14,7 +15,13 @@ public static class ServiceCollectionExtensions
   public static IServiceCollection AddMessagingHeaderContext(this IServiceCollection services)
   {
     ArgumentNullException.ThrowIfNull(services);
-    services.AddNoDuplicateScoped<IHeaderContextAccessor, HeaderContextAccessor>();
+    if (!services.Any(static descriptor => descriptor.ServiceType == typeof(IHeaderContextAccessor)))
+    {
+      services.AddScoped<IHeaderContextAccessor>(serviceProvider => new HeaderContextAccessor(
+          serviceProvider.GetRequiredService<IMessageContextAccessor>(),
+          serviceProvider.GetService<JsonSerializerOptions>()));
+    }
+
     return services;
   }
 
