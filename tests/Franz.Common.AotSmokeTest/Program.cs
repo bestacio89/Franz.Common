@@ -20,6 +20,7 @@ using Franz.Common.Mediator.Pipelines.Processors;
 using Franz.Common.Mediator.Pipelines.Core;
 using Microsoft.Extensions.Hosting;
 using System.Runtime.CompilerServices;
+using Franz.Common.Messaging.Messages;
 
 namespace Franz.Common.AotSmokeTest;
 
@@ -186,7 +187,10 @@ public partial class AotMapper : IMapper<AotSource, AotDestination>
     public partial AotDestination Map(AotSource source);
 }
 
-public sealed record AotCommand(string Value) : ICommand<string>;
+public sealed record AotCommand(string Value) : ICommand<string>, ICorrelatedMessage
+{
+    public Guid? CorrelationId { get; set; }
+}
 public sealed class AotCommandHandler : ICommandHandler<AotCommand, string>
 {
     public Task<string> Handle(AotCommand command, CancellationToken cancellationToken)
@@ -246,7 +250,10 @@ public sealed class AotNotificationHandler : INotificationHandler<AotNotificatio
     }
 }
 
-public sealed record AotEvent(DateTimeOffset OccurredOn) : IEvent;
+public sealed record AotEvent(DateTimeOffset OccurredOn) : IEvent, ICorrelatedMessage
+{
+    public Guid? CorrelationId { get; set; }
+}
 public sealed class AotEventHandler : IEventHandler<AotEvent>
 {
     public bool Executed { get; private set; }
