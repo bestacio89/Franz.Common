@@ -174,7 +174,7 @@ var sagaBuilder = services.AddFranzSagas(options =>
 });
 ```
 
-A null `AuditRetentionPeriod` retains records indefinitely. When configured, a hosted service removes at most `AuditRetentionBatchSize` expired records per cleanup interval. The cutoff is based on the audit timestamp in UTC. MongoDB creates the timestamp index during hosted-service startup; relational EF creates an index through the model; Cosmos audit documents share the existing `SagaStates` container and tenant partition so audit writes remain in the same transactional batch as saga state. Retention cleanup deletes Cosmos records one tenant partition at a time.
+A null `AuditRetentionPeriod` retains records indefinitely. When configured, a hosted service removes at most `AuditRetentionBatchSize` expired records per cleanup interval. The cutoff is based on the audit timestamp in UTC. MongoDB ensures the audit collection and compound timestamp/audit-ID index during hosted-service startup whenever auditing or retention is enabled; relational EF creates retention indexes through the model; Cosmos audit documents share the existing `SagaStates` container and tenant partition so audit writes remain in the same transactional batch as saga state. Cosmos cleanup deletes records one tenant partition at a time and caps each transactional batch at 100 documents.
 
 The in-memory provider does not support durable audit or retention. Configuring retention with `Persistence = "Memory"` is rejected at registration. Hosts must generate and apply an EF Core migration from the updated `SagaDbContext` to create the `SagaAudit` table and indexes before enabling durable audit on relational persistence. The package does not ship a host-specific migration.
 
@@ -185,7 +185,7 @@ The in-memory provider does not support durable audit or retention. Configuring 
 - Cosmos atomicity is limited to one container and one logical partition per incoming message.
 - MongoDB transactions require a transaction-capable deployment.
 - Compensation sequencing is application-defined; there is no automatic compensation stack.
-- Audit writes are best-effort and are not part of the saga persistence transaction.
+- Built-in EF Core, MongoDB, and Cosmos audit-store writes participate in the Saga persistence transaction. Additional custom audit sinks remain best-effort; in-memory auditing is log-only. Retention deletes expired records; archival and export remain host responsibilities.
 - Native AOT compatibility must be validated independently for this package and each adapter before it is claimed.
 
 ## License

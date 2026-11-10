@@ -4,6 +4,9 @@ using Franz.Common.AzureCosmosDB.Options;
 using Franz.Common.Mediator.Dispatchers;
 using Franz.Common.Mediator.Context;
 using Franz.Common.Messaging.Sagas.Abstractions;
+using Franz.Common.Messaging.Sagas.Configuration;
+using Franz.Common.Messaging.Sagas.Logging;
+using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging.Sagas.Exceptions;
 using Franz.Common.Messaging.Sagas.Persistence;
 using Franz.Common.Messaging.Sagas.Persistence.Cosmos;
@@ -11,6 +14,7 @@ using Franz.Common.Messaging.Sagas.Persistence.Serializer;
 using Microsoft.Azure.Cosmos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Testcontainers.CosmosDb;
 
@@ -193,6 +197,79 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<CosmosFixture
       (await outbox.GetPendingAsync()).Should().ContainSingle();
     }
   }
+
+  [Fact]
+  public async Task AuditStore_RollsBackWithSagaTransactionAndPhysicallyDeletesExpiredRecordsInBoundedBatches()
+  {
+    const string tenantId = "tenant-a";
+    var databaseName = $"SagaAudit_{Guid.CreateVersion7():N}";
+    await using (var schemaContext = CreateContext(databaseName))
+      await schemaContext.Database.EnsureCreatedAsync();
+
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddScoped(_ => CreateContext(databaseName));
+    services.AddFranzSagas(options =>
+    {
+      options.Persistence = "Cosmos";
+      options.EnableAuditing = true;
+    });
+
+    await using var provider = services.BuildServiceProvider();
+    await using var scope = provider.CreateAsyncScope();
+    var context = scope.ServiceProvider.GetRequiredService<CosmosSagaDbContext>();
+    var container = context.Database.GetCosmosClient().GetContainer(databaseName, "SagaStates");
+    var store = scope.ServiceProvider.GetRequiredService<ISagaAuditStore>();
+    var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+    var sagaId = Guid.CreateVersion7();
+
+    await unitOfWork.BeginAsync();
+    await store.WriteAsync(CreateAuditRecord(sagaId, tenantId, DateTimeOffset.UtcNow.AddDays(-10)));
+    await unitOfWork.RollbackAsync();
+
+    (await CountAuditDocumentsAsync(container, tenantId)).Should().Be(0L);
+
+    await unitOfWork.BeginAsync();
+    await store.WriteAsync(CreateAuditRecord(sagaId, tenantId, DateTimeOffset.UtcNow.AddDays(-10)));
+    await store.WriteAsync(CreateAuditRecord(sagaId, tenantId, DateTimeOffset.UtcNow.AddDays(-20)));
+    await store.WriteAsync(CreateAuditRecord(sagaId, tenantId, DateTimeOffset.UtcNow));
+    await unitOfWork.CommitAsync();
+
+    (await CountAuditDocumentsAsync(container, tenantId)).Should().Be(3L);
+    (await store.DeleteExpiredAsync(DateTimeOffset.UtcNow.AddDays(-1), batchSize: 1))
+        .Should().Be(1);
+    (await CountAuditDocumentsAsync(container, tenantId)).Should().Be(2L);
+
+    (await store.DeleteExpiredAsync(DateTimeOffset.UtcNow.AddDays(-1), batchSize: 1))
+        .Should().Be(1);
+    (await CountAuditDocumentsAsync(container, tenantId)).Should().Be(1L);
+  }
+
+  private static async Task<long> CountAuditDocumentsAsync(Container container, string tenantId)
+  {
+    using var iterator = container.GetItemQueryIterator<long>(
+        new QueryDefinition("SELECT VALUE COUNT(1) FROM c"),
+        requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(tenantId) });
+    var page = await iterator.ReadNextAsync();
+    return page.Single();
+  }
+
+  private static SagaAuditRecord CreateAuditRecord(
+      Guid sagaId,
+      string tenantId,
+      DateTimeOffset timestamp)
+      => new()
+      {
+        SagaId = sagaId,
+        SagaType = "cosmos-audit-saga",
+        StateType = "cosmos-audit-state",
+        StepType = "Start",
+        IncomingMessageType = "cosmos-audit-event",
+        CorrelationId = Guid.CreateVersion7(),
+        TenantId = tenantId,
+        Status = SagaLifecycleStatus.Completed,
+        Timestamp = timestamp
+      };
 
   [Fact]
   public async Task OutboxClaims_UseETagConcurrencyAndRecoverExpiredLeases()

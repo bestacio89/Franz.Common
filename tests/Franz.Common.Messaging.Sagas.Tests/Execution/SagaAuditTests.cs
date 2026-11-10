@@ -43,7 +43,7 @@ public sealed class SagaAuditTests
   }
 
   [Fact]
-  public async Task Orchestrator_PropagatesDurableAuditFailuresToAbortThePersistenceUnitOfWork()
+  public async Task Orchestrator_PropagatesDurableAuditFailures()
   {
     var saga = new AuditedSaga();
     var repository = new InMemorySagaRepository(new InMemorySagaStateStore(), new JsonSagaStateSerializer());
@@ -63,6 +63,26 @@ public sealed class SagaAuditTests
     await act.Should().ThrowAsync<InvalidOperationException>()
         .WithMessage("durable audit write failed");
     store.WriteAttempts.Should().Be(1);
+  }
+
+  [Fact]
+  public async Task Orchestrator_ContinuesWhenBestEffortAuditSinkFails()
+  {
+    var saga = new AuditedSaga();
+    var repository = new InMemorySagaRepository(new InMemorySagaStateStore(), new JsonSagaStateSerializer());
+    var sink = new FailingBestEffortAuditSink();
+    var services = new TestServiceProvider(saga);
+    var router = new SagaRouter(services);
+    router.RegisterSaga<AuditedSaga>();
+
+    var orchestrator = new SagaOrchestrator(
+        router, repository, new SagaExecutionPipeline(), new TestMessagingPublisher(), services,
+        new ISagaAuditSink[] { sink }, new FranzSagaOptions { EnableAuditing = true },
+        NullLogger<SagaOrchestrator>.Instance);
+
+    await orchestrator.HandleEventAsync(new StartEvent(), Guid.CreateVersion7(), null);
+
+    sink.WriteAttempts.Should().Be(1);
   }
 
   [Fact]
@@ -93,6 +113,17 @@ public sealed class SagaAuditTests
 
     act.Should().Throw<ArgumentOutOfRangeException>()
         .WithParameterName("AuditRetentionPeriod");
+  }
+
+  private sealed class FailingBestEffortAuditSink : ISagaAuditSink
+  {
+    public int WriteAttempts { get; private set; }
+
+    public Task WriteAsync(SagaAuditRecord record, CancellationToken cancellationToken = default)
+    {
+      WriteAttempts++;
+      throw new InvalidOperationException("best-effort audit sink failed");
+    }
   }
 
   private sealed class FailingAuditStore : ISagaAuditStore

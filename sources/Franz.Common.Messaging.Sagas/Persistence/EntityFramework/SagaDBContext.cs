@@ -14,7 +14,6 @@ public sealed class SagaDbContext : DbContextBase
 {
   public DbSet<SagaStateEntity> SagaStates => Set<SagaStateEntity>();
 
-
   public SagaDbContext(
       DbContextOptions<SagaDbContext> options,
       IDispatcher dispatcher,
@@ -56,7 +55,7 @@ public sealed class SagaDbContext : DbContextBase
       entity.Property(x => x.OutgoingMessageType).HasMaxLength(1000);
       entity.Property(x => x.TenantId).HasMaxLength(128);
       entity.Property(x => x.ErrorType).HasMaxLength(1000);
-      entity.HasIndex(x => x.Timestamp);
+      entity.HasIndex(x => new { x.Timestamp, x.AuditId });
       entity.HasIndex(x => new { x.TenantId, x.SagaId, x.Timestamp });
     });
 
