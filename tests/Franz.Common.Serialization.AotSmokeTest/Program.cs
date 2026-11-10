@@ -1,0 +1,1 @@
+return await Franz.Common.Serialization.AotSmokeTest.SerializationAotSmoke.RunAsync();

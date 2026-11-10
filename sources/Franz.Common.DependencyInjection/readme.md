@@ -54,6 +54,21 @@ The package also exposes these Scrutor-backed helpers:
 
 These methods scan assemblies selected by `FromCompanyApplicationDependenciesWithPredicate`; they are not global scans of every loaded assembly.
 
+## Native AOT and trimming
+
+The Scrutor assembly-scanning extensions (`AddDependencies`, `AddScopedDependencies`, `AddSelfScoped`, and the other scan-based helpers) are explicitly marked with `RequiresUnreferencedCode`. They discover arbitrary assemblies and implementation types at runtime, so they are intended for JIT applications and are not part of the Native AOT contract. Native AOT callers should not suppress those warnings.
+
+Use explicit generic registrations instead:
+
+```csharp
+services.AddNoDuplicateSingleton<IClock, SystemClock>();
+services.AddNoDuplicateScoped<IOrderRepository, OrderRepository>();
+```
+
+The generic implementation-type overloads preserve public constructors through `DynamicallyAccessedMembers` annotations. Type-based overloads carry the same constructor-preservation requirement on their `Type` parameter. Factory and instance registrations remain explicit and do not require assembly discovery.
+
+The package's Native AOT smoke suite publishes and executes a consumer that uses explicit generic registration. It deliberately does not call assembly-scanning APIs.
+
 ## Duplicate-registration semantics
 
 `RegistrationStrategySkipExistingPair` compares both `ServiceType` and `ImplementationType`. An existing matching pair is retained. If the same pair is already registered with a different lifetime, registration throws rather than silently preserving an inconsistent lifetime.

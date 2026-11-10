@@ -143,6 +143,39 @@ jobs:
             **/CompatibilitySuppressions.xml
           if-no-files-found: warn
 
+
+  native-aot:
+    name: Native AOT - ${{ matrix.package }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: Business
+            project: tests/Franz.Common.Business.AotSmokeTest/Franz.Common.Business.AotSmokeTest.csproj
+            executable: tests/Franz.Common.Business.AotSmokeTest/bin/Release/net10.0/linux-x64/publish/Franz.Common.Business.AotSmokeTest
+          - package: DependencyInjection
+            project: tests/Franz.Common.DependencyInjection.AotSmokeTest/Franz.Common.DependencyInjection.AotSmokeTest.csproj
+            executable: tests/Franz.Common.DependencyInjection.AotSmokeTest/bin/Release/net10.0/linux-x64/publish/Franz.Common.DependencyInjection.AotSmokeTest
+          - package: Serialization
+            project: tests/Franz.Common.Serialization.AotSmokeTest/Franz.Common.Serialization.AotSmokeTest.csproj
+            executable: tests/Franz.Common.Serialization.AotSmokeTest/bin/Release/net10.0/linux-x64/publish/Franz.Common.Serialization.AotSmokeTest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Publish with trimming and Native AOT
+        shell: bash
+        run: |
+          dotnet publish "${{ matrix.project }}" --configuration Release --runtime linux-x64 --self-contained true -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=full -p:ILLinkTreatWarningsAsErrors=true "-p:WarningsAsErrors=IL2026%3BIL3050%3BIL2067%3BIL2070%3BIL2090%3BIL2046%3BIL3051"
+      - name: Execute native smoke test
+        shell: bash
+        run: "${{ matrix.executable }}"
+
   database-tests:
     name: Database providers
     runs-on: ubuntu-24.04

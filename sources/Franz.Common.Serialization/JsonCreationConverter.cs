@@ -19,12 +19,8 @@ public abstract class SystemTextCreationConverter<T> : JsonConverter<T>
     var target = Create(typeToConvert, element)
         ?? throw new JsonException($"Factory returned null for {typeof(T).FullName}");
 
-    var json = element.GetRawText();
-
-    var result = JsonSerializer.Deserialize(
-        json,
-        target.GetType(),
-        options);
+    var targetTypeInfo = options.GetTypeInfo(target.GetType());
+    var result = JsonSerializer.Deserialize(element.GetRawText(), targetTypeInfo);
 
     if (result is null)
       throw new JsonException($"Deserialization returned null for {target.GetType().FullName}");
@@ -40,11 +36,8 @@ public abstract class SystemTextCreationConverter<T> : JsonConverter<T>
     if (value is null)
       throw new JsonException("Cannot serialize null value.");
 
-    JsonSerializer.Serialize(
-        writer,
-        value,
-        value.GetType(),
-        options);
+    var typeInfo = options.GetTypeInfo(value.GetType());
+    JsonSerializer.Serialize(writer, value, typeInfo);
   }
 
   protected abstract T Create(Type typeToConvert, JsonElement json);

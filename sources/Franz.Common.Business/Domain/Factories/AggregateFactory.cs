@@ -1,4 +1,5 @@
-﻿using System.Linq.Expressions;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Franz.Common.Business.Domain.IdGenerators;
@@ -12,7 +13,10 @@ namespace Franz.Common.Business.Domain.Factories;
 /// The constructor delegate is compiled once per closed generic type and cached
 /// for the lifetime of the application.
 /// </summary>
-public sealed class AggregateFactory<TAggregate, TEvent> : IAggregateFactory<TAggregate>
+public sealed class AggregateFactory<
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors |
+                                DynamicallyAccessedMemberTypes.NonPublicConstructors)] TAggregate,
+    TEvent> : IAggregateFactory<TAggregate>
     where TAggregate : AggregateRoot<TEvent>
     where TEvent : IEvent
 {
@@ -35,10 +39,18 @@ public sealed class AggregateFactory<TAggregate, TEvent> : IAggregateFactory<TAg
               $"{aggregateType.Name} must define a constructor that accepts a single Guid parameter. " +
               $"Add: protected {aggregateType.Name}(Guid id) {{ }}"));
 
+    _activator = RuntimeFeature.IsDynamicCodeSupported
+        ? CreateCompiledActivator(ctor)
+        : id => (TAggregate)ctor.Invoke(new object?[] { id });
+  }
+
+  [RequiresDynamicCode("Expression compilation requires runtime code generation. Native AOT uses the preserved constructor directly.")]
+  private static Func<Guid, TAggregate> CreateCompiledActivator(ConstructorInfo constructor)
+  {
     var idParam = Expression.Parameter(typeof(Guid), "id");
-    _activator = Expression.Lambda<Func<Guid, TAggregate>>(
-                      Expression.New(ctor, idParam), idParam)
-                  .Compile();
+    return Expression.Lambda<Func<Guid, TAggregate>>(
+            Expression.New(constructor, idParam), idParam)
+        .Compile();
   }
 
   private readonly IIdGenerator<Guid> _idGenerator;
