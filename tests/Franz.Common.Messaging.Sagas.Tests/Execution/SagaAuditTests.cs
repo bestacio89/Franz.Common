@@ -41,6 +41,46 @@ public sealed class SagaAuditTests
     record.StateType.Should().Contain(nameof(TestSagaState));
   }
 
+  [Fact]
+  public async Task Orchestrator_PropagatesDurableAuditFailuresToAbortThePersistenceUnitOfWork()
+  {
+    var saga = new AuditedSaga();
+    var repository = new InMemorySagaRepository(new InMemorySagaStateStore(), new JsonSagaStateSerializer());
+    var store = new FailingAuditStore();
+    var services = new TestServiceProvider(saga);
+    var router = new SagaRouter(services);
+    router.RegisterSaga<AuditedSaga>();
+
+    var orchestrator = new SagaOrchestrator(
+        router, repository, new SagaExecutionPipeline(), new TestMessagingPublisher(), services,
+        new ISagaAuditSink[] { store },
+        new FranzSagaOptions { EnableAuditing = true },
+        NullLogger<SagaOrchestrator>.Instance);
+
+    var act = () => orchestrator.HandleEventAsync(new StartEvent(), Guid.CreateVersion7(), null);
+
+    await act.Should().ThrowAsync<InvalidOperationException>()
+        .WithMessage("durable audit write failed");
+    store.WriteAttempts.Should().Be(1);
+  }
+
+  private sealed class FailingAuditStore : ISagaAuditStore
+  {
+    public int WriteAttempts { get; private set; }
+
+    public Task WriteAsync(SagaAuditRecord record, CancellationToken cancellationToken = default)
+    {
+      WriteAttempts++;
+      throw new InvalidOperationException("durable audit write failed");
+    }
+
+    public Task<int> DeleteExpiredAsync(
+        DateTimeOffset cutoff,
+        int batchSize,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(0);
+  }
+
   private sealed class AuditedSaga : SagaBase<TestSagaState>, IStartWith<StartEvent>
   {
     public Task<ISagaTransition> HandleAsync(
