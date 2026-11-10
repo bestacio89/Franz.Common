@@ -1,3 +1,4 @@
+using Franz.Common.DependencyInjection.AotSmokeTest;
 using Franz.Common.DependencyInjection.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 
