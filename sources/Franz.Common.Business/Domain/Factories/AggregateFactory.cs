@@ -1,6 +1,8 @@
-﻿using System.Linq.Expressions;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Franz.Common.Business.Domain.IdGenerators;
 using Franz.Common.Mediator.Messages;
 
@@ -35,10 +37,18 @@ public sealed class AggregateFactory<TAggregate, TEvent> : IAggregateFactory<TAg
               $"{aggregateType.Name} must define a constructor that accepts a single Guid parameter. " +
               $"Add: protected {aggregateType.Name}(Guid id) {{ }}"));
 
+    _activator = RuntimeFeature.IsDynamicCodeSupported
+        ? CreateCompiledActivator(ctor)
+        : id => (TAggregate)ctor.Invoke(new object?[] { id });
+  }
+
+  [RequiresDynamicCode("Expression compilation requires runtime code generation. Native AOT uses the preserved constructor directly.")]
+  private static Func<Guid, TAggregate> CreateCompiledActivator(ConstructorInfo constructor)
+  {
     var idParam = Expression.Parameter(typeof(Guid), "id");
-    _activator = Expression.Lambda<Func<Guid, TAggregate>>(
-                      Expression.New(ctor, idParam), idParam)
-                  .Compile();
+    return Expression.Lambda<Func<Guid, TAggregate>>(
+            Expression.New(constructor, idParam), idParam)
+        .Compile();
   }
 
   private readonly IIdGenerator<Guid> _idGenerator;
