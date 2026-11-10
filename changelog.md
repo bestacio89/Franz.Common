@@ -62,20 +62,20 @@ This release consolidates the platform work developed after the **2.3.4 stable b
 
 ### Saga orchestration and messaging execution
 - Added the dedicated `Franz.Common.Messaging.Sagas` orchestration package with explicit start, step and compensation roles, Saga identity resolution, lifecycle validation and optimistic concurrency.
-- Registered inbound integration-event notification handlers from Saga message contracts and route them through the existing Franz Mediator execution boundary.
+- Registered inbound integration-event notification handlers from Saga message contracts and routed them through the existing Franz Mediator execution boundary.
 - Made inbound integration-event processing fail fast so handler failures reach the transport listener and its configured retry/dead-letter policy.
 - Added provider-native Saga persistence for in-memory, EF Core, MongoDB and Cosmos DB, with documented transaction boundaries and provider prerequisites.
-- Atomically persist inbox receipts, Saga transitions, durable retry messages and outgoing outbox records within supported provider transactions.
+- Persisted inbox receipts, Saga transitions, durable retry messages and outgoing outbox records atomically within supported provider transactions.
 - Added persisted delayed retry and recovery, bounded retry attempts, metadata-only durable auditing and configurable retention for supported durable providers.
 - Preserved at-least-once broker delivery semantics; exactly-once side effects across a database and broker are not claimed. Consumers and external effects remain responsible for idempotency.
 - Separated provider-specific inbox, message, audit and Saga persistence responsibilities into focused source files and adapters.
 
 ### Native AOT and trimming qualification
 - Added package-level Native AOT smoke consumers for Business, DependencyInjection and Serialization, alongside the existing framework and messaging smoke coverage.
-- Preserved entity and aggregate constructor metadata and enumeration fields for the supported Business AOT path; exercise generated handler registration in the native consumer.
-- Mark runtime assembly-scanning DI APIs as requiring unreferenced code and document explicit generic registration as the supported AOT path.
-- Added source-generated JSON metadata support to serializer registration and use `JsonTypeInfo` for supported generic and runtime-type serialization operations.
-- Added an explicit closed generic enumeration converter for AOT applications; retain the reflection-based converter factory as a JIT compatibility path.
+- Preserved entity and aggregate constructor metadata and enumeration fields for the supported Business AOT path, and exercised generated handler registration in the native consumer.
+- Marked runtime assembly-scanning DI APIs as requiring unreferenced code and documented explicit generic registration as the supported AOT path.
+- Added source-generated JSON metadata support to serializer registration and used `JsonTypeInfo` for supported generic and runtime-type serialization operations.
+- Added an explicit closed generic enumeration converter for AOT applications and retained the reflection-based converter factory as a JIT compatibility path.
 - Treated AOT compatibility as a tested package/API contract. Optional integrations, runtime discovery APIs and external provider dependencies require independent qualification; no blanket application-wide AOT guarantee is implied.
 
 ### CI and architecture validation
@@ -87,7 +87,7 @@ This release consolidates the platform work developed after the **2.3.4 stable b
 
 ### Compatibility and release metadata
 
-- Set framework NuGet package versions to 3.0.0 and file versions to 3.0.0.0; retained the established assembly-version policy where applicable.
+- Set framework NuGet package versions to 3.0.0, with assembly and file versions aligned to 3.0.0.0.
 - Kept API compatibility validation anchored to the last published stable baseline, 2.3.4.
 - Kept provider-specific schema changes, deployment prerequisites and API migration details in the affected package guides and release migration records.
 - Gated package publication on full Release validation, API compatibility review, vulnerability checks and explicit release approval. Source integration and documentation updates do not publish packages.
@@ -297,13 +297,13 @@ The following items remain planned work within the 3.0.0 release scope. They are
 ## v2.2.15 — Unit of Work Consolidation
 
 ### Fixed
-- `TransactionPipeline` now correctly backed by real EF transactions — 
+- `TransactionPipeline` now correctly backed by real EF transactions —
   `BeginAsync` and `RollbackAsync` were previously unimplemented.
-- `EfUnitOfWork` consolidated to implement `Franz.Common.Mediator.Pipelines.Core.IUnitOfWork` 
+- `EfUnitOfWork` consolidated to implement `Franz.Common.Mediator.Pipelines.Core.IUnitOfWork`
   exclusively — `Franz.Common.EntityFramework.IUnitOfWork` removed.
 
 ### Migration
-- Update usings from `Franz.Common.EntityFramework.IUnitOfWork` 
+- Update usings from `Franz.Common.EntityFramework.IUnitOfWork`
   to `Franz.Common.Mediator.Pipelines.Core.IUnitOfWork`.
 
 ---
@@ -407,7 +407,7 @@ in certain hosting contexts.
 
 ---
 
-### ⚠️ Breaking Change
+### ⚠ Breaking Change
 
 `AggregateFactory<TAggregate, TEvent>` constructor signature has changed:
 
@@ -472,7 +472,7 @@ public class OrderAggregate : AggregateRoot<OrderEvent>
 
 ---
 
-### ⚙️ Mapping Engine Overhaul (FranzMapper)
+### ⚙ Mapping Engine Overhaul (FranzMapper)
 
 * Introduced a unified `MapInternal<TSource, TDestination>` execution pipeline
 
@@ -561,7 +561,7 @@ public class OrderAggregate : AggregateRoot<OrderEvent>
 
 ---
 
-### ⚖️ Architectural Guarantees
+### ⚖ Architectural Guarantees
 
 * Mapping is now:
 
@@ -605,7 +605,7 @@ public class OrderAggregate : AggregateRoot<OrderEvent>
 
 ---
 
-### ⚙️ Batch & Efficiency Enhancements
+### ⚙ Batch & Efficiency Enhancements
 
 - Added support for:
   - AddRangeAsync
@@ -656,7 +656,7 @@ Enables:
 
 ---
 
-### ⚠️ Breaking Conceptual Change
+### ⚠ Breaking Conceptual Change
 
 - Repositories no longer own persistence boundaries
 - SaveChanges is no longer implicitly executed per repository operation
@@ -769,12 +769,12 @@ Perfect — we can make a **clear, structured list** that reflects all the cache
 
 ---
 
-## v1.7.5 — CosmosDB Provider & Saga Persistence 
+## v1.7.5 — CosmosDB Provider & Saga Persistence
 ────────────────────────────────────────────────────────
 
 ✨ Added
 - Azure CosmosDB Entity Framework provider:
-  • New `CosmosDbContextBase` abstraction 
+  • New `CosmosDbContextBase` abstraction
   • Automatic container conventions via `ApplyCosmosConventions()`
   • Fallback container support (`HasDefaultContainer("franz")`)
   • Plug-and-play integration for EF Core multi-tenant/multi-container setups
@@ -952,7 +952,7 @@ This release consolidates and stabilizes the messaging architecture introduced i
 
 ---
 
-#### ☁️ Azure Messaging Parity Validation
+#### ☁ Azure Messaging Parity Validation
 
 * Azure Service Bus, Event Hubs, and Event Grid adapters validated against:
 
@@ -982,7 +982,7 @@ This release is a **stability and correctness milestone**, preparing the Franz m
 
 ---
 
-## v1.7.0 — Azure Messaging Expansion ☁️
+## v1.7.0 — Azure Messaging Expansion ☁
 
 This release introduces **first-class Azure messaging support** to the Franz Framework, completing transport parity with Kafka and RabbitMQ while preserving Franz’s deterministic, mediator-driven architecture.
 
@@ -1109,13 +1109,13 @@ This release marks a major step toward **cloud-agnostic, enterprise-grade messag
   * `SagaTypeValidator`
   * `SagaMappingValidator`
 
-### ⚙️ **Execution Engine**
+### ⚙ **Execution Engine**
 
 * `SagaOrchestrator` with deterministic ordering
 * `SagaRouter` for runtime saga resolution
 * `SagaExecutionPipeline` for middleware (logging, retries, observers)
 
-### 🗄️ **Persistence Layer**
+### 🗄 **Persistence Layer**
 
 * In-memory saga store
 * EF Core saga store
@@ -1127,7 +1127,7 @@ This release marks a major step toward **cloud-agnostic, enterprise-grade messag
 * `ISagaAuditSink` abstraction
 * `DefaultSagaAuditSink` (ILogger-based)
 
-### 🛠️ **Configuration**
+### 🛠 **Configuration**
 
 * `FranzSagaOptions` (bound from appsettings)
 * `FranzSagaBuilder` with fluent API
@@ -1273,7 +1273,7 @@ Sagas now integrate seamlessly with:
 * Behavior pipelines now cached per `(TRequest, TResponse)` pair
 * No-op implementations ensure zero overhead when features are unused
 
-### 🛠️ **Refactor & Code Modernization**
+### 🛠 **Refactor & Code Modernization**
 
 * Updated to .NET 10 targets
 * Simplified options binding with Microsoft.Extensions.Options
@@ -1346,7 +1346,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.6.15 — ReadRepository Fix 
+## v1.6.15 — ReadRepository Fix
 
 * Fixed compile-time `InvalidCastException` from `List<T>` → `IQueryable<T>`.
 * `GetAll()` now returns `IReadOnlyCollection<T>` for safer semantics.
@@ -1413,7 +1413,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.6.3 — Multi-Environment & Cosmos Governance 🌐️
+## v1.6.3 — Multi-Environment & Cosmos Governance 🌐
 
 ### ✨ Added
 
@@ -1441,7 +1441,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.6.2 — Resilience & Null Safety ️
+## v1.6.2 — Resilience & Null Safety
 
 ### ✨ Added
 
@@ -1488,13 +1488,13 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.6.0 — The Consolidation Release 🏗️
+## v1.6.0 — The Consolidation Release 🏗
 
 *(see previous full details — Outbox/Inbox, Identity, Domain Events, etc.)*
 
 ---
 
-## v1.5.9 — Mapping Improvements ️
+## v1.5.9 — Mapping Improvements
 
 ### ✨ Added
 
@@ -1506,7 +1506,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.5.4–v1.5.8 — Maintenance 
+## v1.5.4–v1.5.8 — Maintenance
 
 ### 🔧 Changed
 
@@ -1527,7 +1527,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.5.2 — Reverse Mapping 
+## v1.5.2 — Reverse Mapping
 
 ### 🐛 Fixed
 
@@ -1536,7 +1536,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.5.1 — Mapping Arrives 
+## v1.5.1 — Mapping Arrives
 
 ### ✨ Added
 
@@ -1561,7 +1561,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.4.5 — Event Semantics 
+## v1.4.5 — Event Semantics
 
 ### 🐛 Fixed
 
@@ -1572,7 +1572,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.4.4 — Stability 
+## v1.4.4 — Stability
 
 ### 🔧 Changed
 
@@ -1595,7 +1595,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.4.1 — Patch & Docs 
+## v1.4.1 — Patch & Docs
 
 ### 📚 Docs
 
@@ -1607,7 +1607,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.4.0 — Observability & Resilience 
+## v1.4.0 — Observability & Resilience
 
 ### ✨ Added
 
@@ -1623,7 +1623,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.3.14 — Correlation IDs 
+## v1.3.14 — Correlation IDs
 
 ### ✨ Added
 
@@ -1637,7 +1637,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.3.12 — Observability 
+## v1.3.12 — Observability
 
 ### ✨ Added
 
@@ -1659,7 +1659,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.3.10 — Scoped DbContext 
+## v1.3.10 — Scoped DbContext
 
 ### 🔧 Changed
 
@@ -1668,7 +1668,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.3.9 — Database Stability 
+## v1.3.9 — Database Stability
 
 ### 🐛 Fixed
 
@@ -1698,7 +1698,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.3.5 — Resilience Pipelines ️
+## v1.3.5 — Resilience Pipelines
 
 ### ✨ Added
 
@@ -1715,7 +1715,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.3.4 — Decoupling AutoMapper 
+## v1.3.4 — Decoupling AutoMapper
 
 ### 🔧 Changed
 
@@ -1724,7 +1724,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.3.3 — Validation & Transactions ⚖️
+## v1.3.3 — Validation & Transactions ⚖
 
 ### ✨ Added
 
@@ -1747,7 +1747,7 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.3.1 — Multi-Tenancy & Mediator 
+## v1.3.1 — Multi-Tenancy & Mediator
 
 ### ✨ Added
 
@@ -1775,10 +1775,10 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.2.65 — Foundation 🏗️
+## v1.2.65 — Foundation 🏗
 
 ### ✨ Added
 
 * 🌐 Kafka bootstrapping: producers, consumers, distributed messaging.
-* 🗄️ Multi-database bootstrapping (SQL).
-* 🗃️ NoSQL support.
+* 🗄 Multi-database bootstrapping (SQL).
+* 🗃 NoSQL support.
