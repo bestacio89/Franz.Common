@@ -75,7 +75,7 @@ jobs:
           fi
 
       - name: Build solution
-        run: dotnet build Franz.Common.slnx --configuration Release --no-restore --maxcpucount:1 -p:GeneratePackageOnBuild=false
+        run: dotnet build Franz.Common.slnx --configuration Release --no-restore --maxcpucount:2 -p:GeneratePackageOnBuild=false
 
       - name: Pack solution for package-consumer validation
         run: dotnet pack Franz.Common.slnx --configuration Release --no-build -p:GeneratePackageOnBuild=false
@@ -93,7 +93,7 @@ jobs:
           feed="$temp_dir/feed"
           consumer="$temp_dir/consumer"
           mkdir -p "$feed" "$consumer"
-          find sources -path '*/bin/Release/*.nupkg' -exec cp -n {} "$feed/" \;
+          find sources -path '*/bin/Release/*.nupkg' -exec cp -n {} "$feed/" \\;
 
           cat > "$consumer/Consumer.csproj" <<'EOF'
           <Project Sdk="Microsoft.NET.Sdk">
@@ -139,18 +139,21 @@ jobs:
       - name: Validate gRPC package consumer
         run: bash scripts/validate-grpc-package-consumer.sh
 
-      - name: Publish and execute Native AOT mapper smoke test
+      - name: Publish and execute Native AOT smoke test
         run: |
           dotnet publish tests/Franz.Common.AotSmokeTest/Franz.Common.AotSmokeTest.csproj --configuration Release --runtime linux-x64 --self-contained true -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=full -p:ILLinkTreatWarningsAsErrors=true
           ./tests/Franz.Common.AotSmokeTest/bin/Release/net10.0/linux-x64/publish/Franz.Common.AotSmokeTest
 
       - name: Test framework architecture policies
-        run: dotnet test tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=architecture-tests.trx"
+        run: dotnet test tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=architecture-tests.trx"
 
-      - name: Test solution
-        # Integration-test projects share heavyweight container resources (notably Cosmos DB).
-        # Run solution test projects sequentially to prevent cross-project emulator contention.
-        run: dotnet test Franz.Common.slnx --configuration Release --no-build --maxcpucount:1 --blame-hang-timeout 10m --logger "trx;LogFileName=dependency-validation.trx"
+      - name: Test independent projects with bounded parallelism
+        env:
+          TEST_PROJECT_PARALLELISM: 2
+        run: bash scripts/run-tests-parallel.sh Release
+
+      - name: Test Cosmos DB project in isolation
+        run: dotnet test tests/Franz.Common.EntityFramework.AzureCosmosDB/Franz.Common.AzureCosmosDB.Tests.csproj --configuration Release --no-build --no-restore --maxcpucount:1 --blame-hang-timeout 10m --logger "trx;LogFileName=cosmos-tests.trx"
 
       - name: Capture container diagnostics
         if: failure()
