@@ -4,6 +4,7 @@ using FluentAssertions;
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging;
+using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Sagas.Abstractions;
 using Franz.Common.Messaging.Sagas.Configuration;
@@ -83,7 +84,7 @@ public sealed class SagaRetryTests
     persisted!.Status.Should().Be(SagaLifecycleStatus.Completed);
     persisted.RetryCount.Should().Be(0);
     persisted.NextAttemptAt.Should().BeNull();
-    fixture.Saga.Attempts.Should().Be(2);
+    ((RetrySagaState)persisted.State).Attempts.Should().Be(2);
     fixture.MessageStore.ScheduledMessages.Should().ContainSingle();
   }
 
@@ -92,12 +93,13 @@ public sealed class SagaRetryTests
   {
     var fixture = new Fixture(maxRetryAttempts: 1, alwaysRetry: true);
     var correlationId = Guid.CreateVersion7();
+    var originalMessageId = Guid.CreateVersion7();
 
     await fixture.Orchestrator.HandleEventAsync(
         new RetryEvent(),
         correlationId,
         causationId: null,
-        Guid.CreateVersion7(),
+        originalMessageId,
         tenantId: null);
 
     var scheduled = fixture.MessageStore.ScheduledMessages.Should().ContainSingle().Which;
@@ -109,8 +111,8 @@ public sealed class SagaRetryTests
     var act = () => fixture.Orchestrator.HandleEventAsync(
         new RetryEvent(),
         correlationId,
+        originalMessageId,
         scheduled.Message.Id,
-        Guid.CreateVersion7(),
         tenantId: null,
         retrySagaId);
 
@@ -159,7 +161,6 @@ public sealed class SagaRetryTests
 
   public sealed class RetrySaga : SagaBase<RetrySagaState>, IStartWith<RetryEvent>
   {
-    public int Attempts { get; private set; }
     public bool AlwaysRetry { get; set; }
 
     public Task<ISagaTransition> HandleAsync(
@@ -167,8 +168,9 @@ public sealed class SagaRetryTests
         ISagaContext context,
         CancellationToken cancellationToken)
     {
-      Attempts++;
-      if (AlwaysRetry || Attempts == 1)
+      var state = (RetrySagaState)context.State;
+      state.Attempts++;
+      if (AlwaysRetry || state.Attempts == 1)
         return Task.FromResult(context.Retry(
             TimeSpan.FromMilliseconds(75),
             new InvalidOperationException("Transient dependency failure.")));
@@ -180,6 +182,7 @@ public sealed class SagaRetryTests
   public sealed class RetrySagaState : ISagaState
   {
     public string? ConcurrencyToken { get; set; }
+    public int Attempts { get; set; }
   }
 
   private sealed class Fixture
