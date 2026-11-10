@@ -10,6 +10,7 @@ namespace Franz.Common.Messaging.Sagas.Logging;
 /// </summary>
 public sealed record SagaAuditRecord
 {
+  public Guid AuditId { get; init; } = Guid.CreateVersion7();
   public required Guid SagaId { get; init; }
   public required string SagaType { get; init; }
   public required string StateType { get; init; }

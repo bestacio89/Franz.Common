@@ -35,6 +35,21 @@ public sealed class FranzSagaOptions
   public TimeSpan DefaultRetryDelay { get; set; } = TimeSpan.FromSeconds(30);
 
   /// <summary>
+  /// Retains durable saga audit records for this duration. Null disables automatic cleanup.
+  /// </summary>
+  public TimeSpan? AuditRetentionPeriod { get; set; }
+
+  /// <summary>
+  /// Interval between bounded audit-retention cleanup batches.
+  /// </summary>
+  public TimeSpan AuditRetentionCleanupInterval { get; set; } = TimeSpan.FromHours(1);
+
+  /// <summary>
+  /// Maximum number of expired audit records removed by one cleanup cycle.
+  /// </summary>
+  public int AuditRetentionBatchSize { get; set; } = 500;
+
+  /// <summary>
   /// Optional EF schema for relational saga persistence.
   /// </summary>
   public string? EntityFrameworkSchema { get; set; }

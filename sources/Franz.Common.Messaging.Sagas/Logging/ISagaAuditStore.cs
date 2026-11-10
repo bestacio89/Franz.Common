@@ -10,6 +10,12 @@ namespace Franz.Common.Messaging.Sagas.Logging;
 public interface ISagaAuditStore : ISagaAuditSink
 {
   /// <summary>
+  /// Performs provider-specific initialization required by retention operations.
+  /// </summary>
+  Task InitializeAsync(CancellationToken cancellationToken = default)
+      => Task.CompletedTask;
+
+  /// <summary>
   /// Deletes at most <paramref name="batchSize"/> audit records older than the supplied UTC cutoff.
   /// </summary>
   Task<int> DeleteExpiredAsync(
