@@ -3,8 +3,10 @@
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Headers;
 using Franz.Common.Serialization;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Franz.Common.Messaging.Messages;
 
@@ -78,10 +80,12 @@ public class Message : INotification, IEvent
 
   public virtual string? MessageType
   {
-    get => GetProperty<string>(nameof(MessageType));
+    get => Properties.TryGetValue(nameof(MessageType), out var value) ? value as string : null;
     set => SetProperty(nameof(MessageType), value);
   }
 
+  [RequiresUnreferencedCode("Use the JsonTypeInfo overload for Native AOT.")]
+  [RequiresDynamicCode("Use the JsonTypeInfo overload for Native AOT.")]
   public T? GetProperty<T>(string key)
   {
     if (!Properties.TryGetValue(key, out var value))
@@ -95,6 +99,33 @@ public class Message : INotification, IEvent
       try
       {
         return json.Deserialize<T>(FranzJson.Default);
+      }
+      catch (Exception exception) when (
+          exception is JsonException or NotSupportedException or InvalidOperationException)
+      {
+        return default;
+      }
+    }
+
+    return default;
+  }
+
+  /// <summary>Reads a JSON-backed message property using application-provided source-generated metadata.</summary>
+  public T? GetProperty<T>(string key, JsonTypeInfo<T> typeInfo)
+  {
+    ArgumentNullException.ThrowIfNull(typeInfo);
+
+    if (!Properties.TryGetValue(key, out var value))
+      return default;
+
+    if (value is T typed)
+      return typed;
+
+    if (value is JsonElement json)
+    {
+      try
+      {
+        return json.Deserialize(typeInfo);
       }
       catch (Exception exception) when (
           exception is JsonException or NotSupportedException or InvalidOperationException)
