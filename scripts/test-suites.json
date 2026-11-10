@@ -52,7 +52,10 @@
       "parallelism": 1,
       "projects": [
         "tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj",
-        "tests/Franz.Common.AotSmokeTest/Franz.Common.AotSmokeTest.csproj"
+        "tests/Franz.Common.AotSmokeTest/Franz.Common.AotSmokeTest.csproj",
+        "tests/Franz.Common.Business.AotSmokeTest/Franz.Common.Business.AotSmokeTest.csproj",
+        "tests/Franz.Common.DependencyInjection.AotSmokeTest/Franz.Common.DependencyInjection.AotSmokeTest.csproj",
+        "tests/Franz.Common.Serialization.AotSmokeTest/Franz.Common.Serialization.AotSmokeTest.csproj"
       ],
       "isolatedProjects": []
     }
