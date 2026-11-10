@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "suites": {
+    "database": {
+      "parallelism": 2,
+      "projects": [
+        "tests/Franz.Common.Entity.Tests/Franz.Common.EntityFramework.Tests.csproj",
+        "tests/Franz.Common.EntityFramework.MariaDB.Tests/Franz.Common.EntityFramework.MariaDB.Tests.csproj",
+        "tests/Franz.Common.EntityFramework.MySql.Tests/Franz.Common.EntityFramework.MySql.Tests.csproj",
+        "tests/Franz.Common.EntityFramework.Oracle.Tests/Franz.Common.EntityFramework.Oracle.Tests.csproj",
+        "tests/Franz.Common.EntityFramework.Postgres.Tests/Franz.Common.EntityFramework.Postgres.Tests.csproj",
+        "tests/Franz.Common.EntityFramework.SQLServer.Tests/Franz.Common.EntityFramework.SQLServer.Tests.csproj",
+        "tests/Franz.Common.MongoDB.Tests/Franz.Common.MongoDB.Tests.csproj"
+      ],
+      "isolatedProjects": [
+        "tests/Franz.Common.EntityFramework.AzureCosmosDB/Franz.Common.AzureCosmosDB.Tests.csproj"
+      ]
+    },
+    "messaging": {
+      "parallelism": 2,
+      "projects": [
+        "tests/Franz.Common.Messaging.Hosting.Kafka.Tests/Franz.Common.Messaging.Hosting.Kafka.Tests.csproj",
+        "tests/Franz.Common.Messaging.Hosting.RabbitMQ.Tests/Franz.Common.Messaging.Hosting.RabbitMQ.Tests.csproj",
+        "tests/Franz.Common.Messaging.Kafka.Tests/Franz.Common.Messaging.Kafka.Tests.csproj",
+        "tests/Franz.Common.Messaging.RabbitMQ.Tests/Franz.Common.Messaging.RabbitMQ.Tests.csproj",
+        "tests/Franz.Common.Messaging.Sagas.Tests/Franz.Common.Messaging.Sagas.Tests.csproj",
+        "tests/Franz.Common.Messaging.Tests/Franz.Common.Messaging.Tests.csproj"
+      ],
+      "isolatedProjects": []
+    },
+    "core": {
+      "parallelism": 2,
+      "projects": [
+        "tests/Franz.Common.Business.Test/Franz.Common.Business.Tests.csproj",
+        "tests/Franz.Common.Caching.Testing/Franz.Common.Caching.Tests.csproj",
+        "tests/Franz.Common.Entity.Tests/Franz.Common.EntityFramework.Tests.csproj",
+        "tests/Franz.Common.Grpc.Tests/Franz.Common.Grpc.Tests.csproj",
+        "tests/Franz.Common.Mapping.Tests/Franz.Common.Mapping.Tests.csproj",
+        "tests/Franz.Common.Mediator.Tests/Franz.Common.Mediator.Tests.csproj",
+        "tests/Franz.Common.MultiTenancy.Tests/Franz.Common.MultiTenancy.Tests.csproj",
+        "tests/Franz.Common.SSO.Tests/Franz.Common.SSO.Tests.csproj"
+      ],
+      "isolatedProjects": []
+    },
+    "integration": {
+      "parallelism": 1,
+      "projects": [
+        "tests/Franz.Common.Integration.Test/Franz.Common.Integration.Tests.csproj"
+      ],
+      "isolatedProjects": []
+    },
+    "quality": {
+      "parallelism": 1,
+      "projects": [
+        "tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj",
+        "tests/Franz.Common.AotSmokeTest/Franz.Common.AotSmokeTest.csproj"
+      ],
+      "isolatedProjects": []
+    }
+  }
+}

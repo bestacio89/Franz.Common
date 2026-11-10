@@ -10,14 +10,18 @@ permissions:
   contents: read
 
 concurrency:
-  group: dependency-validation-v6-${{ github.ref }}
+  group: dependency-validation-v7-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DOTNET_VERSION: 10.0.403
+  BUILD_CONFIGURATION: Release
+
 jobs:
-  validate:
-    name: Restore, audit, build, and test
+  quality-gates:
+    name: Build, package, AOT, and architecture
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,41 +29,13 @@ jobs:
       - name: Validate public package READMEs
         run: python3 scripts/validate-package-readmes.py
 
+      - name: Validate test-suite ownership
+        run: python3 scripts/run-test-suite.py
+
       - name: Install .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.403
-
-      - name: Pull integration-test images
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-
-          pull_image() {
-            local image="$1"
-            local attempt
-            for attempt in 1 2 3; do
-              echo "::group::Pulling ${image} (attempt ${attempt}/3)"
-              if docker pull "${image}"; then
-                echo "::endgroup::"
-                return 0
-              fi
-              echo "::endgroup::"
-              if (( attempt < 3 )); then
-                sleep "$((attempt * 10))"
-              fi
-            done
-            echo "::error::Unable to pull ${image} after three attempts."
-            return 1
-          }
-
-          pull_image "gvenzl/oracle-free:23-slim-faststart"
-          pull_image "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator@sha256:9a4f69121f20c1d6502db84625c71ebb441ab61b01880a7b2d3d8031c6dac429"
-          pull_image "mongo:7.0"
-          pull_image "rabbitmq:4.0-management"
-          pull_image "confluentinc/cp-kafka:7.4.0"
-
-          docker image ls --digests
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore with NuGet security auditing
         id: restore
@@ -149,42 +125,6 @@ jobs:
       - name: Test framework architecture policies
         run: dotnet test tests/Franz.Common.Architecture.Tests/Franz.Common.Architecture.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=architecture-tests.trx"
 
-      - name: Test independent projects with bounded parallelism
-        env:
-          TEST_PROJECT_PARALLELISM: 2
-        run: bash scripts/run-tests-parallel.sh Release
-
-      - name: Test Cosmos DB project in isolation
-        run: dotnet test tests/Franz.Common.EntityFramework.AzureCosmosDB/Franz.Common.AzureCosmosDB.Tests.csproj --configuration Release --no-build --no-restore --maxcpucount:1 --blame-hang-timeout 10m --logger "trx;LogFileName=cosmos-tests.trx"
-
-      - name: Capture container diagnostics
-        if: failure()
-        shell: bash
-        run: |
-          mkdir -p container-diagnostics
-          {
-            echo "## Docker version"
-            docker version
-            echo "## Docker daemon information"
-            docker info
-            echo "## Docker disk usage"
-            docker system df
-            echo "## All containers"
-            docker ps -a --no-trunc
-            echo "## Container inspection"
-            container_ids="$(docker ps -aq)"
-            if [[ -n "$container_ids" ]]; then
-              docker inspect $container_ids
-              while IFS= read -r container_id; do
-                [[ -z "$container_id" ]] && continue
-                echo "## Container logs: $container_id"
-                docker logs --timestamps --details "$container_id" 2>&1 || true
-              done <<< "$container_ids"
-            fi
-            echo "## Local image inventory"
-            docker image ls --digests --no-trunc
-          } > container-diagnostics/docker-diagnostics.log 2>&1 || true
-
       - name: Enforce vulnerability gate
         if: always() && steps.restore.outputs.vulnerabilities_found == 'true'
         shell: bash
@@ -192,14 +132,124 @@ jobs:
           echo "::error::Resolve all NU1901-NU1904 advisories before merging."
           exit 1
 
-      - name: Upload dependency, test, and container reports
+      - name: Upload quality reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dependency-validation-reports
+          name: quality-gate-reports
           path: |
             restore-audit.log
             **/TestResults/*.trx
             **/CompatibilitySuppressions.xml
+          if-no-files-found: warn
+
+  database-tests:
+    name: Database providers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Restore
+        run: dotnet restore Franz.Common.slnx --force-evaluate -p:NuGetAudit=true -p:NuGetAuditLevel=low
+      - name: Validate test-suite ownership
+        run: python3 scripts/run-test-suite.py
+      - name: Run database suite
+        run: python3 scripts/run-test-suite.py database --configuration Release --no-restore
+      - name: Capture container diagnostics
+        if: failure()
+        run: bash scripts/capture-container-diagnostics.sh database
+      - name: Upload database reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-test-reports
+          path: |
+            **/TestResults/*.trx
+            container-diagnostics/**
+          if-no-files-found: warn
+
+  messaging-tests:
+    name: Messaging transports and Sagas
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Restore
+        run: dotnet restore Franz.Common.slnx --force-evaluate -p:NuGetAudit=true -p:NuGetAuditLevel=low
+      - name: Validate test-suite ownership
+        run: python3 scripts/run-test-suite.py
+      - name: Run messaging suite
+        run: python3 scripts/run-test-suite.py messaging --configuration Release --no-restore
+      - name: Capture container diagnostics
+        if: failure()
+        run: bash scripts/capture-container-diagnostics.sh messaging
+      - name: Upload messaging reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: messaging-test-reports
+          path: |
+            **/TestResults/*.trx
+            container-diagnostics/**
+          if-no-files-found: warn
+
+  core-tests:
+    name: Core framework
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Restore
+        run: dotnet restore Franz.Common.slnx --force-evaluate -p:NuGetAudit=true -p:NuGetAuditLevel=low
+      - name: Validate test-suite ownership
+        run: python3 scripts/run-test-suite.py
+      - name: Run core suite
+        run: python3 scripts/run-test-suite.py core --configuration Release --no-restore
+      - name: Upload core reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-test-reports
+          path: '**/TestResults/*.trx'
+          if-no-files-found: warn
+
+  integration-tests:
+    name: Cross-cutting integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Restore
+        run: dotnet restore Franz.Common.slnx --force-evaluate -p:NuGetAudit=true -p:NuGetAuditLevel=low
+      - name: Validate test-suite ownership
+        run: python3 scripts/run-test-suite.py
+      - name: Run integration suite
+        run: python3 scripts/run-test-suite.py integration --configuration Release --no-restore
+      - name: Capture container diagnostics
+        if: failure()
+        run: bash scripts/capture-container-diagnostics.sh integration
+      - name: Upload integration reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-reports
+          path: |
+            **/TestResults/*.trx
             container-diagnostics/**
           if-no-files-found: warn
