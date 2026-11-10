@@ -4,6 +4,7 @@
     "database": {
       "parallelism": 2,
       "projects": [
+        "tests/Franz.Common.Entity.Tests/Franz.Common.EntityFramework.Tests.csproj",
         "tests/Franz.Common.EntityFramework.MariaDB.Tests/Franz.Common.EntityFramework.MariaDB.Tests.csproj",
         "tests/Franz.Common.EntityFramework.MySql.Tests/Franz.Common.EntityFramework.MySql.Tests.csproj",
         "tests/Franz.Common.EntityFramework.Oracle.Tests/Franz.Common.EntityFramework.Oracle.Tests.csproj",
@@ -32,7 +33,6 @@
       "projects": [
         "tests/Franz.Common.Business.Test/Franz.Common.Business.Tests.csproj",
         "tests/Franz.Common.Caching.Testing/Franz.Common.Caching.Tests.csproj",
-        "tests/Franz.Common.Entity.Tests/Franz.Common.EntityFramework.Tests.csproj",
         "tests/Franz.Common.Grpc.Tests/Franz.Common.Grpc.Tests.csproj",
         "tests/Franz.Common.Mapping.Tests/Franz.Common.Mapping.Tests.csproj",
         "tests/Franz.Common.Mediator.Tests/Franz.Common.Mediator.Tests.csproj",
