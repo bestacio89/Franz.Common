@@ -1,6 +1,7 @@
 #nullable enable
 
 using Franz.Common.Headers;
+using Franz.Common.Mediator;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Messages;

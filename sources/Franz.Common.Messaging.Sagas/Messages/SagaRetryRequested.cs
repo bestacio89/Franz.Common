@@ -1,5 +1,6 @@
 #nullable enable
 
+using Franz.Common.Mediator;
 using Franz.Common.Messaging;
 using Franz.Common.Messaging.Messages;
 
