@@ -66,44 +66,52 @@ public sealed class EfSagaMessageStore(SagaDbContext dbContext) : IMessageStore
   }
 
   public async Task MarkAsSentAsync(Guid id, Guid owner, CancellationToken ct = default)
-      => await UpdateOwnedAsync(id, owner, update => update
-          .SetProperty(x => x.SentOn, (DateTime?)DateTime.UtcNow)
-          .SetProperty(x => x.LeaseOwnerId, (Guid?)null)
-          .SetProperty(x => x.LeaseExpiresAt, (DateTime?)null), ct).ConfigureAwait(false);
+  {
+    var affected = await _db.Set<SagaOutboxRecord>()
+        .Where(x => x.Id == id && x.LeaseOwnerId == owner && x.LeaseExpiresAt > DateTime.UtcNow)
+        .ExecuteUpdateAsync(update => update
+            .SetProperty(x => x.SentOn, (DateTime?)DateTime.UtcNow)
+            .SetProperty(x => x.LeaseOwnerId, (Guid?)null)
+            .SetProperty(x => x.LeaseExpiresAt, (DateTime?)null), ct)
+        .ConfigureAwait(false);
+    EnsureOwned(id, owner, affected);
+  }
 
   public async Task UpdateRetryAsync(StoredMessage message, Guid owner, CancellationToken ct = default)
   {
     ArgumentNullException.ThrowIfNull(message);
-    await UpdateOwnedAsync(message.Id, owner, update => update
-        .SetProperty(x => x.RetryCount, message.RetryCount)
-        .SetProperty(x => x.LastError, message.LastError)
-        .SetProperty(x => x.LastTriedOn, message.LastTriedOn)
-        .SetProperty(x => x.NextAttemptAt, message.NextAttemptAt)
-        .SetProperty(x => x.LeaseOwnerId, (Guid?)null)
-        .SetProperty(x => x.LeaseExpiresAt, (DateTime?)null), ct).ConfigureAwait(false);
+    var affected = await _db.Set<SagaOutboxRecord>()
+        .Where(x => x.Id == message.Id && x.LeaseOwnerId == owner && x.LeaseExpiresAt > DateTime.UtcNow)
+        .ExecuteUpdateAsync(update => update
+            .SetProperty(x => x.RetryCount, message.RetryCount)
+            .SetProperty(x => x.LastError, message.LastError)
+            .SetProperty(x => x.LastTriedOn, message.LastTriedOn)
+            .SetProperty(x => x.NextAttemptAt, message.NextAttemptAt)
+            .SetProperty(x => x.LeaseOwnerId, (Guid?)null)
+            .SetProperty(x => x.LeaseExpiresAt, (DateTime?)null), ct)
+        .ConfigureAwait(false);
+    EnsureOwned(message.Id, owner, affected);
   }
 
   public async Task MoveToDeadLetterAsync(StoredMessage message, Guid owner, CancellationToken ct = default)
   {
     ArgumentNullException.ThrowIfNull(message);
-    await UpdateOwnedAsync(message.Id, owner, update => update
-        .SetProperty(x => x.IsDeadLetter, true)
-        .SetProperty(x => x.LastError, message.LastError)
-        .SetProperty(x => x.LastTriedOn, DateTime.UtcNow)
-        .SetProperty(x => x.LeaseOwnerId, (Guid?)null)
-        .SetProperty(x => x.LeaseExpiresAt, (DateTime?)null), ct).ConfigureAwait(false);
+    var affected = await _db.Set<SagaOutboxRecord>()
+        .Where(x => x.Id == message.Id && x.LeaseOwnerId == owner && x.LeaseExpiresAt > DateTime.UtcNow)
+        .ExecuteUpdateAsync(update => update
+            .SetProperty(x => x.IsDeadLetter, true)
+            .SetProperty(x => x.LastError, message.LastError)
+            .SetProperty(x => x.LastTriedOn, DateTime.UtcNow)
+            .SetProperty(x => x.LeaseOwnerId, (Guid?)null)
+            .SetProperty(x => x.LeaseExpiresAt, (DateTime?)null), ct)
+        .ConfigureAwait(false);
+    EnsureOwned(message.Id, owner, affected);
   }
 
-  private async Task UpdateOwnedAsync(
-      Guid id, Guid owner,
-      Func<Microsoft.EntityFrameworkCore.Query.SetPropertyCalls<SagaOutboxRecord>,
-           Microsoft.EntityFrameworkCore.Query.SetPropertyCalls<SagaOutboxRecord>> update,
-      CancellationToken ct)
+  private static void EnsureOwned(Guid id, Guid owner, int affected)
   {
-    var affected = await _db.Set<SagaOutboxRecord>()
-        .Where(x => x.Id == id && x.LeaseOwnerId == owner && x.LeaseExpiresAt > DateTime.UtcNow)
-        .ExecuteUpdateAsync(update, ct).ConfigureAwait(false);
-    if (affected != 1) throw LeaseLost(id, owner);
+    if (affected != 1)
+      throw LeaseLost(id, owner);
   }
 
   private static void ValidateClaim(Guid owner, TimeSpan duration, int batchSize)
