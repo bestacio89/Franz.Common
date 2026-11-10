@@ -310,9 +310,9 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<PostgresFixtu
     {
       var context = verifyRollbackScope.ServiceProvider.GetRequiredService<SagaDbContext>();
       var count = await context.Database
-          .SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"SagaAudit\"")
+          .SqlQueryRaw<long>("SELECT COUNT(*) AS \"Value\" FROM \"SagaAudit\"")
           .SingleAsync();
-      count.Should().Be(0);
+      count.Should().Be(0L);
     }
 
     await using (var commitScope = provider.CreateAsyncScope())
@@ -332,9 +332,9 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<PostgresFixtu
 
       var context = commitScope.ServiceProvider.GetRequiredService<SagaDbContext>();
       var remaining = await context.Database
-          .SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"SagaAudit\"")
+          .SqlQueryRaw<long>("SELECT COUNT(*) AS \"Value\" FROM \"SagaAudit\"")
           .SingleAsync();
-      remaining.Should().Be(1);
+      remaining.Should().Be(1L);
     }
   }
 
