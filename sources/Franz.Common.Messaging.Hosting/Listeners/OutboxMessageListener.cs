@@ -156,7 +156,7 @@ public sealed class OutboxMessageListener : IListener
       }
 
       await inbox.MarkProcessedAsync(message.Id, cancellationToken).ConfigureAwait(false);
-      await messageStore.MarkAsSentAsync(stored.Id, cancellationToken).ConfigureAwait(false);
+      await messageStore.MarkAsSentAsync(stored.Id, leaseOwnerId, cancellationToken).ConfigureAwait(false);
 
       _logger.LogInformation("Marked outbox message {MessageId} as sent and processed.", message.Id);
     }
