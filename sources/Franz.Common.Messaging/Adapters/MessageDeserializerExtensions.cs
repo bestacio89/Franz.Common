@@ -81,7 +81,7 @@ public static class MessageDeserializerExtensions
     // A manifest may be registered after an earlier lookup. Do not retain negative results.
     if (resolvedType is null)
     {
-      ((ICollection<KeyValuePair<string, Lazy<Type?>>)TypeResolutionCache)
+      ((ICollection<KeyValuePair<string, Lazy<Type?>>>)TypeResolutionCache)
           .Remove(new KeyValuePair<string, Lazy<Type?>>(cacheKey, resolution));
     }
 
