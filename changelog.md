@@ -1287,7 +1287,18 @@ Sagas now integrate seamlessly with:
 
 ## v1.6.18–v1.6.19 — Mapping Refinements
 
----
+### Constructor-aware mapping
+
+- Added constructor discovery and invocation for positional record constructors.
+- Enabled mapping into immutable DTOs and record structs without requiring a public parameterless constructor.
+- Retained `ConstructUsing()` and legacy mapping compatibility.
+- Kept `Activator.CreateInstance()` as a fallback only when no usable constructor can be selected.
+
+### Architectural impact
+
+- Improved support for immutable application and transport contracts.
+- Aligned mapping behavior with the architecture rule that DTOs should not require mutable, parameterless construction.
+- Improved constructor selection and object instantiation behavior without changing the existing mapping configuration model.
 
 ## v1.6.17 — Messaging Orchestration & Consistency Update 🧩
 
@@ -1488,9 +1499,84 @@ To standardize naming across all Franz messaging providers and make intent insta
 
 ---
 
-## v1.6.0 — The Consolidation Release 🏗
+## v1.6.0 — The Consolidation Release
 
-*(see previous full details — Outbox/Inbox, Identity, Domain Events, etc.)*
+Identity, messaging and domain-event capabilities were brought together under a consistent application and infrastructure model.
+
+### Added
+
+- **Outbox and Inbox**
+  - Added the persistence-agnostic `IMessageStore` contract and `StoredMessage` DTO for outbox storage.
+  - Added `IInboxStore` for idempotent message consumption.
+  - Added the MongoDB `MongoMessageStore` implementation with automatic index creation.
+  - Added retry exhaustion and dead-letter handling through `MoveToDeadLetterAsync`.
+
+- **Dispatcher and event execution**
+  - Unified dispatch for commands, queries, domain events and integration events.
+  - Added runtime-type dispatch through `PublishEventAsync(IEvent)` overloads.
+  - Propagated correlation context end-to-end through dispatcher and pipeline execution.
+  - Applied logging and validation pipelines consistently across event execution paths.
+
+- **Domain-event contracts**
+  - Introduced `IDomainEvent` as a first-class contract inheriting from `IEvent`.
+  - Required aggregates to raise domain events; entities no longer dispatch events.
+  - Established the distinction between domain events inside aggregates and integration events at messaging, persistence and external boundaries.
+
+- **Identity and SSO**
+  - Added `FranzIdentityContext` with user ID, email, full name, roles, tenant ID and domain ID.
+  - Added `IIdentityContextAccessor` and `FakeIdentityContextAccessor` for application and test use.
+  - Added the ASP.NET Core `HttpContextIdentityContextAccessor`.
+  - Unified claims normalization across WS-Federation, SAML2, OIDC and Keycloak.
+  - Added the `AddFranzSsoIdentity()` bootstrap entry point.
+
+- **Testing infrastructure**
+  - Added an in-memory aggregate repository for integration tests.
+  - Added an in-memory processed-event sink with correlation-aware matching.
+  - Added sanity checks for handler resolution.
+
+- **Messaging hosting**
+  - Added the asynchronous `IListener` contract for Kafka and Outbox listeners.
+  - Added `KafkaHostedService` for hosted Kafka listeners.
+  - Added `OutboxHostedService` to publish MongoDB outbox messages to Kafka.
+  - Added inbox checks to listeners for idempotent dispatch.
+
+### Changed
+
+- **Repositories**
+  - Standardized aggregate repository persistence and replay of domain events.
+  - Removed event raising and persistence from entities.
+  - Corrected dependency-injection registration for aggregate repositories using domain events.
+
+- **Pipelines**
+  - Separated notification execution from event execution.
+  - Organized logging and validation pipeline application consistently.
+
+- **Messaging**
+  - Decoupled transport-level `Message` from persistence-level `StoredMessage`.
+  - Standardized serialization across Kafka and Outbox.
+  - Unified listener deserialization.
+
+- **Mediator semantics**
+  - Clarified domain events as `IDomainEvent` facts raised within aggregates.
+  - Clarified integration events as `IIntegrationEvent` contracts for messaging, persistence and external boundaries.
+  - Required aggregates to register `Apply` handlers for their domain events.
+
+### Fixed
+
+- Corrected dependency-injection mismatches that prevented event handlers from resolving in tests.
+- Fixed repository save loops that failed to publish uncommitted domain events.
+- Corrected serialization mismatches between Kafka and Outbox replay.
+- Restored missing correlation propagation in consumer pipelines.
+- Fixed startup issues caused by multiple identity-provider registrations.
+- Corrected claims-normalization inconsistencies across SSO providers.
+- Removed duplicate handler registrations caused by repeated assembly scans.
+
+### Documentation
+
+- Updated guidance for Outbox/Inbox usage, retry and dead-letter behavior.
+- Documented dependency-injection setup for MongoDB Outbox, Kafka listeners and SSO identity providers.
+- Documented domain-event versus integration-event semantics.
+- Added monitoring hooks and structured logging conventions for success, retry and dead-letter flows.
 
 ---
 
