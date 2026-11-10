@@ -20,15 +20,23 @@ public sealed class ExecutionFaultMessageBuilderStrategy : IMessageBuilderStrate
   public Message Build(object value)
   {
     ArgumentNullException.ThrowIfNull(value);
+
     var fault = value switch
     {
-      IExecutionFault executionFault => executionFault,
+      IExecutionFault executionFault => new ExecutionFault(
+          executionFault.Code,
+          executionFault.Message,
+          executionFault.Source,
+          executionFault.StackTrace)
+      {
+        OccurredAt = executionFault.OccurredAt
+      },
       Exception exception => ExecutionFault.FromException(exception),
       _ => throw new InvalidOperationException(
           $"Type '{value.GetType().FullName}' cannot be converted to an execution fault.")
     };
 
-    var body = _serializer.Serialize(fault, fault.GetType());
+    var body = _serializer.Serialize(fault, typeof(ExecutionFault));
     var message = new Message(body)
     {
       Body = body,
