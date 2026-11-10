@@ -16,7 +16,7 @@ The package provides:
 - Explicit saga-instance identity resolution for non-start messages.
 - Lifecycle-gated orchestration with optimistic concurrency.
 - In-memory, EF Core, MongoDB, and Cosmos DB persistence adapters.
-- Metadata-only audit sink integration.
+- Transactional metadata-only audit persistence and bounded retention for EF Core, MongoDB, and Cosmos DB.
 
 The standard Messaging pipeline deserializes an inbound integration event and publishes it through Franz Mediator. `AddSaga<TSaga>()` registers the Saga notification handler for the exact integration-event contracts declared by that saga. No separate transport-specific Saga strategy executer is required.
 
@@ -155,9 +155,28 @@ The database commit atomically records inbox receipt, saga state, and outgoing m
 
 Hosts without the provider outbox registration retain the direct-publish compatibility path; that path does not provide the atomic inbox/state/outbox guarantee.
 
-## Auditing
+## Auditing and retention
 
-Set `EnableAuditing = true` and register one or more `ISagaAuditSink` implementations. Audit records contain lifecycle and message-type metadata, not application state or exception messages. Sink failures are logged and remain best-effort; audit writes are not part of the persistence transaction.
+Set `EnableAuditing = true` to emit metadata-only lifecycle records. With the EF Core, MongoDB, or Cosmos persistence adapter, the package registers a durable `ISagaAuditStore`. Its writes enlist in the same provider transaction as the inbox receipt, saga state, and outbox records. A durable audit-store failure aborts message processing and prevents the transaction from committing. Additional application-provided `ISagaAuditSink` implementations remain best-effort observability sinks; their failures are logged and do not affect the transaction.
+
+Audit records contain lifecycle and message-type metadata, correlation/causation/message identities, tenant identity, duration, and exception type. They deliberately exclude application state, exception messages, and message payloads.
+
+Retention is opt-in and bounded:
+
+```csharp
+var sagaBuilder = services.AddFranzSagas(options =>
+{
+    options.Persistence = "EntityFramework";
+    options.EnableAuditing = true;
+    options.AuditRetentionPeriod = TimeSpan.FromDays(365);
+    options.AuditRetentionCleanupInterval = TimeSpan.FromHours(6);
+    options.AuditRetentionBatchSize = 500;
+});
+```
+
+A null `AuditRetentionPeriod` retains records indefinitely. When configured, a hosted service removes at most `AuditRetentionBatchSize` expired records per cleanup interval. The cutoff is based on the audit timestamp in UTC. MongoDB creates the timestamp index during hosted-service startup; relational EF creates an index through the model; Cosmos audit documents share the existing `SagaStates` container and tenant partition so audit writes remain in the same transactional batch as saga state. Retention cleanup deletes Cosmos records one tenant partition at a time.
+
+The in-memory provider does not support durable audit or retention. Configuring retention with `Persistence = "Memory"` is rejected at registration. Hosts must apply the updated EF Core migration to create the `SagaAudit` table and indexes before enabling durable audit on relational persistence.
 
 ## Current limitations
 

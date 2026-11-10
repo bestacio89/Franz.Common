@@ -22,6 +22,8 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
 
   public DbSet<CosmosSagaStateDocument> SagaStates => Set<CosmosSagaStateDocument>();
 
+  public DbSet<CosmosSagaAuditDocument> SagaAuditRecords => Set<CosmosSagaAuditDocument>();
+
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
@@ -39,6 +41,20 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
       entity.Property(x => x.Version).IsRequired();
       entity.Property(x => x.CreatedAt).IsRequired();
       entity.Property(x => x.UpdatedAt).IsRequired();
+    });
+
+    modelBuilder.Entity<CosmosSagaAuditDocument>(entity =>
+    {
+      entity.ToContainer("SagaStates");
+      entity.HasPartitionKey(x => x.TenantId);
+      entity.Property(x => x.Id).ToJsonProperty("id");
+      entity.Property(x => x.TenantId).ToJsonProperty("tenantId").IsRequired();
+      entity.Property(x => x.SagaId).IsRequired();
+      entity.Property(x => x.SagaType).IsRequired();
+      entity.Property(x => x.StateType).IsRequired();
+      entity.Property(x => x.StepType).IsRequired();
+      entity.Property(x => x.IncomingMessageType).IsRequired();
+      entity.Property(x => x.Timestamp).IsRequired();
     });
 
     modelBuilder.Entity<CosmosSagaInboxDocument>(entity =>

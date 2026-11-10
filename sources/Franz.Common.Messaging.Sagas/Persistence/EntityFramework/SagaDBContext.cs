@@ -14,6 +14,8 @@ public sealed class SagaDbContext : DbContextBase
 {
   public DbSet<SagaStateEntity> SagaStates => Set<SagaStateEntity>();
 
+  public DbSet<SagaAuditEntity> SagaAuditRecords => Set<SagaAuditEntity>();
+
   public SagaDbContext(
       DbContextOptions<SagaDbContext> options,
       IDispatcher dispatcher,
@@ -40,6 +42,23 @@ public sealed class SagaDbContext : DbContextBase
       entity.Property(x => x.CreatedAt).IsRequired();
       entity.Property(x => x.UpdatedAt).IsRequired();
       entity.Property(x => x.RetryCount).HasDefaultValue(0);
+    });
+
+    modelBuilder.Entity<SagaAuditEntity>(entity =>
+    {
+      entity.ToTable("SagaAudit");
+      entity.HasKey(x => x.AuditId);
+      entity.Property(x => x.AuditId).ValueGeneratedNever();
+      entity.Property(x => x.SagaId).IsRequired();
+      entity.Property(x => x.SagaType).IsRequired().HasMaxLength(1000);
+      entity.Property(x => x.StateType).IsRequired().HasMaxLength(1000);
+      entity.Property(x => x.StepType).IsRequired().HasMaxLength(256);
+      entity.Property(x => x.IncomingMessageType).IsRequired().HasMaxLength(1000);
+      entity.Property(x => x.OutgoingMessageType).HasMaxLength(1000);
+      entity.Property(x => x.TenantId).HasMaxLength(128);
+      entity.Property(x => x.ErrorType).HasMaxLength(1000);
+      entity.HasIndex(x => x.Timestamp);
+      entity.HasIndex(x => new { x.TenantId, x.SagaId, x.Timestamp });
     });
 
     modelBuilder.Entity<SagaInboxRecord>(entity =>
