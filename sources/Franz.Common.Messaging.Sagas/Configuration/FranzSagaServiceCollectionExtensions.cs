@@ -83,7 +83,8 @@ public static class FranzSagaServiceCollectionExtensions
     services.TryAddEnumerable(
         ServiceDescriptor.Singleton<ISagaAuditSink, DefaultSagaAuditSink>());
 
-    if (options.AuditRetentionPeriod.HasValue)
+    if (!options.Persistence.Equals("Memory", StringComparison.OrdinalIgnoreCase) &&
+        (options.EnableAuditing || options.AuditRetentionPeriod.HasValue))
       services.TryAddEnumerable(
           ServiceDescriptor.Singleton<IHostedService, SagaAuditRetentionHostedService>());
 

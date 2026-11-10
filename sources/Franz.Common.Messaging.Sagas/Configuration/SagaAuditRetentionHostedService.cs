@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace Franz.Common.Messaging.Sagas.Configuration;
 
 /// <summary>
-/// Performs bounded, periodic deletion of expired durable saga audit records.
+/// Initializes the durable audit store and performs bounded, periodic retention cleanup.
 /// </summary>
 internal sealed class SagaAuditRetentionHostedService : BackgroundService, IHostedLifecycleService
 {
@@ -39,6 +39,9 @@ internal sealed class SagaAuditRetentionHostedService : BackgroundService, IHost
 
   protected override async Task ExecuteAsync(CancellationToken stoppingToken)
   {
+    if (!_options.AuditRetentionPeriod.HasValue)
+      return;
+
     using var timer = new PeriodicTimer(_options.AuditRetentionCleanupInterval);
     while (!stoppingToken.IsCancellationRequested)
     {
@@ -46,7 +49,7 @@ internal sealed class SagaAuditRetentionHostedService : BackgroundService, IHost
       {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<ISagaAuditStore>();
-        var cutoff = DateTimeOffset.UtcNow - _options.AuditRetentionPeriod!.Value;
+        var cutoff = DateTimeOffset.UtcNow - _options.AuditRetentionPeriod.Value;
         var deleted = await store.DeleteExpiredAsync(
             cutoff,
             _options.AuditRetentionBatchSize,

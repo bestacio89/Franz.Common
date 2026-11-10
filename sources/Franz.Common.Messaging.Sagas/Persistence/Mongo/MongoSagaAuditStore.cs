@@ -22,6 +22,9 @@ internal sealed class MongoSagaAuditStore : ISagaAuditStore
 
   public async Task InitializeAsync(CancellationToken cancellationToken = default)
   {
+    if (_unitOfWork.CurrentSession?.IsInTransaction == true)
+      throw new InvalidOperationException("Saga audit store initialization must run outside a saga execution transaction.");
+
     var index = new CreateIndexModel<MongoSagaAuditDocument>(
         Builders<MongoSagaAuditDocument>.IndexKeys
             .Ascending(record => record.TimestampUtc)
@@ -50,6 +53,10 @@ internal sealed class MongoSagaAuditStore : ISagaAuditStore
   {
     if (batchSize <= 0)
       throw new ArgumentOutOfRangeException(nameof(batchSize), batchSize, "Audit retention batch size must be positive.");
+
+    if (_unitOfWork.CurrentSession?.IsInTransaction == true)
+      throw new InvalidOperationException(
+          "Saga audit retention must run outside a saga execution transaction.");
 
     var filter = Builders<MongoSagaAuditDocument>.Filter.Lt(
         record => record.TimestampUtc,
