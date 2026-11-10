@@ -91,6 +91,26 @@ public class HeaderContextAccessorTests
   }
 
   [Fact]
+  public void TryGetValueGeneric_WithGeneratedMetadata_ShouldDeserializeCorrectly()
+  {
+    var json = JsonSerializer.Serialize(new TestDto { Id = 7, Name = "AOT" });
+    SetupMessageWithHeaders(new Dictionary<string, StringValues>
+    {
+      { "X-Custom-Data", json }
+    });
+
+    var success = _headerAccessor.TryGetValue(
+        "X-Custom-Data",
+        HeaderContextJsonContext.Default.TestDto,
+        out var value);
+
+    success.Should().BeTrue();
+    value.Should().NotBeNull();
+    value!.Id.Should().Be(7);
+    value.Name.Should().Be("AOT");
+  }
+
+  [Fact]
   public void TryGetValueGeneric_WhenJsonIsInvalid_ShouldReturnFalse()
   {
     // Arrange
