@@ -542,7 +542,7 @@ public sealed class SagaOrchestrator
           _messageStore is null ||
           _persistenceUnitOfWork is null)
         throw new SagaConfigurationError(
-            "Durable saga retry requires EF Core, MongoDB, or Cosmos persistence with its transactional IUnitOfWork and scheduled IMessageStore.");
+            "A durable retry scheduler must be configured. Durable saga retry requires EF Core, MongoDB, or Cosmos persistence with a transactional IUnitOfWork and scheduled IMessageStore.");
 
       if (!messageId.HasValue || messageId.Value == Guid.Empty ||
           originalMessage is null ||

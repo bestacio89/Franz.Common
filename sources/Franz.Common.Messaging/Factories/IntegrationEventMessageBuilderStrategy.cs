@@ -17,7 +17,7 @@ public sealed class IntegrationEventMessageBuilderStrategy : IMessageBuilderStra
     ArgumentNullException.ThrowIfNull(value);
 
     var integrationEvent = (IIntegrationEvent)value;
-    var body = JsonSerializer.Serialize(integrationEvent, FranzJson.Default);
+    var body = JsonSerializer.Serialize(integrationEvent, integrationEvent.GetType(), FranzJson.Default);
 
     var message = new Message(body)
     {
