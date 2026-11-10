@@ -14,7 +14,6 @@ public sealed class SagaDbContext : DbContextBase
 {
   public DbSet<SagaStateEntity> SagaStates => Set<SagaStateEntity>();
 
-  public DbSet<SagaAuditEntity> SagaAuditRecords => Set<SagaAuditEntity>();
 
   public SagaDbContext(
       DbContextOptions<SagaDbContext> options,

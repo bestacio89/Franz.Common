@@ -22,7 +22,6 @@ public sealed class CosmosSagaDbContext : CosmosDbContextBase
 
   public DbSet<CosmosSagaStateDocument> SagaStates => Set<CosmosSagaStateDocument>();
 
-  public DbSet<CosmosSagaAuditDocument> SagaAuditRecords => Set<CosmosSagaAuditDocument>();
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {

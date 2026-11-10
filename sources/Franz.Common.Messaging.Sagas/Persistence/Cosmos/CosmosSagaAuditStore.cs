@@ -44,7 +44,7 @@ internal sealed class CosmosSagaAuditStore : ISagaAuditStore
       ErrorType = record.ErrorType
     };
     document.MarkCreated("saga-audit");
-    await _db.SagaAuditRecords.AddAsync(document, cancellationToken).ConfigureAwait(false);
+    await _db.Set<CosmosSagaAuditDocument>().AddAsync(document, cancellationToken).ConfigureAwait(false);
   }
 
   public async Task<int> DeleteExpiredAsync(
@@ -59,7 +59,7 @@ internal sealed class CosmosSagaAuditStore : ISagaAuditStore
 
     // Cosmos transactional batches are limited to 100 operations per logical partition.
     var effectiveBatchSize = Math.Min(batchSize, 100);
-    var expired = await _db.SagaAuditRecords
+    var expired = await _db.Set<CosmosSagaAuditDocument>()
         .Where(record => record.Timestamp < cutoff.ToUniversalTime())
         .OrderBy(record => record.Timestamp)
         .Take(effectiveBatchSize)
@@ -68,7 +68,7 @@ internal sealed class CosmosSagaAuditStore : ISagaAuditStore
 
     foreach (var partition in expired.GroupBy(record => record.TenantId, StringComparer.Ordinal))
     {
-      _db.SagaAuditRecords.RemoveRange(partition);
+      _db.Set<CosmosSagaAuditDocument>().RemoveRange(partition);
       await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 

@@ -21,7 +21,7 @@ internal sealed class EfSagaAuditStore(SagaDbContext dbContext) : ISagaAuditStor
       throw new InvalidOperationException(
           "Durable saga audit writes require the active SagaDbContext persistence transaction.");
 
-    _db.SagaAuditRecords.Add(SagaAuditEntity.From(record));
+    _db.Set<SagaAuditEntity>().Add(SagaAuditEntity.From(record));
     return Task.CompletedTask;
   }
 
@@ -33,7 +33,7 @@ internal sealed class EfSagaAuditStore(SagaDbContext dbContext) : ISagaAuditStor
     if (batchSize <= 0)
       throw new ArgumentOutOfRangeException(nameof(batchSize), batchSize, "Audit retention batch size must be positive.");
 
-    return await _db.SagaAuditRecords
+    return await _db.Set<SagaAuditEntity>()
         .Where(record => record.Timestamp < cutoff.ToUniversalTime())
         .OrderBy(record => record.Timestamp)
         .ThenBy(record => record.AuditId)
