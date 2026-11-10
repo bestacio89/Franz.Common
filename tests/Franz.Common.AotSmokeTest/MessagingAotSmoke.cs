@@ -1,4 +1,6 @@
 using Franz.Common.Messaging;
+using Franz.Common.Messaging.Adapters;
+using Franz.Common.Messaging.Manifest;
 using Franz.Common.Messaging.Extensions;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Messages;
@@ -43,6 +45,13 @@ public static class MessagingAotSmoke
         using var scope = provider.CreateScope();
         var scopedServices = scope.ServiceProvider;
 
+        MessagingManifestRegistry.Register(
+            typeof(AotCommand).Assembly,
+            new MessagingManifest(
+                destinations: null,
+                subscriptions: new[] { typeof(AotEvent) },
+                knownTypes: new[] { typeof(AotCommand), typeof(AotEvent) }));
+
         var integrationEvent = new AotIntegrationEvent(
             Guid.Parse("01936f4a-7c2b-7a31-9f23-8f8d6f9b1c42"),
             "source-generated-messaging");
@@ -67,6 +76,19 @@ public static class MessagingAotSmoke
         if (commandMessage.Kind != MessageKind.Command ||
             serializer.Deserialize<AotCommand>(commandMessage.Body!) != command)
             return Task.FromResult(26);
+
+        var commandEnvelope = command.ToMessage(serializer);
+        var inboundCommand = commandEnvelope.ToCommand(serializer) as AotCommand;
+        if (inboundCommand?.Value != command.Value ||
+            inboundCommand.CorrelationId != commandEnvelope.CorrelationId)
+            return Task.FromResult(29);
+
+        var @event = new AotEvent(DateTimeOffset.UnixEpoch);
+        var eventEnvelope = @event.ToMessage(serializer);
+        var inboundEvent = eventEnvelope.ToEvent(serializer) as AotEvent;
+        if (inboundEvent?.OccurredOn != @event.OccurredOn ||
+            inboundEvent.CorrelationId != eventEnvelope.CorrelationId)
+            return Task.FromResult(30);
 
         var query = new AotQuery(42);
         var queryMessage = factory.Build(query);
