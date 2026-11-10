@@ -29,6 +29,7 @@ public sealed class SagaRetryTests
   public async Task Retry_SchedulesTheOriginalEventAndResumesTheSameSagaAfterTheDelay()
   {
     var fixture = new Fixture(maxRetryAttempts: 3);
+    var scheduledAt = DateTimeOffset.UtcNow;
     var originalMessageId = Guid.CreateVersion7();
     var correlationId = Guid.CreateVersion7();
     var causationId = Guid.CreateVersion7();
@@ -72,7 +73,7 @@ public sealed class SagaRetryTests
         .Which.Should().Be(originalMessageId.ToString("D"));
     scheduled.Message.Headers[SagaRetryHeaders.TargetSagaId].Should().ContainSingle()
         .Which.Should().Be(fixture.Saga.SagaId.ToString("D"));
-    scheduled.NotBefore.Should().BeAfter(DateTimeOffset.UtcNow);
+    scheduled.NotBefore.Should().BeOnOrAfter(scheduledAt.AddMilliseconds(75));
 
     var retrySagaId = retryRequest.SagaId;
     var retryEnvelope = RehydrateOriginalEnvelope(retryRequest, scheduled.Message);
@@ -90,7 +91,7 @@ public sealed class SagaRetryTests
     await earlyDelivery.Should().ThrowAsync<PermanentMessagingException>()
         .WithMessage("*not due*");
 
-    await Task.Delay(scheduled.NotBefore - DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(20));
+    await DelayUntilAsync(scheduled.NotBefore);
 
     await fixture.Orchestrator.HandleEventAsync(
         new RetryEvent(),
@@ -135,7 +136,7 @@ public sealed class SagaRetryTests
     var retryRequest = JsonSerializer.Deserialize<SagaRetryRequested>(
         scheduled.Message.Body!,
         new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
-    await Task.Delay(scheduled.NotBefore - DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(20));
+    await DelayUntilAsync(scheduled.NotBefore);
 
     var retrySagaId = retryRequest.SagaId;
     var retryEnvelope = RehydrateOriginalEnvelope(retryRequest, scheduled.Message);
@@ -188,6 +189,13 @@ public sealed class SagaRetryTests
     await act.Should().ThrowAsync<TechnicalException>()
         .WithMessage("*durable retry*");
     (await repository.LoadAsync(saga.SagaId, null, typeof(RetrySagaState))).Should().BeNull();
+  }
+
+  private static async Task DelayUntilAsync(DateTimeOffset dueAt)
+  {
+    var remaining = dueAt - DateTimeOffset.UtcNow;
+    if (remaining > TimeSpan.Zero)
+      await Task.Delay(remaining + TimeSpan.FromMilliseconds(20));
   }
 
   private static Message RehydrateOriginalEnvelope(
