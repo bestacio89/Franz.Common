@@ -28,7 +28,11 @@ public sealed class SagaRetryTests
   [Fact]
   public async Task Retry_SchedulesTheOriginalEventAndResumesTheSameSagaAfterTheDelay()
   {
-    // Keep the deadline comfortably ahead of the early-delivery assertion.\n    // A 75 ms deadline can expire during test-host scheduling under CI load.\n    var fixture = new Fixture(\n        maxRetryAttempts: 3,\n        retryDelay: TimeSpan.FromSeconds(2));
+    // Keep the deadline comfortably ahead of the early-delivery assertion.
+    // A 75 ms deadline can expire during test-host scheduling under CI load.
+    var fixture = new Fixture(
+        maxRetryAttempts: 3,
+        retryDelay: TimeSpan.FromSeconds(2));
     var scheduledAt = DateTimeOffset.UtcNow;
     var originalMessageId = Guid.CreateVersion7();
     var correlationId = Guid.CreateVersion7();
@@ -229,7 +233,8 @@ public sealed class SagaRetryTests
 
   public sealed class RetrySaga : SagaBase<RetrySagaState>, IStartWith<RetryEvent>
   {
-    public bool AlwaysRetry { get; set; }\n    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(75);
+    public bool AlwaysRetry { get; set; }
+    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(75);
 
     public Task<ISagaTransition> HandleAsync(
         RetryEvent message,
@@ -262,7 +267,8 @@ public sealed class SagaRetryTests
 
     public Fixture(int maxRetryAttempts, bool alwaysRetry = false)
     {
-      Saga.AlwaysRetry = alwaysRetry;\n      Saga.RetryDelay = retryDelay ?? TimeSpan.FromMilliseconds(75);
+      Saga.AlwaysRetry = alwaysRetry;
+      Saga.RetryDelay = retryDelay ?? TimeSpan.FromMilliseconds(75);
       var services = new TestServiceProvider(Saga);
       Repository = new InMemorySagaRepository(
           new InMemorySagaStateStore(),
