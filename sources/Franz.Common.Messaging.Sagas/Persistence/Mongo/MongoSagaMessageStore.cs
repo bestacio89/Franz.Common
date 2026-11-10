@@ -24,7 +24,8 @@ public sealed class MongoSagaMessageStore : IMessageStore
     _outbox.Indexes.CreateMany(new[]
     {
       new CreateIndexModel<MongoSagaStoredMessage>(Builders<MongoSagaStoredMessage>.IndexKeys.Ascending(item => item.SentOn)),
-      new CreateIndexModel<MongoSagaStoredMessage>(Builders<MongoSagaStoredMessage>.IndexKeys.Ascending(item => item.NextAttemptAt))
+      new CreateIndexModel<MongoSagaStoredMessage>(Builders<MongoSagaStoredMessage>.IndexKeys.Ascending(item => item.NextAttemptAt)),
+      new CreateIndexModel<MongoSagaStoredMessage>(Builders<MongoSagaStoredMessage>.IndexKeys.Ascending(item => item.LeaseExpiresAt))
     });
   }
 

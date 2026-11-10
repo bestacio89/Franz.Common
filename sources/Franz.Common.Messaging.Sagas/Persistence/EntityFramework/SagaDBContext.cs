@@ -58,7 +58,7 @@ public sealed class SagaDbContext : DbContextBase
       entity.Property(x => x.HeadersJson).IsRequired();
       entity.Property(x => x.PropertiesJson).IsRequired();
       entity.Property(x => x.CreatedOn).IsRequired();
-      entity.HasIndex(x => new { x.SentOn, x.IsDeadLetter, x.NextAttemptAt, x.Id });
+      entity.HasIndex(x => new { x.SentOn, x.IsDeadLetter, x.NextAttemptAt, x.LeaseExpiresAt, x.Id });
     });
   }
 }

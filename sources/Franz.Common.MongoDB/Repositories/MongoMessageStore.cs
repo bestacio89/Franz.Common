@@ -33,6 +33,9 @@ public class MongoMessageStore : IMessageStore
             new CreateIndexModel<StoredMessage>(
                 Builders<StoredMessage>.IndexKeys.Ascending(m => m.NextAttemptAt)),
 
+            new CreateIndexModel<StoredMessage>(
+                Builders<StoredMessage>.IndexKeys.Ascending(m => m.LeaseExpiresAt)),
+
             // For retry cycle handling and DLQ triage
             new CreateIndexModel<StoredMessage>(
                 Builders<StoredMessage>.IndexKeys.Ascending(m => m.RetryCount)),
@@ -53,7 +56,7 @@ public class MongoMessageStore : IMessageStore
       => await _collection.InsertOneAsync(message.ToStored(), cancellationToken: cancellationToken);
 
   public async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(CancellationToken cancellationToken = default)
-      => await _collection.Find(PendingFilter())
+      => await _collection.Find(m => m.SentOn == null && !m.IsDeadLetter && (m.NextAttemptAt == null || m.NextAttemptAt <= DateTime.UtcNow))
                           .SortBy(m => m.Id) // Leverage Guid v7 sequentiality for FIFO
                           .ToListAsync(cancellationToken);
 
@@ -63,93 +66,11 @@ public class MongoMessageStore : IMessageStore
   {
     ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
 
-    return await _collection.Find(PendingFilter())
+    return await _collection.Find(m => m.SentOn == null && !m.IsDeadLetter && (m.NextAttemptAt == null || m.NextAttemptAt <= DateTime.UtcNow))
         .SortBy(m => m.Id)
         .Limit(batchSize)
         .ToListAsync(cancellationToken);
   }
-
-  public async Task<IReadOnlyList<StoredMessage>> ClaimPendingAsync(
-      Guid owner, TimeSpan duration, int batchSize, CancellationToken ct = default)
-  {
-    if (owner == Guid.Empty) throw new ArgumentException("Lease owner cannot be empty.", nameof(owner));
-    if (duration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(duration));
-    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
-    var now = DateTime.UtcNow;
-    var filter = PendingFilter(now);
-    var update = Builders<StoredMessage>.Update.Set(x => x.LeaseOwnerId, owner)
-        .Set(x => x.LeaseExpiresAt, now.Add(duration));
-    var options = new FindOneAndUpdateOptions<StoredMessage>
-    {
-      Sort = Builders<StoredMessage>.Sort.Ascending(x => x.Id),
-      ReturnDocument = ReturnDocument.After
-    };
-    var claimed = new List<StoredMessage>(batchSize);
-    for (var i = 0; i < batchSize; i++)
-    {
-      var item = await _collection.FindOneAndUpdateAsync(filter, update, options, ct).ConfigureAwait(false);
-      if (item is null) break;
-      claimed.Add(item);
-    }
-    return claimed;
-  }
-
-  public async Task MarkAsSentAsync(Guid id, Guid owner, CancellationToken ct = default)
-  {
-    var update = Builders<StoredMessage>.Update.Set(x => x.SentOn, DateTime.UtcNow)
-        .Unset(x => x.LeaseOwnerId).Unset(x => x.LeaseExpiresAt);
-    await EnsureOwnedUpdateAsync(id, owner, update, ct).ConfigureAwait(false);
-  }
-
-  public async Task UpdateRetryAsync(StoredMessage message, Guid owner, CancellationToken ct = default)
-  {
-    ArgumentNullException.ThrowIfNull(message);
-    var update = Builders<StoredMessage>.Update.Set(x => x.RetryCount, message.RetryCount)
-        .Set(x => x.LastError, message.LastError).Set(x => x.LastTriedOn, message.LastTriedOn)
-        .Set(x => x.NextAttemptAt, message.NextAttemptAt)
-        .Unset(x => x.LeaseOwnerId).Unset(x => x.LeaseExpiresAt);
-    await EnsureOwnedUpdateAsync(message.Id, owner, update, ct).ConfigureAwait(false);
-  }
-
-  public async Task MoveToDeadLetterAsync(StoredMessage message, Guid owner, CancellationToken ct = default)
-  {
-    ArgumentNullException.ThrowIfNull(message);
-    var filter = Builders<StoredMessage>.Filter.Eq(x => x.Id, message.Id) &
-                 Builders<StoredMessage>.Filter.Eq(x => x.LeaseOwnerId, owner) &
-                 Builders<StoredMessage>.Filter.Gt(x => x.LeaseExpiresAt, DateTime.UtcNow);
-    message.IsDeadLetter = true;
-    message.LastTriedOn = DateTime.UtcNow;
-    message.LeaseOwnerId = null;
-    message.LeaseExpiresAt = null;
-    var result = await _collection.ReplaceOneAsync(filter, message, cancellationToken: ct).ConfigureAwait(false);
-    if (result.MatchedCount != 1) throw LeaseLost(message.Id, owner);
-    await _deadLetterCollection.ReplaceOneAsync(x => x.Id == message.Id, message,
-        new ReplaceOptions { IsUpsert = true }, ct).ConfigureAwait(false);
-    await _collection.DeleteOneAsync(x => x.Id == message.Id, ct).ConfigureAwait(false);
-  }
-
-  private async Task EnsureOwnedUpdateAsync(Guid id, Guid owner, UpdateDefinition<StoredMessage> update, CancellationToken ct)
-  {
-    var filter = Builders<StoredMessage>.Filter.Eq(x => x.Id, id) &
-                 Builders<StoredMessage>.Filter.Eq(x => x.LeaseOwnerId, owner) &
-                 Builders<StoredMessage>.Filter.Gt(x => x.LeaseExpiresAt, DateTime.UtcNow);
-    var result = await _collection.UpdateOneAsync(filter, update, cancellationToken: ct).ConfigureAwait(false);
-    if (result.MatchedCount != 1) throw LeaseLost(id, owner);
-  }
-
-  private static FilterDefinition<StoredMessage> PendingFilter(DateTime? now = null)
-  {
-    var current = now ?? DateTime.UtcNow;
-    return Builders<StoredMessage>.Filter.Eq(x => x.SentOn, null) &
-           Builders<StoredMessage>.Filter.Eq(x => x.IsDeadLetter, false) &
-           (Builders<StoredMessage>.Filter.Eq(x => x.NextAttemptAt, null) |
-            Builders<StoredMessage>.Filter.Lte(x => x.NextAttemptAt, current)) &
-           (Builders<StoredMessage>.Filter.Eq(x => x.LeaseExpiresAt, null) |
-            Builders<StoredMessage>.Filter.Lte(x => x.LeaseExpiresAt, current));
-  }
-
-  private static InvalidOperationException LeaseLost(Guid id, Guid owner)
-      => new($"Outbox lease for message '{id}' is no longer owned by dispatcher '{owner}'.");
 
   // 🛠️ FIX: Changed parameter type from string to Guid to match IMessageStore
   public async Task MarkAsSentAsync(Guid id, CancellationToken cancellationToken = default)

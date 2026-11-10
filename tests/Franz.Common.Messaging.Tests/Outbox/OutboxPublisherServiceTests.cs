@@ -36,8 +36,9 @@ public class OutboxPublisherServiceTests
       MessageType = "Test"
     };
 
-    _mockStore.Setup(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-        .ReturnsAsync(new List<StoredMessage> { storedMessage });
+    _mockStore.SetupSequence(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<StoredMessage> { storedMessage })
+        .ReturnsAsync(Array.Empty<StoredMessage>());
 
     var service = CreateService();
 
@@ -46,7 +47,7 @@ public class OutboxPublisherServiceTests
 
     // Assert
     _mockStore.Verify(s =>
-        s.ClaimPendingAsync(It.IsAny<Guid>(), _options.LeaseDuration, _options.BatchSize, It.IsAny<CancellationToken>()),
+        s.ClaimPendingAsync(It.IsAny<Guid>(), _options.LeaseDuration, 1, It.IsAny<CancellationToken>()),
         Times.Once);
 
     _mockSender.Verify(s =>
@@ -69,8 +70,9 @@ public class OutboxPublisherServiceTests
       BatchSize = 10
     });
     var storedMessage = new StoredMessage { Id = Guid.CreateVersion7(), RetryCount = 0 };
-    _mockStore.Setup(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-        .ReturnsAsync(new List<StoredMessage> { storedMessage });
+    _mockStore.SetupSequence(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<StoredMessage> { storedMessage })
+        .ReturnsAsync(Array.Empty<StoredMessage>());
     _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
         .ThrowsAsync(new PermanentMessagingException("The configured ordering key is missing."));
 
@@ -93,8 +95,9 @@ public class OutboxPublisherServiceTests
       RetryCount = 0
     };
 
-    _mockStore.Setup(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-        .ReturnsAsync(new List<StoredMessage> { storedMessage });
+    _mockStore.SetupSequence(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<StoredMessage> { storedMessage })
+        .ReturnsAsync(Array.Empty<StoredMessage>());
 
     _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
         .ThrowsAsync(new Exception("Network Down"));
@@ -129,8 +132,9 @@ public class OutboxPublisherServiceTests
       RetryCount = 2 // already at limit (MaxRetries = 2)
     };
 
-    _mockStore.Setup(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-        .ReturnsAsync(new List<StoredMessage> { storedMessage });
+    _mockStore.SetupSequence(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<StoredMessage> { storedMessage })
+        .ReturnsAsync(Array.Empty<StoredMessage>());
 
     _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
         .ThrowsAsync(new Exception("Permanent Failure"));
@@ -165,8 +169,9 @@ public class OutboxPublisherServiceTests
       RetryCount = 2
     };
 
-    _mockStore.Setup(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-        .ReturnsAsync(new List<StoredMessage> { storedMessage });
+    _mockStore.SetupSequence(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<StoredMessage> { storedMessage })
+        .ReturnsAsync(Array.Empty<StoredMessage>());
     _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
         .ThrowsAsync(new Exception("Permanent Failure"));
 
@@ -191,8 +196,9 @@ public class OutboxPublisherServiceTests
     var storedMessage = new StoredMessage { Id = Guid.CreateVersion7() };
     _options.InitialRetryDelay = TimeSpan.FromSeconds(2);
     _options.MaxRetryDelay = TimeSpan.FromSeconds(10);
-    _mockStore.Setup(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-        .ReturnsAsync(new List<StoredMessage> { storedMessage });
+    _mockStore.SetupSequence(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<StoredMessage> { storedMessage })
+        .ReturnsAsync(Array.Empty<StoredMessage>());
     _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
         .ThrowsAsync(new InvalidOperationException("Transient failure"));
 
@@ -216,8 +222,9 @@ public class OutboxPublisherServiceTests
     var storedMessage = new StoredMessage { Id = Guid.CreateVersion7() };
     using var cancellation = new CancellationTokenSource();
 
-    _mockStore.Setup(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-        .ReturnsAsync(new List<StoredMessage> { storedMessage });
+    _mockStore.SetupSequence(s => s.ClaimPendingAsync(It.IsAny<Guid>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<StoredMessage> { storedMessage })
+        .ReturnsAsync(Array.Empty<StoredMessage>());
 
     _mockSender.Setup(s => s.SendAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>()))
         .Returns<Message, CancellationToken>((_, _) =>

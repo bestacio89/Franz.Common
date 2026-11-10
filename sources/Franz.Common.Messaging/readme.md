@@ -58,6 +58,8 @@ Both the background outbox publisher and the hosted outbox listener use the same
 - Dispatchers claim one message at a time. This avoids leasing an entire sequential batch while earlier messages are still being processed.
 - MongoDB uses atomic `findOneAndUpdate` claims; EF Core relational Saga storage uses conditional database updates; EF Core Cosmos storage uses document ETag optimistic concurrency.
 
+For relational Saga persistence, the new nullable lease columns are part of the `SagaOutbox` schema. Hosts with an existing relational Saga database must apply an EF Core migration for `SagaOutbox.LeaseOwnerId` and `SagaOutbox.LeaseExpiresAt` before deploying this version; the library does not mutate an existing schema automatically. Cosmos DB and MongoDB persist the additional nullable document fields without a relational migration.
+
 The guarantee is **at-least-once delivery**, not exactly-once side effects. A process can publish successfully and crash before recording completion; a later lease holder may publish again. Consumers must remain idempotent. Configure `OutboxOptions.LeaseDuration` to exceed the expected maximum duration of one dispatch operation. The legacy unowned store methods remain for compatibility, but framework-managed dispatchers exclusively use the ownership-checked methods. Custom `IMessageStore` implementations must implement the atomic claim and ownership-aware methods before they can be used by these dispatchers; the default interface implementations fail closed.
 
 ## Related packages
