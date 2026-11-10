@@ -201,6 +201,8 @@ public sealed class MongoSagaRepositoryIntegrationTests : IAsyncLifetime
   [Fact]
   public async Task OutboxClaims_AreExclusiveAndExpiredLeasesCanBeReclaimed()
   {
+    await _database.DropCollectionAsync("sagaOutbox");
+
     await using var unitOfWorkA = new MongoSagaUnitOfWork(_database);
     await using var unitOfWorkB = new MongoSagaUnitOfWork(_database);
     var storeA = new MongoSagaMessageStore(_database, unitOfWorkA);

@@ -177,7 +177,10 @@ public sealed class SagaRepositoryIntegrationTests : IClassFixture<PostgresFixtu
   public async Task OutboxClaims_AreExclusiveAndExpiredLeasesCanBeReclaimed()
   {
     await using (var schemaContext = CreateContext())
+    {
       await schemaContext.Database.EnsureCreatedAsync();
+      await schemaContext.Database.ExecuteSqlRawAsync("DELETE FROM \"SagaOutbox\"");
+    }
 
     var message = new Message("{}") { MessageType = "lease-contract" };
     await using (var seedContext = CreateContext())
