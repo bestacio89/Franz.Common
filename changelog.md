@@ -30,8 +30,6 @@
 
 ---
 
-## v3.0.0 — Major platform release (planned)
-
 ### Saga orchestration and messaging execution
 - Add the dedicated `Franz.Common.Messaging.Sagas` orchestration package with explicit start, step and compensation roles, Saga identity resolution, lifecycle validation and optimistic concurrency.
 - Register inbound integration-event notification handlers from Saga message contracts and route them through the existing Franz Mediator execution boundary.
