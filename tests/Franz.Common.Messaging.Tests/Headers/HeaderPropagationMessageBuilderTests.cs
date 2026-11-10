@@ -75,8 +75,12 @@ public class HeaderPropagationMessageBuilderTests
 
     var builder = new HeaderPropagationMessageBuilder(_mockAccessor.Object, null, options);
     var message = new Message("{}");
-    string[]? propagated = ["Tenant-A", "Tenant-B"];
-    _mockAccessor.Setup(a => a.TryGetValue("X-Custom", out propagated)).Returns(true);
+    _mockAccessor
+        .Setup(a => a.ListAll())
+        .Returns(new Dictionary<string, string[]>
+        {
+          ["X-Custom"] = ["Tenant-A", "Tenant-B"]
+        });
 
     builder.BuildAsync(message);
 
