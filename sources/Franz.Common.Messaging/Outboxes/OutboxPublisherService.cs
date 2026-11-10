@@ -143,7 +143,7 @@ public sealed class OutboxPublisherService : BackgroundService
       {
         if (_options.DeadLetterEnabled)
         {
-          await _messageStore.MoveToDeadLetterAsync(stored, ct);
+          await _messageStore.MoveToDeadLetterAsync(stored, leaseOwnerId, ct);
 
           _logger.LogError(
               ex,
@@ -167,7 +167,7 @@ public sealed class OutboxPublisherService : BackgroundService
       {
         stored.RetryCount++;
         stored.NextAttemptAt = CalculateNextAttempt(stored.RetryCount, stored.LastTriedOn.Value);
-        await _messageStore.UpdateRetryAsync(stored, ct);
+        await _messageStore.UpdateRetryAsync(stored, leaseOwnerId, ct);
 
         _logger.LogWarning(
             ex,
