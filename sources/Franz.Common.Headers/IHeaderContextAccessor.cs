@@ -20,6 +20,8 @@ public interface IHeaderContextAccessor
   /// Attempts to retrieve and deserialize a header value to the specified type <typeparamref name="T"/>.
   /// This compatibility overload uses the implementation's configured serializer.
   /// </summary>
+  [RequiresUnreferencedCode("Use the JsonTypeInfo overload for Native AOT.")]
+  [RequiresDynamicCode("Use the JsonTypeInfo overload for Native AOT.")]
   bool TryGetValue<T>(string key, [MaybeNullWhen(false)] out T value);
 
   /// <summary>
