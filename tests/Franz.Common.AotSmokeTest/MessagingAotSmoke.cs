@@ -4,6 +4,7 @@ using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
 using Microsoft.Extensions.DependencyInjection;
+using System.Runtime.CompilerServices;
 
 namespace Franz.Common.AotSmokeTest;
 
@@ -11,6 +12,27 @@ public static class MessagingAotSmoke
 {
     public static Task<int> RunAsync()
     {
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            try
+            {
+                _ = new JsonMessageSerializer();
+                return Task.FromResult(24);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+
+            try
+            {
+                _ = new IntegrationEventMessageBuilderStrategy();
+                return Task.FromResult(25);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
         var services = new ServiceCollection();
         services
             .AddMessagingSerialization(AotMessagingJsonContext.Default)
