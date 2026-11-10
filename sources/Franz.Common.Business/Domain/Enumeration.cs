@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace Franz.Common.Business.Domain;
@@ -20,7 +21,8 @@ public abstract class Enumeration<TId> : IComparable<Enumeration<TId>>
 
   private static readonly Dictionary<Type, object> _cache = new();
 
-  public static IReadOnlyCollection<TEnumeration> GetAll<TEnumeration>()
+  public static IReadOnlyCollection<TEnumeration> GetAll<
+      [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicFields)] TEnumeration>()
       where TEnumeration : Enumeration<TId>
   {
     var type = typeof(TEnumeration);
@@ -49,19 +51,25 @@ public abstract class Enumeration<TId> : IComparable<Enumeration<TId>>
 
   public override int GetHashCode() => Id.GetHashCode();
 
-  public static TEnumeration FromValue<TEnumeration>(TId value)
+  public static TEnumeration FromValue<
+      [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicFields)] TEnumeration>(TId value)
       where TEnumeration : Enumeration<TId>
   {
     return Parse<TEnumeration, TId>(value, "value", item => item.Id.Equals(value));
   }
 
-  public static TEnumeration FromDisplayName<TEnumeration>(string displayName)
+  public static TEnumeration FromDisplayName<
+      [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicFields)] TEnumeration>(string displayName)
       where TEnumeration : Enumeration<TId>
   {
     return Parse<TEnumeration, string>(displayName, "display name", item => item.Name == displayName);
   }
 
-  private static T Parse<T, K>(K value, string description, Func<T, bool> predicate)
+  private static T Parse<
+      [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicFields)] T, K>(
+      K value,
+      string description,
+      Func<T, bool> predicate)
       where T : Enumeration<TId>
   {
     var enumeration = GetAll<T>().FirstOrDefault(predicate);
@@ -76,7 +84,6 @@ public abstract class Enumeration<TId> : IComparable<Enumeration<TId>>
     return Id.CompareTo(other.Id);
   }
 
-  // Numeric-only utility
   public static int AbsoluteDifference(Enumeration<int> first, Enumeration<int> second)
       => Math.Abs(first.Id - second.Id);
 }
