@@ -168,6 +168,7 @@ jobs:
         with:
           name: database-test-reports
           path: |
+            artifacts/test-results/**
             **/TestResults/*.trx
             container-diagnostics/**
           if-no-files-found: warn
@@ -197,6 +198,7 @@ jobs:
         with:
           name: messaging-test-reports
           path: |
+            artifacts/test-results/**
             **/TestResults/*.trx
             container-diagnostics/**
           if-no-files-found: warn
@@ -222,7 +224,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: core-test-reports
-          path: '**/TestResults/*.trx'
+          path: |
+            artifacts/test-results/**
+            **/TestResults/*.trx
           if-no-files-found: warn
 
   integration-tests:
@@ -250,6 +254,7 @@ jobs:
         with:
           name: integration-test-reports
           path: |
+            artifacts/test-results/**
             **/TestResults/*.trx
             container-diagnostics/**
           if-no-files-found: warn
