@@ -25,6 +25,16 @@ public sealed class FranzSagaOptions
   public bool EnableAuditing { get; set; }
 
   /// <summary>
+  /// Maximum number of durable retry schedules allowed for one consecutive saga step.
+  /// </summary>
+  public int MaxRetryAttempts { get; set; } = 10;
+
+  /// <summary>
+  /// Delay used when a retry transition does not specify an explicit delay.
+  /// </summary>
+  public TimeSpan DefaultRetryDelay { get; set; } = TimeSpan.FromSeconds(30);
+
+  /// <summary>
   /// Optional EF schema for relational saga persistence.
   /// </summary>
   public string? EntityFrameworkSchema { get; set; }

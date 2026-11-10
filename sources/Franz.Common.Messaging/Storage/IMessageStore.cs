@@ -16,6 +16,17 @@ public interface IMessageStore
   Task SaveAsync(Message message, CancellationToken cancellationToken = default);
 
   /// <summary>
+  /// Persists a message in the outbox without making it eligible for dispatch before
+  /// <paramref name="notBefore"/>. Implementations must preserve the schedule in the same
+  /// persistence transaction as related domain state.
+  /// </summary>
+  Task SaveScheduledAsync(
+      Message message,
+      DateTimeOffset notBefore,
+      CancellationToken cancellationToken = default)
+      => throw new NotSupportedException("This message store does not support scheduled messages.");
+
+  /// <summary>
   /// Retrieves messages that haven't been sent yet and are not in the DLQ.
   /// Because we use Guid v7, these should naturally return in chronological order.
   /// </summary>

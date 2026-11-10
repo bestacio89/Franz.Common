@@ -21,6 +21,7 @@ public sealed record SagaPersistenceRecord
   public DateTimeOffset? CompletedAt { get; init; }
   public DateTimeOffset? FailedAt { get; init; }
   public DateTimeOffset? NextAttemptAt { get; init; }
+  public int RetryCount { get; init; }
   public Guid? LastMessageId { get; init; }
   public string? LastError { get; init; }
 }

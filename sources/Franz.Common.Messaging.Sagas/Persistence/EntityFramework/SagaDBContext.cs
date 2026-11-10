@@ -39,6 +39,7 @@ public sealed class SagaDbContext : DbContextBase
       entity.Property(x => x.Status).IsRequired();
       entity.Property(x => x.CreatedAt).IsRequired();
       entity.Property(x => x.UpdatedAt).IsRequired();
+      entity.Property(x => x.RetryCount).HasDefaultValue(0);
     });
 
     modelBuilder.Entity<SagaInboxRecord>(entity =>

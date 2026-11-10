@@ -117,6 +117,12 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
 
     var tenantId = SagaTenantContextResolver.ResolveTenantId(message, _tenantExecutionContextAccessor);
     Guid? messageId = message.Id == Guid.Empty ? null : message.Id;
+    var retrySagaId = SagaRetryHeaders.ReadTargetSagaId(message);
+
+    if (retrySagaId.HasValue &&
+        (!messageId.HasValue || message.GetProperty<bool>(MessagingConstants.TransportGeneratedMessageId)))
+      throw new PermanentMessagingException(
+          "Saga retry delivery requires a stable, non-empty message identity.");
 
     if (_inboxStore is not null)
     {
@@ -159,6 +165,7 @@ public sealed class SagaDispatchingMessageHandler : IMessageHandler
           causationId,
           messageId,
           tenantId,
+          retrySagaId,
           ct).ConfigureAwait(false);
 
       if (_persistenceUnitOfWork is not null)

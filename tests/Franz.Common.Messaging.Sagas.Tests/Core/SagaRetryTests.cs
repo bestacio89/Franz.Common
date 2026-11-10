@@ -35,7 +35,7 @@ public sealed class SagaRetryTests
         originalMessageId,
         tenantId: null);
 
-    var scheduled = fixture.MessageStore.ScheduledMessages.Should().ContainSingle().Subject;
+    var scheduled = fixture.MessageStore.ScheduledMessages.Should().ContainSingle().Which;
     var persisted = await fixture.Repository.LoadAsync(
         fixture.Saga.SagaId, null, typeof(RetrySagaState));
 
@@ -100,7 +100,7 @@ public sealed class SagaRetryTests
         Guid.CreateVersion7(),
         tenantId: null);
 
-    var scheduled = fixture.MessageStore.ScheduledMessages.Should().ContainSingle().Subject;
+    var scheduled = fixture.MessageStore.ScheduledMessages.Should().ContainSingle().Which;
     await Task.Delay(scheduled.NotBefore - DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(20));
 
     var retrySagaId = Guid.Parse(

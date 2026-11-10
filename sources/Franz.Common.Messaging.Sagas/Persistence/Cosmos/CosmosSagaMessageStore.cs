@@ -22,11 +22,26 @@ public sealed class CosmosSagaMessageStore : IMessageStore
     _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
   }
 
-  public async Task SaveAsync(Message message, CancellationToken cancellationToken = default)
+  public Task SaveAsync(Message message, CancellationToken cancellationToken = default)
+  {
+    ArgumentNullException.ThrowIfNull(message);
+    return SaveStoredAsync(message.ToStored(), cancellationToken);
+  }
+
+  public Task SaveScheduledAsync(
+      Message message,
+      DateTimeOffset notBefore,
+      CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(message);
     var stored = message.ToStored();
-    var tenantId = message.Headers.TryGetValue(HeaderConstants.TenantId, out var values) &&
+    stored.NextAttemptAt = notBefore.UtcDateTime;
+    return SaveStoredAsync(stored, cancellationToken);
+  }
+
+  private async Task SaveStoredAsync(StoredMessage stored, CancellationToken cancellationToken)
+  {
+    var tenantId = stored.Headers.TryGetValue(HeaderConstants.TenantId, out var values) &&
                    values.Length == 1
         ? values[0]
         : string.Empty;

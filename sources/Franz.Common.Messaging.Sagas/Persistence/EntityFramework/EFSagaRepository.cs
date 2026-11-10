@@ -59,6 +59,7 @@ public sealed class EFSagaRepository : ISagaRepository
       CompletedAt = entity.CompletedAt,
       FailedAt = entity.FailedAt,
       NextAttemptAt = entity.NextAttemptAt,
+      RetryCount = entity.RetryCount,
       LastMessageId = entity.LastMessageId,
       LastError = entity.LastError
     };
@@ -97,6 +98,7 @@ public sealed class EFSagaRepository : ISagaRepository
         CompletedAt = record.CompletedAt,
         FailedAt = record.FailedAt,
         NextAttemptAt = record.NextAttemptAt,
+        RetryCount = record.RetryCount,
         LastMessageId = record.LastMessageId,
         LastError = record.LastError
       };
@@ -123,6 +125,7 @@ public sealed class EFSagaRepository : ISagaRepository
       entity.CompletedAt = record.CompletedAt;
       entity.FailedAt = record.FailedAt;
       entity.NextAttemptAt = record.NextAttemptAt;
+      entity.RetryCount = record.RetryCount;
       entity.LastMessageId = record.LastMessageId;
       entity.LastError = record.LastError;
     }

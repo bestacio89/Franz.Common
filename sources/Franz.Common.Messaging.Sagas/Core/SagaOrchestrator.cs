@@ -2,7 +2,9 @@
 
 using Franz.Common.Mediator;
 using Franz.Common.Mediator.Context;
+using Franz.Common.Mediator.Pipelines.Core;
 using Franz.Common.Messaging;
+using Franz.Common.Messaging.Exceptions;
 using Franz.Common.Messaging.Factories;
 using Franz.Common.Messaging.Storage;
 using Franz.Common.Messaging.Sagas.Abstractions;
@@ -28,6 +30,7 @@ public sealed class SagaOrchestrator
   private readonly SagaExecutionPipeline _pipeline;
   private readonly IMessagingPublisher _publisher;
   private readonly IMessageStore? _messageStore;
+  private readonly IUnitOfWork? _persistenceUnitOfWork;
   private readonly IServiceProvider _services;
   private readonly IReadOnlyCollection<ISagaAuditSink> _auditSinks;
   private readonly FranzSagaOptions _options;
@@ -40,7 +43,7 @@ public sealed class SagaOrchestrator
       IMessagingPublisher publisher,
       IServiceProvider services)
       : this(router, repository, pipeline, publisher, services,
-          Array.Empty<ISagaAuditSink>(), new FranzSagaOptions(), NullLogger<SagaOrchestrator>.Instance)
+          Array.Empty<ISagaAuditSink>(), new FranzSagaOptions(), NullLogger<SagaOrchestrator>.Instance, null, null)
   {
   }
 
@@ -53,7 +56,7 @@ public sealed class SagaOrchestrator
       IEnumerable<ISagaAuditSink> auditSinks,
       FranzSagaOptions options,
       ILogger<SagaOrchestrator>? logger = null)
-      : this(router, repository, pipeline, publisher, services, auditSinks, options, logger, null)
+      : this(router, repository, pipeline, publisher, services, auditSinks, options, logger, null, null)
   {
   }
 
@@ -66,7 +69,8 @@ public sealed class SagaOrchestrator
       IEnumerable<ISagaAuditSink> auditSinks,
       FranzSagaOptions options,
       ILogger<SagaOrchestrator>? logger,
-      IMessageStore? messageStore)
+      IMessageStore? messageStore,
+      IUnitOfWork? persistenceUnitOfWork = null)
   {
     _router = router ?? throw new ArgumentNullException(nameof(router));
     _repository = repository ?? throw new ArgumentNullException(nameof(repository));
@@ -77,6 +81,7 @@ public sealed class SagaOrchestrator
     _options = options ?? throw new ArgumentNullException(nameof(options));
     _logger = logger ?? NullLogger<SagaOrchestrator>.Instance;
     _messageStore = messageStore;
+    _persistenceUnitOfWork = persistenceUnitOfWork;
   }
 
   internal bool TryResolveMessageType(string typeName, out Type? messageType)
@@ -93,6 +98,23 @@ public sealed class SagaOrchestrator
           causationId,
           messageId: null,
           tenantId: null,
+          retrySagaId: null,
+          cancellationToken);
+
+  public Task HandleEventAsync(
+      IIntegrationEvent incomingEvent,
+      Guid correlationId,
+      Guid? causationId,
+      Guid? messageId,
+      string? tenantId,
+      CancellationToken cancellationToken = default)
+      => HandleEventAsync(
+          incomingEvent,
+          correlationId,
+          causationId,
+          messageId,
+          tenantId,
+          retrySagaId: null,
           cancellationToken);
 
   public async Task HandleEventAsync(
@@ -101,26 +123,46 @@ public sealed class SagaOrchestrator
       Guid? causationId,
       Guid? messageId,
       string? tenantId,
+      Guid? retrySagaId,
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(incomingEvent);
     cancellationToken.ThrowIfCancellationRequested();
 
+    if (retrySagaId == Guid.Empty)
+      throw new PermanentMessagingException("Saga retry target identity cannot be empty.");
+
     var messageType = incomingEvent.GetType();
+    var retryMatched = false;
 
     SagaFailedException? failure = null;
     foreach (var registration in _router.ResolveRegistrationsForMessage(messageType))
     {
       try
       {
-        await ExecuteSagaForMessageAsync(
-            incomingEvent,
-            registration,
-            correlationId,
-            causationId,
-            messageId,
-            tenantId,
-            cancellationToken).ConfigureAwait(false);
+        if (retrySagaId.HasValue)
+        {
+          retryMatched |= await ExecuteRetryForMessageAsync(
+              incomingEvent,
+              registration,
+              retrySagaId.Value,
+              correlationId,
+              causationId,
+              messageId,
+              tenantId,
+              cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+          await ExecuteSagaForMessageAsync(
+              incomingEvent,
+              registration,
+              correlationId,
+              causationId,
+              messageId,
+              tenantId,
+              cancellationToken).ConfigureAwait(false);
+        }
       }
       catch (SagaFailedException exception)
       {
@@ -132,6 +174,120 @@ public sealed class SagaOrchestrator
 
     if (failure is not null)
       ExceptionDispatchInfo.Capture(failure).Throw();
+
+    if (retrySagaId.HasValue && !retryMatched)
+      throw new PermanentMessagingException(
+          $"Saga retry delivery does not match a pending retry for saga '{retrySagaId.Value}'.");
+  }
+
+  private async Task<bool> ExecuteRetryForMessageAsync(
+      IIntegrationEvent message,
+      SagaRegistration registration,
+      Guid retrySagaId,
+      Guid correlationId,
+      Guid? causationId,
+      Guid? messageId,
+      string? tenantId,
+      CancellationToken cancellationToken)
+  {
+    if (!messageId.HasValue || messageId.Value == Guid.Empty)
+      throw new PermanentMessagingException(
+          "Saga retry delivery requires a stable, non-empty message identity.");
+
+    var record = await _repository.LoadAsync(
+        retrySagaId,
+        tenantId,
+        typeof(object),
+        cancellationToken).ConfigureAwait(false);
+
+    if (record is null)
+      return false;
+
+    var expectedSagaType = registration.SagaType.AssemblyQualifiedName ?? registration.SagaType.FullName!;
+    if (!string.Equals(record.SagaType, expectedSagaType, StringComparison.Ordinal))
+      return false;
+
+    if (record.Status != SagaLifecycleStatus.RetryScheduled ||
+        record.LastMessageId != messageId ||
+        record.RetryCount <= 0 ||
+        record.NextAttemptAt is null)
+      throw new PermanentMessagingException(
+          $"Message '{messageId.Value}' is not the persisted retry delivery for saga '{retrySagaId}'.");
+
+    if (record.NextAttemptAt.Value > DateTimeOffset.UtcNow)
+      throw new PermanentMessagingException(
+          $"Saga retry delivery for saga '{retrySagaId}' is not due until '{record.NextAttemptAt.Value:O}'.");
+
+    if (record.State is not ISagaState state ||
+        !registration.StateType.IsInstanceOfType(state))
+      throw new SagaConfigurationError(
+          $"Persisted state for saga '{retrySagaId}' is incompatible with '{registration.SagaType.FullName}'.");
+
+    var saga = _services.GetService(registration.SagaType)
+        ?? throw new SagaConfigurationError(
+            $"Saga '{registration.SagaType.FullName}' is not registered in the service provider.");
+
+    MethodInfo? handler;
+    if (registration.CanStartWith(message.GetType()))
+      handler = registration.StartHandlers.GetValueOrDefault(message.GetType());
+    else if (registration.StepHandlers.TryGetValue(message.GetType(), out var stepHandler))
+      handler = stepHandler;
+    else
+      handler = registration.CompensationHandlers.GetValueOrDefault(message.GetType());
+
+    if (handler is null)
+      throw new SagaConfigurationError(
+          $"Saga '{registration.SagaType.Name}' has no handler for retry message '{message.GetType().Name}'.");
+
+    SetSagaId(saga, retrySagaId);
+    SetSagaState(saga, registration, state);
+
+    var effectiveCorrelationId = ResolveCorrelationId(record, correlationId);
+    var resumeStatus = registration.CanCompensate(message.GetType())
+        ? SagaLifecycleStatus.Compensating
+        : SagaLifecycleStatus.Running;
+
+    var executionContext = new SagaContext(
+        retrySagaId,
+        registration.SagaType,
+        state,
+        message,
+        effectiveCorrelationId,
+        causationId,
+        cancellationToken);
+
+    var handlerTimer = Stopwatch.StartNew();
+    var result = await ExecuteHandlerAsync(
+        saga,
+        message,
+        handler,
+        executionContext,
+        cancellationToken).ConfigureAwait(false);
+    handlerTimer.Stop();
+
+    EnsureSagaIdentityUnchanged(saga, retrySagaId);
+
+    await PersistTransitionAsync(
+        record with
+        {
+          Status = resumeStatus,
+          CorrelationId = effectiveCorrelationId,
+          State = GetSagaState(saga, registration),
+          LastMessageId = messageId
+        },
+        record.Version,
+        result,
+        message,
+        messageId,
+        message.GetType(),
+        registration.CanCompensate(message.GetType()) ? "Compensate" : "Retry",
+        effectiveCorrelationId,
+        causationId,
+        tenantId,
+        handlerTimer.Elapsed,
+        cancellationToken).ConfigureAwait(false);
+
+    return true;
   }
 
   private async Task ExecuteSagaForMessageAsync(
@@ -219,6 +375,7 @@ public sealed class SagaOrchestrator
           record,
           expectedVersion: null,
           transition,
+          message,
           messageId,
           messageType,
           "Start",
@@ -308,6 +465,7 @@ public sealed class SagaOrchestrator
         },
         existingRecord.Version,
         result,
+        message,
         messageId,
         messageType,
         registration.CanCompensate(messageType) ? "Compensate" : "Step",
@@ -322,6 +480,7 @@ public sealed class SagaOrchestrator
       SagaPersistenceRecord record,
       long? expectedVersion,
       ISagaTransition transition,
+      IIntegrationEvent incomingEvent,
       Guid? messageId,
       Type incomingMessageType,
       string stepType,
@@ -339,9 +498,82 @@ public sealed class SagaOrchestrator
           $"Saga '{record.SagaType}' produced outgoing message '{transition.OutgoingMessage.GetType().FullName}'. " +
           "Only IIntegrationEvent messages can be published by the saga orchestrator.");
 
+    var retryLimitExceeded = false;
     if (transition.Type == SagaTransitionType.Retry)
-      throw new SagaConfigurationError(
-          "Saga retry is not enabled: a durable retry scheduler and atomic scheduling boundary are not configured.");
+    {
+      if (transition.OutgoingMessage is not null)
+        throw new SagaConfigurationError("A retry transition cannot publish a separate outgoing message.");
+
+      if (_messageStore is null || _persistenceUnitOfWork is null)
+        throw new SagaConfigurationError(
+            "Durable saga retry requires a transactional persistence IUnitOfWork and a scheduled IMessageStore.");
+
+      if (!messageId.HasValue || messageId.Value == Guid.Empty)
+        throw new SagaConfigurationError(
+            "Durable saga retry requires the original inbound message to have a stable, non-empty identity.");
+
+      if (_options.MaxRetryAttempts < 1)
+        throw new SagaConfigurationError("Saga MaxRetryAttempts must be greater than zero.");
+
+      if (record.RetryCount >= _options.MaxRetryAttempts)
+      {
+        transition = SagaTransition.Fail(
+            new SagaRetryLimitExceededException(
+                record.SagaId,
+                _options.MaxRetryAttempts,
+                transition.Error));
+        retryLimitExceeded = true;
+      }
+      else
+      {
+        var delay = transition.Delay ?? _options.DefaultRetryDelay;
+        if (delay <= TimeSpan.Zero)
+          throw new SagaConfigurationError("Saga retry delay must be greater than zero.");
+
+        var scheduledAt = DateTimeOffset.UtcNow.Add(delay);
+        var retryContext = MediatorContext.Current
+            .WithCorrelationId(correlationId)
+            .WithCausationId(messageId)
+            .WithTenant(tenantId);
+        using var retryContextScope = MediatorContext.BeginScope(retryContext);
+
+        var retryMessage = new IntegrationEventMessageBuilderStrategy().Build(incomingEvent);
+        retryMessage.MessageType = incomingEvent.GetType().AssemblyQualifiedName
+            ?? incomingEvent.GetType().FullName
+            ?? incomingEvent.GetType().Name;
+        retryMessage.Headers[SagaRetryHeaders.TargetSagaId] = [record.SagaId.ToString("D")];
+
+        var scheduledRecord = record with
+        {
+          Status = SagaLifecycleStatus.RetryScheduled,
+          UpdatedAt = DateTimeOffset.UtcNow,
+          NextAttemptAt = scheduledAt,
+          RetryCount = checked(record.RetryCount + 1),
+          LastMessageId = retryMessage.Id,
+          LastError = transition.Error?.Message ?? record.LastError
+        };
+
+        await _repository.SaveAsync(scheduledRecord, expectedVersion, cancellationToken)
+            .ConfigureAwait(false);
+
+        await WriteAuditAsync(
+            scheduledRecord,
+            transition,
+            incomingMessageType,
+            stepType,
+            correlationId,
+            causationId,
+            messageId,
+            tenantId,
+            duration,
+            cancellationToken).ConfigureAwait(false);
+
+        await _messageStore.SaveScheduledAsync(retryMessage, scheduledAt, cancellationToken)
+            .ConfigureAwait(false);
+
+        return;
+      }
+    }
 
     if (transition.Type == SagaTransitionType.Compensate && transition.OutgoingMessage is null)
       throw new SagaConfigurationError(
@@ -362,6 +594,7 @@ public sealed class SagaOrchestrator
       SagaTransitionType.Complete => SagaLifecycleStatus.Completed,
       SagaTransitionType.Compensate => SagaLifecycleStatus.Compensating,
       SagaTransitionType.Fail => SagaLifecycleStatus.Failed,
+      SagaTransitionType.Retry => SagaLifecycleStatus.RetryScheduled,
       _ => throw new SagaConfigurationError(
           $"Saga transition type '{transition.Type}' is not a supported lifecycle outcome.")
     };
@@ -373,6 +606,7 @@ public sealed class SagaOrchestrator
       CompletedAt = nextStatus == SagaLifecycleStatus.Completed ? now : record.CompletedAt,
       FailedAt = nextStatus == SagaLifecycleStatus.Failed ? now : record.FailedAt,
       NextAttemptAt = null,
+      RetryCount = retryLimitExceeded ? record.RetryCount : 0,
       LastMessageId = messageId,
       LastError = transition.Error?.Message ?? record.LastError
     };

@@ -76,7 +76,7 @@ The persisted lifecycle states are:
 |---|---|---|
 | `Running` | Step handlers | Normal forward execution |
 | `Compensating` | Compensation handlers only | Forward execution is suspended while compensation proceeds |
-| `RetryScheduled` | None | Reserved for a future durable scheduler; currently unsupported |
+| `RetryScheduled` | None | A durable retry is pending; only its persisted retry delivery may resume execution |
 | `Completed` | None | Successful terminal state |
 | `Failed` | None | Failed terminal state |
 
@@ -85,7 +85,7 @@ A handler returns an `ISagaTransition`:
 - `Complete(message?)`: persist `Completed` and its completion timestamp.
 - `Compensate(message, error?)`: require an outgoing integration event, persist `Compensating`, and enqueue the compensation request.
 - `Fail(error)`: persist `Failed`, commit the transaction, then surface `SagaFailedException`.
-- `Retry(delay?, error?)`: rejected before persistence because no durable retry scheduler is configured.
+- `Retry(delay?, error?)`: persist `RetryScheduled`, the next-attempt timestamp, retry count, and a fresh retry-message identity; atomically enqueue the original integration event in the outbox for delayed delivery.
 
 Compensation order is application-defined and sequential. A compensation handler may emit the next compensation command/event; the next compensation handler runs only after that message is delivered. While the saga is `Compensating`, ordinary step messages are rejected. The orchestrator does not persist or validate the expected next compensation message, infer a compensation stack, or execute compensations in reverse order automatically. Saga implementations must validate domain-specific compensation ordering against their persisted state.
 
@@ -101,6 +101,27 @@ The inbound path is:
 4. The handler establishes one persistence unit of work and invokes the orchestrator.
 
 Inbound integration-event notifications use `StopOnFirstFailure`. A handler failure therefore propagates back to the transport listener instead of being swallowed by the Mediator's default `ContinueOnError` policy. The configured transport retry/dead-letter policy can then decide the delivery disposition. This fail-fast rule applies to all handlers of an inbound integration event, not only Saga handlers.
+
+## Durable retry and recovery
+
+A handler can request a durable retry with `context.Retry(delay?, error?)`. The retry path is part of the same persistence unit of work as the saga state transition:
+
+1. Persist `RetryScheduled`, `NextAttemptAt`, the incremented retry count, and the identity of the scheduled retry message.
+2. Rebuild the original integration event as a new Franz message. Preserve correlation and tenant metadata, set causation to the message that requested the retry, and add the reserved `franz-saga-retry-target` header.
+3. Save the retry message through `IMessageStore.SaveScheduledAsync` with the same due timestamp.
+4. Commit the saga state and outbox record together. The existing `OutboxPublisherService` does not claim the message before `NextAttemptAt`; no separate scheduler process is required.
+
+After restart, the persisted outbox record remains pending and becomes eligible at its due time. The inbound Saga adapter accepts a retry only when its target saga, message ID, lifecycle status, and due timestamp match the persisted retry schedule. This also handles retries of start events: the existing saga state is rehydrated rather than creating a second saga instance. Other saga registrations for the same event are not invoked by a targeted retry.
+
+The retry message receives a new stable message ID. Inbox deduplication therefore applies independently to each scheduled attempt. If dispatch fails before the persistence transaction commits, the inbox receipt and saga changes roll back; if publication succeeds but the outbox completion is interrupted, the same outbox message is published again and the inbox suppresses duplicate execution.
+
+Configuration:
+
+- `MaxRetryAttempts` defaults to `10`. Once the retry budget is exhausted, the saga is persisted as `Failed` and `SagaFailedException` is surfaced after commit.
+- `DefaultRetryDelay` defaults to 30 seconds. A handler-supplied delay overrides it and must be positive.
+- Durable retries require a transactional persistence `IUnitOfWork` and an `IMessageStore` implementation that supports scheduled messages. The built-in EF Core, MongoDB, and Cosmos Saga adapters implement this contract. The in-memory adapter deliberately does not provide durable retry guarantees; unsupported custom stores fail closed.
+
+**Relational schema update:** add a non-null `RetryCount` integer column with default `0` to `SagaStates` through the host application's EF Core migration before deploying this version. MongoDB and Cosmos DB persist the additive field in their existing documents. The retry schedule reuses the existing `NextAttemptAt` and `LastMessageId` fields; no retry-specific outbox table or container is introduced.
 
 ## Atomic persistence boundary
 
@@ -140,7 +161,7 @@ Set `EnableAuditing = true` and register one or more `ISagaAuditSink` implementa
 
 ## Current limitations
 
-- Durable retry scheduling is not implemented.
+- Durable retry scheduling is available for the EF Core, MongoDB, and Cosmos persistence adapters. The in-memory adapter and custom stores without scheduled-message support cannot provide it.
 - The in-memory adapter is non-durable and does not provide atomic inbox/outbox processing.
 - Cosmos atomicity is limited to one container and one logical partition per incoming message.
 - MongoDB transactions require a transaction-capable deployment.

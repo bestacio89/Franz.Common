@@ -29,14 +29,30 @@ public sealed class MongoSagaMessageStore : IMessageStore
     });
   }
 
-  public async Task SaveAsync(Message message, CancellationToken cancellationToken = default)
+  public Task SaveAsync(Message message, CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(message);
-    var stored = MongoSagaStoredMessage.From(message.ToStored());
+    return SaveStoredAsync(message.ToStored(), cancellationToken);
+  }
+
+  public Task SaveScheduledAsync(
+      Message message,
+      DateTimeOffset notBefore,
+      CancellationToken cancellationToken = default)
+  {
+    ArgumentNullException.ThrowIfNull(message);
+    var stored = message.ToStored();
+    stored.NextAttemptAt = notBefore.UtcDateTime;
+    return SaveStoredAsync(stored, cancellationToken);
+  }
+
+  private async Task SaveStoredAsync(StoredMessage stored, CancellationToken cancellationToken)
+  {
+    var document = MongoSagaStoredMessage.From(stored);
     if (_unitOfWork.CurrentSession is { } session)
-      await _outbox.InsertOneAsync(session, stored, cancellationToken: cancellationToken).ConfigureAwait(false);
+      await _outbox.InsertOneAsync(session, document, cancellationToken: cancellationToken).ConfigureAwait(false);
     else
-      await _outbox.InsertOneAsync(stored, cancellationToken: cancellationToken).ConfigureAwait(false);
+      await _outbox.InsertOneAsync(document, cancellationToken: cancellationToken).ConfigureAwait(false);
   }
 
   public async Task<IReadOnlyList<StoredMessage>> GetPendingAsync(CancellationToken cancellationToken = default)

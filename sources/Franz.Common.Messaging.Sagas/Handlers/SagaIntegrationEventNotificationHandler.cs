@@ -53,7 +53,13 @@ internal sealed class SagaIntegrationEventNotificationHandler<TNotification> : I
 
     var causationId = ResolveCausationId(message);
     Guid? messageId = message is { Id: var id } && id != Guid.Empty ? id : null;
+    var retrySagaId = SagaRetryHeaders.ReadTargetSagaId(message);
     var tenantId = SagaTenantContextResolver.ResolveTenantId(message, _tenantExecutionContextAccessor);
+
+    if (retrySagaId.HasValue &&
+        (!messageId.HasValue || message!.GetProperty<bool>(MessagingConstants.TransportGeneratedMessageId)))
+      throw new PermanentMessagingException(
+          "Saga retry delivery requires a stable, non-empty message identity.");
 
     if (_inboxStore is not null)
     {
@@ -99,6 +105,7 @@ internal sealed class SagaIntegrationEventNotificationHandler<TNotification> : I
           causationId,
           messageId,
           tenantId,
+          retrySagaId,
           cancellationToken).ConfigureAwait(false);
 
       if (_persistenceUnitOfWork is not null)

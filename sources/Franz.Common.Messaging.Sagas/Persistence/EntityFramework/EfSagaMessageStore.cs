@@ -12,11 +12,27 @@ public sealed class EfSagaMessageStore(SagaDbContext dbContext) : IMessageStore
 {
   private readonly SagaDbContext _db = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
 
-  public async Task SaveAsync(Message message, CancellationToken cancellationToken = default)
+  public Task SaveAsync(Message message, CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(message);
+    return SaveStoredAsync(message.ToStored(), cancellationToken);
+  }
+
+  public Task SaveScheduledAsync(
+      Message message,
+      DateTimeOffset notBefore,
+      CancellationToken cancellationToken = default)
+  {
+    ArgumentNullException.ThrowIfNull(message);
+    var stored = message.ToStored();
+    stored.NextAttemptAt = notBefore.UtcDateTime;
+    return SaveStoredAsync(stored, cancellationToken);
+  }
+
+  private async Task SaveStoredAsync(StoredMessage stored, CancellationToken cancellationToken)
+  {
     await _db.Set<SagaOutboxRecord>()
-        .AddAsync(SagaOutboxRecord.From(message), cancellationToken)
+        .AddAsync(SagaOutboxRecord.From(stored), cancellationToken)
         .ConfigureAwait(false);
     await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
   }

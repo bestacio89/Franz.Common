@@ -27,8 +27,11 @@ internal sealed class SagaOutboxRecord
   public bool IsDeadLetter { get; set; }
 
   public static SagaOutboxRecord From(Message message)
+      => From(message.ToStored());
+
+  public static SagaOutboxRecord From(StoredMessage stored)
   {
-    var stored = message.ToStored();
+    ArgumentNullException.ThrowIfNull(stored);
     return new SagaOutboxRecord
     {
       Id = stored.Id,
@@ -37,7 +40,8 @@ internal sealed class SagaOutboxRecord
       PropertiesJson = JsonSerializer.Serialize(stored.Properties),
       CorrelationId = stored.CorrelationId,
       MessageType = stored.MessageType,
-      CreatedOn = stored.CreatedOn
+      CreatedOn = stored.CreatedOn,
+      NextAttemptAt = stored.NextAttemptAt
     };
   }
 

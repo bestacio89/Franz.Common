@@ -23,6 +23,7 @@ public sealed class CosmosSagaStateDocument : Entity<Guid>
   public DateTimeOffset? CompletedAt { get; set; }
   public DateTimeOffset? FailedAt { get; set; }
   public DateTimeOffset? NextAttemptAt { get; set; }
+  public int RetryCount { get; set; }
   public Guid? LastMessageId { get; set; }
   public string? LastError { get; set; }
 }
