@@ -1,22 +1,30 @@
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Messaging.Messages;
 using Franz.Common.Messaging.Serialization;
-using Franz.Common.Serialization;
-using Microsoft.Extensions.Primitives;
-using System.Text.Json;
 
 namespace Franz.Common.Messaging.Factories;
 
-public sealed class CommandMessageBuilderStrategy
-  : IMessageBuilderStrategy
+public sealed class CommandMessageBuilderStrategy : IMessageBuilderStrategy
 {
-  public bool CanBuild(object value)
-    => value is ICommand;
+  private readonly IMessageSerializer _serializer;
+
+  public CommandMessageBuilderStrategy()
+      : this(new JsonMessageSerializer())
+  {
+  }
+
+  public CommandMessageBuilderStrategy(IMessageSerializer serializer)
+      => _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+
+  public bool CanBuild(object value) => value is ICommand;
 
   public Message Build(object value)
   {
-    var body = JsonSerializer.Serialize(value, FranzJson.Default);
+    ArgumentNullException.ThrowIfNull(value);
+    if (!CanBuild(value))
+      throw new InvalidOperationException($"Type '{value.GetType().FullName}' does not implement ICommand.");
 
+    var body = _serializer.Serialize(value, value.GetType());
     var message = new Message(body)
     {
       Body = body,
@@ -24,11 +32,9 @@ public sealed class CommandMessageBuilderStrategy
     };
 
     message.Headers.Add(
-     MessagingConstants.ClassName,
-     new[] { HeaderNamer.GetEventClassName(value.GetType()) }
-   );
+        MessagingConstants.ClassName,
+        new[] { HeaderNamer.GetEventClassName(value.GetType()) });
 
     return message;
   }
 }
-
