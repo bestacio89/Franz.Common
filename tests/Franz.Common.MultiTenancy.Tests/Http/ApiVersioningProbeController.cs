@@ -11,6 +11,6 @@ public sealed class ApiVersioningProbeController : ControllerBase
   [HttpGet]
   public IActionResult Get()
   {
-    return Ok(new ApiVersioningProbeResponse("ok"));
+    return Ok(new { Value = "ok" });
   }
 }
