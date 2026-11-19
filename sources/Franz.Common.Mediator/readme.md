@@ -43,7 +43,7 @@ Use the marker-type overload when you also want the default enterprise pipeline 
 services.AddFranzMediatorDefault<ApplicationAssemblyMarker>();
 ```
 
-This registers the mediator infrastructure and generated handlers from the marker type's assembly, then applies generator-emitted closed-generic pipelines. Commands, queries, and void commands receive logging, validation, Serilog logging, and transaction pipelines plus the built-in logging/audit pre- and post-processors. Notifications receive notification logging and notification validation. It does not add event-validation or resilience pipelines. The generated closed-generic pipeline contribution is the AOT-oriented default-pipeline path.
+This registers the mediator infrastructure and generated handlers from the marker type's assembly, then applies generator-emitted closed-generic pipelines. Commands, queries, and void commands receive logging, validation, and transaction pipelines, together with the generated logging and audit processors. The generated composition does not register the `SerilogLoggingPipeline` or `SerilogLoggingPostProcessor`; the Serilog logging pre-processor and Serilog audit processors remain part of the generated processor set. Notifications receive notification logging and notification validation. It does not add event-validation or resilience pipelines. The closed-generic pipeline contribution is the AOT-oriented default-pipeline path.
 
 ### V2 registration API
 
@@ -56,7 +56,7 @@ services.AddFranzMediatorV2(
     handlerAssembly: typeof(CreateHeroHandler).Assembly);
 ```
 
-It uses the same compile-time generated handler-registration model. `AddFranzMediatorV2Default` adds open-generic request logging, validation, Serilog logging, and transaction pipelines, plus the matching request pre/post-processors; notifications receive notification logging and validation. Those open-generic pipeline registrations are not supported by Native AOT, and the helper does not add event validation. V1 and V2 core registration are API-level entry points; neither falls back to runtime reflection-based handler discovery.
+It uses the same compile-time generated handler-registration model. `AddFranzMediatorV2Default` adds open-generic request logging, validation, and transaction pipelines, plus the matching logging and audit processors; notifications receive notification logging and validation. It does not register the `SerilogLoggingPipeline` or `SerilogLoggingPostProcessor` as additional request lifecycle layers. The explicit `AddFranzSerilogLoggingPipelineV2` extension remains available when an application deliberately wants that pipeline. These open-generic pipeline registrations are not supported by Native AOT, and the helper does not add event validation. V1 and V2 core registration are API-level entry points; neither falls back to runtime reflection-based handler discovery.
 
 ### Full standard composition
 
@@ -171,7 +171,11 @@ The request execution model supports:
 
 ### Events and notifications
 
-Events and notifications retain their distinct dispatch contracts and pipeline models. Event processing supports event pipelines, pre-processors, post-processors, and event handlers. Notifications use notification handlers and notification pipelines.
+Events and notifications retain their distinct dispatch contracts and pipeline models. Event pre-processors execute sequentially before event pipelines and handlers. Event pipelines wrap the handler chain, and event post-processors execute sequentially only after that chain completes successfully. A pre-processor, pipeline, or handler failure skips the post-processors and propagates to the caller. Notifications use notification handlers and notification pipelines.
+
+### Lifecycle logging and correlation
+
+Mediator lifecycle logging is metadata-oriented: request, response, event, and notification payloads are not destructured into lifecycle log entries. Correlation identifiers are established before they are captured by lifecycle logging and audit processors. Information-level logging paths check whether that level is enabled before performing the corresponding logging work.
 
 ### Repeatable continuation
 

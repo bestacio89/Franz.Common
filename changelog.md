@@ -16,6 +16,15 @@ This file records the framework's release history, from the original 1.x foundat
 
 This release consolidates the platform work developed after the **2.3.4 stable baseline**. The subsequent tenant-security hardening and platform changes are part of 3.0.0; they are not a separate 2.3.5 release. The shared build metadata targets 3.0.0, but NuGet publication remains a separate, explicitly approved release operation.
 
+### Mediator dispatch lifecycle and logging
+
+- Execute event pre-processors sequentially before event pipelines and handlers, then execute event post-processors sequentially only after successful dispatch. Pre-processing, pipeline, and handler failures continue to propagate and prevent post-processing.
+- Resolve dispatcher service collections once per resolution path instead of re-enumerating the same service collection.
+- Remove redundant Serilog request lifecycle pipeline registrations from generated V1 defaults and the V2 default composition while retaining explicit Serilog pipeline registration APIs and the remaining audit/logging processors.
+- Keep lifecycle logging metadata-only: request, response, event, and notification payloads are not destructured into routine lifecycle log entries.
+- Ensure correlation identifiers before lifecycle logging/audit capture and avoid Information-level logging work when that level is disabled.
+- Add regression coverage for event processor ordering, successful and failed dispatch lifecycle behavior, safe audit logging, and default V2 composition.
+
 ### Tenant security and request execution
 
 - Required host-based tenant resolution to use a verified canonical domain mapping owned by the resolved tenant.

@@ -49,7 +49,7 @@ using Franz.Common.Mediator.Extensions;
 services.AddFranzMediatorDefault<OrdersApplicationAssembly>();
 ```
 
-This registers generated handlers from the marker assembly and applies generator-emitted closed-generic request and notification pipelines. It is the AOT-oriented default-pipeline composition. It includes request logging, validation, Serilog logging, transaction behavior, built-in logging/audit processors, and notification logging/validation. It does not include event validation or resilience pipelines.
+This registers generated handlers from the marker assembly and applies generator-emitted closed-generic request and notification pipelines. It is the AOT-oriented default-pipeline composition. It includes request logging, validation, and transaction behavior, together with generated logging and audit processors; notifications receive logging and validation. The generated composition does not add the `SerilogLoggingPipeline` or `SerilogLoggingPostProcessor`. The Serilog logging pre-processor and Serilog audit processors remain registered. It does not include event validation or resilience pipelines.
 
 ### V2 default pipelines
 
@@ -60,7 +60,7 @@ services.AddFranzMediatorV2Default(
     handlerAssembly: typeof(OrdersApplicationAssembly).Assembly);
 ```
 
-This applies open-generic request logging, validation, Serilog logging, and transaction pipelines, with matching request processors. Notifications receive logging and validation. This composition is not Native AOT compatible because it relies on open-generic pipeline registrations.
+This applies open-generic request logging, validation, and transaction pipelines, with matching logging and audit processors. Notifications receive logging and validation. It does not add the `SerilogLoggingPipeline` or `SerilogLoggingPostProcessor` as additional request lifecycle layers; `AddFranzSerilogLoggingPipelineV2()` remains available for explicit opt-in. This composition is not Native AOT compatible because it relies on open-generic pipeline registrations.
 
 ### Full standard composition
 
@@ -98,6 +98,14 @@ Pipeline continuations are repeatable: each call to `next()` executes the downst
 Only retry operations whose side effects are safe to repeat, or protect them with idempotency and transaction/outbox strategies appropriate to the application. A transaction pipeline does not make an external side effect atomic with a database commit.
 
 Pipeline registration order is an application composition detail. Verify the effective order with an integration test when behavior depends on nesting; do not infer transactional or retry ordering from the order of extension calls alone.
+
+### Event processor lifecycle
+
+`PublishEventAsync` executes registered `IEventPreProcessor<TEvent>` implementations sequentially before entering the event pipeline and handler chain. After the pipeline-wrapped handler chain succeeds, registered `IEventPostProcessor<TEvent>` implementations execute sequentially. If pre-processing, a pipeline, or a handler fails, post-processing is not run and the failure propagates. Processor ordering follows dependency-injection registration order; do not parallelize processors when their order or side effects matter.
+
+### Safe lifecycle logging
+
+Lifecycle logging and audit entries retain correlation metadata without destructuring request, response, event, or notification payloads. Correlation identifiers are ensured before they are captured. This reduces accidental exposure of application data and avoids unnecessary payload formatting in routine lifecycle logs. Applications that need payload diagnostics should implement an explicit, reviewed diagnostic path rather than relying on default lifecycle logging.
 
 ## Operational guidance
 
