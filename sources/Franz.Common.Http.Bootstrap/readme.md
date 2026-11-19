@@ -27,6 +27,12 @@ builder.Services.AddHttpArchitecture(
 
 The registration composes common architecture services, HTTP controllers, exact-origin CORS, forwarded-header support, serialization, error strategies, JWT authentication entry-point, header context, API documentation, HTTP identity context, tenant resolution, serializers, and health checks.
 
+### API versioning contract
+
+The standard HTTP bootstrap uses URL-segment API versioning exclusively. The version is part of the route (for example, `/api/v1/orders`); it is not read from an `x-api-version` request header or an `Accept` media-type parameter.
+
+Clients should send normal content-negotiation headers, such as `Accept: application/json`. Do not register `MediaTypeApiVersionWriter` for clients targeting the standard Franz HTTP API contract. The versioning setup does not sanitize or rewrite caller-supplied headers.
+
 ### Authentication is explicit
 
 `AddHttpArchitecture` calls `AddFranzAuthentication()` to expose the authentication builder, but it does not configure a JWT bearer handler or choose an identity provider. Configure the intended scheme explicitly. For symmetric JWTs:

@@ -6,6 +6,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="8.10.0" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.14" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.14" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
@@ -18,6 +19,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\sources\Franz.Common.MultiTenancy\Franz.Common.MultiTenancy.csproj" />
+    <ProjectReference Include="..\..\sources\Franz.Common.Http.Documentation\Franz.Common.Http.Documentation.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Http.MultiTenancy\Franz.Common.Http.MultiTenancy.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Http.Authentication\Franz.Common.Http.Authentication.csproj" />
     <ProjectReference Include="..\..\sources\Franz.Common.Http.Identity\Franz.Common.Http.Identity.csproj" />
