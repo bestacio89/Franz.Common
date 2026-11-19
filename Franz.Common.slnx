@@ -92,6 +92,7 @@
     <Project Path="tests/Franz.Common.EntityFramework.MySql.Tests/Franz.Common.EntityFramework.MySql.Tests.csproj" />
     <Project Path="tests/Franz.Common.EntityFramework.SQLServer.Tests/Franz.Common.EntityFramework.SQLServer.Tests.csproj" />
     <Project Path="tests/Franz.Common.Integration.Test/Franz.Common.Integration.Tests.csproj" />
+    <Project Path="tests/Franz.Common.Logging.Tests/Franz.Common.Logging.Tests.csproj" />
     <Project Path="tests/Franz.Common.Mapping.Tests/Franz.Common.Mapping.Tests.csproj" />
     <Project Path="tests/Franz.Common.Mediator.Tests/Franz.Common.Mediator.Tests.csproj" Id="72f4d006-188b-4a8b-b0c9-31f1aef11c3d" />
     <Project Path="tests/Franz.Common.MultiTenancy.Tests/Franz.Common.MultiTenancy.Tests.csproj" />
