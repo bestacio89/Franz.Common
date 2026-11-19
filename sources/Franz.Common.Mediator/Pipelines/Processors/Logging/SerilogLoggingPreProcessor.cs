@@ -26,8 +26,9 @@ public sealed class SerilogLoggingPreProcessor<TRequest> : IPreProcessor<TReques
     var requestType = request?.GetType().Name ?? typeof(TRequest).Name;
 
     // Ensure() creates the Guid v7 that links all downstream Serilog properties.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
+    if (!_logger.IsEnabled(LogLevel.Information))
+      return Task.CompletedTask;
 
     using (LogContext.PushProperty("FranzRequest", requestType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))

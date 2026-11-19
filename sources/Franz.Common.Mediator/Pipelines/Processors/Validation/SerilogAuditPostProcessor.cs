@@ -30,8 +30,9 @@ public sealed class SerilogAuditPostProcessor<TRequest, TResponse> : IPostProces
     var requestType = request?.GetType().Name ?? typeof(TRequest).Name;
     
     // We use Ensure() to guarantee we have a valid lineage for the final audit entry.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
+    if (!_logger.IsEnabled(LogLevel.Information))
+      return Task.CompletedTask;
 
     using (LogContext.PushProperty("FranzRequest", requestType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))
@@ -40,8 +41,8 @@ public sealed class SerilogAuditPostProcessor<TRequest, TResponse> : IPostProces
       if (_env.IsDevelopment())
       {
         // In Dev, we log the full response for deep debugging
-        _logger.LogInformation("✅ [Audit-Post] {Request} [{CorrelationId}] response {@Response}",
-            requestType, correlationId, response);
+        _logger.LogInformation("✅ [Audit-Post] {Request} [{CorrelationId}] completed successfully",
+            requestType, correlationId);
       }
       else
       {

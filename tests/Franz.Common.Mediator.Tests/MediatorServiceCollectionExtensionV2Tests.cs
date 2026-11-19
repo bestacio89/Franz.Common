@@ -154,13 +154,11 @@ public class MediatorServiceCollectionExtensionsV2Tests
     services.Should().Contain(d => d.ServiceType == typeof(IEventPipeline<>) && d.ImplementationType == typeof(EventValidationPipeline<>));
     services.Should().Contain(d => d.ServiceType == typeof(IEventPipeline<>) && d.ImplementationType == typeof(SerilogEventLoggingPipeline<>));
 
-    services.Should().Contain(d => d.ServiceType == typeof(IEventPreProcessor<>) && d.ImplementationType == typeof(EventAuditPreProcessor<>));
     services.Should().Contain(d => d.ServiceType == typeof(IEventPreProcessor<>) && d.ImplementationType == typeof(SerilogEventAuditPreProcessor<>));
     services.Should().Contain(d => d.ServiceType == typeof(IEventPreProcessor<>) && d.ImplementationType == typeof(SerilogEventLoggingPreProcessor<>));
 
     services.Should().Contain(d => d.ServiceType == typeof(IEventPostProcessor<>) && d.ImplementationType == typeof(SerilogEventLoggingPostProcessor<>));
     services.Should().Contain(d => d.ServiceType == typeof(IEventPostProcessor<>) && d.ImplementationType == typeof(SerilogEventAuditPostProcessor<>));
-    services.Should().Contain(d => d.ServiceType == typeof(IEventPostProcessor<>) && d.ImplementationType == typeof(EventAuditPostProcessor<>));
   }
 
   [Fact]

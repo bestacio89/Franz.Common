@@ -26,8 +26,9 @@ public sealed class SerilogAuditPreProcessor<TRequest> : IPreProcessor<TRequest>
     var requestType = request?.GetType().Name ?? typeof(TRequest).Name;
 
     // If this is the entry point, we create the timestamped ID here.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
+    if (!_logger.IsEnabled(LogLevel.Information))
+      return Task.CompletedTask;
 
     using (LogContext.PushProperty("FranzRequest", requestType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))

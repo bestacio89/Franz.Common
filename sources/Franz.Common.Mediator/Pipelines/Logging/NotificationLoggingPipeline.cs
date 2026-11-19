@@ -33,8 +33,7 @@ public sealed class NotificationLoggingPipeline<TNotification> : INotificationPi
     var notificationName = typeof(TNotification).Name;
 
     // Notifications are usually secondary effects; this keeps them linked to the primary intent.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
 
@@ -46,8 +45,8 @@ public sealed class NotificationLoggingPipeline<TNotification> : INotificationPi
         if (_env.IsDevelopment())
         {
           _logger.LogInformation(
-              "[Notification] {NotificationName} [{CorrelationId}] started with payload {@Notification}",
-              notificationName, correlationId, notification);
+              "[Notification] {NotificationName} [{CorrelationId}] started",
+              notificationName, correlationId);
         }
         else
         {
@@ -63,8 +62,8 @@ public sealed class NotificationLoggingPipeline<TNotification> : INotificationPi
         if (_env.IsDevelopment())
         {
           _logger.LogInformation(
-              "[Notification] {NotificationName} [{CorrelationId}] finished in {Elapsed} ms with payload {@Notification}",
-              notificationName, correlationId, stopwatch.ElapsedMilliseconds, notification);
+              "[Notification] {NotificationName} [{CorrelationId}] finished in {Elapsed} ms",
+              notificationName, correlationId, stopwatch.ElapsedMilliseconds);
         }
         else
         {
@@ -80,8 +79,8 @@ public sealed class NotificationLoggingPipeline<TNotification> : INotificationPi
         if (_env.IsDevelopment())
         {
           _logger.LogError(ex,
-              "[Notification] {NotificationName} [{CorrelationId}] failed after {Elapsed} ms with payload {@Notification}",
-              notificationName, correlationId, stopwatch.ElapsedMilliseconds, notification);
+              "[Notification] {NotificationName} [{CorrelationId}] failed after {Elapsed} ms",
+              notificationName, correlationId, stopwatch.ElapsedMilliseconds);
         }
         else
         {

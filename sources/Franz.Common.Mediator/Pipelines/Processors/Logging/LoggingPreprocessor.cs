@@ -35,16 +35,17 @@ public sealed class LoggingPreProcessor<TRequest> : IPreProcessor<TRequest>
 
     // Ensure() establishes the 128-bit Guid v7 that will travel through 
     // Pipelines, Sagas, and Domain Events.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
+    if (!_logger.IsEnabled(LogLevel.Information))
+      return Task.CompletedTask;
 
     using (_logger.BeginScope(new { CorrelationId = correlationId }))
     {
       if (_env.IsDevelopment())
       {
         _logger.LogInformation(
-            "[Pre-{Prefix}] Handling {RequestName} [{CorrelationId}] with payload {@Request}",
-            prefix, requestType, correlationId, request);
+            "[Pre-{Prefix}] Handling {RequestName} [{CorrelationId}]",
+            prefix, requestType, correlationId);
       }
       else
       {

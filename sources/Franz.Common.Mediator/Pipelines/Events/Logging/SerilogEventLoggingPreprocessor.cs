@@ -29,8 +29,9 @@ public sealed class SerilogEventLoggingPreProcessor<TEvent> : IEventPreProcessor
 
 
     // This ensures the "Start" log is the chronological anchor for the entire flow.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
+    if (!_logger.IsEnabled(LogLevel.Information))
+      return Task.CompletedTask;
 
 
     using (LogContext.PushProperty("FranzEvent", eventType))

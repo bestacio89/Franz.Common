@@ -26,16 +26,17 @@ public sealed class SerilogLoggingPostProcessor<TRequest, TResponse> : IPostProc
     var requestType = request?.GetType().Name ?? typeof(TRequest).Name;
 
     // This keeps the "Success" log bitwise-linked to the "Start" log.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
+    if (!_logger.IsEnabled(LogLevel.Information))
+      return Task.CompletedTask;
 
     using (LogContext.PushProperty("FranzRequest", requestType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))
     using (LogContext.PushProperty("FranzProcessor", nameof(SerilogLoggingPostProcessor<TRequest, TResponse>)))
     {
       // Log the native Guid—Serilog sinks will index this as a UUID/Guid type, not a string.
-      _logger.LogInformation("✅ [Post] {Request} [{CorrelationId}] produced {@Response}",
-          requestType, correlationId, response);
+      _logger.LogInformation("✅ [Post] {Request} [{CorrelationId}] completed successfully",
+          requestType, correlationId);
     }
 
     return Task.CompletedTask;

@@ -219,10 +219,6 @@ public static class MediatorServiceCollectionExtensions
             typeof(SerilogEventLoggingPipeline<>)));
 
 
-    services.TryAddEnumerable(
-        ServiceDescriptor.Scoped(
-            typeof(IEventPreProcessor<>),
-            typeof(EventAuditPreProcessor<>)));
 
     services.TryAddEnumerable(
         ServiceDescriptor.Scoped(
@@ -245,10 +241,6 @@ public static class MediatorServiceCollectionExtensions
             typeof(IEventPostProcessor<>),
             typeof(SerilogEventAuditPostProcessor<>)));
 
-    services.TryAddEnumerable(
-        ServiceDescriptor.Scoped(
-            typeof(IEventPostProcessor<>),
-            typeof(EventAuditPostProcessor<>)));
 
     return services;
   }
