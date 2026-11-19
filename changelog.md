@@ -1,20 +1,18 @@
 # Franz Framework — Changelog
 
-This file records the framework's release history, from the original 1.x foundation through the current 3.0.0 development cycle.
+This file records the framework's published release history and current unreleased work, from the original 1.x foundation through the 3.x release line.
 
 ## Release status and ordering
 
 - Entries are ordered newest first.
-- **3.0.0 is in development and has not been published.** It consolidates all platform work completed after the 2.3.4 baseline, including the tenant-security hardening previously tracked as unreleased work. There was no separate 2.3.5 release.
-- **2.3.4 is the last published stable baseline** used for compatibility review.
+- **3.0.1 is in development and has not been published.** It is a compatible patch over the published 3.0.0 release.
+- **3.0.0 is the latest published stable release** and the compatibility baseline for 3.0.1.
 - Earlier version entries are retained as historical records. Grouped version ranges remain grouped where the original changelog recorded them that way.
 - Planned items are identified explicitly and are not presented as shipped capabilities.
 
 ---
 
-## v3.0.0 — Major platform release (in development; not published)
-
-This release consolidates the platform work developed after the **2.3.4 stable baseline**. The subsequent tenant-security hardening and platform changes are part of 3.0.0; they are not a separate 2.3.5 release. The shared build metadata targets 3.0.0, but NuGet publication remains a separate, explicitly approved release operation.
+## v3.0.1 — Mediator lifecycle hardening (in development; not published)
 
 ### Mediator dispatch lifecycle and logging
 
@@ -24,6 +22,19 @@ This release consolidates the platform work developed after the **2.3.4 stable b
 - Keep lifecycle logging metadata-only: request, response, event, and notification payloads are not destructured into routine lifecycle log entries.
 - Ensure correlation identifiers before lifecycle logging/audit capture and avoid Information-level logging work when that level is disabled.
 - Add regression coverage for event processor ordering, successful and failed dispatch lifecycle behavior, safe audit logging, and default V2 composition.
+
+### Compatibility and release metadata
+
+- Set framework NuGet package versions to 3.0.1 and file versions to 3.0.1.0.
+- Keep assembly version at 3.0.0.0 to preserve binary identity across this compatible patch release.
+- Validate API compatibility against the published 3.0.0 package.
+- Require full Release validation, vulnerability checks and explicit release approval before NuGet publication.
+
+---
+
+## v3.0.0 — Major platform release (published)
+
+This release consolidated the platform work developed after the **2.3.4 stable baseline**. The subsequent tenant-security hardening and platform changes shipped as 3.0.0; they were not a separate 2.3.5 release. NuGet publication of 3.0.0 is complete.
 
 ### Tenant security and request execution
 

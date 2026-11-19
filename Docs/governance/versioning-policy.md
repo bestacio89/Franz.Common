@@ -13,9 +13,9 @@ Franz.Common uses semantic versioning (SemVer) for its published NuGet packages.
 
 ## Release version
 
-The coordinated release target is **3.0.0**, a major release under SemVer. The shared `common.targets` file sets package version **3.0.0**, assembly version **3.0.0.0**, and file version **3.0.0.0**. This prepares package metadata but does not publish packages.
+The coordinated release target is **3.0.1**, a compatible patch release under SemVer. The shared `common.targets` file sets package version **3.0.1**, assembly version **3.0.0.0**, and file version **3.0.1.0**. Keeping the assembly version stable avoids an unnecessary binary identity change for a patch release.
 
-`PackageValidationBaselineVersion` remains **2.3.4**, the last published stable baseline. It is intentionally not set to 3.0.0: package version identifies the candidate being built, while the compatibility baseline identifies the already-published package against which API compatibility is evaluated. Intentional breaking changes for a major release must be reviewed and recorded through the package-validation suppression mechanism; the baseline must not be moved forward merely to make validation pass.
+`PackageValidationBaselineVersion` is **3.0.0**, the last published stable release. Compatibility validation for this patch must compare against that published package. Do not move the baseline beyond the latest published version merely to make validation pass; intentional public API changes must be reviewed and classified according to SemVer.
 
 ## Semantic versioning
 
