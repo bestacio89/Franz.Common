@@ -61,7 +61,7 @@ public class MediatorServiceCollectionExtensionsV2Tests
     // Assert
     services.Should().Contain(d => d.ServiceType == typeof(IPipeline<,>) && d.ImplementationType == typeof(LoggingPipeline<,>));
     services.Should().Contain(d => d.ServiceType == typeof(IPipeline<,>) && d.ImplementationType == typeof(ValidationPipeline<,>));
-    services.Should().Contain(d => d.ServiceType == typeof(IPipeline<,>) && d.ImplementationType == typeof(SerilogLoggingPipeline<,>));
+    services.Should().NotContain(d => d.ServiceType == typeof(IPipeline<,>) && d.ImplementationType == typeof(SerilogLoggingPipeline<,>));
     services.Should().Contain(d => d.ServiceType == typeof(IPipeline<,>) && d.ImplementationType == typeof(TransactionPipeline<,>));
   }
 
