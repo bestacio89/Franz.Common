@@ -1,10 +1,10 @@
 # Franz.Common.Http.Documentation
 
-> ASP.NET Core API-versioning and native OpenAPI/Scalar endpoint registration.
+> ASP.NET Core URL-segment API versioning and native OpenAPI/Scalar endpoint registration.
 
 ## Overview
 
-ASP.NET Core API-versioning and native OpenAPI/Scalar endpoint registration.
+This package configures API versioning and native OpenAPI/Scalar endpoint registration for Franz HTTP services.
 
 ## Installation
 
@@ -25,7 +25,35 @@ builder.Services
     .ConfigureOpenApi();
 ```
 
-Call `ConfigureApiVersioning()` before `ConfigureOpenApi()`. The versioning setup registers controllers with the route prefix `api/v{version:apiVersion}`, sets the default API version to 1.0, assumes the default when the request omits a version, reports supported versions, and combines URL-segment, `x-api-version` header, and `x-api-version` media-type readers.
+Call `ConfigureApiVersioning()` before `ConfigureOpenApi()`. The standard version reader is exclusively URL-segment based. The default API version is 1.0, the default version is assumed when unspecified, and supported API versions are reported.
+
+The standard route prefix is:
+
+```text
+/api/v{version:apiVersion}
+```
+
+### Client request contract
+
+The API version belongs in the URL. Clients must not use `MediaTypeApiVersionWriter`, add an `x-api-version` request header, or encode the version as an `Accept` media-type parameter.
+
+Send a normal representation preference:
+
+```http
+GET /api/v1/orders
+Accept: application/json
+```
+
+Do not send:
+
+```http
+Accept: application/json; x-api-version=1.0
+x-api-version: 1.0
+```
+
+The versioning configuration does not rewrite or sanitize client headers. Applications that explicitly replace the configured `ApiVersionReader` own that alternative contract and its associated content-negotiation behavior.
+
+## OpenAPI registration
 
 The current `ConfigureOpenApi()` implementation registers the native OpenAPI document named `v1`. It sets the document title from the entry assembly and the document version to `1.0`. Do not assume that it currently discovers and registers one document for every API version: the implementation shown registers only `v1`.
 
@@ -50,7 +78,7 @@ The versioning registration adds the general route prefix through MVC options. C
 ```csharp
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/orders")]
+[Route("orders")]
 public sealed class OrdersController : ControllerBase
 {
 }
