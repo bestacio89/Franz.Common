@@ -10,7 +10,10 @@ namespace Franz.Common.Mediator.Tests.Dispatchers;
 
 public sealed class EventProcessorLifecycleTests
 {
-  public sealed record TestEvent : IEvent;
+  public sealed record TestEvent : IEvent
+  {
+    public DateTimeOffset OccurredOn { get; } = DateTimeOffset.UtcNow;
+  }
 
   public sealed class RecordingHandler(List<string> calls, bool shouldFail = false) : IEventHandler<TestEvent>
   {
