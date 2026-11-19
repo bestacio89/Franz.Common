@@ -1,9 +1,13 @@
 using Asp.Versioning;
 using FluentAssertions;
 using Franz.Common.Http.Documentation.Extensions;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
 
 namespace Franz.Common.MultiTenancy.Tests.Http;
 
@@ -50,5 +54,41 @@ public sealed class ApiVersioningConfigurationTests
     context.Request.Headers["x-api-version"] = "1.0";
 
     reader.Read(context.Request).Should().BeEmpty();
+  }
+
+  [Fact]
+  public async Task VersionedEndpoint_ReturnsJsonContentTypeWithoutApiVersionParameter()
+  {
+    var hostBuilder = new WebHostBuilder()
+        .ConfigureServices(services =>
+        {
+          services
+              .AddFranzDocumentation()
+              .ConfigureApiVersioning();
+
+          services
+              .AddControllers()
+              .AddApplicationPart(typeof(ApiVersioningProbeController).Assembly);
+        })
+        .Configure(application =>
+        {
+          application.UseRouting();
+          application.UseEndpoints(endpoints => endpoints.MapControllers());
+        });
+
+    using var server = new TestServer(hostBuilder);
+    using var client = server.CreateClient();
+    client.DefaultRequestHeaders.Accept.Add(
+        new MediaTypeWithQualityHeaderValue("application/json"));
+
+    using var response = await client.GetAsync("/api/v1/versioning-probe");
+
+    response.EnsureSuccessStatusCode();
+
+    var contentType = response.Content.Headers.ContentType;
+    contentType.Should().NotBeNull();
+    contentType!.MediaType.Should().Be("application/json");
+    contentType.Parameters.Should().NotContain(parameter =>
+        string.Equals(parameter.Name, "x-api-version", StringComparison.OrdinalIgnoreCase));
   }
 }
