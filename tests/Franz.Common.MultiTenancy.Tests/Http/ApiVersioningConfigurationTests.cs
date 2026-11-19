@@ -43,7 +43,7 @@ public sealed class ApiVersioningConfigurationTests
         .ApiVersionReader;
 
     var request = new DefaultHttpContext().Request;
-    request.Headers.Accept = "application/json; x-api-version=1.0";
+    request.Headers["Accept"] = "application/json; x-api-version=1.0";
     request.Headers["x-api-version"] = "1.0";
 
     reader.Read(request).Should().BeEmpty();
