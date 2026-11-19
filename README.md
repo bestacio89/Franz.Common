@@ -144,7 +144,7 @@ builder.Services.AddBusiness(typeof(Program).Assembly);
 
 For Saga orchestration, see the complete provider-specific registration examples in the [Saga README](sources/Franz.Common.Messaging.Sagas/readme.md). Do not copy a generic sample without configuring the selected persistence provider, migrations/containers and outbox worker.
 
-The shared build target currently sets the package version to **3.0.1**, keeps the assembly version at **3.0.0.0** for patch-level binary identity stability, and sets the file version to **3.0.1.0**. Version metadata does not itself publish packages to NuGet.
+The shared build target currently sets the package version to **3.0.2**, keeps the assembly version at **3.0.0.0** for patch-level binary identity stability, and sets the file version to **3.0.2.0**. The 3.0.1 development work is carried forward into this release. Version metadata does not itself publish packages to NuGet. Version metadata does not itself publish packages to NuGet.
 
 ## Build and test
 
@@ -195,7 +195,7 @@ CI publishes machine-readable and human-readable reports. Absolute performance t
 
 ## Versioning and release notes
 
-All framework packages share the coordinated version defined in [common.targets](common.targets). The published **3.0.0** release is the compatibility baseline for the current **3.0.1** patch. Publication of 3.0.1 remains gated on full Release validation, API compatibility review and explicit release approval.
+All framework packages share the coordinated version defined in [common.targets](common.targets). The published **3.0.0** release is the compatibility baseline for the current **3.0.2** patch. Publication of 3.0.2 remains gated on full Release validation, API compatibility review, vulnerability checks and explicit release approval. The standard HTTP bootstrap now reads API versions exclusively from URL segments; consumers relying on header or media-type version readers must migrate to the URL-segment contract.
 
 See [changelog.md](changelog.md) for the detailed history, migration notes and release boundaries. A changelog entry does not by itself mean that packages have been published to NuGet.
 
