@@ -42,10 +42,13 @@ public sealed class ApiVersioningConfigurationTests
         .Value
         .ApiVersionReader;
 
-    var request = new DefaultHttpContext().Request;
-    request.Headers["Accept"] = "application/json; x-api-version=1.0";
-    request.Headers["x-api-version"] = "1.0";
+    var context = new DefaultHttpContext
+    {
+      RequestServices = provider
+    };
+    context.Request.Headers["Accept"] = "application/json; x-api-version=1.0";
+    context.Request.Headers["x-api-version"] = "1.0";
 
-    reader.Read(request).Should().BeEmpty();
+    reader.Read(context.Request).Should().BeEmpty();
   }
 }
