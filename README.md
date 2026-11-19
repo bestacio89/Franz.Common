@@ -144,7 +144,7 @@ builder.Services.AddBusiness(typeof(Program).Assembly);
 
 For Saga orchestration, see the complete provider-specific registration examples in the [Saga README](sources/Franz.Common.Messaging.Sagas/readme.md). Do not copy a generic sample without configuring the selected persistence provider, migrations/containers and outbox worker.
 
-The shared build target currently sets the package version to **3.0.2**, keeps the assembly version at **3.0.0.0** for patch-level binary identity stability, and sets the file version to **3.0.2.0**. The 3.0.1 development work is carried forward into this release. Version metadata does not itself publish packages to NuGet. Version metadata does not itself publish packages to NuGet.
+The shared build target currently sets the package version to **3.0.2**, keeps the assembly version at **3.0.0.0** for patch-level binary identity stability, and sets the file version to **3.0.2.0**. The 3.0.1 development work is carried forward into this release. Version metadata does not itself publish packages to NuGet.
 
 ## Build and test
 

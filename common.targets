@@ -43,7 +43,7 @@
 
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 
-    <!-- 3.0.2 compatible patch; API compatibility is validated against published 3.0.0. -->
+    <!-- 3.0.2 patch release; API compatibility is validated against published 3.0.0. See the changelog for the HTTP reader migration note. -->
    
   </PropertyGroup>
 

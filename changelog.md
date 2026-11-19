@@ -5,7 +5,7 @@ This file records the framework's published release history and current unreleas
 ## Release status and ordering
 
 - Entries are ordered newest first.
-- **3.0.2 is in development and has not been published.** It is a compatible patch over the published 3.0.0 release.
+- **3.0.2 is in development and has not been published.** It is a patch release based on the published 3.0.0 baseline; see the HTTP compatibility note below for the reader-contract migration.
 - **3.0.1 was not published separately.** Its mediator lifecycle hardening work is carried forward into 3.0.2.
 - **3.0.0 is the latest published stable release** and the compatibility baseline for 3.0.2.
 - Earlier version entries are retained as historical records. Grouped version ranges remain grouped where the original changelog recorded them that way.
