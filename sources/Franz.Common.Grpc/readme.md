@@ -70,7 +70,7 @@ The former channel-owning `IFranzGrpcClientFactory` and `FranzGrpcClientFactory`
 
 ## Configuration
 
-Only options with implemented runtime semantics remain in the 3.0.0 configuration surface:
+The 3.0.1 package retains the configuration surface introduced in 3.0.0; only options with implemented runtime semantics are documented here:
 
 | Section | Property | Default | Semantics |
 |---|---|---|---|

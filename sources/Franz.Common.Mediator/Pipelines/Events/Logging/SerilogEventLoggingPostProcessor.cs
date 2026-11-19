@@ -29,16 +29,17 @@ public sealed class SerilogEventLoggingPostProcessor<TEvent> : IEventPostProcess
 
     
     // This ensures the "Success" log is bitwise-linked to the "Start" log.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId(); // Guarantees we have a v7 Guid
+    var correlationId = MediatorContext.EnsureCorrelationId();
+    if (!_logger.IsEnabled(LogLevel.Information))
+      return Task.CompletedTask; // Guarantees we have a v7 Guid
 
     using (LogContext.PushProperty("FranzEvent", eventType))
     using (LogContext.PushProperty("FranzCorrelationId", correlationId))
     using (LogContext.PushProperty("FranzProcessor", nameof(SerilogEventLoggingPostProcessor<TEvent>)))
     {
       // Logging the native Guid directly for high-speed indexing in Seq/ELK/SQL.
-      _logger.LogInformation("✅ [Event-Post] {Event} [{CorrelationId}] handled successfully: {@Event}",
-          eventType, correlationId, @event);
+      _logger.LogInformation("✅ [Event-Post] {Event} [{CorrelationId}] handled successfully",
+          eventType, correlationId);
     }
 
     return Task.CompletedTask;

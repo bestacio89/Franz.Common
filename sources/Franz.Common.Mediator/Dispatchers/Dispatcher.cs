@@ -3,6 +3,8 @@ using Franz.Common.Mediator.Diagnostics;
 using Franz.Common.Mediator.Handlers;
 using Franz.Common.Mediator.Messages;
 using Franz.Common.Mediator.Pipelines.Core;
+using Franz.Common.Mediator.Pipelines.Events.PostProcessing;
+using Franz.Common.Mediator.Pipelines.Events.Preprocessing;
 using Franz.Common.Mediator.Pipelines.Processors;
 using Franz.Common.Mediator.Registration;
 using Franz.Common.Mediator.Validation.Events;
@@ -306,6 +308,8 @@ public class FranzDispatcher : IDispatcher
 
     try
     {
+      await RunEventPreProcessors(@event, cancellationToken).ConfigureAwait(false);
+
       var handlers = ResolveServices<IEventHandler<TEvent>>();
       var pipelines = ResolveServices<IEventPipeline<TEvent>>();
 
@@ -328,6 +332,7 @@ public class FranzDispatcher : IDispatcher
       }
 
       await handlerChain().ConfigureAwait(false);
+      await RunEventPostProcessors(@event, cancellationToken).ConfigureAwait(false);
 
       var duration = DateTime.UtcNow - start;
       await NotifyRequestCompleted(@event, null, context.CorrelationId, duration, cancellationToken).ConfigureAwait(false);
@@ -424,8 +429,24 @@ public class FranzDispatcher : IDispatcher
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   private IReadOnlyList<TService> ResolveServices<TService>()
   {
-    return _serviceProvider.GetServices<TService>() as IReadOnlyList<TService>
-           ?? _serviceProvider.GetServices<TService>().ToArray();
+    var services = _serviceProvider.GetServices<TService>();
+    return services as IReadOnlyList<TService> ?? services.ToArray();
+  }
+
+  private async Task RunEventPreProcessors<TEvent>(TEvent @event, CancellationToken ct)
+      where TEvent : IEvent
+  {
+    var processors = ResolveServices<IEventPreProcessor<TEvent>>();
+    for (var i = 0; i < processors.Count; i++)
+      await processors[i].ProcessAsync(@event, ct).ConfigureAwait(false);
+  }
+
+  private async Task RunEventPostProcessors<TEvent>(TEvent @event, CancellationToken ct)
+      where TEvent : IEvent
+  {
+    var processors = ResolveServices<IEventPostProcessor<TEvent>>();
+    for (var i = 0; i < processors.Count; i++)
+      await processors[i].ProcessAsync(@event, ct).ConfigureAwait(false);
   }
 
   private Task RunPreProcessorsDynamic(object request, CancellationToken ct)

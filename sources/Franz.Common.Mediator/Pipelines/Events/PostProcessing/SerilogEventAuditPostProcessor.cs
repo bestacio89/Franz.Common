@@ -31,8 +31,9 @@ public sealed class SerilogEventAuditPostProcessor<TEvent> : IEventPostProcessor
     var eventType = @event?.GetType().Name ?? typeof(TEvent).Name;
 
     // instead of creating a random string "N" ID.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
+    if (!_logger.IsEnabled(LogLevel.Information))
+      return Task.CompletedTask;
 
     
 
@@ -42,8 +43,8 @@ public sealed class SerilogEventAuditPostProcessor<TEvent> : IEventPostProcessor
     {
       if (_env.IsDevelopment())
       {
-        _logger.LogInformation("✅ [Audit-Event] {Event} [{CorrelationId}] details {@Event}",
-            eventType, correlationId, @event);
+        _logger.LogInformation("✅ [Audit-Event] {Event} [{CorrelationId}] handled successfully",
+            eventType, correlationId);
       }
       else
       {

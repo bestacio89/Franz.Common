@@ -70,7 +70,7 @@ builder.Services.AddFranzMediatorDefault<OrdersApplicationAssembly>();
 
 The marker type can be an otherwise empty type declared in the assembly containing the handlers. The source generator contributes handler registrations at build time; the application references `Franz.Common.Mediator`, which carries the generator as an analyzer asset.
 
-This default composition includes request logging, validation, Serilog logging, transaction pipelines, and the built-in logging/audit pre- and post-processors. Notifications receive notification logging and validation. It does not add event validation or resilience pipelines.
+This default composition includes request logging, validation, and transaction pipelines, plus generated logging and audit processors. Notifications receive notification logging and validation. The generated composition does not register `SerilogLoggingPipeline` or `SerilogLoggingPostProcessor`; the Serilog logging pre-processor and Serilog audit processors remain in the processor set. It does not add event validation or resilience pipelines.
 
 If you need only core infrastructure and explicit generated registration, use:
 

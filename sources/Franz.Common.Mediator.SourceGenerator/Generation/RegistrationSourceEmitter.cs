@@ -159,8 +159,6 @@ internal static class FranzMediatorGeneratedRegistration
     AppendScoped(builder, registered, $"IPipeline<{pipelineRequest}, {responseType}>",
         $"ValidationPipeline<{pipelineRequest}, {responseType}>");
     AppendScoped(builder, registered, $"IPipeline<{pipelineRequest}, {responseType}>",
-        $"SerilogLoggingPipeline<{pipelineRequest}, {responseType}>");
-    AppendScoped(builder, registered, $"IPipeline<{pipelineRequest}, {responseType}>",
         $"TransactionPipeline<{pipelineRequest}, {responseType}>");
 
     AppendScoped(builder, registered, $"IPreProcessor<{concreteRequest}>",
@@ -174,8 +172,6 @@ internal static class FranzMediatorGeneratedRegistration
 
     AppendScoped(builder, registered, $"IPostProcessor<{concreteRequest}, {responseType}>",
         $"LoggingPostProcessor<{concreteRequest}, {responseType}>");
-    AppendScoped(builder, registered, $"IPostProcessor<{concreteRequest}, {responseType}>",
-        $"SerilogLoggingPostProcessor<{concreteRequest}, {responseType}>");
     AppendScoped(builder, registered, $"IPostProcessor<{concreteRequest}, {responseType}>",
         $"SerilogAuditPostProcessor<{concreteRequest}, {responseType}>");
   }

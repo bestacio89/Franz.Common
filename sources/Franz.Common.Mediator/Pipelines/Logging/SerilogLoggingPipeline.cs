@@ -30,8 +30,7 @@ public sealed class SerilogLoggingPipeline<TRequest, TResponse> : IPipeline<TReq
 
 
     // This ensures the correlation ID is a sortable, timestamped binary.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
 
     var stopwatch = Stopwatch.StartNew();
 

@@ -35,16 +35,17 @@ public sealed class LoggingPostProcessor<TRequest, TResponse> : IPostProcessor<T
 
     // BAZOOKA REFACTOR: Fetch the existing Guid v7.
     // In a Post-Processor, we expect the ID to already exist from the Pre-Processor or Pipeline.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
+    if (!_logger.IsEnabled(LogLevel.Information))
+      return Task.CompletedTask;
 
     using (_logger.BeginScope(new { CorrelationId = correlationId }))
     {
       if (_env.IsDevelopment())
       {
         _logger.LogInformation(
-            "[Post-{Prefix}] {RequestName} [{CorrelationId}] produced response {@Response}",
-            prefix, requestType, correlationId, response);
+            "[Post-{Prefix}] {RequestName} [{CorrelationId}] completed successfully",
+            prefix, requestType, correlationId);
       }
       else
       {
