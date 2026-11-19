@@ -34,6 +34,7 @@
         "tests/Franz.Common.Business.Test/Franz.Common.Business.Tests.csproj",
         "tests/Franz.Common.Caching.Testing/Franz.Common.Caching.Tests.csproj",
         "tests/Franz.Common.Grpc.Tests/Franz.Common.Grpc.Tests.csproj",
+        "tests/Franz.Common.Logging.Tests/Franz.Common.Logging.Tests.csproj",
         "tests/Franz.Common.Mapping.Tests/Franz.Common.Mapping.Tests.csproj",
         "tests/Franz.Common.Mediator.Tests/Franz.Common.Mediator.Tests.csproj",
         "tests/Franz.Common.MultiTenancy.Tests/Franz.Common.MultiTenancy.Tests.csproj",
