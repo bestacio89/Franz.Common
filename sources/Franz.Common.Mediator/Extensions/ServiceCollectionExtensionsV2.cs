@@ -99,7 +99,6 @@ public static class MediatorServiceCollectionExtensionsV2
 
     services.AddFranzLoggingPipelineV2();
     services.AddFranzValidationPipelineV2();
-    services.AddFranzSerilogLoggingPipelineV2();
     services.AddFranzSerilogAuditPipelineV2();
     services.AddFranzTransactionPipelineV2();
 
@@ -283,10 +282,6 @@ public static class MediatorServiceCollectionExtensionsV2
             typeof(IEventPipeline<>),
             typeof(SerilogEventLoggingPipeline<>)));
 
-    services.TryAddEnumerable(
-        ServiceDescriptor.Scoped(
-            typeof(IEventPreProcessor<>),
-            typeof(EventAuditPreProcessor<>)));
 
     services.TryAddEnumerable(
         ServiceDescriptor.Scoped(
@@ -308,10 +303,6 @@ public static class MediatorServiceCollectionExtensionsV2
             typeof(IEventPostProcessor<>),
             typeof(SerilogEventAuditPostProcessor<>)));
 
-    services.TryAddEnumerable(
-        ServiceDescriptor.Scoped(
-            typeof(IEventPostProcessor<>),
-            typeof(EventAuditPostProcessor<>)));
 
     return services;
   }

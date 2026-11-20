@@ -30,8 +30,11 @@ await host.RunAsync();
 
 `UseLog()` configures Serilog from host configuration and registered services, enriches events with log context, application name, machine name, and environment name, and applies the package's baseline source filters.
 
-- Development: Debug minimum level, console and debug sinks, and daily rolling `logs/dev-.log` files with a retained-file limit of 10.
-- Non-development: Information minimum level, console output, daily JSON `logs/prod-sre-.json` and human-readable `logs/prod-dev-.log` files.
+- Development: Debug minimum level, console and debug sinks, and daily rolling `logs/dev-.log` files with a retained-file limit of 10. Franz.Common namespace events remain available for development diagnostics.
+- Non-development: Information minimum level, console output, daily JSON `logs/prod-sre-.json` and human-readable `logs/prod-dev-.log` files. Events whose `SourceContext` is exactly `Franz.Common` or starts with `Franz.Common.` are excluded from this production-style pipeline at every level.
+- The filter is applied to the logger pipeline, so it applies consistently to all sinks configured through this non-development branch, including sinks loaded from Serilog configuration.
+
+The filter matches the structured `SourceContext` property only. It does not suppress application events merely because their message text mentions Franz.Common, and it does not match similarly prefixed namespaces such as `Franz.Commonish`.
 
 The extension configures UTF-8 console encoding and invokes `TraceHelper.LogConsole()`. Elastic APM agent setup is compiled only in DEBUG builds; it is not an unconditional production APM registration.
 
@@ -43,7 +46,7 @@ var host = Host.CreateDefaultBuilder(args)
     .Build();
 ```
 
-This uses a desktop-oriented template with thread ID enrichment, console/debug sinks, and daily rolling `logs/desktop-.log` files. It does not add request ID or request path fields to the output template.
+This uses a desktop-oriented template with thread ID enrichment, console/debug sinks, and daily rolling `logs/desktop-.log` files. It does not add request ID or request path fields to the output template. The production-only Franz.Common source filter does not apply to this development-oriented desktop pipeline.
 
 ### UseHybridLog
 
@@ -57,7 +60,7 @@ This applies baseline filters, reads Serilog configuration, enriches from log co
 
 ## Filtering and enrichment
 
-The baseline configuration excludes selected low-value framework sources, including EF Core internals, HttpClient, Data Protection, static files, host lifetime, health-check diagnostics, Kestrel transport, and selected routing/model-binding/versioning events below Warning. These filters are package defaults; review them against the diagnostic requirements of the deployed application.
+The baseline configuration excludes selected low-value framework sources, including EF Core internals, HttpClient, Data Protection, static files, host lifetime, health-check diagnostics, Kestrel transport, and selected routing/model-binding/versioning events below Warning. The additional Franz.Common namespace suppression is intentionally limited to the non-development branch of `UseLog()`.
 
 ## Operational guidance
 

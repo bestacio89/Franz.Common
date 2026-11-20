@@ -1,20 +1,62 @@
 # Franz Framework — Changelog
 
-This file records the framework's release history, from the original 1.x foundation through the current 3.0.0 development cycle.
+This file records the framework's published release history and current unreleased work, from the original 1.x foundation through the 3.x release line.
 
 ## Release status and ordering
 
 - Entries are ordered newest first.
-- **3.0.0 is in development and has not been published.** It consolidates all platform work completed after the 2.3.4 baseline, including the tenant-security hardening previously tracked as unreleased work. There was no separate 2.3.5 release.
-- **2.3.4 is the last published stable baseline** used for compatibility review.
+- **3.0.2 is in development and has not been published.** It is a patch release based on the published 3.0.0 baseline; see the HTTP compatibility note below for the reader-contract migration.
+- **3.0.1 was not published separately.** Its mediator lifecycle hardening work is carried forward into 3.0.2.
+- **3.0.0 is the latest published stable release** and the compatibility baseline for 3.0.2.
 - Earlier version entries are retained as historical records. Grouped version ranges remain grouped where the original changelog recorded them that way.
 - Planned items are identified explicitly and are not presented as shipped capabilities.
 
 ---
 
-## v3.0.0 — Major platform release (in development; not published)
+## v3.0.2 — HTTP, logging and mediator hardening (in development; not published)
 
-This release consolidates the platform work developed after the **2.3.4 stable baseline**. The subsequent tenant-security hardening and platform changes are part of 3.0.0; they are not a separate 2.3.5 release. The shared build metadata targets 3.0.0, but NuGet publication remains a separate, explicitly approved release operation.
+### HTTP API versioning and content negotiation
+
+- Configure the standard HTTP documentation/bootstrap path to use `UrlSegmentApiVersionReader` exclusively. API versions are carried in routes such as `/api/v1/orders`.
+- Remove the standard `x-api-version` header reader and media-type version reader. The default HTTP contract no longer derives API versions from request headers or `Accept` parameters.
+- Document the client request contract as a normal representation header, for example `Accept: application/json`; do not use `MediaTypeApiVersionWriter`, an `x-api-version` request header, or an API-version parameter on the `Accept` media type.
+- Keep response content negotiation independent of API version selection so JSON responses retain the normal `application/json` content type without an `x-api-version` parameter.
+- Keep request headers caller-owned: the framework does not rewrite or sanitize incoming `Accept` or custom headers.
+- Move `FranzDocumentationBuilder` into its own source file to preserve the one-top-level-type-per-file convention.
+- Add regression coverage for URL-segment-only reader configuration, rejection of header/media-type version input by the standard reader, and a real TestServer response whose JSON content type has no API-version parameter.
+
+**Compatibility note:** consumers that explicitly relied on the standard bootstrap accepting `x-api-version` headers or media-type parameters must move the version into the URL. The route-segment contract is the supported default.
+
+### Production logging noise suppression
+
+- Add a production-style filter to the non-development `UseLog()` pipeline in `Franz.Common.Logging`.
+- Exclude events whose structured `SourceContext` is exactly `Franz.Common` or begins with `Franz.Common.`, at every log level and across the sinks configured by that pipeline.
+- Match the structured source context rather than message text. Application namespaces, similarly prefixed namespaces such as `Franz.Commonish`, and events without a `SourceContext` remain visible.
+- Preserve existing behavior for the Development branch, `UseDesktopLog()`, and `UseHybridLog()`; the namespace suppression is deliberately scoped to the non-development `UseLog()` pipeline.
+- Add a dedicated `Franz.Common.Logging.Tests` project with regression coverage, register it in the solution and core CI suite, and document the filtering contract in the package README.
+
+### Mediator dispatch lifecycle hardening
+
+- Execute event pre-processors sequentially before event pipelines and handlers, then execute event post-processors sequentially only after successful dispatch. Pre-processing, pipeline, and handler failures continue to propagate and prevent post-processing.
+- Resolve dispatcher service collections once per resolution path instead of re-enumerating the same service collection.
+- Remove redundant Serilog request lifecycle pipeline registrations from generated V1 defaults and the V2 default composition while retaining explicit Serilog pipeline registration APIs and the remaining audit/logging processors.
+- Keep lifecycle logging metadata-only: request, response, event, and notification payloads are not destructured into routine lifecycle log entries.
+- Ensure correlation identifiers before lifecycle logging/audit capture and avoid Information-level logging work when that level is disabled.
+- Add regression coverage for event processor ordering, successful and failed dispatch lifecycle behavior, safe audit logging, and default V2 composition.
+
+### Compatibility and release metadata
+
+- Set framework NuGet package versions to 3.0.2 and file versions to 3.0.2.0.
+- Keep assembly version at 3.0.0.0 to preserve binary identity across this compatible patch release.
+- Validate API compatibility against the published 3.0.0 package.
+- Require full Release validation, vulnerability checks and explicit release approval before NuGet publication.
+- Treat the HTTP URL-segment-only reader as the standard configuration contract; consumers using the removed header/media-type reader behavior must migrate before adopting the updated bootstrap.
+
+---
+
+## v3.0.0 — Major platform release (published)
+
+This release consolidated the platform work developed after the **2.3.4 stable baseline**. The subsequent tenant-security hardening and platform changes shipped as 3.0.0; they were not a separate 2.3.5 release. NuGet publication of 3.0.0 is complete.
 
 ### Tenant security and request execution
 

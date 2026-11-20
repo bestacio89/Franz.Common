@@ -6,9 +6,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <Version>3.0.0</Version>
+    <Version>3.0.2</Version>
     <AssemblyVersion>3.0.0.0</AssemblyVersion>
-    <FileVersion>3.0.0.0</FileVersion>
+    <FileVersion>3.0.2.0</FileVersion>
 
     <Authors>Bernardo Estacio Abreu</Authors>
   </PropertyGroup>
@@ -43,7 +43,7 @@
 
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 
-    <!-- Compare the 3.0.0 release candidate against the last published stable package. -->
+    <!-- 3.0.2 patch release; API compatibility is validated against published 3.0.0. See the changelog for the HTTP reader migration note. -->
    
   </PropertyGroup>
 

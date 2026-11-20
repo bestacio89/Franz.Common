@@ -27,6 +27,10 @@ public class SerilogEventLoggingTests
   public SerilogEventLoggingTests()
   {
     _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Development);
+    _preProcessorLoggerMock.Setup(logger => logger.IsEnabled(LogLevel.Information)).Returns(true);
+    _postProcessorLoggerMock.Setup(logger => logger.IsEnabled(LogLevel.Information)).Returns(true);
+    _pipelineLoggerMock.Setup(logger => logger.IsEnabled(LogLevel.Information)).Returns(true);
+    _pipelineLoggerMock.Setup(logger => logger.IsEnabled(LogLevel.Error)).Returns(true);
   }
 
   [Fact]

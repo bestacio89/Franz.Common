@@ -1,26 +1,13 @@
 ﻿#nullable enable
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
-using Franz.Common.Http.Documentation.Configuration;
-using Franz.Common.Http.Documentation.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
-
 using System.Reflection;
 
 namespace Franz.Common.Http.Documentation.Extensions;
-
-public sealed class FranzDocumentationBuilder
-{
-  internal IServiceCollection Services { get; }
-
-  internal FranzDocumentationBuilder(IServiceCollection services)
-  {
-    Services = services;
-  }
-}
 
 public static class ServiceCollectionExtensions
 {
@@ -34,8 +21,9 @@ public static class ServiceCollectionExtensions
   }
 
   /// <summary>
-  /// Configures API versioning using Asp.Versioning — replaces legacy
-  /// Microsoft.AspNetCore.Mvc.Versioning. Must be called before ConfigureOpenApi.
+  /// Configures URL-segment API versioning using Asp.Versioning.
+  /// The API version is read exclusively from the route segment.
+  /// Must be called before ConfigureOpenApi.
   /// </summary>
   public static FranzDocumentationBuilder ConfigureApiVersioning(
       this FranzDocumentationBuilder builder)
@@ -51,11 +39,7 @@ public static class ServiceCollectionExtensions
           opt.DefaultApiVersion = new ApiVersion(1, 0);
           opt.AssumeDefaultVersionWhenUnspecified = true;
           opt.ReportApiVersions = true;
-
-          opt.ApiVersionReader = ApiVersionReader.Combine(
-                  new UrlSegmentApiVersionReader(),
-                  new HeaderApiVersionReader("x-api-version"),
-                  new MediaTypeApiVersionReader("x-api-version"));
+          opt.ApiVersionReader = new UrlSegmentApiVersionReader();
         })
         .AddApiExplorer(setup =>
         {
@@ -67,10 +51,7 @@ public static class ServiceCollectionExtensions
   }
 
   /// <summary>
-  /// Registers one native OpenAPI document per discovered API version.
-  /// Uses a temporary service provider to resolve IApiVersionDescriptionProvider
-  /// at registration time — the correct pattern for design-time version discovery.
-  /// Replaces AddSwaggerGen entirely — no Swashbuckle dependency.
+  /// Registers the native OpenAPI document for API version 1.
   /// </summary>
   public static FranzDocumentationBuilder ConfigureOpenApi(
      this FranzDocumentationBuilder builder)
@@ -93,5 +74,4 @@ public static class ServiceCollectionExtensions
 
     return builder;
   }
-
 }

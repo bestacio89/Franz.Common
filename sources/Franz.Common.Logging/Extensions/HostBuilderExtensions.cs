@@ -44,6 +44,21 @@ namespace Franz.Common.Logging.Extensions
                 .Filter.ByExcluding(e => e.Level < LogEventLevel.Warning && Matching.FromSource("Asp.Versioning")(e));
         }
 
+        internal static LoggerConfiguration ApplyProductionFilters(this LoggerConfiguration cfg)
+        {
+            return cfg.Filter.ByExcluding(logEvent =>
+            {
+                if (!logEvent.Properties.TryGetValue("SourceContext", out var sourceContext) ||
+                    sourceContext is not ScalarValue { Value: string sourceContextName })
+                {
+                    return false;
+                }
+
+                return string.Equals(sourceContextName, "Franz.Common", StringComparison.Ordinal) ||
+                       sourceContextName.StartsWith("Franz.Common.", StringComparison.Ordinal);
+            });
+        }
+
         public static IHostBuilder UseLog(this IHostBuilder hostBuilder)
         {
             TraceHelper.LogConsole();
@@ -69,7 +84,8 @@ namespace Franz.Common.Logging.Extensions
                 }
                 else
                 {
-                    logCfg.MinimumLevel.Information()
+                    logCfg.ApplyProductionFilters()
+                        .MinimumLevel.Information()
                         .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} | ReqId:{RequestId} | {Message:lj}{NewLine}{Exception}")
                         .WriteTo.File(new Serilog.Formatting.Json.JsonFormatter(), "logs/prod-sre-.json", rollingInterval: RollingInterval.Day, encoding: utf8)
                         .WriteTo.File("logs/prod-dev-.log", rollingInterval: RollingInterval.Day, encoding: utf8, outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {SourceContext} | ReqId:{RequestId} | Path:{RequestPath} | {Message:lj}{NewLine}{Exception}");
@@ -85,7 +101,7 @@ namespace Franz.Common.Logging.Extensions
         public static IHostBuilder UseDesktopLog(this IHostBuilder hostBuilder)
         {
             TraceHelper.LogConsole();
-            
+
             hostBuilder.UseSerilog((context, services, logCfg) =>
             {
                 logCfg.ApplyBaseFilters()

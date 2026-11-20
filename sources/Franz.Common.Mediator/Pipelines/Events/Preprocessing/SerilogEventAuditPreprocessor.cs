@@ -28,8 +28,9 @@ public sealed class SerilogEventAuditPreProcessor<TEvent> : IEventPreProcessor<T
 
     // BAZOOKA REFACTOR: Fetch or establish the native Guid v7 context.
     // This ensures the audit trail is physically ordered in your log storage.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId(); 
+    var correlationId = MediatorContext.EnsureCorrelationId();
+    if (!_logger.IsEnabled(LogLevel.Information))
+      return Task.CompletedTask; 
 
    
     using (LogContext.PushProperty("FranzEvent", eventType))

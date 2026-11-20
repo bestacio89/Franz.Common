@@ -38,8 +38,7 @@ public sealed class LoggingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
             : "Request";
 
     // If an ID exists (from an upstream HTTP header or Message), it is preserved.
-    var correlationId = MediatorContext.CorrelationId;
-    MediatorContext.EnsureCorrelationId();
+    var correlationId = MediatorContext.EnsureCorrelationId();
     var stopwatch = Stopwatch.StartNew();
 
     // Scope the native Guid—Serilog will index this as a UUID, not a string.
@@ -50,8 +49,8 @@ public sealed class LoggingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
         if (_env.IsDevelopment())
         {
           _logger.LogInformation(
-              "[{Prefix}] {RequestName} [{CorrelationId}] started with payload {@Request}",
-              prefix, requestName, correlationId, request);
+              "[{Prefix}] {RequestName} [{CorrelationId}] started",
+              prefix, requestName, correlationId);
         }
         else
         {
@@ -67,8 +66,8 @@ public sealed class LoggingPipeline<TRequest, TResponse> : IPipeline<TRequest, T
         if (_env.IsDevelopment())
         {
           _logger.LogInformation(
-              "[{Prefix}] {RequestName} [{CorrelationId}] finished in {Elapsed} ms with response {@Response}",
-              prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds, response);
+              "[{Prefix}] {RequestName} [{CorrelationId}] finished in {Elapsed} ms",
+              prefix, requestName, correlationId, stopwatch.ElapsedMilliseconds);
         }
         else
         {
